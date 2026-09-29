@@ -3,8 +3,11 @@ import {
   parseTagName,
   parseTags,
   tagLabel,
+  tagRanges,
+  tagSpellings,
   tagTree,
   tagWithAncestors,
+  writtenTags,
   type Tag,
   type TagNode,
 } from "./tags";
@@ -157,7 +160,7 @@ describe("tagTree", () => {
     ]);
 
     const shape = (nodes: readonly TagNode[]): unknown[] =>
-      nodes.map((node) => [tagLabel(node.tag), node.count, shape(node.children)]);
+      nodes.map((node) => [node.label, node.count, shape(node.children)]);
     expect(shape(tree)).toEqual([
       ["go", 2, []],
       [
@@ -171,11 +174,76 @@ describe("tagTree", () => {
     ]);
   });
 
+  it("labels each tag with its spelling's last segment", () => {
+    const tree = tagTree([
+      { ...count("java", 2), spelling: "Java" },
+      { ...count("java#linked_list", 1), spelling: "Java#Linked_List" },
+      count("go", 1),
+    ]);
+    expect(tree.map((node) => node.label)).toEqual(["go", "Java"]);
+    expect(tree[1]?.children.map((node) => node.label)).toEqual(["Linked List"]);
+  });
+
+  it("capitalizes every label on request", () => {
+    const tree = tagTree([count("java", 1), count("java#streams", 1)], { capitalize: true });
+    expect(tree.map((node) => node.label)).toEqual(["Java"]);
+    expect(tree[0]?.children.map((node) => node.label)).toEqual(["Streams"]);
+  });
+
   it("makes a tag without a known parent a root", () => {
     expect(tagTree([count("a#b", 1)]).map((node) => node.tag.name)).toEqual(["a#b"]);
   });
 
   it("is empty for no tags", () => {
     expect(tagTree([])).toEqual([]);
+  });
+});
+
+describe("writtenTags", () => {
+  it("keeps the case of each tag's first spelling, in the order of parseTags", () => {
+    expect(writtenTags("#Java#Linked_List and #java#linked_list, #GO")).toEqual([
+      "Java#Linked_List",
+      "GO",
+    ]);
+    expect(names("#Java#Linked_List and #java#linked_list, #GO")).toEqual([
+      "java#linked_list",
+      "go",
+    ]);
+  });
+});
+
+describe("tagLabel", () => {
+  it("shows the last segment, case kept, with underscores as spaces", () => {
+    expect(tagLabel("Java#Linked_List")).toBe("Linked List");
+    expect(tagLabel("getting-started")).toBe("getting-started");
+    expect(tagLabel("новые_технологии", true)).toBe("Новые технологии");
+    expect(tagLabel("Java#iOS", true)).toBe("IOS");
+  });
+});
+
+describe("tagSpellings", () => {
+  it("spells each tag and its ancestors as the notes write them", () => {
+    const spellings = tagSpellings([["Java#Streams"], ["Go"]]);
+    expect(Object.fromEntries(spellings)).toEqual({
+      java: "Java",
+      "java#streams": "Java#Streams",
+      go: "Go",
+    });
+  });
+
+  it("takes the spelling most notes use, and capitals on a tie", () => {
+    expect(tagSpellings([["java"], ["java"], ["Java"]]).get("java")).toBe("java");
+    expect(tagSpellings([["java"], ["Java"]]).get("java")).toBe("Java");
+    expect(tagSpellings([["Java#x", "java"], ["java"]]).get("java")).toBe("java");
+  });
+});
+
+describe("tagRanges", () => {
+  it("finds tags in plain text with the same rules as parseTags", () => {
+    const text = "See #java#streams, C#, #123 and (#новые_технологии).";
+    expect(tagRanges(text).map(({ from, to }) => text.slice(from, to))).toEqual([
+      "#java#streams",
+      "#новые_технологии",
+    ]);
   });
 });

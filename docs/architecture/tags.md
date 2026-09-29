@@ -22,12 +22,25 @@ UI, and is tested in `tags.test.ts`.
   `C#`, `foo#bar` and `##x` are not tags, while `(#tips)` is.
 - **Not all digits:** a first segment made only of digits (`#123`, `#2024`) is not a tag, to
   avoid issue numbers. Later segments may be digits (`#java#8`).
-- **Case-insensitive:** tags are normalized to lowercase (`#Java` = `#java`).
+- **Case-insensitive:** tags are normalized to lowercase (`#Java` = `#java`). The spelling is
+  kept for display only (`writtenTags`).
 - **Anywhere in text:** paragraphs, headings (`# Java #tips` → `tips`), lists, quotes,
   tables, and link text.
 - **Never in:** inline code, fenced or indented code, HTML, URLs (`…/page#section`,
   autolinks, link destinations), image alt text, or escaped `\#`.
-- **Frontmatter** is not scanned. Callers pass the document body.
+- **Frontmatter:** the text of the frontmatter is not scanned, but its `tags` field lists tags
+  too, with the same rules, without the leading `#` (in YAML an unquoted `#` starts a
+  comment):
+
+  ```yaml
+  tags:
+    - parent_1#child
+    - parent_2
+  ```
+
+  A single string works as well (`tags: java, go` or `tags: java go`). A note's tags are its
+  frontmatter tags, then its body tags, each once (`noteTags`, `frontmatterTags`); entries
+  that are not tags (`2024`, `a b`) are skipped.
 
 The result is deduplicated and ordered by first appearance.
 
@@ -48,12 +61,27 @@ is matched only against plain text tokens. The `text_join` rule is disabled so a
 ## Index and navigation
 
 - **Index:** a derived IndexedDB store, always rebuildable (see [storage](storage.md#tag-index)).
-- **Sidebar tree:** the hierarchy (`tagTree` in the domain), each tag with the number of notes
-  within it (its own and its children's). Branches start collapsed; the branch of the active
-  tag starts open. It is read again whenever a note changes.
+- **Sidebar tree:** a project tree (`TagTreeView.tsx`, styled after VS Code's explorer) with
+  two kinds of node. A tag is a **folder** (`tagTree` in the domain) showing the number of
+  notes within it (its own and its children's); a note is a **document** inside each tag it
+  carries itself (`notesTaggedExactly`), so a note tagged only `java#collections` sits in
+  `collections`, not directly in `java`. An open folder lists its child tags, then its notes,
+  both by name. Folders start closed; the active tag and the folders above it start open.
+  The tags are read again whenever a note changes, and so are the notes of every open folder.
+- **Tree labels:** a folder shows its tag's last segment as written, with `_` shown as a
+  space and, by default, a capital first letter (setting "Tag names"; "As written" keeps the
+  case) (`tagLabel`: `#Java#Linked_List` → `Java` › `Linked List`). When notes spell a
+  tag differently, the spelling in most notes wins, and on a tie the first in code point
+  order, so capitals win (`tagSpellings`). Links, filters and the index use the lowercase
+  name.
+  A folder's name opens its filtered list (and opens the folder); a document opens the note.
 - **Filtering:** a tag opens the note list searched for it, `/?q=%23java%23collections` (a
   [search](search.md) tag filter). A filter on `java` includes notes tagged only
-  `java#collections`. The filter shows as a removable chip, and the tag is marked in the tree.
+  `java#collections`. The filter shows as a removable chip in the search box, and the tag is marked in the tree.
+
+- **In notes:** the editors and the reader mark tags (`tagRanges` finds them in plain text
+  with the same rules; code, HTML, URLs and frontmatter are skipped), a little heavier than
+  the text (weight 560, not bold).
 
 ## Reading mode
 

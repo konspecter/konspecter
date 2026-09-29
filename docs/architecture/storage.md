@@ -27,7 +27,7 @@ Database `konspecter`, version 5:
 | Object store | Key       | Value                                                                     |
 | ------------ | --------- | ------------------------------------------------------------------------- |
 | `notes`      | note `id` | `{ id, markdown }` (see [domain model](domain-model.md))                  |
-| `tags`       | `noteId`  | `{ noteId, tags, memberOf }`, derived, with a `memberOf` multiEntry index |
+| `tags`       | `noteId`  | `{ noteId, tags, written, memberOf }`, derived, `memberOf` multiEntry idx |
 | `meta`       | name      | `tagIndexVersion`                                                         |
 | `reading`    | note id   | `{ noteId, position, updatedAt }`, user state (see [reading](reading.md)) |
 | `sync`       | note id   | sync bookkeeping (see [sync](sync.md))                                    |
@@ -59,7 +59,8 @@ upgrades never wait forever. The old tab then shows storage errors until it is r
 
 ## Tag index
 
-`tags` is **derived data**: one entry per note, with the tags written in it (`tags`) and
+`tags` is **derived data**: one entry per note, with the tags written in it (`tags`), the
+same tags as written, case kept, for display (`written`, e.g. `Java#Linked_List`), and
 those tags plus all their ancestors (`memberOf`, e.g. `java`, `java#collections`). The
 `memberOf` multiEntry index answers "which notes are in `java`?" directly, including notes
 tagged only with `java#collections` (`infrastructure/storage/tag-index.ts`).

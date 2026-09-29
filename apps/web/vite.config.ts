@@ -55,10 +55,16 @@ export default defineConfig({
         display: "standalone",
         background_color: "#fbfbfa",
         theme_color: "#1f1f1f",
+        // The owl (scripts/render-icons.mjs): a squircle for "any", full bleed for "maskable".
         icons: [
           { src: "icon-192.png", sizes: "192x192", type: "image/png" },
           { src: "icon-512.png", sizes: "512x512", type: "image/png" },
-          { src: "icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+          {
+            src: "icon-maskable-512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable",
+          },
         ],
       },
       workbox: {

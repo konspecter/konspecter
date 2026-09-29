@@ -3,6 +3,7 @@ import type { NoteRepository } from "../../application/notes/note-repository";
 import { downloadFile } from "../../infrastructure/files/files";
 import { useAsync } from "../hooks/use-async";
 import { errorMessage } from "./ErrorState";
+import { t, tn } from "../i18n/i18n";
 
 /**
  * Backups are the Markdown export. Recovery rebuilds derived indexes and deals
@@ -29,12 +30,9 @@ export function BackupRecovery({ store }: { store: NoteRepository }) {
   return (
     <section className="setting offline-storage" aria-labelledby="backup-recovery">
       <h2 id="backup-recovery" className="setting-heading">
-        Backup &amp; recovery
+        {t("backup.title")}
       </h2>
-      <p className="setting-hint">
-        To back up, export all notes: the files are plain Markdown and need nothing else to be read.
-        Tag and search indexes are built from the notes and can always be rebuilt.
-      </p>
+      <p className="setting-hint">{t("backup.hint")}</p>
       {store.rebuildIndexes && (
         <button
           type="button"
@@ -43,20 +41,16 @@ export function BackupRecovery({ store }: { store: NoteRepository }) {
             run(async () => {
               await store.rebuildIndexes?.();
               const count = (await store.list()).length;
-              return `Indexes rebuilt from ${String(count)} ${count === 1 ? "note" : "notes"}.`;
+              return tn("backup.rebuilt", count);
             });
           }}
         >
-          Rebuild indexes
+          {t("backup.rebuild")}
         </button>
       )}
       {records.length > 0 && (
         <div role="alert" className="recovery">
-          <p>
-            {records.length === 1 ? "1 stored record" : `${String(records.length)} stored records`}{" "}
-            could not be read as notes. They are kept as they are. Download them to inspect or
-            restore by hand, then remove them.
-          </p>
+          <p>{tn("backup.unreadable", records.length)}</p>
           <ul>
             {records.map((record) => (
               <li key={record.key}>
@@ -77,22 +71,22 @@ export function BackupRecovery({ store }: { store: NoteRepository }) {
                 setSaved(true);
               }}
             >
-              Download them (.json)
+              {t("backup.download")}
             </button>
             <button
               type="button"
               className="button button-danger"
               disabled={!saved}
-              title={saved ? undefined : "Download them first"}
+              title={saved ? undefined : t("backup.downloadFirst")}
               onClick={() => {
                 run(async () => {
                   await store.removeUnreadable?.(records.map((record) => record.key));
                   unreadable.retry();
-                  return "Unreadable records removed.";
+                  return t("backup.removed");
                 });
               }}
             >
-              Remove them
+              {t("backup.remove")}
             </button>
           </div>
         </div>

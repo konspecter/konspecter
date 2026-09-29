@@ -1,12 +1,27 @@
-import { memo, useEffect, useState, useSyncExternalStore, type MouseEvent, type Ref } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+  type MouseEvent,
+  type Ref,
+} from "react";
 import { Link } from "react-router";
-import { tagTree, type TagNode } from "../../domain/tag/tags";
-import type { NoteCatalog, NoteSummary } from "../../application/notes/note-catalog";
+import { tagTree, type Tag, type TagNode } from "../../domain/tag/tags";
+import {
+  notesTaggedExactly,
+  type NoteCatalog,
+  type NoteSummary,
+} from "../../application/notes/note-catalog";
 import type { NoteRepository } from "../../application/notes/note-repository";
+import type { TagNames } from "../../domain/settings/settings";
 import { formatKeys, SHORTCUTS } from "../app/shortcuts";
 import { GearIcon, NewNoteIcon, SidebarIcon } from "./icons";
 import { summaryTitle } from "./note-title";
 import { TagTreeView } from "./TagTreeView";
+import { t } from "../i18n/i18n";
+import { rich } from "../i18n/rich";
 
 type SidebarProps = {
   store: NoteRepository;
@@ -16,10 +31,13 @@ type SidebarProps = {
   currentNoteId: string | null;
   /** The tag the note list is filtered by, if any. */
   activeTag: string | null;
+  tagNames: TagNames;
   onToggle: () => void;
   /** Called when a link in the sidebar is followed (narrow screens close it). */
   onNavigate: () => void;
   toggleRef?: Ref<HTMLButtonElement>;
+  /** Receives the footer element where the open page shows its details. */
+  detailsRef?: Ref<HTMLDivElement>;
 };
 
 /** Tooltip text with the shortcut, e.g. "Settings (⌘,)". */
@@ -27,16 +45,21 @@ export function withShortcut(label: string, keys: string): string {
   return `${label} (${formatKeys(keys)})`;
 }
 
-/** The left panel: controls, the tag tree and the recently edited notes. */
+/**
+ * The left panel: controls, the tag tree and the recently edited notes, and
+ * at the bottom the open note's details (rendered there by the note page).
+ */
 export const Sidebar = memo(function Sidebar({
   store,
   catalog,
   open,
   currentNoteId,
   activeTag,
+  tagNames,
   onToggle,
   onNavigate,
   toggleRef,
+  detailsRef,
 }: SidebarProps) {
   const library = useSyncExternalStore(catalog.subscribe, catalog.getSnapshot);
   const notes = library.status === "ready" ? library.notes : null;
@@ -49,7 +72,7 @@ export const Sidebar = memo(function Sidebar({
     <aside
       id="sidebar"
       className="sidebar"
-      aria-label="Sidebar"
+      aria-label={t("sidebar.label")}
       hidden={!open}
       onClick={handleClick}
     >
@@ -58,10 +81,10 @@ export const Sidebar = memo(function Sidebar({
           ref={toggleRef}
           type="button"
           className="icon-button"
-          aria-label="Hide sidebar"
+          aria-label={t("sidebar.hide")}
           aria-expanded="true"
           aria-controls="sidebar"
-          title="Hide sidebar"
+          title={withShortcut(t("sidebar.hide"), SHORTCUTS.toggleSidebar.keys)}
           onClick={onToggle}
         >
           <SidebarIcon />
@@ -70,27 +93,33 @@ export const Sidebar = memo(function Sidebar({
         <Link
           to="/settings"
           className="icon-button"
-          aria-label="Settings"
-          title={withShortcut("Settings", SHORTCUTS.settings.keys)}
+          aria-label={t("sidebar.settings")}
+          title={withShortcut(t("sidebar.settings"), SHORTCUTS.settings.keys)}
         >
           <GearIcon />
         </Link>
         <Link
           to="/notes/new"
           className="icon-button"
-          aria-label="New note"
-          title={withShortcut("New note", SHORTCUTS.newNote.keys)}
+          aria-label={t("sidebar.newNote")}
+          title={withShortcut(t("sidebar.newNote"), SHORTCUTS.newNote.keys)}
         >
           <NewNoteIcon />
         </Link>
       </div>
       <div className="sidebar-scroll">
-        <SidebarTags store={store} library={library} activeTag={activeTag} />
+        <SidebarTags
+          store={store}
+          library={library}
+          activeTag={activeTag}
+          currentNoteId={currentNoteId}
+          tagNames={tagNames}
+        />
         <nav className="sidebar-section" aria-labelledby="recent-heading">
           <h2 id="recent-heading" className="sidebar-heading">
-            Recent
+            {t("sidebar.recent")}
           </h2>
-          {notes && notes.length === 0 && <p className="sidebar-hint">No notes yet.</p>}
+          {notes && notes.length === 0 && <p className="sidebar-hint">{t("sidebar.noNotes")}</p>}
           {notes && notes.length > 0 && (
             <ul className="recent-list">
               {notes.map((note) => (
@@ -100,6 +129,7 @@ export const Sidebar = memo(function Sidebar({
           )}
         </nav>
       </div>
+      <div ref={detailsRef} className="sidebar-details" />
     </aside>
   );
 });
@@ -129,16 +159,24 @@ type SidebarTagsProps = {
   /** Changes whenever a note changes: the tags are read again then. */
   library: unknown;
   activeTag: string | null;
+  currentNoteId: string | null;
+  tagNames: TagNames;
 };
 
-function SidebarTags({ store, library, activeTag }: SidebarTagsProps) {
+function SidebarTags({ store, library, activeTag, currentNoteId, tagNames }: SidebarTagsProps) {
   const [tree, setTree] = useState<readonly TagNode[] | null>(null);
+  // A new loader for every change, so open folders read their notes again.
+  const loadNotes = useCallback(
+    (tag: Tag) => notesTaggedExactly(store, tag),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- library marks the change
+    [store, library],
+  );
   // Read again whenever a note changes; the old tree stays until then.
   useEffect(() => {
     let current = true;
     store
       .tags()
-      .then(tagTree)
+      .then((counts) => tagTree(counts, { capitalize: tagNames === "capitalized" }))
       .then(
         (next) => {
           if (current) setTree(next);
@@ -148,20 +186,25 @@ function SidebarTags({ store, library, activeTag }: SidebarTagsProps) {
     return () => {
       current = false;
     };
-  }, [store, library]);
+  }, [store, library, tagNames]);
 
   if (tree === null) return null;
   return (
     <nav className="sidebar-section" aria-labelledby="tags-heading">
       <h2 id="tags-heading" className="sidebar-heading">
-        Tags
+        {t("sidebar.tags")}
       </h2>
       {tree.length === 0 ? (
         <p className="sidebar-hint">
-          Write <code>#tag</code> or <code>#parent#child</code> in a note.
+          {rich("sidebar.tagsHint", { tag: <code>#tag</code>, nested: <code>#parent#child</code> })}
         </p>
       ) : (
-        <TagTreeView nodes={tree} activeTag={activeTag} />
+        <TagTreeView
+          nodes={tree}
+          activeTag={activeTag}
+          currentNoteId={currentNoteId}
+          loadNotes={loadNotes}
+        />
       )}
     </nav>
   );

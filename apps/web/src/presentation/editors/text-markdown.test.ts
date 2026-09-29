@@ -19,12 +19,18 @@ describe("text editor Markdown conversion", () => {
     ["characters that need escaping", "a_b * c [not a link]"],
     ["bare URLs", "see https://example.com/a_b"],
     ["tags", "#java#collections"],
+    ["tags with underscores in any script", "#новые_технологии #linked_list"],
     ["an empty body", ""],
   ])("keeps the meaning of %s", (_, markdown) => {
     expect(markdownToTextDoc(markdown).supported).toBe(true);
     // A second round trip is stable: the editor's own output is its fixed point.
     const once = roundTrip(markdown);
     expect(roundTrip(once)).toBe(once);
+  });
+
+  it("writes underscores inside words of any script as they are", () => {
+    expect(roundTrip("#новые_технологии and a_b")).toBe("#новые_технологии and a_b");
+    expect(roundTrip("_emphasis_ and snake\\_case")).toBe("*emphasis* and snake_case");
   });
 
   it("normalizes formatting without changing meaning", () => {

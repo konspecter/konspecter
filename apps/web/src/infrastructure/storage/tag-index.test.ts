@@ -40,6 +40,30 @@ describe("tag index", () => {
     ]);
   });
 
+  it("indexes the tags listed in the frontmatter", async () => {
+    const store = await openNoteStore(uniqueName());
+    await store.put(note("a", "---\ntags:\n  - parent_1#child\n  - parent_2\n---\nBody"));
+
+    expect((await store.tags()).map(({ tag, count }) => [tag.name, count])).toEqual([
+      ["parent_1", 1],
+      ["parent_1#child", 1],
+      ["parent_2", 1],
+    ]);
+    expect(ids(await store.notesWithTag(tag("parent_1")))).toEqual(["a"]);
+  });
+
+  it("keeps how the notes write each tag, for display", async () => {
+    const store = await openNoteStore(uniqueName());
+    await store.put(note("a", "#Java#Linked_List"));
+    await store.put(note("b", "#Java #go"));
+
+    expect((await store.tags()).map(({ tag, spelling }) => [tag.name, spelling])).toEqual([
+      ["go", "go"],
+      ["java", "Java"],
+      ["java#linked_list", "Java#Linked_List"],
+    ]);
+  });
+
   it("updates entries when a note changes and removes them when it is deleted", async () => {
     const store = await openNoteStore(uniqueName());
     const original = note("a", "#old");

@@ -2,6 +2,10 @@ import type { ReadingPositionMode } from "../reading/reading";
 
 export type Theme = "system" | "light" | "dark";
 export type EditorMode = "text" | "markdown";
+/** How tags are named in the sidebar tree. */
+export type TagNames = "capitalized" | "as-written";
+/** Whether the editing area has its own surface (a slightly darker panel). */
+export type EditingArea = "highlighted" | "plain";
 
 export type Settings = {
   readonly theme: Theme;
@@ -9,6 +13,8 @@ export type Settings = {
   /** Multiplier for reading and editing text. */
   readonly fontScale: number;
   readonly readingPosition: ReadingPositionMode;
+  readonly tagNames: TagNames;
+  readonly editingArea: EditingArea;
 };
 
 export const FONT_SCALES = [0.9, 1, 1.15, 1.3] as const;
@@ -18,6 +24,8 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultEditor: "text",
   fontScale: 1,
   readingPosition: "restore",
+  tagNames: "capitalized",
+  editingArea: "highlighted",
 };
 
 function oneOf<T extends string | number>(value: unknown, options: readonly T[], fallback: T): T {
@@ -44,5 +52,7 @@ export function parseSettings(value: unknown): Settings {
       ["restore", "ask", "off"],
       DEFAULT_SETTINGS.readingPosition,
     ),
+    tagNames: oneOf(record.tagNames, ["capitalized", "as-written"], DEFAULT_SETTINGS.tagNames),
+    editingArea: oneOf(record.editingArea, ["highlighted", "plain"], DEFAULT_SETTINGS.editingArea),
   };
 }

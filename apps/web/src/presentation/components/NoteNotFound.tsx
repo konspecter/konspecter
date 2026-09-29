@@ -1,14 +1,15 @@
 import { Link } from "react-router";
 import { EmptyState } from "./EmptyState";
+import { t } from "../i18n/i18n";
 
 export function NoteNotFound() {
   return (
     <>
-      <title>Note not found · Konspecter</title>
-      <EmptyState title="Note not found">
-        <p>This note does not exist or has been removed.</p>
+      <title>{t("app.title", { title: t("note.notFound") })}</title>
+      <EmptyState title={t("note.notFound")}>
+        <p>{t("note.notFoundText")}</p>
         <p>
-          <Link to="/">Back to notes</Link>
+          <Link to="/">{t("note.backToNotes")}</Link>
         </p>
       </EmptyState>
     </>

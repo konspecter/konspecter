@@ -63,7 +63,8 @@ export function App({
     const root = document.documentElement;
     root.dataset.theme = settings.theme;
     root.style.setProperty("--font-scale", String(settings.fontScale));
-  }, [settings.theme, settings.fontScale]);
+    root.dataset.editingArea = settings.editingArea;
+  }, [settings.theme, settings.fontScale, settings.editingArea]);
 
   useEffect(() => catalog.start(), [catalog]);
 
@@ -120,6 +121,7 @@ export function App({
             onThemeChange={setTheme}
             mode={settings.defaultEditor}
             onModeChange={setMode}
+            tagNames={settings.tagNames}
             updates={updates}
             sync={sync}
           />

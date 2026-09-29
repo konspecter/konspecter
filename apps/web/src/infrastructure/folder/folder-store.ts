@@ -12,7 +12,7 @@ import {
   type FolderChange,
 } from "../desktop/desktop";
 import { SearchIndex, type SearchHit } from "../search/search-index";
-import { tagEntry, type TagCount, type TagEntry } from "../storage/tag-index";
+import { countTags, tagEntry, type TagCount, type TagEntry } from "../storage/tag-index";
 
 /** Where reading positions are kept: the app's own database, not the files. */
 export type ReadingStateStore = {
@@ -236,13 +236,7 @@ export class FolderStore implements NoteRepository {
 
   async tags(): Promise<TagCount[]> {
     await this.#ensureLoaded();
-    const counts = new Map<string, number>();
-    for (const file of this.#files.values()) {
-      for (const name of file.tags.memberOf) counts.set(name, (counts.get(name) ?? 0) + 1);
-    }
-    return [...counts]
-      .map(([name, count]) => ({ tag: { path: name.split("#"), name }, count }))
-      .sort((a, b) => (a.tag.name < b.tag.name ? -1 : a.tag.name > b.tag.name ? 1 : 0));
+    return countTags([...this.#files.values()].map((file) => file.tags));
   }
 
   async notesWithTag(tag: Tag): Promise<Note[]> {

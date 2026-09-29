@@ -203,3 +203,14 @@ describe("MarkdownView: title", () => {
     expect(within(root).getByRole("heading")).toBeInTheDocument();
   });
 });
+
+describe("MarkdownView: tags", () => {
+  it("marks tags in text, not in code or bare URLs", () => {
+    const root = renderMarkdown("See #java and `#code`, https://a.b/#x and **#bold**");
+
+    expect([...root.querySelectorAll(".md-tag")].map((tag) => tag.textContent)).toEqual([
+      "#java",
+      "#bold",
+    ]);
+  });
+});

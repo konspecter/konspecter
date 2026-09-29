@@ -66,6 +66,8 @@ cross-site request carries no credentials. CORS allows only configured origins
 - Tauri capabilities grant the window only `core:default`; there is no generic shell or
   filesystem plugin, and no user-configurable command (which would turn XSS into code
   execution).
+- The web inspector (developer tools) cannot be opened: the window sets `devtools: false`, so
+  not even development builds offer it, and release builds do not include it.
 
 ### Secure credential storage
 

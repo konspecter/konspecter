@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useMatch, useNavigate, useSearchParams } from "react-router";
 import { parseQuery } from "../../domain/search/query";
-import type { EditorMode, Theme } from "../../domain/settings/settings";
+import type { EditorMode, TagNames, Theme } from "../../domain/settings/settings";
 import type { NoteCatalog } from "../../application/notes/note-catalog";
 import type { NoteRepository } from "../../application/notes/note-repository";
 import type { SyncEngine } from "../../infrastructure/sync/sync-engine";
@@ -10,6 +10,7 @@ import { SHORTCUTS } from "../app/shortcuts";
 import type { UpdateSource } from "../app/updates";
 import { useShortcuts } from "../hooks/use-shortcuts";
 import { Antenna } from "./Antenna";
+import { DetailsSlot } from "./details-slot";
 import { NewNoteIcon, SidebarIcon } from "./icons";
 import { SearchBox } from "./SearchBox";
 import { ShortcutsDialog } from "./ShortcutsDialog";
@@ -17,6 +18,8 @@ import { Sidebar, withShortcut } from "./Sidebar";
 import { SyncIndicator } from "./SyncIndicator";
 import { ModeToggle, ThemeToggle, useDarkTheme } from "./TopBarControls";
 import { UpdateBanner } from "./UpdateBanner";
+import { t } from "../i18n/i18n";
+import { useScrollbarGutter } from "../hooks/use-scrollbar-gutter";
 
 type LayoutProps = {
   store: NoteRepository;
@@ -26,6 +29,7 @@ type LayoutProps = {
   onThemeChange: (theme: Theme) => void;
   mode: EditorMode;
   onModeChange: (mode: EditorMode) => void;
+  tagNames: TagNames;
   updates?: UpdateSource | undefined;
   sync?: SyncEngine | undefined;
 };
@@ -68,6 +72,7 @@ export function Layout({
   onThemeChange,
   mode,
   onModeChange,
+  tagNames,
   updates,
   sync,
 }: LayoutProps) {
@@ -79,10 +84,12 @@ export function Layout({
   const currentNoteId = matchedId === undefined || matchedId === "new" ? null : matchedId;
   const [sidebarOpen, setSidebarOpen] = useState(initialSidebarOpen);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [detailsSlot, setDetailsSlot] = useState<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const sidebarToggleRef = useRef<HTMLButtonElement>(null);
   const barToggleRef = useRef<HTMLButtonElement>(null);
   const dark = useDarkTheme(theme);
+  useScrollbarGutter();
 
   const query = location.pathname === "/" ? (searchParams.get("q") ?? "") : "";
   const activeTag = useMemo(() => {
@@ -93,11 +100,17 @@ export function Layout({
   }, [query]);
 
   const toggleSidebar = useCallback(() => {
+    // The focus moves only if it would disappear with the sidebar or with the
+    // button just used; from the editor (the shortcut), it stays where it is.
+    const active = document.activeElement;
+    const moveFocus =
+      active instanceof Element &&
+      (active === barToggleRef.current || active.closest("#sidebar") !== null);
     setSidebarOpen((open) => {
       rememberSidebar(!open);
       return !open;
     });
-    // The button just used disappears; keep the focus on its counterpart.
+    if (!moveFocus) return;
     requestAnimationFrame(() => {
       (sidebarToggleRef.current?.offsetParent
         ? sidebarToggleRef.current
@@ -124,6 +137,10 @@ export function Layout({
     newNote,
     quickNewNote: newNote,
     settings: () => void navigate("/settings"),
+    toggleSidebar,
+    editorMode: () => {
+      onModeChange(mode === "markdown" ? "text" : "markdown");
+    },
     help: () => {
       setShowShortcuts(true);
     },
@@ -132,7 +149,7 @@ export function Layout({
   return (
     <div className="app" data-sidebar={sidebarOpen ? "open" : "closed"}>
       <a className="skip-link" href="#content">
-        Skip to content
+        {t("app.skipToContent")}
       </a>
       <Sidebar
         store={store}
@@ -140,9 +157,11 @@ export function Layout({
         open={sidebarOpen}
         currentNoteId={currentNoteId}
         activeTag={activeTag}
+        tagNames={tagNames}
         onToggle={toggleSidebar}
         onNavigate={closeSidebarOnNarrow}
         toggleRef={sidebarToggleRef}
+        detailsRef={setDetailsSlot}
       />
       {sidebarOpen && (
         <div className="sidebar-backdrop" aria-hidden="true" onClick={closeSidebarOnNarrow} />
@@ -156,19 +175,19 @@ export function Layout({
                   ref={barToggleRef}
                   type="button"
                   className="icon-button"
-                  aria-label="Show sidebar"
+                  aria-label={t("sidebar.show")}
                   aria-expanded="false"
                   aria-controls="sidebar"
-                  title="Show sidebar"
+                  title={withShortcut(t("sidebar.show"), SHORTCUTS.toggleSidebar.keys)}
                   onClick={toggleSidebar}
                 >
                   <SidebarIcon />
                 </button>
                 <Link
                   to="/notes/new"
-                  className="icon-button topbar-new"
-                  aria-label="New note"
-                  title={withShortcut("New note", SHORTCUTS.newNote.keys)}
+                  className="icon-button"
+                  aria-label={t("sidebar.newNote")}
+                  title={withShortcut(t("sidebar.newNote"), SHORTCUTS.newNote.keys)}
                 >
                   <NewNoteIcon />
                 </Link>
@@ -191,7 +210,9 @@ export function Layout({
         </header>
         {updates && <UpdateBanner updates={updates} />}
         <main id="content" className="content" tabIndex={-1}>
-          <Outlet />
+          <DetailsSlot value={detailsSlot}>
+            <Outlet />
+          </DetailsSlot>
         </main>
       </div>
       {showShortcuts && <ShortcutsDialog onClose={closeShortcuts} />}

@@ -1,4 +1,4 @@
-import { isEmptyQuery, parseQuery, withoutTag } from "./query";
+import { joinQuery, queryParts, takeTags, isEmptyQuery, parseQuery, withoutTag } from "./query";
 import { parseTagName, type Tag } from "../tag/tags";
 
 const tagNames = (input: string) => parseQuery(input).tags.map((tag) => tag.name);
@@ -41,5 +41,32 @@ describe("withoutTag", () => {
   it("removes the tokens that select a tag and keeps the rest", () => {
     const java = parseTagName("java") as Tag;
     expect(withoutTag("hashmap #Java  #go java", java)).toBe("hashmap #go java");
+  });
+});
+
+describe("query parts", () => {
+  const names = (parts: { tags: readonly { name: string }[]; text: string }) => [
+    parts.tags.map((tag) => tag.name),
+    parts.text,
+  ];
+
+  it("splits a query into its tag filters and the other words", () => {
+    expect(names(queryParts("hash #java  maps #java#collections"))).toEqual([
+      ["java", "java#collections"],
+      "hash maps",
+    ]);
+  });
+
+  it("takes only the tags written in full while typing", () => {
+    expect(names(takeTags("#java hash"))).toEqual([["java"], "hash"]);
+    expect(names(takeTags("hash #jav"))).toEqual([[], "hash #jav"]);
+    expect(names(takeTags("hash #java "))).toEqual([["java"], "hash "]);
+    expect(names(takeTags("#123 x"))).toEqual([[], "#123 x"]);
+  });
+
+  it("joins tags and text back into a query", () => {
+    const { tags } = queryParts("#java #go");
+    expect(joinQuery(tags, "hash ")).toBe("#java #go hash ");
+    expect(joinQuery([], "")).toBe("");
   });
 });

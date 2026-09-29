@@ -1,8 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { NoteEditor, type EditorMode } from "./NoteEditor";
-import { setSourceValue, sourceValue } from "./test-helpers";
+import { setSourceValue, sourceValue, typeSubstituted } from "./test-helpers";
 
 /** The editor with a mode switch, as the top bar drives it. */
 function Harness({
@@ -161,10 +161,42 @@ describe("text mode", () => {
     expect(save()).toBe("plain **bold**");
   });
 
+  it("folds to one tool and its toggle, and unfolds to all of them", async () => {
+    renderEditor("Some text");
+
+    await userEvent.click(textBox());
+    const toolbar = screen.getByRole("toolbar", { name: "Formatting" });
+    const toggle = within(toolbar).getByRole("button", { name: "All formatting tools" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(
+      within(toolbar)
+        .getAllByRole("button")
+        .map((b) => b.getAttribute("aria-label")),
+    ).toEqual(["Bold", "All formatting tools"]);
+
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(within(toolbar).getByRole("button", { name: "Code block" })).toBeInTheDocument();
+    expect(localStorage.getItem("konspecter.toolbar")).toBe("open");
+  });
+
+  it("keeps the tool in effect at the caret when folded", async () => {
+    renderEditor("## Section");
+
+    await userEvent.click(textBox());
+    const toolbar = screen.getByRole("toolbar", { name: "Formatting" });
+    expect(
+      within(toolbar)
+        .getAllByRole("button")
+        .map((b) => b.getAttribute("aria-label")),
+    ).toEqual(["Heading", "All formatting tools"]);
+  });
+
   it("toggles headings on the current block", async () => {
     const { save } = renderEditor("Section");
 
     await userEvent.click(textBox());
+    await userEvent.click(screen.getByRole("button", { name: "All formatting tools" }));
     await userEvent.click(screen.getByRole("button", { name: "Heading" }));
 
     expect(screen.getByRole("button", { name: "Heading" })).toHaveAttribute("aria-pressed", "true");
@@ -309,5 +341,63 @@ describe("metadata fields", () => {
     await userEvent.click(screen.getByRole("button", { name: "Text" }));
 
     expect(titleField()).toHaveValue("Typed in source");
+  });
+});
+
+describe("tags and code in the editors", () => {
+  const marked = (root: Element) =>
+    [...root.querySelectorAll(".md-tag")].map((element) => element.textContent);
+
+  it("marks tags in the text editor, but not in code", () => {
+    renderEditor("Notes on #java and `#code`\n\n```\n#not\n```");
+
+    expect(marked(textBox())).toEqual(["#java"]);
+  });
+
+  it("marks tags and code blocks in the Markdown editor", () => {
+    renderEditor(
+      '---\nk: "#no"\n---\n# Title #tips\n\nSee `#no` https://a.b/#no\n\n```json\n{"a": "#no"}\n```',
+      "markdown",
+    );
+
+    expect(marked(sourceBox())).toEqual(["#tips"]);
+    expect(sourceBox().querySelectorAll(".cm-code-line")).toHaveLength(3);
+  });
+
+  it("keeps a typed straight quote in code, and the system's quote in prose", () => {
+    renderEditor("Text\n\n```json\n{}\n```", "markdown");
+    const box = sourceBox();
+    const inCode = "Text\n\n```json\n{".length;
+
+    expect(typeSubstituted(box, inCode, '"', "«")).toBe(true);
+    expect(sourceValue(box)).toBe('Text\n\n```json\n{"}\n```');
+    expect(typeSubstituted(box, 4, '"', "«")).toBe(false);
+  });
+});
+
+describe("the title and tags found in the Markdown source", () => {
+  it("shows them above the source, read-only, and follows the typing", async () => {
+    renderEditor("# Заголовок\n\nНовый текст\n\n#go#to\n\n#goto", "markdown");
+
+    const found = screen.getByLabelText("Title and tags found in the text");
+    expect(found).toHaveTextContent("TitleЗаголовок");
+    expect([...found.querySelectorAll(".md-tag")].map((tag) => tag.textContent)).toEqual([
+      "#go#to",
+      "#goto",
+    ]);
+
+    setSourceValue(sourceBox(), "---\ntags: [meta]\n---\n# Other\n\n#goto");
+    await waitFor(() => {
+      expect(found).toHaveTextContent("TitleOther");
+    });
+    expect([...found.querySelectorAll(".md-tag")].map((tag) => tag.textContent)).toEqual([
+      "#meta",
+      "#goto",
+    ]);
+  });
+
+  it("is not shown in the text editor, or when there is nothing to show", () => {
+    renderEditor("# Title", "text");
+    expect(screen.queryByLabelText("Title and tags found in the text")).not.toBeInTheDocument();
   });
 });

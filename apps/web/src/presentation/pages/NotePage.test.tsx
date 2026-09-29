@@ -1,10 +1,12 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState, type ReactNode } from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { parseDocument } from "../../domain/document/document";
 import { createNote } from "../../domain/note/note";
 import { openNoteStore, type NoteStore } from "../../infrastructure/storage/note-store";
 import { Activity } from "../app/activity";
+import { DetailsSlot } from "../components/details-slot";
 import { NotePage } from "./NotePage";
 
 // Simulates the renderer chunk failing to download, e.g. when offline.
@@ -23,15 +25,28 @@ function Where() {
   return <output aria-label="Location">{location.pathname}</output>;
 }
 
+/** A place for the page's details, as the sidebar provides in the app. */
+function WithDetails({ children }: { children: ReactNode }) {
+  const [slot, setSlot] = useState<HTMLDivElement | null>(null);
+  return (
+    <DetailsSlot value={slot}>
+      {children}
+      <div ref={setSlot} />
+    </DetailsSlot>
+  );
+}
+
 /** Both routes render one element, as in App, so a saved new note keeps its editor. */
 function renderNotePage(store: NoteStore, path: string, activity = new Activity()) {
   const page = <NotePage store={store} mode="text" activity={activity} />;
   render(
     <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route path="notes/new" element={page} />
-        <Route path="notes/:id" element={page} />
-      </Routes>
+      <WithDetails>
+        <Routes>
+          <Route path="notes/new" element={page} />
+          <Route path="notes/:id" element={page} />
+        </Routes>
+      </WithDetails>
       <Where />
     </MemoryRouter>,
   );

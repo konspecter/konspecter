@@ -5,6 +5,7 @@ import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { omitLeadingTitle } from "./omit-leading-title";
+import { rehypeTags } from "./rehype-tags";
 import "./markdown.css";
 
 type MarkdownViewProps = {
@@ -64,6 +65,7 @@ export function MarkdownView({ markdown, title, titleDerived, onRendered }: Mark
     // markup of its own (highlighting spans).
     rehypeSanitize,
     [rehypeHighlight, { detect: false }],
+    rehypeTags,
     [omitLeadingTitle, { title, derived: titleDerived }],
   ];
 

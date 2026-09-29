@@ -1,3 +1,5 @@
+// First: sets the interface language before any other module runs.
+import { t } from "./presentation/i18n/setup";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
@@ -108,7 +110,7 @@ try {
   root.render(
     <StrictMode>
       <main className="content">
-        <ErrorState title="Konspecter could not open its local storage" error={error} />
+        <ErrorState title={t("app.storageFailed")} error={error} />
       </main>
     </StrictMode>,
   );

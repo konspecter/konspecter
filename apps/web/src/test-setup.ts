@@ -8,3 +8,8 @@ Element.prototype.getClientRects = () => emptyRects;
 Range.prototype.getClientRects = () => emptyRects;
 Range.prototype.getBoundingClientRect = () => new DOMRect();
 document.elementFromPoint = () => null;
+
+// Per-device preferences (sidebar, toolbar) start fresh in every test.
+beforeEach(() => {
+  localStorage.clear();
+});

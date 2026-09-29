@@ -35,7 +35,7 @@ test("a library of 2,000 notes stays fast", async ({ page }) => {
     })),
     { name: "huge.md", mimeType: "text/markdown", buffer: Buffer.from(note(99999, 200)) },
   ]);
-  await expect(page.getByText(`Imported ${String(NOTES + 1)} notes.`)).toBeVisible({
+  await expect(page.getByText(`Imported ${(NOTES + 1).toLocaleString("en")} notes.`)).toBeVisible({
     timeout: 120_000,
   });
   log(`import ${String(NOTES + 1)} files through the UI`, Date.now() - start);
@@ -49,13 +49,13 @@ test("a library of 2,000 notes stays fast", async ({ page }) => {
 
   start = Date.now();
   await page.getByRole("searchbox", { name: "Search notes" }).fill("hash");
-  await expect(page.getByRole("heading", { name: "Search results" })).toBeVisible();
   await expect(page.locator(".note-results mark").first()).toBeVisible();
   const firstSearch = Date.now() - start;
   log("first search (index warmed while idle)", firstSearch);
 
   start = Date.now();
-  await page.getByRole("searchbox", { name: "Search notes" }).fill("queue #topic3");
+  // The tag becomes a chip in the search box once a space follows it.
+  await page.getByRole("searchbox", { name: "Search notes" }).fill("#topic3 queue");
   await expect(page.getByRole("list", { name: "Tag filters" })).toBeVisible();
   await expect(page.locator(".note-results mark").first()).toBeVisible();
   log("next search", Date.now() - start);

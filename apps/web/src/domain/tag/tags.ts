@@ -28,14 +28,41 @@ const ALL_DIGITS = /^\p{N}+$/u;
 
 /** All tags in a Markdown body, deduplicated, in order of first appearance. */
 export function parseTags(markdown: string): Tag[] {
-  const seen = new Map<string, Tag>();
+  return tagsAsWritten(markdown).map(([tag]) => tag);
+}
+
+/**
+ * The tags of a Markdown body as first written there, case kept and without
+ * the leading "#" ("Java#Linked_List"), in the order of `parseTags`.
+ */
+export function writtenTags(markdown: string): string[] {
+  return tagsAsWritten(markdown).map(([, written]) => written);
+}
+
+function tagsAsWritten(markdown: string): [Tag, string][] {
+  const seen = new Map<string, [Tag, string]>();
   for (const text of taggableText(tokenizer.parse(markdown, {}))) {
     for (const match of text.matchAll(TAG)) {
-      const tag = toTag(match[1] ?? "");
-      if (tag && !seen.has(tag.name)) seen.set(tag.name, tag);
+      const written = match[1] ?? "";
+      const tag = toTag(written);
+      if (tag && !seen.has(tag.name)) seen.set(tag.name, [tag, written]);
     }
   }
   return [...seen.values()];
+}
+
+/**
+ * Where tags are in a piece of plain text (no Markdown syntax), as ranges that
+ * include the "#". For marking tags in editors, which already know which text
+ * is code; the same rules as `parseTags` otherwise.
+ */
+export function tagRanges(text: string): { from: number; to: number }[] {
+  const ranges: { from: number; to: number }[] = [];
+  for (const match of text.matchAll(TAG)) {
+    if (toTag(match[1] ?? ""))
+      ranges.push({ from: match.index, to: match.index + match[0].length });
+  }
+  return ranges;
 }
 
 function toTag(raw: string): Tag | null {
@@ -90,6 +117,8 @@ export function isWithin(tag: Tag, ancestor: Tag): boolean {
 
 export type TagNode = {
   readonly tag: Tag;
+  /** What the tree shows: see `tagLabel`. */
+  readonly label: string;
   /** Notes tagged with this tag or any tag below it. */
   readonly count: number;
   readonly children: readonly TagNode[];
@@ -97,13 +126,19 @@ export type TagNode = {
 
 /**
  * Arranges tag counts into a tree, siblings sorted by name. A tag whose parent
- * is missing from the input becomes a root.
+ * is missing from the input becomes a root. `spelling` is the tag as written
+ * (see `tagSpellings`); without it the tag shows in lowercase. `capitalize`
+ * starts every label with a capital letter.
  */
-export function tagTree(counts: readonly { tag: Tag; count: number }[]): TagNode[] {
-  type Mutable = { tag: Tag; count: number; children: Mutable[] };
+export function tagTree(
+  counts: readonly { tag: Tag; count: number; spelling?: string }[],
+  { capitalize = false }: { capitalize?: boolean } = {},
+): TagNode[] {
+  type Mutable = { tag: Tag; label: string; count: number; children: Mutable[] };
   const byName = new Map<string, Mutable>();
-  for (const { tag, count } of counts) {
-    byName.set(tag.name, { tag, count, children: [] });
+  for (const { tag, count, spelling } of counts) {
+    const label = tagLabel(spelling ?? tag.name, capitalize);
+    byName.set(tag.name, { tag, label, count, children: [] });
   }
   const roots: Mutable[] = [];
   for (const node of byName.values()) {
@@ -121,7 +156,51 @@ export function tagTree(counts: readonly { tag: Tag; count: number }[]): TagNode
   return sort(roots);
 }
 
-/** The tag's last segment, for display inside a tree. */
-export function tagLabel(tag: Tag): string {
-  return tag.path.at(-1) ?? tag.name;
+/**
+ * How a tag is shown inside the tree: the last segment of its spelling, case
+ * kept, with "_" shown as a space ("Java#Linked_List" → "Linked List"), and
+ * with a capital first letter if `capitalize` ("новые_технологии" → "Новые технологии").
+ */
+export function tagLabel(spelling: string, capitalize = false): string {
+  const label = (spelling.split("#").at(-1) ?? spelling).replaceAll("_", " ");
+  if (!capitalize) return label;
+  const [first = "", ...rest] = label;
+  return first.toLocaleUpperCase() + rest.join("");
+}
+
+/**
+ * One spelling per tag name, for display, from each note's tags as written
+ * (`writtenTags`). An ancestor is spelled as written before its child
+ * ("Java" from "Java#Streams"). When notes differ ("#Java", "#java"), the
+ * spelling in most notes wins; a tie goes to the first in code point order,
+ * so capitals win.
+ */
+export function tagSpellings(notes: Iterable<readonly string[]>): Map<string, string> {
+  const votes = new Map<string, Map<string, number>>();
+  for (const written of notes) {
+    // Each note votes once per spelling.
+    const spelled = new Set(
+      written.flatMap((tag) => {
+        const segments = tag.split("#");
+        return segments.map((_, index) => segments.slice(0, index + 1).join("#"));
+      }),
+    );
+    for (const spelling of spelled) {
+      const name = spelling.toLowerCase();
+      const counts = votes.get(name) ?? new Map<string, number>();
+      counts.set(spelling, (counts.get(spelling) ?? 0) + 1);
+      votes.set(name, counts);
+    }
+  }
+  const chosen = new Map<string, string>();
+  for (const [name, counts] of votes) {
+    let best: [string, number] | null = null;
+    for (const [spelling, count] of counts) {
+      if (!best || count > best[1] || (count === best[1] && spelling < best[0])) {
+        best = [spelling, count];
+      }
+    }
+    if (best) chosen.set(name, best[0]);
+  }
+  return chosen;
 }

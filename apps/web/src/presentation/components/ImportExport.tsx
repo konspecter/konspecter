@@ -5,6 +5,8 @@ import type { NoteRepository } from "../../application/notes/note-repository";
 import { exportToFolder, isDesktop } from "../../infrastructure/desktop/desktop";
 import { downloadFile, readMarkdownFiles, zipFiles } from "../../infrastructure/files/files";
 import { errorMessage } from "./ErrorState";
+import { t, tn } from "../i18n/i18n";
+import { rich } from "../i18n/rich";
 
 type Result = { readonly text: string; readonly details: readonly string[] };
 
@@ -12,10 +14,10 @@ function describeImport(
   report: ImportReport,
   unreadable: readonly { name: string; reason: string }[],
 ) {
-  const parts = [`Imported ${String(report.imported)} ${report.imported === 1 ? "note" : "notes"}`];
-  if (report.duplicates > 0) parts.push(`${String(report.duplicates)} already in the library`);
+  const parts = [tn("transfer.imported", report.imported)];
+  if (report.duplicates > 0) parts.push(tn("transfer.duplicates", report.duplicates));
   const problems = [...unreadable, ...report.rejected];
-  if (problems.length > 0) parts.push(`${String(problems.length)} not imported`);
+  if (problems.length > 0) parts.push(tn("transfer.rejected", problems.length));
   return { text: `${parts.join(", ")}.`, details: problems.map((p) => `${p.name}: ${p.reason}`) };
 }
 
@@ -56,16 +58,19 @@ export function ImportExport({ store }: { store: NoteRepository }) {
   function handleExport() {
     run(async () => {
       const files = exportFiles(await store.list());
-      if (files.length === 0) return { text: "There are no notes to export.", details: [] };
+      if (files.length === 0) return { text: t("transfer.nothing"), details: [] };
       if (isDesktop()) {
         const done = await exportToFolder(files);
         return done
-          ? { text: `Exported ${String(done.written)} notes to ${done.folder}.`, details: [] }
+          ? {
+              text: tn("transfer.exportedTo", done.written, { folder: done.folder }),
+              details: [],
+            }
           : null;
       }
       downloadFile("konspecter-notes.zip", zipFiles(files));
       return {
-        text: `Exported ${String(files.length)} notes as konspecter-notes.zip.`,
+        text: tn("transfer.exportedZip", files.length, { file: "konspecter-notes.zip" }),
         details: [],
       };
     });
@@ -74,15 +79,12 @@ export function ImportExport({ store }: { store: NoteRepository }) {
   return (
     <section className="setting offline-storage" aria-labelledby="import-export">
       <h2 id="import-export" className="setting-heading">
-        Import &amp; export
+        {t("transfer.title")}
       </h2>
-      <p className="setting-hint">
-        Notes are plain Markdown: imports keep files as written, and exports are the same{" "}
-        <code>.md</code> files, readable without Konspecter.
-      </p>
+      <p className="setting-hint">{rich("transfer.hint", { md: <code>.md</code> })}</p>
       <div className="actions">
         <label htmlFor={filesId} className="button">
-          Import .md files…
+          {t("transfer.importFiles")}
         </label>
         <input
           id={filesId}
@@ -94,7 +96,7 @@ export function ImportExport({ store }: { store: NoteRepository }) {
           onChange={handleFiles}
         />
         <label htmlFor={folderId} className="button">
-          Import a folder…
+          {t("transfer.importFolder")}
         </label>
         <input
           id={folderId}
@@ -105,7 +107,7 @@ export function ImportExport({ store }: { store: NoteRepository }) {
           onChange={handleFiles}
         />
         <button type="button" className="button" disabled={busy} onClick={handleExport}>
-          {isDesktop() ? "Export all to a folder…" : "Export all (.zip)"}
+          {isDesktop() ? t("transfer.exportFolder") : t("transfer.exportZip")}
         </button>
       </div>
       {result && (

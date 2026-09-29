@@ -2,7 +2,7 @@ import { parseDocument } from "../../domain/document/document";
 import { createNote, type Note } from "../../domain/note/note";
 import { openNoteStore } from "../../infrastructure/storage/note-store";
 import { mustGet } from "../../infrastructure/storage/test-utils";
-import { Autosave, type AutosaveEvents } from "./autosave";
+import { Autosave, savesSettled, type AutosaveEvents } from "./autosave";
 
 let count = 0;
 const newStore = () => openNoteStore(`autosave-test-${String((count += 1))}`);
@@ -131,6 +131,59 @@ describe("coalescing", () => {
     await autosave.flush();
     expect(on.onBusy).toHaveBeenLastCalledWith(false);
     expect(on.onBusy).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("savesSettled", () => {
+  it("waits for a note's save that is still running, so a read gets the latest text", async () => {
+    const store = await newStore();
+    const note = createNote("# A", new Date("2024-05-01T09:00:00Z"), "a");
+    await store.put(note);
+    let release: () => void = () => undefined;
+    const put = store.put.bind(store);
+    vi.spyOn(store, "put").mockImplementation(async (next) => {
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      await put(next);
+    });
+    const autosave = new Autosave(store, note, events());
+
+    autosave.change(() => "# A\n\nlatest");
+    const flushing = autosave.flush();
+    let settled = false;
+    const waiting = savesSettled(store, "a").then(() => {
+      settled = true;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(settled).toBe(false);
+
+    release();
+    await waiting;
+    expect((await mustGet(store, "a")).markdown).toContain("latest");
+    await flushing;
+    await savesSettled(store, "other"); // nothing running: resolves at once
+  });
+});
+
+describe("an editor that took over the saved dates", () => {
+  it("does not save again: its text is the stored version", async () => {
+    const store = await newStore();
+    const note = createNote("# A", new Date("2024-05-01T09:00:00Z"), "a");
+    await store.put(note);
+    const on = events();
+    const autosave = new Autosave(store, note, on, { now: at("2024-05-01T10:00:00Z") });
+
+    autosave.change(() => "# A\n\nmore");
+    await autosave.flush();
+    const saved = await mustGet(store, "a");
+    expect(on.onSaved).toHaveBeenCalledTimes(1);
+
+    // The editor now shows the stored text (with the new `updated`).
+    autosave.change(() => saved.markdown);
+    await autosave.flush();
+    expect(on.onSaved).toHaveBeenCalledTimes(1);
+    expect(await store.get("a")).toEqual(saved);
   });
 });
 

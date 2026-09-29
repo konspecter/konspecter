@@ -3,8 +3,11 @@ import {
   InvalidNoteError,
   byMostRecent,
   createNote,
+  noteTags,
   noteTitle,
   noteUpdated,
+  noteWrittenTags,
+  withSavedDates,
   parseNote,
   readNote,
   readNotes,
@@ -128,5 +131,43 @@ describe("reading notes", () => {
       "undated",
     ]);
     expect(byMostRecent(readNote(notes[2] as Note), readNote(notes[2] as Note))).toBe(0);
+  });
+});
+
+describe("noteTags", () => {
+  it("takes the frontmatter's tags first, then the body's, each once", () => {
+    const read = readNote({
+      id: "n",
+      markdown: "---\ntags:\n  - parent_1#child\n  - Java\n---\nText #java and #go, not `#code`.",
+    });
+    expect(noteTags(read).map((tag) => tag.name)).toEqual(["parent_1#child", "java", "go"]);
+    expect(noteWrittenTags(read)).toEqual(["parent_1#child", "Java", "go"]);
+  });
+
+  it("skips frontmatter entries that are not tags", () => {
+    const read = readNote({ id: "n", markdown: "---\ntags: [2024, ok, 'a b']\n---\n" });
+    expect(noteTags(read).map((tag) => tag.name)).toEqual(["ok"]);
+  });
+});
+
+describe("withSavedDates", () => {
+  const saved = {
+    id: "n",
+    markdown: "---\ncreated: 2024-01-01T00:00:00Z\nupdated: 2024-02-02T00:00:00Z\n---\n\n# N",
+  };
+
+  it("takes over the dates a save wrote and keeps the rest of the text", () => {
+    expect(withSavedDates("# N\n\ntyped since", saved)).toBe(
+      "---\ncreated: 2024-01-01T00:00:00Z\nupdated: 2024-02-02T00:00:00Z\n---\n\n# N\n\ntyped since",
+    );
+    expect(withSavedDates("---\ntitle: T\nupdated: 2023-01-01T00:00:00Z\n---\n\n# N", saved)).toBe(
+      "---\ntitle: T\nupdated: 2024-02-02T00:00:00Z\ncreated: 2024-01-01T00:00:00Z\n---\n\n# N",
+    );
+  });
+
+  it("returns the text itself when the dates already match or it is invalid", () => {
+    expect(withSavedDates(saved.markdown, saved)).toBe(saved.markdown);
+    const invalid = "---\ntitle: [\n---\n";
+    expect(withSavedDates(invalid, saved)).toBe(invalid);
   });
 });

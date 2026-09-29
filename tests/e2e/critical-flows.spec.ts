@@ -51,9 +51,11 @@ test("Markdown → index → search, and Markdown → tags → navigation", asyn
   await expect(list(page).getByRole("link")).toHaveText(["Networking"]);
 
   const tags = page.getByRole("navigation", { name: "Tags" });
-  await tags.getByRole("link", { name: "#java" }).click();
+  await tags.getByRole("link", { name: "Java" }).click();
   await expect(list(page).getByRole("link")).toHaveText(["Hash maps"]);
-  await expect(search).toHaveValue("#java");
+  // The tag is a chip in the search box.
+  await expect(search).toHaveValue("");
+  await expect(page.getByRole("list", { name: "Tag filters" })).toHaveText(/^#java/);
 });
 
 test("notes persist in IndexedDB across reloads and render as Markdown", async ({ page }) => {
@@ -72,7 +74,7 @@ test("notes persist in IndexedDB across reloads and render as Markdown", async (
 
   // The mode is remembered; the text view shows the note rendered (it has a table).
   await expect(page.getByRole("textbox", { name: "Markdown" })).toContainText("TreeMap");
-  await page.getByRole("banner").getByRole("button", { name: "Text" }).click();
+  await page.getByRole("banner").getByRole("button", { name: "Markdown", pressed: true }).click();
   await expect(page.getByRole("table")).toContainText("sorted");
   await expect(page.locator("pre code.language-java .hljs-keyword").first()).toBeVisible();
   await page.goto("/");
@@ -111,7 +113,7 @@ test("HTML in a note cannot run script", async ({ page }) => {
   );
   await saved(page);
   // Text mode shows a note with HTML rendered (and sanitized), not editable as rich text.
-  await page.getByRole("banner").getByRole("button", { name: "Text" }).click();
+  await page.getByRole("banner").getByRole("button", { name: "Markdown", pressed: true }).click();
 
   // The javascript: link lost its href, so it is not even a link any more.
   const rendered = page.locator(".note-editor .markdown");
@@ -141,16 +143,16 @@ test("a conflict keeps both versions (editing while the note changes)", async ({
   await other.goto(url);
   const otherEditor = other.getByRole("textbox", { name: "Note text" });
   await expect(otherEditor).toContainText("my edit");
-  await otherEditor.click();
-  await other.keyboard.press("ControlOrMeta+End");
+  await otherEditor.getByText("original my edit").click();
+  await other.keyboard.press("End");
   await other.keyboard.type(" other tab's edit");
   await expect(
     other.getByRole("img", { name: "Everything is stored on this device" }),
   ).toBeVisible();
 
   // This tab still shows its version; editing it now keeps both.
-  await editor.click();
-  await page.keyboard.press("ControlOrMeta+End");
+  await editor.getByText("original my edit").click();
+  await page.keyboard.press("End");
   await page.keyboard.type(" again");
 
   await expect(page.getByText("This is a conflict copy")).toBeVisible({ timeout: 10_000 });
@@ -168,4 +170,22 @@ test("global shortcuts work from the editor", async ({ page }) => {
   await page.keyboard.press(`${modifier}+p`);
   await expect(page.getByRole("searchbox", { name: "Search notes" })).toBeFocused();
   await expect(list(page).getByRole("link")).toHaveText(["Shortcuts"]);
+});
+
+test("typing in Markdown mode through several saves keeps every character", async ({ page }) => {
+  await createNote(page, ["# Typing", "start"]);
+  await page.keyboard.press(`${await mod(page)}+/`);
+  const source = page.getByRole("textbox", { name: "Markdown" });
+  await expect(source).toBeFocused();
+  await source.getByText("start").click();
+  await page.keyboard.press("End");
+  // Pauses long enough for saves to run, and write their dates, mid-typing.
+  const words = ["alpha", "beta", "gamma", "delta", "epsilon"];
+  for (const word of words) {
+    await page.keyboard.type(` ${word}`, { delay: 30 });
+    await page.waitForTimeout(450);
+  }
+  await expect(source).toContainText(`start ${words.join(" ")}`);
+  // The frontmatter shows the dates the last save wrote.
+  await expect(source).toContainText(/updated: \d{4}-\d{2}-\d{2}T/);
 });

@@ -1,6 +1,7 @@
 import { createNote } from "../../domain/note/note";
 import { openNoteStore } from "../../infrastructure/storage/note-store";
-import { NoteCatalog, summarize, type NoteSummary } from "./note-catalog";
+import { parseTagName, type Tag } from "../../domain/tag/tags";
+import { NoteCatalog, notesTaggedExactly, summarize, type NoteSummary } from "./note-catalog";
 
 let count = 0;
 const newStore = () => openNoteStore(`catalog-test-${String((count += 1))}`);
@@ -37,6 +38,25 @@ describe("summarize", () => {
       valid: false,
       updated: null,
     });
+  });
+});
+
+describe("notesTaggedExactly", () => {
+  const tag = (name: string) => parseTagName(name) as Tag;
+
+  it("lists the notes with the tag itself, not only a tag below it, by title", async () => {
+    const store = await newStore();
+    const now = new Date("2024-01-01");
+    await store.put(createNote("# streams\n\n#java", now, "a"));
+    await store.put(createNote("# Collections\n\n#java#collections", now, "b"));
+    await store.put(createNote("# Arrays\n\n#java #java#collections", now, "c"));
+    await store.put(createNote("#\n\n#java", now, "d"));
+    await store.put(createNote("# Other\n\n#go", now, "e"));
+
+    const java = await notesTaggedExactly(store, tag("java"));
+    expect(java.map((note) => note.id)).toEqual(["c", "a", "d"]);
+    const children = await notesTaggedExactly(store, tag("java#collections"));
+    expect(children.map((note) => note.id)).toEqual(["c", "b"]);
   });
 });
 

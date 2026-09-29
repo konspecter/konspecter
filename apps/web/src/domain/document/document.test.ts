@@ -1,4 +1,6 @@
 import {
+  frontmatterTags,
+  otherMetadata,
   InvalidDocumentError,
   documentTitle,
   formatTimestamp,
@@ -240,5 +242,40 @@ describe("conflict_of", () => {
     expect(markdown).toBe("---\nconflict_of: n1\n---\n\nBody");
     expect(parseDocument(markdown).metadata.conflictOf).toBe("n1");
     expect(updateMetadata(markdown, { conflictOf: null })).toBe("---\n---\n\nBody");
+  });
+});
+
+describe("otherMetadata", () => {
+  it("lists the fields Konspecter does not manage, as text", () => {
+    const markdown =
+      "---\ntitle: T\nauthor: Ann\ntags: [a, b]\nupdated: 2026-01-01\ndraft: true\nempty: null\n---\nBody";
+    // Tags are the note's tags, not another field.
+    expect(otherMetadata(markdown)).toEqual([
+      { key: "author", value: "Ann" },
+      { key: "draft", value: "true" },
+    ]);
+  });
+
+  it("is empty without valid frontmatter", () => {
+    expect(otherMetadata("Body")).toEqual([]);
+    expect(otherMetadata("---\ntitle: [\n---\nBody")).toEqual([]);
+  });
+});
+
+describe("frontmatterTags", () => {
+  it("reads a list of tags, with or without a leading #", () => {
+    expect(
+      frontmatterTags('---\ntags:\n  - parent_1#child\n  - parent_2\n  - "#Java"\n---\nBody'),
+    ).toEqual(["parent_1#child", "parent_2", "Java"]);
+  });
+
+  it("reads one string of tags separated by spaces or commas", () => {
+    expect(frontmatterTags("---\ntags: java, go rust\n---\n")).toEqual(["java", "go", "rust"]);
+  });
+
+  it("is empty without the field or valid frontmatter", () => {
+    expect(frontmatterTags("---\ntitle: T\n---\n#body")).toEqual([]);
+    expect(frontmatterTags("#body")).toEqual([]);
+    expect(frontmatterTags("---\ntags: [\n---\n")).toEqual([]);
   });
 });

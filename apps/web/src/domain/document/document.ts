@@ -171,6 +171,65 @@ export function parseDocument(markdown: string): MarkdownDocument {
   return { metadata: readMetadata(parseFrontmatter(yaml)), body: bodyAfterFrontmatter(rest) };
 }
 
+const TAGS_KEY = "tags";
+
+/**
+ * The tags listed in the frontmatter's `tags` field, as written, without a
+ * leading "#": a list (`- java#collections`) or one string (`java, go` or
+ * `java go`). Whether each is a valid tag is for the tag rules to decide.
+ * Empty without valid frontmatter or without the field.
+ */
+export function frontmatterTags(markdown: string): string[] {
+  const { yaml } = splitFrontmatter(markdown);
+  if (yaml === null) return [];
+  let values: unknown;
+  try {
+    values = parseFrontmatter(yaml).toJS();
+  } catch {
+    return [];
+  }
+  if (values === null || typeof values !== "object") return [];
+  const field = (values as Record<string, unknown>)[TAGS_KEY];
+  const items = Array.isArray(field)
+    ? field
+    : typeof field === "string"
+      ? field.split(/[\s,]+/)
+      : [];
+  return items
+    .filter((item): item is string | number => typeof item === "string" || typeof item === "number")
+    .map((item) => String(item).trim().replace(/^#/, ""))
+    .filter((item) => item !== "");
+}
+
+/**
+ * The frontmatter fields Konspecter does not manage itself (anything but
+ * title, dates, cover and conflict_of), in written order, with each value as
+ * display text. Empty when there is no valid frontmatter.
+ */
+export function otherMetadata(markdown: string): { key: string; value: string }[] {
+  const { yaml } = splitFrontmatter(markdown);
+  if (yaml === null) return [];
+  let values: unknown;
+  try {
+    values = parseFrontmatter(yaml).toJS();
+  } catch {
+    return [];
+  }
+  if (values === null || typeof values !== "object") return [];
+  // Tags are shown with the note's other tags (`frontmatterTags`).
+  const managed = new Set<string>([...Object.values(FRONTMATTER_KEY), TAGS_KEY]);
+  return Object.entries(values as Record<string, unknown>)
+    .filter(([key, value]) => !managed.has(key) && value !== null && value !== undefined)
+    .map(([key, value]) => ({ key, value: displayValue(value) }));
+}
+
+function displayValue(value: unknown): string {
+  if (Array.isArray(value)) return value.map(displayValue).join(", ");
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "object" && value !== null) return JSON.stringify(value);
+  return String(value);
+}
+
 /**
  * Writes a document in canonical form: non-null metadata in a fixed key order,
  * a blank line, then the body. Without metadata the result is just the body.

@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
-import { isEmptyQuery, parseQuery, withoutTag } from "../../domain/search/query";
+import { isEmptyQuery, parseQuery } from "../../domain/search/query";
 import { highlight, snippet, type SnippetPart } from "../../domain/search/snippet";
 import type { NoteCatalog, NoteSummary } from "../../application/notes/note-catalog";
 import type { NoteRepository } from "../../application/notes/note-repository";
@@ -11,6 +11,8 @@ import { NoteDate } from "../components/NoteDate";
 import { Snippet } from "../components/Snippet";
 import { summaryTitle } from "../components/note-title";
 import { useAsync } from "../hooks/use-async";
+import { t } from "../i18n/i18n";
+import { rich } from "../i18n/rich";
 
 type NotesPageProps = {
   store: NoteRepository;
@@ -45,7 +47,7 @@ function hitRow(hit: SearchHit): Row {
       : hit.text;
   return {
     id: hit.id,
-    title: highlight(hit.title || "Untitled", hit.terms),
+    title: highlight(hit.title || t("note.untitled"), hit.terms),
     updated: hit.updated || null,
     text: snippet(text, hit.terms),
   };
@@ -65,7 +67,7 @@ function byRecentEdit(a: SearchHit, b: SearchHit): number {
  * search runs, the previous list stays, so typing never blanks the page.
  */
 export function NotesPage({ store, catalog }: NotesPageProps) {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const query = searchParams.get("q") ?? "";
   const parsed = useMemo(() => parseQuery(query), [query]);
   const searching = !isEmptyQuery(parsed);
@@ -105,15 +107,11 @@ export function NotesPage({ store, catalog }: NotesPageProps) {
     [library],
   );
 
-  const setQuery = (q: string) => {
-    setSearchParams(q ? { q } : {}, { replace: true });
-  };
-
   let content;
   if (library.status === "error") {
     content = (
       <ErrorState
-        title="Could not load notes"
+        title={t("list.loadFailed")}
         error={library.error}
         onRetry={() => void catalog.reload()}
       />
@@ -121,13 +119,13 @@ export function NotesPage({ store, catalog }: NotesPageProps) {
   } else if (library.status === "loading") {
     content = null;
   } else if (searching && found && "error" in found) {
-    content = <ErrorState title="Search failed" error={found.error} />;
+    content = <ErrorState title={t("list.searchFailed")} error={found.error} />;
   } else {
     const rows = searching && hitRows ? hitRows : noteRows;
     if (rows.length > 0) {
       content = <ResultList rows={rows} />;
     } else if (searching && found?.query === query) {
-      content = <EmptyState title="No matching notes" />;
+      content = <EmptyState title={t("list.noMatches")} />;
     } else if (!searching) {
       content = <Welcome store={store} />;
     } else {
@@ -135,44 +133,17 @@ export function NotesPage({ store, catalog }: NotesPageProps) {
     }
   }
 
-  const count =
-    library.status !== "ready"
-      ? null
-      : searching
-        ? found && "hits" in found && found.query === query
-          ? found.hits.length
-          : null
-        : library.notes.length;
-
   return (
     <>
-      <title>{searching ? `${query} · Konspecter` : "Notes · Konspecter"}</title>
-      <div className="list-header">
-        <h1 className="list-title">{searching ? "Search results" : "All notes"}</h1>
-        {count !== null && count > 0 && <span className="list-count">{count}</span>}
-      </div>
-      {parsed.tags.length > 0 && (
-        <ul className="filter-chips" aria-label="Tag filters">
-          {parsed.tags.map((tag) => (
-            <li key={tag.name}>
-              #{tag.name}
-              <button
-                type="button"
-                aria-label={`Remove #${tag.name} filter`}
-                onClick={() => {
-                  setQuery(withoutTag(query, tag));
-                }}
-              >
-                ×
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <title>{t("app.title", { title: searching ? query : t("list.notes") })}</title>
+      {/* The app holds only notes: the list needs no visible heading. Tag filters are
+          chips in the search box. */}
+      <h1 className="visually-hidden">{searching ? t("list.searchResults") : t("list.notes")}</h1>
       {unreadable.status === "success" && unreadable.value.length > 0 && (
         <p role="note" className="conflict-banner">
-          Some stored notes could not be read. They are kept safe; see{" "}
-          <Link to="/settings">Settings → Backup &amp; recovery</Link>.
+          {rich("list.unreadable", {
+            link: <Link to="/settings">{t("list.unreadableLink")}</Link>,
+          })}
         </p>
       )}
       {content}
@@ -182,7 +153,7 @@ export function NotesPage({ store, catalog }: NotesPageProps) {
 
 const ResultList = memo(function ResultList({ rows }: { rows: readonly Row[] }) {
   return (
-    <ol className="note-results" aria-label="Notes">
+    <ol className="note-results" aria-label={t("list.notes")}>
       {rows.map((row) => (
         <ResultRow key={row.id} row={row} />
       ))}
@@ -206,44 +177,16 @@ const ResultRow = memo(function ResultRow({ row }: { row: Row }) {
   );
 });
 
-const EXAMPLE_NOTE = `# Welcome to Konspecter
-
-Every note is a **Markdown** document. This one shows what that gives you.
-
-## Headings and lists
-
-- Plain lists, and numbered ones
-- Links: [CommonMark](https://commonmark.org)
-
-## Code
-
-\`\`\`java
-Map<String, Integer> counts = new HashMap<>();
-\`\`\`
-
-## Tags
-
-Write a tag anywhere, like #konspecter or a nested one: #konspecter#getting-started.
-The sidebar lists them, and search understands them: try \`#konspecter\`.
-
-Everything you type is saved as you go. Switch to **Markdown** at the top to see the
-source, or delete this note when you are done.
-`;
-
 function Welcome({ store }: { store: NoteRepository }) {
   const navigate = useNavigate();
   const [adding, setAdding] = useState(false);
   return (
     <section className="welcome" aria-labelledby="welcome-title">
-      <h2 id="welcome-title">Welcome to Konspecter</h2>
-      <p>
-        Technical notes as plain Markdown, kept on this device and working offline. Tag them
-        anywhere with <code>#tags</code>, find them with full-text search, and sync them with a
-        server when you want to.
-      </p>
+      <h2 id="welcome-title">{t("welcome.title")}</h2>
+      <p>{rich("welcome.text", { tags: <code>#tags</code> })}</p>
       <div className="actions">
         <Link to="/notes/new" className="button button-primary">
-          Create your first note
+          {t("welcome.create")}
         </Link>
         <button
           type="button"
@@ -251,17 +194,19 @@ function Welcome({ store }: { store: NoteRepository }) {
           disabled={adding}
           onClick={() => {
             setAdding(true);
-            void store.create(EXAMPLE_NOTE, new Date()).then((note) => {
+            void store.create(t("welcome.exampleNote"), new Date()).then((note) => {
               void navigate(`/notes/${encodeURIComponent(note.id)}`);
             });
           }}
         >
-          Add an example note
+          {t("welcome.example")}
         </button>
       </div>
       <p className="setting-hint">
-        Have notes already? Import <code>.md</code> files or a folder in{" "}
-        <Link to="/settings">Settings</Link>, where you can also connect sync.
+        {rich("welcome.import", {
+          md: <code>.md</code>,
+          settings: <Link to="/settings">{t("sidebar.settings")}</Link>,
+        })}
       </p>
     </section>
   );

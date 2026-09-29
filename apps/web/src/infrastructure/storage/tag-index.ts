@@ -1,19 +1,21 @@
 import type { IDBPDatabase, IDBPTransaction } from "idb";
-import { noteTags, parseNote, readNote, type Note } from "../../domain/note/note";
-import { tagWithAncestors, type Tag } from "../../domain/tag/tags";
+import { noteWrittenTags, parseNote, readNote, type Note } from "../../domain/note/note";
+import { parseTagName, tagSpellings, tagWithAncestors, type Tag } from "../../domain/tag/tags";
 import type { KonspecterDb } from "./schema";
 
 /**
  * Bump when the tag rules or the entry shape change. Stores built by another
  * version are rebuilt from the notes when the database is opened.
  */
-export const TAG_INDEX_VERSION = 1;
+export const TAG_INDEX_VERSION = 3;
 
 /** Derived data: which tags a note has. Always rebuildable from the notes. */
 export type TagEntry = {
   readonly noteId: string;
   /** Tags written in the note. */
   readonly tags: readonly string[];
+  /** The same tags as written, case kept, for display ("Java#Streams"). */
+  readonly written: readonly string[];
   /** The tags plus all their ancestors; indexed (multiEntry) for tag → notes. */
   readonly memberOf: readonly string[];
 };
@@ -22,14 +24,34 @@ export type TagCount = {
   readonly tag: Tag;
   /** Notes tagged with this tag or any tag below it. */
   readonly count: number;
+  /** How the notes write it (`tagSpellings`). */
+  readonly spelling: string;
 };
 
 type WriteTransaction = IDBPTransaction<KonspecterDb, ("notes" | "tags" | "meta")[], "readwrite">;
 
 export function tagEntry(note: Note): TagEntry {
-  const tags = noteTags(readNote(note));
+  const written = noteWrittenTags(readNote(note));
+  const tags = written.flatMap((tag) => parseTagName(tag) ?? []);
   const memberOf = new Set(tags.flatMap((tag) => tagWithAncestors(tag).map((t) => t.name)));
-  return { noteId: note.id, tags: tags.map((tag) => tag.name), memberOf: [...memberOf] };
+  return { noteId: note.id, tags: tags.map((tag) => tag.name), written, memberOf: [...memberOf] };
+}
+
+/** Every tag in the entries, each counting the notes within it, sorted by name. */
+export function countTags(entries: Iterable<TagEntry>): TagCount[] {
+  const list = [...entries];
+  const counts = new Map<string, number>();
+  for (const entry of list) {
+    for (const name of entry.memberOf) counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  const spellings = tagSpellings(list.map((entry) => entry.written));
+  return [...counts]
+    .map(([name, count]) => ({
+      tag: { path: name.split("#"), name },
+      count,
+      spelling: spellings.get(name) ?? name,
+    }))
+    .sort((a, b) => (a.tag.name < b.tag.name ? -1 : a.tag.name > b.tag.name ? 1 : 0));
 }
 
 /** Recomputes every entry from the notes, inside one transaction. */
@@ -74,8 +96,13 @@ async function indexMatchesNotes(db: IDBPDatabase<KonspecterDb>): Promise<boolea
   const noted = new Set(noteKeys.map(String));
   const indexed = new Set<string>();
   for (const entry of entries as unknown[]) {
-    const { noteId, tags, memberOf } = (entry ?? {}) as Record<string, unknown>;
-    if (typeof noteId !== "string" || !Array.isArray(tags) || !Array.isArray(memberOf))
+    const { noteId, tags, written, memberOf } = (entry ?? {}) as Record<string, unknown>;
+    if (
+      typeof noteId !== "string" ||
+      !Array.isArray(tags) ||
+      !Array.isArray(written) ||
+      !Array.isArray(memberOf)
+    )
       return false;
     indexed.add(noteId);
   }
@@ -85,16 +112,7 @@ async function indexMatchesNotes(db: IDBPDatabase<KonspecterDb>): Promise<boolea
 
 /** Every tag in use, each counting the notes within it, sorted by name. */
 export async function allTags(db: IDBPDatabase<KonspecterDb>): Promise<TagCount[]> {
-  const counts = new Map<string, number>();
-  let cursor = await db.transaction("tags").store.index("memberOf").openKeyCursor();
-  while (cursor) {
-    const name = cursor.key;
-    if (typeof name === "string") counts.set(name, (counts.get(name) ?? 0) + 1);
-    cursor = await cursor.continue();
-  }
-  return [...counts]
-    .map(([name, count]) => ({ tag: { path: name.split("#"), name }, count }))
-    .sort((a, b) => (a.tag.name < b.tag.name ? -1 : a.tag.name > b.tag.name ? 1 : 0));
+  return countTags(await db.getAll("tags"));
 }
 
 /** Ids of the notes tagged with `tag` or any tag below it. */

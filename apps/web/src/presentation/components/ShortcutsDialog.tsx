@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { formatKeys, SHORTCUTS } from "../app/shortcuts";
+import { t } from "../i18n/i18n";
 
 /** The shortcut registry as a definition list (the dialog and Settings). */
 export function ShortcutList() {
@@ -10,7 +11,7 @@ export function ShortcutList() {
           <dt>
             <kbd>{formatKeys(keys)}</kbd>
           </dt>
-          <dd>{label}</dd>
+          <dd>{t(label)}</dd>
         </div>
       ))}
     </dl>
@@ -41,10 +42,10 @@ export function ShortcutsDialog({ onClose }: { onClose: () => void }) {
           event.stopPropagation();
         }}
       >
-        <h2 id="shortcuts-title">Keyboard shortcuts</h2>
+        <h2 id="shortcuts-title">{t("shortcuts.title")}</h2>
         <ShortcutList />
         <button ref={close} type="button" className="button" onClick={onClose}>
-          Close
+          {t("app.close")}
         </button>
       </div>
     </div>

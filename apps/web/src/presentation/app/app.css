@@ -9,18 +9,25 @@
   --color-sidebar: #f3f3f1;
   --color-fg: #1f2023;
   --color-muted: #5d6167;
+  /* Quieter than muted, still readable (AA) on the sidebar: secondary details. */
+  --color-faint: #666a70;
   --color-border: #e3e3df;
   --color-hover: #ebebe8;
   --color-active: #e3e3df;
   --color-field: #efefec;
   --color-field-focus: #e7e7e3;
+  /* The editing area's panel, a shade darker than the page. */
+  --color-editor: #f3f3f0;
   --color-accent: #2d6aa6;
   --color-danger: #a8322a;
+  --color-tree-folder: #4f86bd;
+  --color-tree-guide: #d6d8d4;
   /* A highlighter pen on paper. */
   --color-mark: #f7e3a1;
   --color-mark-fg: #2b2410;
   --color-antenna-idle: #c2c3c0;
   --color-antenna-active: #55585d;
+  --color-antenna-offline: #c9742c;
   --color-shadow: rgb(31 32 35 / 14%);
 
   --font-ui:
@@ -31,6 +38,8 @@
   --column-width: 720px;
   --sidebar-width: 272px;
   --topbar-height: 52px;
+  /* The search's own row under the top bar on small screens. */
+  --topbar-search-row: 0px;
   /* Set from the "Text size" setting; scales reading and editing text. */
   --font-scale: 1;
   --gutter: 16px;
@@ -44,17 +53,22 @@
     --color-sidebar: #161719;
     --color-fg: #e5e5e2;
     --color-muted: #9ba0a6;
+    --color-faint: #858a90;
     --color-border: #2d2f32;
     --color-hover: #26282b;
     --color-active: #2e3034;
     --color-field: #26282b;
     --color-field-focus: #2e3034;
+    --color-editor: #131416;
     --color-accent: #86b3df;
     --color-danger: #eeb0aa;
+    --color-tree-folder: #7ea9d4;
+    --color-tree-guide: #3a3d41;
     --color-mark: #5b4d1f;
     --color-mark-fg: #f6ecc9;
     --color-antenna-idle: #474a4f;
     --color-antenna-active: #b8bcc1;
+    --color-antenna-offline: #e39a5b;
     --color-shadow: rgb(8 9 10 / 45%);
   }
 }
@@ -69,18 +83,65 @@
   --color-sidebar: #161719;
   --color-fg: #e5e5e2;
   --color-muted: #9ba0a6;
+  --color-faint: #858a90;
   --color-border: #2d2f32;
   --color-hover: #26282b;
   --color-active: #2e3034;
   --color-field: #26282b;
   --color-field-focus: #2e3034;
+  --color-editor: #131416;
   --color-accent: #86b3df;
   --color-danger: #eeb0aa;
+  --color-tree-folder: #7ea9d4;
+  --color-tree-guide: #3a3d41;
   --color-mark: #5b4d1f;
   --color-mark-fg: #f6ecc9;
   --color-antenna-idle: #474a4f;
   --color-antenna-active: #b8bcc1;
+  --color-antenna-offline: #e39a5b;
   --color-shadow: rgb(8 9 10 / 45%);
+}
+
+/* Code colours, for the reader's highlighting and the Markdown editor (GitHub's palettes). */
+:root {
+  --code-bg: #f6f7f8;
+  --code-fg: #24292f;
+  --code-comment: #6e7781;
+  --code-keyword: #cf222e;
+  --code-string: #0a3069;
+  --code-number: #0550ae;
+  --code-title: #8250df;
+  --code-type: #953800;
+  --code-meta: #116329;
+  --quote-border: #d0d7de;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --code-bg: #1f2124;
+    --code-fg: #e6edf3;
+    --code-comment: #8b949e;
+    --code-keyword: #ff7b72;
+    --code-string: #a5d6ff;
+    --code-number: #79c0ff;
+    --code-title: #d2a8ff;
+    --code-type: #ffa657;
+    --code-meta: #7ee787;
+    --quote-border: #3d444d;
+  }
+}
+
+:root[data-theme="dark"] {
+  --code-bg: #1f2124;
+  --code-fg: #e6edf3;
+  --code-comment: #8b949e;
+  --code-keyword: #ff7b72;
+  --code-string: #a5d6ff;
+  --code-number: #79c0ff;
+  --code-title: #d2a8ff;
+  --code-type: #ffa657;
+  --code-meta: #7ee787;
+  --quote-border: #3d444d;
 }
 
 :root[data-titlebar="overlay"] {
@@ -97,6 +158,11 @@ html,
 body {
   margin: 0;
   background: var(--color-bg);
+}
+
+/* The page scrolls; the scrollbar's room is kept, so content never shifts when it appears. */
+html {
+  scrollbar-gutter: stable;
 }
 
 body {
@@ -272,34 +338,149 @@ mark {
   font-weight: 550;
 }
 
+/*
+ * The sidebar's footer: the open note's details, rendered there by the note
+ * page. Empty (and hidden) everywhere else. Smaller and quieter than the rest.
+ */
+.sidebar-details {
+  flex-shrink: 0;
+  max-height: 45%;
+  overflow-y: auto;
+  padding: 10px 8px calc(10px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--color-border);
+  color: var(--color-faint);
+  font-size: 12px;
+}
+
+.sidebar-details:empty {
+  display: none;
+}
+
+.note-details .sidebar-heading {
+  margin-top: 0;
+}
+
+.details-list {
+  display: grid;
+  gap: 3px;
+  margin: 0 8px 8px;
+}
+
+.details-row {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  gap: 8px;
+}
+
+.details-row dt {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.details-row dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.details-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+}
+
+.details-tags a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.details-tags a:hover {
+  color: var(--color-fg);
+  text-decoration: underline;
+}
+
+.details-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin: 0 2px;
+}
+
+.details-actions .icon-button {
+  width: 30px;
+  height: 30px;
+  color: var(--color-faint);
+}
+
+.details-actions .icon-button:hover {
+  color: var(--color-fg);
+}
+
+.details-actions .icon-button[aria-expanded="true"] {
+  background: var(--color-active);
+  color: var(--color-fg);
+}
+
+.details-actions .icon-button-danger:hover {
+  color: var(--color-danger);
+}
+
+.note-details .inline-error {
+  margin: 6px 8px 0;
+  font-size: 12px;
+}
+
 .sidebar-backdrop {
   display: none;
 }
 
+/*
+ * The page keeps room for its scrollbar on the right (scrollbar-gutter). The
+ * same room on the left (--scrollbar-gutter, measured by the layout) keeps the
+ * main column's margins equal on both sides.
+ */
 .main {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  padding-left: var(--scrollbar-gutter, 0px);
   min-height: 100vh;
   min-height: 100dvh;
 }
 
+/*
+ * Wide windows: three columns, the search centred in the middle, up to 30rem.
+ * Both sides are at least as wide as the controls on the right (and the macOS
+ * window buttons when the sidebar is closed), so they are never squeezed out
+ * and the search keeps equal margins. Medium and small screens: see below.
+ */
 .topbar {
+  /* The controls on the right: two buttons, the antenna and the gaps. */
+  --topbar-controls: calc(2 * 32px + 28px + 3 * 6px);
+  --topbar-side: var(--topbar-controls);
+
   position: sticky;
   top: 0;
   z-index: 5;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 30rem) minmax(0, 1fr);
+  grid-template-columns:
+    minmax(var(--topbar-side), 1fr) minmax(0, 30rem)
+    minmax(var(--topbar-side), 1fr);
   align-items: center;
   gap: 12px;
-  height: calc(var(--topbar-height) + env(safe-area-inset-top));
+  height: calc(var(--topbar-height) + var(--topbar-search-row) + env(safe-area-inset-top));
   padding: env(safe-area-inset-top) max(12px, env(safe-area-inset-right)) 0 12px;
   background: var(--color-bg);
   font-family: var(--font-ui);
 }
 
+/* With the sidebar closed, the macOS window buttons sit before the first controls. */
 .app[data-sidebar="closed"] .topbar {
-  padding-left: calc(12px + var(--titlebar-inset));
+  --topbar-side: calc(var(--topbar-controls) + var(--titlebar-inset));
+}
+
+.app[data-sidebar="closed"] .topbar-start {
+  padding-left: var(--titlebar-inset);
 }
 
 .topbar-start,
@@ -313,6 +494,26 @@ mark {
 
 .topbar-end {
   gap: 6px;
+}
+
+/*
+ * Medium screens: the search fills the row between the controls, with the
+ * same gap on each side. The gap is a margin on the controls, so an empty
+ * side (sidebar open) adds none.
+ */
+@media (max-width: 1024px) {
+  .topbar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0;
+  }
+
+  .topbar-start:not(:empty) {
+    margin-right: 12px;
+  }
+
+  .topbar-end {
+    margin-left: 12px;
+  }
 }
 
 .content {
@@ -354,41 +555,90 @@ mark {
   color: var(--color-fg);
 }
 
+/* One field: the icon, the tag chips, the text and the shortcut hint. */
 .search-box {
-  position: relative;
   display: flex;
   align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 34px;
+  padding: 0 9px 0 11px;
+  border-radius: 9px;
+  background: var(--color-field);
   color: var(--color-muted);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  cursor: text;
+}
+
+.search-box:hover,
+.search-box:focus-within {
+  background: var(--color-field-focus);
 }
 
 .search-box > .icon {
-  position: absolute;
-  left: 11px;
+  flex-shrink: 0;
   pointer-events: none;
 }
 
-.search-input {
-  width: 100%;
-  height: 34px;
-  padding: 0 3.25rem 0 36px;
-  border: 0;
-  border-radius: 9px;
-  background: var(--color-field);
+.search-chips {
+  display: flex;
+  flex-shrink: 1;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+}
+
+.search-chips li {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 1px;
+  height: 24px;
+  padding: 0 2px 0 8px;
+  border-radius: 999px;
+  background: var(--color-bg);
   color: var(--color-fg);
-  font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.search-chips button {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--color-muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.search-chips button:hover {
+  background: var(--color-hover);
+  color: var(--color-fg);
+}
+
+.search-input {
+  flex: 1;
+  min-width: 4rem;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-fg);
+  font: inherit;
 }
 
 .search-input::placeholder {
   color: var(--color-muted);
-}
-
-.search-input:hover {
-  background: var(--color-field-focus);
-}
-
-.search-input:focus {
-  background: var(--color-field-focus);
 }
 
 .search-input::-webkit-search-cancel-button {
@@ -396,8 +646,7 @@ mark {
 }
 
 .search-kbd {
-  position: absolute;
-  right: 9px;
+  flex-shrink: 0;
   border: 0;
   color: var(--color-muted);
   font-family: var(--font-ui);
@@ -407,36 +656,6 @@ mark {
 
 .search-input:focus + .search-kbd {
   display: none;
-}
-
-.mode-toggle {
-  display: inline-flex;
-  flex-shrink: 0;
-  padding: 2px;
-  border-radius: 9px;
-  background: var(--color-field);
-}
-
-.mode-button {
-  height: 28px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 7px;
-  background: none;
-  color: var(--color-muted);
-  font-family: var(--font-ui);
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.mode-button:hover {
-  color: var(--color-fg);
-}
-
-.mode-button[aria-pressed="true"] {
-  background: var(--color-bg);
-  color: var(--color-fg);
-  box-shadow: 0 1px 2px var(--color-shadow);
 }
 
 .antenna {
@@ -451,6 +670,10 @@ mark {
 
 .antenna[data-active="true"] {
   color: var(--color-antenna-active);
+}
+
+.antenna[data-state="offline"] {
+  color: var(--color-antenna-offline);
 }
 
 .antenna[data-active="true"] .wave {
@@ -478,6 +701,8 @@ mark {
 }
 
 .sync-indicator {
+  /* Shortens (…) rather than widening the side of the top bar. */
+  min-width: 0;
   overflow: hidden;
   color: var(--color-danger);
   font-size: 13px;
@@ -563,39 +788,84 @@ kbd {
   font-size: 0.9em;
 }
 
+/* Tags in notes stand out a little: heavier than the text, lighter than bold. */
+.md-tag {
+  font-weight: 560;
+}
+
 /* --- Tag tree ------------------------------------------------------------ */
 
-.tag-tree {
+/*
+ * A project tree, after VS Code's explorer (GitHub Light): flat full-width
+ * rows, a chevron and a folder or document icon, indent guides under each
+ * open folder. Rows indent by --depth, set on each row and group.
+ */
+.tree {
+  --tree-row: 24px;
+  --tree-indent: 12px;
+  --tree-pad: 12px;
+  --tree-twistie: 16px;
+
+  margin: 0 -8px;
+  padding: 0;
+  font-size: 13px;
+  list-style: none;
+}
+
+.tree-group {
+  position: relative;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.tag-tree .tag-tree {
-  padding-left: 14px;
+/* The guide runs under the parent folder's chevron. */
+.tree-group::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--tree-pad) + (var(--depth) - 1) * var(--tree-indent) + var(--tree-twistie) / 2);
+  width: 1px;
+  background: var(--color-tree-guide);
+  content: "";
+  pointer-events: none;
 }
 
-.tag-row {
+.tree-row {
   display: flex;
   align-items: center;
-  gap: 2px;
-  border-radius: 7px;
+  gap: 4px;
+  min-height: var(--tree-row);
+  padding: 0 8px 0 calc(var(--tree-pad) + var(--depth) * var(--tree-indent));
+  color: var(--color-fg);
+  line-height: 1.3;
 }
 
-.tag-row:hover {
+.tree-row:hover {
   background: var(--color-hover);
 }
 
-.tag-row:has([aria-current="page"]) {
+.tree-row:has(.tree-label[aria-current="page"]),
+.tree-document[aria-current="page"] {
   background: var(--color-active);
 }
 
-.tag-toggle {
-  display: inline-grid;
+.tree-row:has(:focus-visible),
+.tree-document:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: -1px;
+}
+
+.tree-row :focus-visible {
+  outline: none;
+}
+
+.tree-toggle {
+  display: inline-flex;
   flex-shrink: 0;
-  place-items: center;
-  width: 22px;
-  height: 28px;
+  align-items: center;
+  gap: 2px;
+  align-self: stretch;
   padding: 0;
   border: 0;
   background: none;
@@ -603,32 +873,62 @@ kbd {
   cursor: pointer;
 }
 
-.tag-toggle .icon {
-  width: 14px;
-  height: 14px;
+.tree .icon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.tree-toggle .icon-chevron {
   transition: transform 120ms ease;
 }
 
-.tag-toggle[aria-expanded="true"] .icon {
+.tree-toggle[aria-expanded="true"] .icon-chevron {
   transform: rotate(90deg);
 }
 
-.tag-link {
+.tree .icon-folder {
+  color: var(--color-tree-folder);
+}
+
+.tree .icon-document {
+  color: var(--color-muted);
+}
+
+/* A document has no chevron: its icon lines up with the folders beside it. */
+.tree-document {
+  padding-left: calc(
+    var(--tree-pad) + var(--depth) * var(--tree-indent) + var(--tree-twistie) + 2px
+  );
+  text-decoration: none;
+}
+
+.tree-label {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  padding: 3px 0;
-  color: var(--color-fg);
+  color: inherit;
   text-decoration: none;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.tag-count {
+.tree-row:has(.tree-label[aria-current="page"]) .tree-label,
+.tree-document[aria-current="page"] {
+  font-weight: 550;
+}
+
+.tree-count {
   flex-shrink: 0;
-  padding: 0 8px 0 4px;
   color: var(--color-muted);
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (pointer: coarse) {
+  .tree {
+    --tree-row: 36px;
+  }
 }
 
 /* --- Page content -------------------------------------------------------- */
@@ -640,26 +940,6 @@ kbd {
   line-height: 1.2;
   letter-spacing: -0.01em;
   overflow-wrap: anywhere;
-}
-
-.list-header {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-  font-family: var(--font-ui);
-}
-
-.list-title {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-muted);
-}
-
-.list-count {
-  color: var(--color-muted);
-  font-size: 13px;
 }
 
 .note-results {
@@ -711,8 +991,7 @@ kbd {
   outline: none;
 }
 
-.note-result time,
-.note-meta {
+.note-result time {
   flex-shrink: 0;
   color: var(--color-muted);
   font-family: var(--font-ui);
@@ -729,35 +1008,6 @@ kbd {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   line-clamp: 2;
-}
-
-.filter-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin: 0 0 1rem;
-  padding: 0;
-  list-style: none;
-  font-family: var(--font-ui);
-  font-size: 14px;
-}
-
-.filter-chips li {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.1rem 0.25rem 0.1rem 0.6rem;
-  border-radius: 999px;
-  background: var(--color-field);
-}
-
-.filter-chips button {
-  border: 0;
-  background: none;
-  color: var(--color-muted);
-  font-size: 15px;
-  line-height: 1;
-  cursor: pointer;
 }
 
 .empty-state {
@@ -857,7 +1107,7 @@ kbd {
 
 .resume-reading {
   position: sticky;
-  top: calc(var(--topbar-height) + 0.5rem);
+  top: calc(var(--topbar-height) + var(--topbar-search-row) + 0.5rem);
   z-index: 2;
   display: flex;
   flex-wrap: wrap;
@@ -869,33 +1119,6 @@ kbd {
   background: var(--color-field);
   font-family: var(--font-ui);
   font-size: 14px;
-}
-
-.note-footer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.5rem 1.5rem;
-  margin-top: 3rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--color-border);
-  font-family: var(--font-ui);
-  font-size: 13px;
-}
-
-.note-meta {
-  margin: 0;
-}
-
-.note-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1.25rem;
-}
-
-.note-footer .inline-error {
-  flex-basis: 100%;
 }
 
 /* --- Settings ------------------------------------------------------------ */
@@ -1016,6 +1239,18 @@ kbd {
   font-size: 18px;
 }
 
+.dialog-message {
+  margin: -0.25rem 0 0;
+  color: var(--color-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.dialog-actions {
+  justify-content: flex-end;
+  margin-top: 1.25rem;
+}
+
 .shortcuts {
   display: grid;
   gap: 0.4rem;
@@ -1063,18 +1298,36 @@ kbd {
     background: color-mix(in srgb, var(--color-fg) 20%, transparent);
   }
 
+  :root {
+    --topbar-search-row: 42px;
+  }
+
+  /* The controls in the first row, the search across the whole second one. */
   .topbar {
+    grid-template-areas:
+      "start . end"
+      "search search search";
+    grid-template-rows: var(--topbar-height) 34px;
     grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: 8px;
+    padding-bottom: 8px;
   }
 
+  .topbar-start {
+    grid-area: start;
+  }
+
+  .topbar-end {
+    grid-area: end;
+  }
+
+  .search-box {
+    grid-area: search;
+  }
+
+  /* The same margins as the search bar above. */
   .content {
-    --content-inset: var(--gutter);
+    --content-inset: 12px;
     padding-top: 12px;
-  }
-
-  .mode-button {
-    padding: 0 7px;
   }
 
   .search-kbd {
@@ -1084,13 +1337,5 @@ kbd {
   .note-result-head {
     flex-direction: column;
     gap: 0;
-  }
-}
-
-@media (max-width: 440px) {
-  /* Room for the search: the theme stays in Settings, New note in the sidebar. */
-  .theme-toggle,
-  .topbar-new {
-    display: none;
   }
 }

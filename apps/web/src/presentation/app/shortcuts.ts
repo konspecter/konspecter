@@ -1,20 +1,24 @@
+import type { TextKey } from "../i18n/i18n";
+
 /**
  * Every keyboard shortcut in the app, in one place: the handlers (Layout and
  * the note page) and the lists shown to the user read the same table.
  *
  * `Mod` is ⌘ on macOS and Ctrl elsewhere. Modifier shortcuts work
  * everywhere, also while typing in an editor; single keys only outside text
- * fields.
+ * fields. Labels are message keys (translated where they are shown).
  */
 export const SHORTCUTS = {
-  search: { keys: "Mod+P", label: "Search" },
-  newNote: { keys: "Mod+N", label: "New note" },
-  settings: { keys: "Mod+,", label: "Settings" },
-  save: { keys: "Mod+S", label: "Save now (notes also save as you type)" },
-  quickSearch: { keys: "/", label: "Search" },
-  quickNewNote: { keys: "n", label: "New note" },
-  help: { keys: "?", label: "Show these shortcuts" },
-} as const;
+  search: { keys: "Mod+P", label: "shortcut.search" },
+  newNote: { keys: "Mod+N", label: "shortcut.newNote" },
+  settings: { keys: "Mod+,", label: "shortcut.settings" },
+  save: { keys: "Mod+S", label: "shortcut.save" },
+  toggleSidebar: { keys: "Mod+\\", label: "shortcut.sidebar" },
+  editorMode: { keys: "Mod+/", label: "shortcut.editorMode" },
+  quickSearch: { keys: "/", label: "shortcut.search" },
+  quickNewNote: { keys: "n", label: "shortcut.newNote" },
+  help: { keys: "?", label: "shortcut.help" },
+} as const satisfies Record<string, { keys: string; label: TextKey }>;
 
 export type ShortcutName = keyof typeof SHORTCUTS;
 
@@ -35,7 +39,8 @@ export function formatKeys(keys: string, mac = isMac()): string {
 /** The physical key, for layouts where ⌘/Ctrl + key reports another character (Cyrillic). */
 function keyCode(key: string): string | null {
   if (/^[a-z]$/i.test(key)) return `Key${key.toUpperCase()}`;
-  return key === "," ? "Comma" : key === "/" ? "Slash" : null;
+  const codes: Record<string, string> = { ",": "Comma", "/": "Slash", "\\": "Backslash" };
+  return codes[key] ?? null;
 }
 
 /** Whether `event` is the shortcut `keys` ("Mod+P", "?"). */

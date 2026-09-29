@@ -29,6 +29,27 @@ describe("matchesShortcut", () => {
     );
   });
 
+  it("finds ⌘/ and ⌘\\ on a Russian layout, where those keys type other characters", () => {
+    // Russian (PC): the "/" key types "."; the "\\" key types "\\" (PC) or "ё" (Mac).
+    expect(matchesShortcut("Mod+/", key({ key: ".", code: "Slash", metaKey: true }), true)).toBe(
+      true,
+    );
+    expect(
+      matchesShortcut("Mod+\\", key({ key: "ё", code: "Backslash", metaKey: true }), true),
+    ).toBe(true);
+    expect(
+      matchesShortcut("Mod+\\", key({ key: "\\", code: "Backslash", ctrlKey: true }), false),
+    ).toBe(true);
+    // Russian (PC) types "/" with Shift: that is not ⌘/.
+    expect(
+      matchesShortcut(
+        "Mod+/",
+        key({ key: "/", code: "Backslash", ctrlKey: true, shiftKey: true }),
+        false,
+      ),
+    ).toBe(false);
+  });
+
   it("matches single keys only without modifiers", () => {
     expect(matchesShortcut("?", key({ key: "?", shiftKey: true }), false)).toBe(true);
     expect(matchesShortcut("n", key({ key: "n" }), false)).toBe(true);

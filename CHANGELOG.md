@@ -1,5 +1,45 @@
 # Changelog
 
+## Unreleased — updates package 2
+
+- A new app icon: the Konspecter owl, a simple, friendly orange owl with big amber eyes
+  holding an ancient parchment scroll on wooden rods, a flat mascot with fine brown outlines
+  on a warm cream plate, drawn in
+  each system's style (macOS squircle with shadow, full-bleed iOS/Apple touch icon, Windows
+  tile, Android adaptive and themed icon, PWA maskable icon), and new Android splash screens.
+- English and Russian, chosen from the system's language (English otherwise).
+- The note's details move to the sidebar's footer, "Details": dates, length, tags, cover and
+  other frontmatter fields, with the actions as icon buttons; smaller and quieter text.
+- The formatting toolbar is flat and pale until pointed at, folds to one tool, always stays on
+  the left (also on phones) and grows upward when there is no room below.
+- The editing area is a slightly darker panel with the same gap on every side, as tall as the
+  note (setting "Editing area"), more distinct in the dark theme; page margins are equal on
+  both sides at every width.
+- Deleting a note asks for confirmation in the app's own dialog.
+- Shortcuts ⌘/Ctrl+\ to show or hide the sidebar and ⌘/Ctrl+/ to switch between the text
+  editor and Markdown, from anywhere, also on a Russian layout.
+- The note list and search results have no heading; tag filters are chips inside the search
+  box (a typed `#tag` becomes one after a space; × or Backspace removes it).
+- In a new note, a first line shorter than 50 characters becomes the title when Enter ends it.
+- In Russian the sidebar's tag tree is called «Конспекты».
+- Tags in notes are a little heavier than the text; tag names in the sidebar start with a
+  capital letter (setting "Tag names").
+- Markdown mode highlights the Markdown and fenced code (```json and others) in colour; a
+  typed `"` stays straight in code and frontmatter instead of turning into «».
+- The antenna shows a third state: crossed out in orange when sync has no connection.
+- The page no longer shifts sideways when a scrollbar appears.
+- The desktop app no longer opens the web inspector.
+- Markdown mode shows the title and tags found in the text on a read-only line above the
+  source (they are not copied into the frontmatter).
+- The dates each save writes (`created`, `updated`) appear in the editor at once, also in
+  Markdown mode's source, so the editor and the stored note never differ.
+- Tags listed in the frontmatter's `tags` field count as the note's tags: in the sidebar
+  tree, search filters and Details.
+- Fixed: coming back to a note right after leaving it could show it without its last changes
+  until later; opening a note now waits for its save still running.
+- Fixed: a tag with `_` in Cyrillic (`#новые_технологии`) typed in the text editor was saved
+  as `#новые\_технологии` and cut to `новые`.
+
 ## Unreleased — updates package 1
 
 - A two-panel window: a sidebar with the tag tree and recently edited notes, and a top bar
@@ -13,6 +53,13 @@
 - Global shortcuts ⌘/Ctrl+P, ⌘/Ctrl+N and ⌘/Ctrl+, (also on Cyrillic keyboard layouts).
 - No loading screens; the editor and the search index are prepared in the background.
 - The Inter font (Latin and Cyrillic), softer colours, and focus shown without outline boxes.
+- The sidebar's tag tree reads like a project explorer: tags are folders, the notes tagged
+  with them are documents inside, with folder and document icons and indent guides.
+  Tag names show as written (case kept) with `_` as a space.
+- The Text/Markdown switch in the top bar is a single icon button: a T for the text editor,
+  the Markdown mark for the source.
+- The top bar search is centred on wide windows, fills the row between the buttons on medium
+  ones and has its own full-width row on small screens; the buttons are no longer hidden.
 - Removed: the separate reader, edit and tags pages (`/notes/:id/edit`, `/search`, `/tags`,
   `?tag=`); their functions live in the editor, the list and the sidebar.
 

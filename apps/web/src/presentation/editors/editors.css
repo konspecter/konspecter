@@ -16,6 +16,8 @@
 /*
  * The contextual toolbar: a vertical strip in the margin beside the block
  * being edited. Absolutely positioned, so showing it never moves the text.
+ * At rest it is flat and pale, so it does not compete with the text; pointing
+ * at it or moving the focus into it brings up its frame.
  */
 .text-editor-toolbar {
   position: absolute;
@@ -26,11 +28,23 @@
   gap: 1px;
   padding: 3px;
   border-radius: 10px;
+  background: transparent;
+  box-shadow: none;
+  font-family: var(--font-ui);
+  opacity: 0.55;
+  transition:
+    opacity 120ms ease,
+    background-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.text-editor-toolbar:hover,
+.text-editor-toolbar:focus-within {
   background: var(--color-bg);
   box-shadow:
     0 0 0 1px var(--color-border),
     0 4px 14px var(--color-shadow);
-  font-family: var(--font-ui);
+  opacity: 1;
 }
 
 .text-editor-toolbar[hidden] {
@@ -46,11 +60,16 @@
   border: 0;
   border-radius: 7px;
   background: none;
-  color: var(--color-fg);
+  color: var(--color-muted);
   font-family: var(--font-ui);
   font-size: 12px;
   font-weight: 650;
   cursor: pointer;
+}
+
+.text-editor-toolbar:hover .toolbar-button:not(:disabled),
+.text-editor-toolbar:focus-within .toolbar-button:not(:disabled) {
+  color: var(--color-fg);
 }
 
 .toolbar-button:hover:not(:disabled) {
@@ -59,12 +78,35 @@
 
 .toolbar-button[aria-pressed="true"] {
   background: var(--color-active);
+  color: var(--color-fg);
 }
 
 .toolbar-button:disabled {
-  color: var(--color-muted);
   cursor: default;
   opacity: 0.45;
+}
+
+/* The fold toggle: a small chevron, down while folded, up while open. */
+.toolbar-fold {
+  height: 20px;
+}
+
+.toolbar-fold .icon {
+  width: 14px;
+  height: 14px;
+  transform: rotate(90deg);
+  transition: transform 120ms ease;
+}
+
+.toolbar-fold[aria-expanded="true"] .icon {
+  transform: rotate(-90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .text-editor-toolbar,
+  .toolbar-fold .icon {
+    transition: none;
+  }
 }
 
 .text-editor-content {
@@ -80,10 +122,69 @@
   pointer-events: none;
 }
 
-/* No margin to spare on phones: the toolbar floats at the right edge instead. */
+/*
+ * The editing area as a panel (setting "Editing area"): a shade darker than
+ * the page, with the same gap on every side, and as tall as the note (no
+ * empty space forced below the text). The toolbar stays on the left, in the
+ * column's margin beside the panel.
+ */
+.note-editor {
+  --editor-gap: 28px;
+}
+
+:root[data-editing-area="highlighted"] .note-editor {
+  min-height: 0;
+  padding: var(--editor-gap);
+  border-radius: 14px;
+  background: var(--color-editor);
+}
+
+:root[data-editing-area="highlighted"] .text-editor-content,
+:root[data-editing-area="highlighted"] .markdown-source .cm-editor {
+  min-height: 0;
+}
+
+/* The gap is the panel's alone: the text adds no margin at its top or bottom. */
+:root[data-editing-area="highlighted"] .note-editor > :first-child,
+:root[data-editing-area="highlighted"] .text-editor-content > :first-child,
+:root[data-editing-area="highlighted"] .note-editor .markdown > :first-child {
+  margin-top: 0;
+}
+
+:root[data-editing-area="highlighted"] .note-editor > :last-child,
+:root[data-editing-area="highlighted"] .text-editor-content > :last-child,
+:root[data-editing-area="highlighted"] .note-editor .markdown > :last-child {
+  margin-bottom: 0;
+}
+
+:root[data-editing-area="highlighted"] .text-editor-toolbar {
+  right: calc(100% + var(--editor-gap) + 8px);
+}
+
+/*
+ * Small screens have no margin for the toolbar: the editor's left gap holds
+ * it instead (the same gap on every side, and a compact toolbar), so it stays
+ * on the left there too and never covers the text.
+ */
 @media (max-width: 760px) {
-  .text-editor-toolbar {
-    right: 0;
+  .note-editor {
+    --editor-gap: 36px;
+
+    padding-left: var(--editor-gap);
+  }
+
+  .text-editor-toolbar,
+  :root[data-editing-area="highlighted"] .text-editor-toolbar {
+    right: calc(100% + 2px);
+    padding: 2px;
+  }
+
+  .text-editor-toolbar .toolbar-button {
+    width: 28px;
+  }
+
+  :root[data-editing-area="highlighted"] .note-editor {
+    border-radius: 12px;
   }
 }
 
@@ -168,4 +269,58 @@
 
 .cover-field:focus {
   border-bottom-color: var(--color-muted);
+}
+
+/* Monospace has no weight between medium and semibold. */
+.markdown-source .md-tag {
+  font-weight: 500;
+}
+
+/* Code blocks in the source read as blocks, as in the reader. */
+.markdown-source .cm-code-line {
+  padding-inline: 12px;
+  background: var(--code-bg);
+}
+
+.markdown-source .cm-code-first {
+  border-radius: 6px 6px 0 0;
+}
+
+.markdown-source .cm-code-last {
+  border-radius: 0 0 6px 6px;
+}
+
+.markdown-source .cm-code-first.cm-code-last {
+  border-radius: 6px;
+}
+
+/* Above the Markdown source: the title and tags read from it (read-only). */
+.source-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  margin: 0 0 14px;
+  color: var(--color-faint);
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+
+.source-summary div {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+
+.source-summary dt {
+  flex-shrink: 0;
+}
+
+.source-summary dd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  min-width: 0;
+  margin: 0;
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
 }

@@ -17,7 +17,8 @@
     "licenses:check": "node scripts/check-licenses.mjs",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm licenses:check",
     "e2e": "pnpm --filter @konspecter/e2e e2e",
-    "versions:check": "node scripts/check-versions.mjs"
+    "versions:check": "node scripts/check-versions.mjs",
+    "icons": "node scripts/render-icons.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

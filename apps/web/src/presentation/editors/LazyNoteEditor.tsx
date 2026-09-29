@@ -1,6 +1,7 @@
 import { lazy, Suspense, type ComponentType } from "react";
 import type { NoteEditorProps } from "./NoteEditor";
 import { ErrorState } from "../components/ErrorState";
+import { t } from "../i18n/i18n";
 
 let editorModule: Promise<typeof import("./NoteEditor")> | null = null;
 
@@ -22,7 +23,7 @@ const NoteEditor = lazy<ComponentType<NoteEditorProps>>(() =>
   preloadEditor().then(
     (module) => ({ default: module.NoteEditor }),
     (error: unknown) => ({
-      default: () => <ErrorState title="Could not load the editor" error={error} />,
+      default: () => <ErrorState title={t("editor.loadFailed")} error={error} />,
     }),
   ),
 );

@@ -1,7 +1,12 @@
 import MarkdownIt from "markdown-it";
 import type Token from "markdown-it/lib/token.mjs";
-import { defaultMarkdownParser, defaultMarkdownSerializer } from "prosemirror-markdown";
+import {
+  defaultMarkdownParser,
+  defaultMarkdownSerializer,
+  MarkdownSerializer,
+} from "prosemirror-markdown";
 import type { Node } from "prosemirror-model";
+import { t, type TextKey } from "../i18n/i18n";
 
 export type TextEditorContent =
   | { readonly supported: true; readonly doc: Node }
@@ -14,11 +19,11 @@ const reference = new MarkdownIt({ html: true, linkify: true });
 const TASK_ITEM = /^[ \t]*(?:[-+*]|\d+[.)])[ \t]+\[[ xX]\](?:[ \t]|$)/m;
 const FOOTNOTE = /\[\^[^\]\s]+\]/;
 
-const FEATURE_NAMES: Record<string, string> = {
-  table_open: "tables",
-  s_open: "strikethrough",
-  html_block: "HTML",
-  html_inline: "HTML",
+const FEATURE_NAMES: Record<string, TextKey> = {
+  table_open: "editor.feature.tables",
+  s_open: "editor.feature.strikethrough",
+  html_block: "editor.feature.html",
+  html_inline: "editor.feature.html",
 };
 
 /**
@@ -27,26 +32,56 @@ const FEATURE_NAMES: Record<string, string> = {
  * formatting (list markers, line wrapping, `Title\n===` headings).
  */
 export function markdownToTextDoc(body: string): TextEditorContent {
-  const features = new Set<string>();
-  if (TASK_ITEM.test(body)) features.add("task lists");
-  if (FOOTNOTE.test(body)) features.add("footnotes");
+  const features = new Set<TextKey>();
+  if (TASK_ITEM.test(body)) features.add("editor.feature.taskLists");
+  if (FOOTNOTE.test(body)) features.add("editor.feature.footnotes");
   for (const token of flatten(reference.parse(body, {}))) {
     const name = FEATURE_NAMES[token.type];
     if (name) features.add(name);
   }
   if (features.size > 0) {
-    return { supported: false, reason: `This note uses ${[...features].join(", ")}` };
+    const names = [...features].map((feature) => t(feature)).join(", ");
+    return { supported: false, reason: t("editor.uses", { features: names }) };
   }
 
   const doc = defaultMarkdownParser.parse(body);
   if (signature(body) !== signature(textDocToMarkdown(doc))) {
-    return { supported: false, reason: "This note uses Markdown the text editor would change" };
+    return { supported: false, reason: t("editor.wouldChange") };
   }
   return { supported: true, doc };
 }
 
+/** `\_` between letters or digits of any script: an escape CommonMark does not need there. */
+const INTRAWORD_ESCAPED_UNDERSCORE = /(?<=[\p{L}\p{N}])\\_(?=[\p{L}\p{N}])/gu;
+
+const defaultText = defaultMarkdownSerializer.nodes.text;
+
+/**
+ * The default serializer, except that `_` between letters or digits stays as
+ * it is in every script. prosemirror-markdown keeps it only between ASCII
+ * letters, so `#новые_технологии` would be written `#новые\_технологии`,
+ * which is a different tag (`новые`). Intraword `_` never starts emphasis.
+ */
+const serializer = new MarkdownSerializer(
+  {
+    ...defaultMarkdownSerializer.nodes,
+    text(state, node, parent, index) {
+      const escape = state.esc.bind(state);
+      state.esc = (text, startOfLine) =>
+        escape(text, startOfLine).replace(INTRAWORD_ESCAPED_UNDERSCORE, "_");
+      try {
+        defaultText?.(state, node, parent, index);
+      } finally {
+        Reflect.deleteProperty(state, "esc");
+      }
+    },
+  },
+  defaultMarkdownSerializer.marks,
+  defaultMarkdownSerializer.options,
+);
+
 export function textDocToMarkdown(doc: Node): string {
-  return defaultMarkdownSerializer.serialize(doc);
+  return serializer.serialize(doc);
 }
 
 function flatten(tokens: readonly Token[]): Token[] {

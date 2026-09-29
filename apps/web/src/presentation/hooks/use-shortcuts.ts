@@ -29,7 +29,9 @@ export function useShortcuts(handlers: ShortcutHandlers): void {
         const { keys } = SHORTCUTS[name as ShortcutName];
         if (!matchesShortcut(keys, event)) continue;
         if (!keys.startsWith("Mod+") && isTyping(event.target)) return;
+        // Ours alone: an editor's own binding for the keys (CodeMirror's Mod-/) does not run.
         event.preventDefault();
+        event.stopPropagation();
         handler();
         return;
       }

@@ -1,4 +1,5 @@
 import {
+  frontmatterTags,
   InvalidDocumentError,
   documentTitle,
   formatTimestamp,
@@ -6,7 +7,7 @@ import {
   updateMetadata,
   type MarkdownDocument,
 } from "../document/document";
-import { parseTags, type Tag } from "../tag/tags";
+import { parseTagName, writtenTags, type Tag } from "../tag/tags";
 
 /**
  * A stored note: an id plus its Markdown document. Everything else (title,
@@ -60,6 +61,23 @@ function stampDates(markdown: string, now: Date, fallbackCreated: string | null)
     created: metadata.created ?? fallbackCreated ?? timestamp,
     updated: timestamp,
   });
+}
+
+/**
+ * `text` with the dates a save wrote into `saved` (`created`, `updated`), so
+ * an editor's document shows what is stored. Everything else in `text` stays
+ * as it is, so text typed while the save ran is kept. Returns `text` itself
+ * when nothing changes or either document is invalid.
+ */
+export function withSavedDates(text: string, saved: Note): string {
+  try {
+    const { created, updated } = parseDocument(saved.markdown).metadata;
+    const current = parseDocument(text).metadata;
+    if (current.created === created && current.updated === updated) return text;
+    return updateMetadata(text, { created, updated });
+  } catch {
+    return text;
+  }
 }
 
 /** Validates a stored record and returns it as a Note. */
@@ -123,7 +141,24 @@ function updatedTime(read: ReadNote): number | null {
   return updated === null ? null : Date.parse(updated);
 }
 
-/** The tags written in the note's body; none if its document is invalid. */
+/**
+ * The note's tags: those listed in the frontmatter's `tags` field, then those
+ * written in the body, each once (by name). None if its document is invalid.
+ */
 export function noteTags(read: ReadNote): Tag[] {
-  return read.valid ? parseTags(read.document.body) : [];
+  return noteWrittenTags(read).flatMap((written) => parseTagName(written) ?? []);
+}
+
+/** The note's tags as written, case kept, in the order of `noteTags`. */
+export function noteWrittenTags(read: ReadNote): string[] {
+  if (!read.valid) return [];
+  const seen = new Map<string, string>();
+  for (const written of [
+    ...frontmatterTags(read.note.markdown),
+    ...writtenTags(read.document.body),
+  ]) {
+    const tag = parseTagName(written);
+    if (tag && !seen.has(tag.name)) seen.set(tag.name, written);
+  }
+  return [...seen.values()];
 }

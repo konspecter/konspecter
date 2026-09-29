@@ -1,3 +1,5 @@
+import { t } from "../i18n/i18n";
+
 type ErrorStateProps = {
   title: string;
   error: unknown;
@@ -11,7 +13,7 @@ export function ErrorState({ title, error, onRetry }: ErrorStateProps) {
       <p>{errorMessage(error)}</p>
       {onRetry && (
         <button type="button" className="button" onClick={onRetry}>
-          Try again
+          {t("app.tryAgain")}
         </button>
       )}
     </section>

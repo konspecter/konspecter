@@ -5,6 +5,7 @@ import {
   updateMetadata,
   type Metadata,
 } from "../../domain/document/document";
+import { t } from "../i18n/i18n";
 
 type MetadataFieldsProps = {
   /** The whole document; the fields read and write its frontmatter. */
@@ -54,13 +55,13 @@ export const MetadataFields = memo(function MetadataFields({
       {showTitle && (
         <>
           <label htmlFor={titleId} className="visually-hidden">
-            Title
+            {t("editor.title")}
           </label>
           <input
             id={titleId}
             className="title-field"
             value={title ?? ""}
-            placeholder={derivedTitle || "Title"}
+            placeholder={derivedTitle || t("editor.title")}
             onChange={(event) => {
               set("title", event.target.value);
             }}
@@ -69,7 +70,7 @@ export const MetadataFields = memo(function MetadataFields({
       )}
       {showCover && (
         <div className="metadata-row">
-          <label htmlFor={coverId}>Cover image</label>
+          <label htmlFor={coverId}>{t("editor.cover")}</label>
           <input
             id={coverId}
             className="cover-field"

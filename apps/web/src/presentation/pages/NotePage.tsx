@@ -1,25 +1,26 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { InvalidDocumentError } from "../../domain/document/document";
-import { noteUpdated, readNote, type Note } from "../../domain/note/note";
+import { readNote, type Note } from "../../domain/note/note";
 import type { ReadingPositionMode } from "../../domain/reading/reading";
 import type { EditorMode } from "../../domain/settings/settings";
-import { Autosave } from "../../application/notes/autosave";
-import { exportFiles } from "../../application/library/export-notes";
+import { Autosave, savesSettled } from "../../application/notes/autosave";
 import type { NoteRepository } from "../../application/notes/note-repository";
-import { exportToFolder, FolderError, isDesktop } from "../../infrastructure/desktop/desktop";
-import { downloadFile } from "../../infrastructure/files/files";
+import { FolderError } from "../../infrastructure/desktop/desktop";
 import { requestPersistence } from "../../infrastructure/storage/persistence";
 import type { Activity } from "../app/activity";
 import { CoverImage } from "../components/CoverImage";
 import { ErrorState, errorMessage } from "../components/ErrorState";
-import { NoteDate } from "../components/NoteDate";
+import { Details } from "../components/details-slot";
+import { NoteDetails } from "../components/NoteDetails";
 import { NoteNotFound } from "../components/NoteNotFound";
 import { displayTitle } from "../components/note-title";
 import { LazyNoteEditor } from "../editors/LazyNoteEditor";
 import { useAsync } from "../hooks/use-async";
 import { useReadingPosition } from "../hooks/use-reading-position";
 import { useShortcuts } from "../hooks/use-shortcuts";
+import { t } from "../i18n/i18n";
+import { rich } from "../i18n/rich";
 
 type NotePageProps = {
   store: NoteRepository;
@@ -45,8 +46,13 @@ export function NotePage({ store, mode, activity, readingPosition = "restore" }:
   const continued = id !== undefined && adopted?.id === id ? adopted : null;
 
   const target = id !== undefined && continued === null ? id : null;
+  // After any save of the note still running (the editor just left it), so
+  // the text shown is its latest.
   const load = useCallback(
-    () => (target === null ? Promise.resolve(undefined) : store.get(target)),
+    () =>
+      target === null
+        ? Promise.resolve(undefined)
+        : savesSettled(store, target).then(() => store.get(target)),
     [store, target],
   );
   const loaded = useAsync(load);
@@ -70,9 +76,7 @@ export function NotePage({ store, mode, activity, readingPosition = "restore" }:
     // A local read takes a moment; show nothing rather than a loading screen.
     return null;
   } else if (loaded.status === "error") {
-    return (
-      <ErrorState title="Could not load the note" error={loaded.error} onRetry={loaded.retry} />
-    );
+    return <ErrorState title={t("note.loadFailed")} error={loaded.error} onRetry={loaded.retry} />;
   } else if (!loaded.value) {
     return <NoteNotFound />;
   } else {
@@ -220,36 +224,38 @@ function NoteSession({
   });
 
   const read = saved ? readNote(saved) : null;
-  const title = read ? displayTitle(read) : "New note";
+  const title = read ? displayTitle(read) : t("note.new");
   const metadata = read?.valid ? read.document.metadata : null;
 
   return (
     <article className="note-page" aria-label={title}>
-      <title>{`${title} · Konspecter`}</title>
+      <title>{t("app.title", { title })}</title>
       <h1 className="visually-hidden">{title}</h1>
       {metadata?.cover && <CoverImage src={metadata.cover} />}
       {metadata?.conflictOf && (
         <p role="note" className="conflict-banner">
-          This is a conflict copy: it holds a version that was changed in two places at once.
-          Compare it with{" "}
-          <Link to={`/notes/${encodeURIComponent(metadata.conflictOf)}`}>the original</Link>, keep
-          what you need, then delete this copy.
+          {rich("note.conflictCopy", {
+            original: (
+              <Link to={`/notes/${encodeURIComponent(metadata.conflictOf)}`}>
+                {t("note.theOriginal")}
+              </Link>
+            ),
+          })}
         </p>
       )}
       {changedElsewhere && (
         <p role="note" className="conflict-banner">
-          This note was changed elsewhere while you were editing it. Your version is saved as a
-          conflict copy, and the other one stays in this note.
+          {t("note.changedElsewhere")}
         </p>
       )}
       {reading.resumePosition !== null && (
         <div className="resume-reading" role="status">
-          <span>You were {Math.round(reading.resumePosition * 100)}% through this note.</span>
+          <span>{t("note.resumeAt", { percent: Math.round(reading.resumePosition * 100) })}</span>
           <button type="button" className="button" onClick={reading.resume}>
-            Continue reading
+            {t("note.continueReading")}
           </button>
           <button type="button" className="button" onClick={reading.dismiss}>
-            Start from the top
+            {t("note.startFromTop")}
           </button>
         </div>
       )}
@@ -260,17 +266,19 @@ function NoteSession({
         onChange={handleChange}
         onReady={handleReady}
         autoFocus={initial === null}
+        titleFromFirstLine={initial === null}
+        saved={saved}
         showMetadata={showMetadata}
       />
       {problem !== null && (
         <p role="alert" className="inline-error">
           {problem instanceof InvalidDocumentError
-            ? `Not saved: ${problem.message}. Fix the frontmatter and it saves again.`
-            : `Could not save the note: ${errorMessage(problem)}. Your text is kept; the next change tries again.`}
+            ? t("note.notSavedInvalid", { reason: problem.message })
+            : t("note.saveFailed", { error: errorMessage(problem) })}
         </p>
       )}
-      {saved && (
-        <NoteFooter
+      <Details>
+        <NoteDetails
           note={saved}
           store={store}
           showMetadata={showMetadata}
@@ -278,119 +286,13 @@ function NoteSession({
             setShowMetadata((shown) => !shown);
           }}
           onDelete={async () => {
+            if (!saved) return;
             await autosave.dispose();
             await store.delete(saved.id);
             void navigate("/", { replace: true });
           }}
         />
-      )}
+      </Details>
     </article>
-  );
-}
-
-type NoteFooterProps = {
-  note: Note;
-  store: NoteRepository;
-  showMetadata: boolean;
-  onToggleMetadata: () => void;
-  onDelete: () => Promise<void>;
-};
-
-/** Dates and the less frequent actions, kept quiet under the text. */
-function NoteFooter({ note, store, showMetadata, onToggleMetadata, onDelete }: NoteFooterProps) {
-  const [deleting, setDeleting] = useState(false);
-  const [failure, setFailure] = useState<unknown>(null);
-  const read = readNote(note);
-  const updated = noteUpdated(read);
-  const created = read.valid ? read.document.metadata.created : null;
-
-  async function handleDelete() {
-    if (!window.confirm(`Delete “${displayTitle(read)}”? This cannot be undone.`)) return;
-    setDeleting(true);
-    setFailure(null);
-    try {
-      await onDelete();
-    } catch (error) {
-      setFailure(new Error(`Could not delete the note: ${errorMessage(error)}`));
-      setDeleting(false);
-    }
-  }
-
-  return (
-    <footer className="note-footer">
-      {(created ?? updated) !== null && (
-        <p className="note-meta">
-          {created !== null && (
-            <>
-              Created <NoteDate value={created} />
-            </>
-          )}
-          {created !== null && updated !== null && " · "}
-          {updated !== null && (
-            <>
-              Edited <NoteDate value={updated} />
-            </>
-          )}
-        </p>
-      )}
-      <div className="note-actions">
-        <button
-          type="button"
-          className="link-button"
-          aria-expanded={showMetadata}
-          onClick={onToggleMetadata}
-        >
-          Title and cover
-        </button>
-        {!store.openExternally && (
-          <button
-            type="button"
-            className="link-button"
-            onClick={() => {
-              const [file] = exportFiles([note]);
-              if (!file) return;
-              if (isDesktop()) {
-                void exportToFolder([file]).catch(setFailure);
-              } else {
-                downloadFile(file.name, new Blob([file.contents], { type: "text/markdown" }));
-              }
-            }}
-          >
-            {isDesktop() ? "Export…" : "Download .md"}
-          </button>
-        )}
-        {store.openExternally && (
-          <button
-            type="button"
-            className="link-button"
-            onClick={() => void store.openExternally?.(note.id).catch(setFailure)}
-          >
-            Open in external editor
-          </button>
-        )}
-        {store.reveal && (
-          <button
-            type="button"
-            className="link-button"
-            onClick={() => void store.reveal?.(note.id).catch(setFailure)}
-          >
-            Show in Finder
-          </button>
-        )}
-        <button
-          type="button"
-          className="link-button link-button-danger"
-          disabled={deleting}
-          onClick={() => void handleDelete()}
-        >
-          Delete
-        </button>
-      </div>
-      {failure !== null && (
-        <p role="alert" className="inline-error">
-          {errorMessage(failure)}
-        </p>
-      )}
-    </footer>
   );
 }

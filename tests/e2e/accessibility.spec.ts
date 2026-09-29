@@ -84,7 +84,9 @@ test("the layout fills the window at any size", async ({ page }) => {
     await page.goto("/");
     const main = await page.locator(".main").boundingBox();
     expect(main?.height, `${String(width)}×${String(height)}`).toBeGreaterThanOrEqual(height);
-    expect((main?.x ?? 0) + (main?.width ?? 0)).toBeCloseTo(width, 0);
+    // Up to the scrollbar's room, which is kept even when nothing scrolls (stable layout).
+    const clientWidth = await page.evaluate(() => document.body.clientWidth);
+    expect((main?.x ?? 0) + (main?.width ?? 0)).toBeCloseTo(clientWidth, 0);
     const sidebar = page.getByRole("complementary", { name: "Sidebar" });
     if (await sidebar.isVisible()) {
       expect((await sidebar.boundingBox())?.height).toBeCloseTo(height, 0);

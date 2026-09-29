@@ -11,8 +11,11 @@ import { ErrorState } from "../components/ErrorState";
 import { markdownToTextDoc, textDocToMarkdown } from "./text-markdown";
 import { MarkdownSourceEditor } from "./MarkdownSourceEditor";
 import { MetadataFields } from "./MetadataFields";
+import { SourceSummary } from "./SourceSummary";
 import { TextEditor } from "./TextEditor";
 import "./editors.css";
+import { t } from "../i18n/i18n";
+import { withSavedDates, type Note } from "../../domain/note/note";
 
 export type { EditorMode };
 
@@ -22,7 +25,7 @@ const MarkdownView = lazy(() =>
   import("../markdown/MarkdownView").then(
     (module) => ({ default: module.MarkdownView }),
     (error: unknown) => ({
-      default: () => <ErrorState title="Could not load the note reader" error={error} />,
+      default: () => <ErrorState title={t("editor.readerLoadFailed")} error={error} />,
     }),
   ),
 );
@@ -41,6 +44,13 @@ export type NoteEditorProps = {
   onReady?: () => void;
   /** Puts the caret in the editor when it opens (a new note). */
   autoFocus?: boolean;
+  /** A new note: a short first line becomes the title when Enter ends it. */
+  titleFromFirstLine?: boolean;
+  /**
+   * The stored version, after each save: the dates the save wrote (created,
+   * updated) become part of the edited document at once, in every mode.
+   */
+  saved?: Note | null;
   /** Shows the title and cover fields even when they are empty. */
   showMetadata?: boolean;
 };
@@ -72,7 +82,7 @@ function viewFor(mode: EditorMode, markdown: string, key: number): View {
     return {
       kind: "source",
       key,
-      notice: `Text editing is unavailable: ${reason}. Fix it in the Markdown below.`,
+      notice: t("editor.textUnavailable", { reason }),
     };
   }
   const content = markdownToTextDoc(document.body);
@@ -80,7 +90,7 @@ function viewFor(mode: EditorMode, markdown: string, key: number): View {
   return {
     kind: "rendered",
     key,
-    notice: `${content.reason}, so it can only be edited in Markdown mode.`,
+    notice: t("editor.markdownOnly", { reason: content.reason }),
     body: document.body,
     title: documentTitle(document),
     titleDerived: !document.metadata.title?.trim(),
@@ -98,6 +108,8 @@ export const NoteEditor = memo(function NoteEditor({
   onChange,
   onReady,
   autoFocus = false,
+  titleFromFirstLine = false,
+  saved = null,
   showMetadata = false,
 }: NoteEditorProps) {
   // The document as of the last metadata or source edit. In text mode its
@@ -109,6 +121,23 @@ export const NoteEditor = memo(function NoteEditor({
   const markdownRef = useRef(initialMarkdown);
   const docRef = useRef<{ readonly session: number; readonly doc: Node } | null>(null);
   const [shown, setShown] = useState(() => ({ mode, view: viewFor(mode, initialMarkdown, 0) }));
+  // The dates each save writes join the document at once: the frontmatter
+  // held here (text mode), and the text read when saving.
+  const [syncedWith, setSyncedWith] = useState(saved);
+  if (saved !== syncedWith) {
+    setSyncedWith(saved);
+    if (saved) {
+      const next = withSavedDates(markdown, saved);
+      if (next !== markdown) setMarkdown(next);
+    }
+  }
+  useEffect(() => {
+    if (saved) markdownRef.current = withSavedDates(markdownRef.current, saved);
+  }, [saved]);
+
+  // Whether the caret is in the editor: switching modes then (the shortcut)
+  // puts it in the other editor, so typing can go on.
+  const [focusWithin, setFocusWithin] = useState(false);
   let { view } = shown;
 
   if (mode !== shown.mode) {
@@ -158,7 +187,15 @@ export const NoteEditor = memo(function NoteEditor({
   const firstLine = doc?.firstChild?.textContent.trim();
 
   return (
-    <div className="note-editor">
+    <div
+      className="note-editor"
+      onFocus={() => {
+        setFocusWithin(true);
+      }}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setFocusWithin(false);
+      }}
+    >
       {view.kind !== "text" && view.notice && (
         <p role="status" className="editor-notice">
           {view.notice}
@@ -177,15 +214,19 @@ export const NoteEditor = memo(function NoteEditor({
           key={view.key}
           initialDoc={view.doc}
           onChange={handleTextChange}
-          autoFocus={autoFocus}
+          autoFocus={autoFocus || focusWithin}
+          titleFromFirstLine={titleFromFirstLine}
         />
       )}
+      {view.kind === "source" && <SourceSummary markdown={markdown} />}
       {view.kind === "source" && (
         <MarkdownSourceEditor
           key={view.key}
           initialValue={markdown}
           onChange={handleSourceChange}
-          autoFocus={autoFocus}
+          autoFocus={autoFocus || focusWithin}
+          titleFromFirstLine={titleFromFirstLine}
+          saved={saved}
         />
       )}
       {view.kind === "rendered" && (

@@ -2,19 +2,13 @@ import { useId, useState, useSyncExternalStore, type SubmitEvent } from "react";
 import type { SyncEngine, SyncStatus } from "../../infrastructure/sync/sync-engine";
 import { errorMessage } from "./ErrorState";
 import { NoteDate } from "./NoteDate";
-
-const STATE_TEXT: Record<SyncStatus["state"], string> = {
-  disabled: "Not connected",
-  idle: "Up to date",
-  syncing: "Syncing…",
-  offline: "Offline — changes are kept and sent when you are back online",
-  error: "Sync failed; retrying",
-};
+import { t, tn } from "../i18n/i18n";
+import { rich } from "../i18n/rich";
 
 export function syncSummary(status: SyncStatus): string {
-  const parts = [STATE_TEXT[status.state]];
-  if (status.pending > 0) parts.push(`${String(status.pending)} waiting to upload`);
-  if (status.blocked > 0) parts.push(`${String(status.blocked)} held back`);
+  const parts = [t(`sync.state.${status.state}`)];
+  if (status.pending > 0) parts.push(tn("sync.pending", status.pending));
+  if (status.blocked > 0) parts.push(tn("sync.blocked", status.blocked));
   return parts.join(" · ");
 }
 
@@ -23,7 +17,7 @@ export function SyncSettings({ sync }: { sync: SyncEngine }) {
   return (
     <section className="setting sync-settings" aria-labelledby="sync-heading">
       <h2 id="sync-heading" className="setting-heading">
-        Sync
+        {t("sync.title")}
       </h2>
       {status.state === "disabled" ? (
         <ConnectForm sync={sync} />
@@ -38,30 +32,28 @@ function SyncState({ sync, status }: { sync: SyncEngine; status: SyncStatus }) {
   return (
     <>
       <p className="setting-hint">
-        Connected to <strong>{status.serverUrl}</strong> as <strong>{status.account?.email}</strong>
-        .
+        {rich("sync.connectedTo", {
+          server: <strong>{status.serverUrl}</strong>,
+          account: <strong>{status.account?.email}</strong>,
+        })}
       </p>
       <p role="status" className="sync-status">
         {syncSummary(status)}
         {status.lastSyncedAt && (
           <>
-            {" · last synced "}
-            <NoteDate value={status.lastSyncedAt} />
+            {" · "}
+            {rich("sync.lastSynced", { date: <NoteDate value={status.lastSyncedAt} /> })}
           </>
         )}
       </p>
       {status.error && <p className="inline-error">{status.error}</p>}
-      {status.blocked > 0 && (
-        <p className="setting-hint">
-          Notes changed on two devices at once are held back with both versions kept.
-        </p>
-      )}
+      {status.blocked > 0 && <p className="setting-hint">{t("sync.heldBack")}</p>}
       <div className="actions">
         <button type="button" className="button" onClick={() => void sync.syncNow()}>
-          Sync now
+          {t("sync.now")}
         </button>
         <button type="button" className="button" onClick={() => void sync.disconnect()}>
-          Disconnect
+          {t("sync.disconnect")}
         </button>
       </div>
     </>
@@ -90,11 +82,8 @@ function ConnectForm({ sync }: { sync: SyncEngine }) {
 
   return (
     <form className="connect-form" onSubmit={(event) => void handleSubmit(event)}>
-      <p className="setting-hint">
-        Notes stay on this device either way. Connecting keeps them in step with a Konspecter
-        server.
-      </p>
-      <label htmlFor={urlId}>Server URL</label>
+      <p className="setting-hint">{t("sync.intro")}</p>
+      <label htmlFor={urlId}>{t("sync.serverUrl")}</label>
       <input
         id={urlId}
         type="url"
@@ -105,7 +94,7 @@ function ConnectForm({ sync }: { sync: SyncEngine }) {
           setServerUrl(event.target.value);
         }}
       />
-      <label htmlFor={tokenId}>Access token</label>
+      <label htmlFor={tokenId}>{t("sync.token")}</label>
       <input
         id={tokenId}
         type="password"
@@ -119,12 +108,12 @@ function ConnectForm({ sync }: { sync: SyncEngine }) {
       />
       {error !== null && (
         <p role="alert" className="inline-error">
-          Could not connect: {errorMessage(error)}
+          {t("sync.connectFailed", { error: errorMessage(error) })}
         </p>
       )}
       <div className="actions">
         <button type="submit" className="button button-primary" disabled={connecting}>
-          Connect
+          {t("sync.connect")}
         </button>
       </div>
     </form>

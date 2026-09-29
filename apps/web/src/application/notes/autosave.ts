@@ -37,6 +37,36 @@ export type AutosaveOptions = {
   changedUnderneath?: (error: unknown) => boolean;
 };
 
+/** Per repository and note id, the saves running or waiting to run. */
+const saving = new WeakMap<NoteRepository, Map<string, Promise<void>>>();
+
+function track(store: NoteRepository, noteId: string, save: Promise<void>): void {
+  let notes = saving.get(store);
+  if (!notes) {
+    notes = new Map();
+    saving.set(store, notes);
+  }
+  notes.set(noteId, save);
+  void save.finally(() => {
+    if (notes.get(noteId) === save) notes.delete(noteId);
+  });
+}
+
+/**
+ * Resolves once no save of `noteId` is running in `store`. Read a note only
+ * then: an editor just left may still be writing its last changes, and
+ * reading earlier would show the text before them.
+ */
+export async function savesSettled(store: NoteRepository, noteId: string): Promise<void> {
+  for (
+    let save = saving.get(store)?.get(noteId);
+    save !== undefined;
+    save = saving.get(store)?.get(noteId)
+  ) {
+    await save;
+  }
+}
+
 /**
  * Saves an editor's text as it changes, without React: changes are coalesced
  * (a quiet `delay`, at most `maxWait` while typing continues), one write is in
@@ -115,7 +145,14 @@ export class Autosave {
   }
 
   /** Saves any pending change now. Never rejects: problems go to `onProblem`. */
-  async flush(): Promise<void> {
+  flush(): Promise<void> {
+    const done = this.#flush();
+    const id = this.#base?.id;
+    if (id !== undefined) track(this.#store, id, done);
+    return done;
+  }
+
+  async #flush(): Promise<void> {
     clearTimeout(this.#timer);
     while (this.#running) await this.#running;
     const retry = this.#retry;
@@ -174,7 +211,10 @@ export class Autosave {
       this.#problem(error);
       return;
     }
-    if (markdown === this.#written && !this.#unsaved) return;
+    // Nothing new: the text last written, or the stored version itself (an
+    // editor that took over the dates the last save wrote).
+    const unchanged = markdown === this.#written || markdown === this.#base?.markdown;
+    if (unchanged && !this.#unsaved) return;
     try {
       await this.#write(markdown);
       this.#unsaved = false;

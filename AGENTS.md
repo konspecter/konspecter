@@ -53,9 +53,11 @@ All planned phases are done. New work needs a new plan in `.claude/plans/`.
 | Package   | Scope                                                                      | Status |
 | --------- | -------------------------------------------------------------------------- | ------ |
 | Updates 1 | Two-panel UI, editor-first notes with autosave, search UX, shortcuts, font | Done   |
+| Updates 2 | Owl icon, English/Russian UI, sidebar details, toolbar, tags, highlighting | Done   |
 
-Spec: `.claude/plans/updates-1.md`; implementation notes: `updates-1-implementation.md`.
-UI architecture: `docs/architecture/ui.md`.
+Specs and notes: `.claude/plans/updates-1.md` (+ `updates-1-implementation.md`), `updates-2.md`
+(+ `updates-2-implementation.md`). UI architecture: `docs/architecture/ui.md`; languages:
+`docs/architecture/i18n.md`.
 
 ## Working rules
 
@@ -96,7 +98,8 @@ apps/web/                 React + Vite web app (the shared UI for all clients)
                           (http/), sync engine (sync/), desktop bridge (desktop/), File Mode (folder/),
                           mobile detection (mobile/),
                           browser files, ZIP, downloads (files/)
-  src/presentation/       UI: app/ (routes, styles), components/, editors/, hooks/, markdown/, pages/
+  src/presentation/       UI: app/ (routes, styles), components/, editors/, hooks/, i18n/ (en, ru),
+                          markdown/, pages/
 apps/mobile/              Capacitor 8 Android app around apps/web (android/: generated Gradle project)
 apps/desktop/             Tauri 2 desktop shell around apps/web
   src-tauri/src/          Rust: lib.rs (commands), folder.rs (File Mode file access)
@@ -112,6 +115,7 @@ tests/e2e/                Playwright end-to-end tests
 docs/license-policy.md    dependency license policy
 license-policy.json       machine-readable license policy used by CI
 scripts/check-licenses.mjs
+scripts/render-icons.mjs  the app icon (owl) for every platform: `pnpm icons`
 .github/workflows/ci.yml
 ```
 
@@ -133,6 +137,7 @@ pnpm format           # Prettier (write); format:check to verify
 pnpm licenses:check   # npm dependency license policy
 pnpm check            # all of the above, as CI runs them
 pnpm e2e              # Playwright end-to-end tests in Chromium (see docs/testing.md)
+pnpm icons            # re-render every app icon from scripts/render-icons.mjs (needs e2e deps)
 pnpm --filter @konspecter/web coverage   # unit tests with coverage
 pnpm --filter @konspecter/web bench      # performance measurements (docs/performance.md)
 

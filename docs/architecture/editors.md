@@ -9,7 +9,8 @@ themselves ([Autosave](#autosave), [ADR-010](decisions/ADR-010-autosave-editor-f
 | **Text**     | the body, as rich text        | ProseMirror + `prosemirror-markdown`                      |
 | **Markdown** | the whole document, as source | CodeMirror 6 ([ADR-006](decisions/ADR-006-codemirror.md)) |
 
-The mode switch is the Text/Markdown toggle in the top bar; the choice is remembered (the
+The mode switch is one icon button in the top bar (pressed while the Markdown source shows;
+its icon, a T or the Markdown mark, is the mode it switches to); the choice is remembered (the
 `defaultEditor` setting). Edits carry over when switching modes.
 
 ## Text mode
@@ -20,8 +21,16 @@ with a contextual formatting toolbar and Markdown-style shortcuts.
 - **Contextual toolbar:** hidden until the text has focus. Then it is a vertical strip in the
   margin, starting at the top of the block that holds the caret, and it follows the caret
   from block to block. It is absolutely positioned, so it takes no space and never shifts the
-  text. Tab moves from the text into it; it hides when focus leaves both. On narrow screens it
-  floats at the right edge.
+  text. Tab moves from the text into it; it hides when focus leaves both. It is always on the
+  left: in the column's margin, and on small screens in the editor's left gap (a compact
+  toolbar). It stays visible: it grows down from the block's top, and when it does not fit
+  below within the window (under the top bar) and there is more room above, it ends at the
+  block's bottom and grows up (`toolbarTopFor`); scrolling and resizing place it again. At
+  rest it is flat and pale (no frame, muted buttons); pointing at it or moving the focus into
+  it brings up its frame.
+- **Folding:** the toolbar starts folded (remembered per device, `localStorage`): one tool,
+  the one in effect at the caret (a heading, bold…), else the last one used, else Bold, and a
+  chevron that unfolds all of them. Unfolded, the chevron folds it again.
 
 - **Formatting:** bold, italic, inline code, link, heading (H2), subheading (H3), quote,
   bulleted and numbered lists, and code block. The toolbar shows which marks and blocks
@@ -29,8 +38,19 @@ with a contextual formatting toolbar and Markdown-style shortcuts.
 - **Shortcuts:** typing `#`–`######` + space makes a heading, `>` a quote, `-`/`*`/`+` a
   list, `1.` a numbered list, and ` ```lang ` + space a code block. Backspace right
   after a shortcut undoes it. `Mod-B/I/\`` toggle marks, `Mod-Z`/`Mod-Shift-Z`undo and redo,`Mod-[`/`Mod-]`outdent and indent list items, and`Shift-Enter` inserts a line break.
+- **First line as title:** in a new note, Enter at the end of the first line makes it the
+  title (a level 1 heading) when it is shorter than 50 characters, while the note is still
+  that one line, so only once (`firstLineTitle`). Markdown mode does the same by writing
+  `# ` in front, unless the line already starts with Markdown syntax.
+- **Tags** are marked (a decoration, weight 560: heavier than the text, not bold), outside
+  code, with the parser's rules (`tagRanges`).
+- **Quotes in code:** a typographic quote the system puts in for a typed `"` or `'` (macOS
+  smart quotes, «» in Russian) is replaced by the straight quote in code blocks and inline
+  code; text keeps the system's choice.
 - **Markdown generation:** the ProseMirror document uses `prosemirror-markdown`'s CommonMark
-  schema, so every editor state maps to Markdown and back. The serializer writes the body.
+  schema, so every editor state maps to Markdown and back. The serializer writes the body,
+  except that `_` between letters or digits of any script is written as it is (the library
+  escapes it unless both neighbours are ASCII, which cut `#новые_технологии` to `#новые`).
   The frontmatter is kept byte for byte (`replaceBody` in the document module).
 - **Canonical output:** until the first edit, the document is untouched, so opening and saving
   never reformats a note. After an edit, the body is written in the serializer's style:
@@ -56,11 +76,21 @@ frontmatter opens as source, where the frontmatter can be fixed.
 
 CodeMirror 6 over the whole document, frontmatter included (`MarkdownSourceEditor.tsx`):
 
-- **Highlighting:** GFM Markdown, YAML in the frontmatter block, and fenced code in its own
-  language (grammars from `@codemirror/language-data`, loaded on demand). Colours use the
-  reader's tokens, so both themes match.
+- **Highlighting:** GFM Markdown (headings, emphasis, links and URLs, list and quote markers,
+  inline code, escapes), YAML in the frontmatter block, and fenced code in its own language
+  (grammars from `@codemirror/language-data`, loaded on demand), with code blocks on the code
+  background. Colours are the reader's code tokens (global in `app.css`), so both themes
+  match. Tags are marked (outside code, HTML, URLs and the frontmatter).
+- **Quotes:** in code blocks, inline code and the frontmatter a typed `"` or `'` stays
+  straight even when the system substitutes a typographic quote (see Text mode); `autocorrect`
+  and `autocapitalize` are off.
 - **Editing:** undo and redo, search and replace (`Mod-F`), Tab indents, and long lines
   wrap.
+- **Found title and tags** (`SourceSummary.tsx`): a read-only line above the source shows the
+  title and tags the app reads from the document (the heading or `title:`, the `#tags` and the
+  `tags:` list), following the typing. They are not written into the frontmatter: the text is
+  their one source ([ADR-002](decisions/ADR-002-markdown-source-of-truth.md)); the
+  frontmatter holds only what is set explicitly, and the dates.
 - **No autocompletion**, by design, and no bracket closing, so what you type is what is
   saved.
 
@@ -71,7 +101,24 @@ Text mode is the default for new and existing notes.
 
 `MetadataFields` edits `title` and `cover` in the frontmatter. While they are empty the fields
 stay hidden (the body's heading is the title); a note that has them shows them, and _Title
-and cover_ under the text opens both.
+and cover_ in the sidebar's Details opens both.
+
+## Editing area
+
+With the setting "Editing area" on (the default), the editor is a panel a shade darker than
+the page (`--color-editor`) with the same gap on every side (`--editor-gap`: 28px, 36px on
+small screens, where the gap holds the toolbar) and as tall as the note: no empty space is
+forced below the text, and the text adds no margin at its top or bottom. Off, the editor sits
+on the page as before (`data-editing-area` on `<html>`).
+
+## Saved dates in the editor
+
+Each save writes `created` and `updated` into the stored document. They join the edited
+document at once (`withSavedDates`, from the note page's `saved`): into the frontmatter the
+text editor keeps, and in Markdown mode into the source, as the smallest in-place change (the
+caret stays, it is not undoable). Only the dates are taken over, so text typed while the save
+ran is kept. The editor then holds the stored version, which autosave recognizes, so taking
+over the dates never causes another save.
 
 ## Autosave
 

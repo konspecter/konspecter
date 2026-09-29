@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from "react";
 import type { EditorMode, Theme } from "../../domain/settings/settings";
-import { MoonIcon, SunIcon } from "./icons";
+import { MarkdownIcon, MoonIcon, SunIcon, TextIcon } from "./icons";
+import { t } from "../i18n/i18n";
+import { formatKeys, SHORTCUTS } from "../app/shortcuts";
 
 const DARK = "(prefers-color-scheme: dark)";
 
@@ -27,10 +29,10 @@ export function ThemeToggle({ dark, onToggle }: { dark: boolean; onToggle: () =>
   return (
     <button
       type="button"
-      className="icon-button theme-toggle"
-      aria-label="Dark theme"
+      className="icon-button"
+      aria-label={t("topbar.darkTheme")}
       aria-pressed={dark}
-      title={dark ? "Switch to the light theme" : "Switch to the dark theme"}
+      title={dark ? t("topbar.toLight") : t("topbar.toDark")}
       onClick={onToggle}
     >
       {dark ? <SunIcon /> : <MoonIcon />}
@@ -38,11 +40,7 @@ export function ThemeToggle({ dark, onToggle }: { dark: boolean; onToggle: () =>
   );
 }
 
-const MODES: readonly (readonly [EditorMode, string])[] = [
-  ["text", "Text"],
-  ["markdown", "Markdown"],
-];
-
+/** One button: pressed while notes show their Markdown source; the icon shows the other mode. */
 export function ModeToggle({
   mode,
   onChange,
@@ -50,21 +48,19 @@ export function ModeToggle({
   mode: EditorMode;
   onChange: (mode: EditorMode) => void;
 }) {
+  const markdown = mode === "markdown";
   return (
-    <div className="mode-toggle" role="group" aria-label="Editor mode">
-      {MODES.map(([value, label]) => (
-        <button
-          key={value}
-          type="button"
-          className="mode-button"
-          aria-pressed={mode === value}
-          onClick={() => {
-            onChange(value);
-          }}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
+    <button
+      type="button"
+      className="icon-button"
+      aria-label={t("topbar.markdown")}
+      aria-pressed={markdown}
+      title={`${markdown ? t("topbar.toText") : t("topbar.toMarkdown")} (${formatKeys(SHORTCUTS.editorMode.keys)})`}
+      onClick={() => {
+        onChange(markdown ? "text" : "markdown");
+      }}
+    >
+      {markdown ? <TextIcon /> : <MarkdownIcon />}
+    </button>
   );
 }

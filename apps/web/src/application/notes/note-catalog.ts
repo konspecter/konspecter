@@ -1,5 +1,6 @@
 import { plainText } from "../../domain/document/plain-text";
-import { noteTitle, noteUpdated, readNote, type Note } from "../../domain/note/note";
+import { noteTags, noteTitle, noteUpdated, readNote, type Note } from "../../domain/note/note";
+import type { Tag } from "../../domain/tag/tags";
 import type { NoteChange, NoteRepository } from "./note-repository";
 
 /** What lists show of a note, without keeping its whole text in memory. */
@@ -50,6 +51,26 @@ export function byMostRecentSummary(a: NoteSummary, b: NoteSummary): number {
     return bTime - aTime;
   }
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+/** By title, untitled notes last, then by id. */
+function byTitleSummary(a: NoteSummary, b: NoteSummary): number {
+  if ((a.title === "") !== (b.title === "")) return a.title === "" ? 1 : -1;
+  const byTitle = a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true });
+  if (byTitle !== 0) return byTitle;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+/**
+ * The notes tagged with `tag` itself, not only with a tag below it (those sit
+ * under the child tag), by title: the documents inside a tag in the tag tree.
+ */
+export async function notesTaggedExactly(store: NoteRepository, tag: Tag): Promise<NoteSummary[]> {
+  const notes = await store.notesWithTag(tag);
+  return notes
+    .filter((note) => noteTags(readNote(note)).some((own) => own.name === tag.name))
+    .map(summarize)
+    .sort(byTitleSummary);
 }
 
 /**
