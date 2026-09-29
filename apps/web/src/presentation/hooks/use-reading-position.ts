@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   positionToScroll,
   scrollToPosition,
+  type EditorSelection,
   type ReadingPositionMode,
 } from "../../domain/reading/reading";
 import type { NoteRepository } from "../../application/notes/note-repository";
+import { saveBeforeClosing } from "../app/closing";
 
 function currentPosition(): number | null {
   const { scrollHeight } = document.documentElement;
@@ -29,7 +31,8 @@ type Options = {
 /**
  * Saves the reader's scroll position per note and brings it back when the
  * note is opened again: automatically ("restore"), on request ("ask", via
- * `resume`), or not at all ("off", which also stops saving).
+ * `resume`), or not at all ("off", which also stops saving). The caret is
+ * saved alongside (`rememberSelection`); the note page restores it.
  */
 export function useReadingPosition({ store, noteId, mode, ready, saveDelay = 400 }: Options) {
   const [offer, setOffer] = useState<{ noteId: string; position: number } | null>(null);
@@ -59,32 +62,81 @@ export function useReadingPosition({ store, noteId, mode, ready, saveDelay = 400
     if (mode === "off") return;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let pending: number | null = null;
-    const save = () => {
+    const save = (): Promise<void> => {
       if (timer !== undefined) clearTimeout(timer);
       timer = undefined;
-      if (pending === null) return;
+      if (pending === null) return Promise.resolve();
       const position = pending;
       pending = null;
-      store.saveReadingPosition(noteId, position).catch(() => undefined);
+      return store.saveReadingPosition(noteId, position).catch(() => undefined);
     };
+    const unregister = saveBeforeClosing(save);
     const onScroll = () => {
       pending = currentPosition();
       if (timer !== undefined) clearTimeout(timer);
-      timer = setTimeout(save, saveDelay);
+      timer = setTimeout(() => void save(), saveDelay);
+    };
+    const onHidden = () => {
+      if (document.visibilityState === "hidden") void save();
     };
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("pagehide", save);
+    const onPageHide = () => void save();
+    window.addEventListener("pagehide", onPageHide);
+    document.addEventListener("visibilitychange", onHidden);
     return () => {
+      unregister();
       window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("pagehide", save);
-      save();
+      window.removeEventListener("pagehide", onPageHide);
+      document.removeEventListener("visibilitychange", onHidden);
+      void save();
     };
   }, [store, noteId, mode, saveDelay]);
+
+  // The caret, saved the same way: a moment after it stops moving, and at
+  // once when the page is hidden or closed.
+  const selectionSaver = useRef<((selection: EditorSelection) => void) | null>(null);
+  useEffect(() => {
+    if (mode === "off" || noteId === "") return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let pending: EditorSelection | null = null;
+    const save = (): Promise<void> => {
+      if (timer !== undefined) clearTimeout(timer);
+      timer = undefined;
+      if (pending === null) return Promise.resolve();
+      const selection = pending;
+      pending = null;
+      return store.saveEditorSelection(noteId, selection).catch(() => undefined);
+    };
+    const unregister = saveBeforeClosing(save);
+    const onHidden = () => {
+      if (document.visibilityState === "hidden") void save();
+    };
+    selectionSaver.current = (selection) => {
+      pending = selection;
+      if (timer !== undefined) clearTimeout(timer);
+      timer = setTimeout(() => void save(), saveDelay);
+    };
+    const onPageHide = () => void save();
+    window.addEventListener("pagehide", onPageHide);
+    document.addEventListener("visibilitychange", onHidden);
+    return () => {
+      unregister();
+      selectionSaver.current = null;
+      window.removeEventListener("pagehide", onPageHide);
+      document.removeEventListener("visibilitychange", onHidden);
+      void save();
+    };
+  }, [store, noteId, mode, saveDelay]);
+  const rememberSelection = useCallback((selection: EditorSelection) => {
+    selectionSaver.current?.(selection);
+  }, []);
 
   const visibleOffer = offer?.noteId === noteId && mode === "ask" ? offer : null;
   return {
     /** In "ask" mode, the saved position the reader can jump back to. */
     resumePosition: visibleOffer?.position ?? null,
+    /** Saves where the caret is (the editor reports it as it moves). */
+    rememberSelection,
     resume: () => {
       if (visibleOffer) scrollTo(visibleOffer.position);
       setOffer(null);

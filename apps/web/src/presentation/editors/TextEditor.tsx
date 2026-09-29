@@ -1,5 +1,5 @@
 import type { Node } from "prosemirror-model";
-import type { Command } from "prosemirror-state";
+import { TextSelection, type Command } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import "prosemirror-view/style/prosemirror.css";
 import {
@@ -15,8 +15,10 @@ import {
 import { ChevronIcon } from "../components/icons";
 import {
   createTextEditorState,
+  FROM_ELSEWHERE,
   isLinkActive,
   linkCommand,
+  replaceDocument,
   toolbarActions,
 } from "./text-editor-setup";
 import { t, type TextKey } from "../i18n/i18n";
@@ -24,11 +26,24 @@ import { t, type TextKey } from "../i18n/i18n";
 type TextEditorProps = {
   /** Read once, when the editor mounts. */
   initialDoc: Node;
+  /**
+   * A version from elsewhere to show instead, in place: the caret and the
+   * scroll position stay, and it is not reported as an edit (a new object
+   * each time).
+   */
+  replacement?: { readonly doc: Node } | null;
   onChange: (doc: Node) => void;
+  /** Where the caret goes when the editor opens (clamped to the document). */
+  initialSelection?: Caret | null;
+  /** The caret moved, or the editor gained or lost the focus. */
+  onSelectionChange?: (caret: Caret) => void;
   autoFocus?: boolean;
   /** A new note: a short first line becomes the title when Enter ends it. */
   titleFromFirstLine?: boolean;
 };
+
+/** A caret in ProseMirror positions, and whether the editor has the focus. */
+export type Caret = { readonly anchor: number; readonly head: number; readonly focused: boolean };
 
 type Tool = {
   /** Identifies the tool (a message key). */
@@ -125,7 +140,10 @@ export function toolbarTopFor(
  */
 export const TextEditor = memo(function TextEditor({
   initialDoc,
+  replacement = null,
   onChange,
+  initialSelection = null,
+  onSelectionChange,
   autoFocus = false,
   titleFromFirstLine = false,
 }: TextEditorProps) {
@@ -134,11 +152,17 @@ export const TextEditor = memo(function TextEditor({
   const mountRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
-  const [editorState, setEditorState] = useState(() =>
-    createTextEditorState(initialDoc, { titleFromFirstLine }),
-  );
+  const onSelectionRef = useRef(onSelectionChange);
+  const [editorState, setEditorState] = useState(() => {
+    const state = createTextEditorState(initialDoc, { titleFromFirstLine });
+    if (!initialSelection) return state;
+    const size = state.doc.content.size;
+    const at = (position: number) => state.doc.resolve(Math.min(position, size));
+    const selection = TextSelection.between(at(initialSelection.anchor), at(initialSelection.head));
+    return state.apply(state.tr.setSelection(selection));
+  });
   const [initialState] = useState(editorState);
-  const [initialFocus] = useState(autoFocus);
+  const [initialFocus] = useState(autoFocus || initialSelection?.focused === true);
   const [focused, setFocused] = useState(false);
   const [toolbarTop, setToolbarTop] = useState<number | null>(null);
   const [folded, setFolded] = useState(initialFolded);
@@ -146,7 +170,8 @@ export const TextEditor = memo(function TextEditor({
 
   useEffect(() => {
     onChangeRef.current = onChange;
-  }, [onChange]);
+    onSelectionRef.current = onSelectionChange;
+  }, [onChange, onSelectionChange]);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -164,11 +189,30 @@ export const TextEditor = memo(function TextEditor({
         const next = view.state.apply(transaction);
         view.updateState(next);
         setEditorState(next);
-        if (transaction.docChanged) {
+        if (transaction.docChanged && !transaction.getMeta(FROM_ELSEWHERE)) {
           onChangeRef.current(next.doc);
         }
+        if (transaction.selectionSet || transaction.docChanged) report();
+      },
+      handleDOMEvents: {
+        focus: () => {
+          report(true);
+          return false;
+        },
+        blur: () => {
+          // Once the focus has moved: a window that loses the focus (another
+          // app, closing) keeps it in the editor, and so does the caret.
+          setTimeout(() => {
+            if (viewRef.current === view) report();
+          }, 0);
+          return false;
+        },
       },
     });
+    function report(focused = view.hasFocus()) {
+      const { anchor, head } = view.state.selection;
+      onSelectionRef.current?.({ anchor, head, focused });
+    }
     viewRef.current = view;
     if (initialFocus) view.focus();
     return () => {
@@ -176,6 +220,13 @@ export const TextEditor = memo(function TextEditor({
       viewRef.current = null;
     };
   }, [initialState, initialFocus]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || !replacement) return;
+    const transaction = replaceDocument(view.state, replacement.doc);
+    if (transaction) view.dispatch(transaction);
+  }, [replacement]);
 
   // Place the toolbar after every render that can move the caret's block or
   // change the toolbar's height (folding), and again once it shows, when its

@@ -8,7 +8,7 @@ export type RemoteNote = {
 
 /**
  * Why a note is not being synced: its local and server versions both changed
- * (a conflict; both are kept), or the server refused it.
+ * (a conflict, settled at the end of the sync cycle), or the server refused it.
  */
 export type SyncBlock =
   | { readonly reason: "conflict"; readonly remote: RemoteNote | null }

@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "What the main window may do. Kept minimal: native access is added per feature. Dragging: the overlay title bar (macOS) moves the window from the app's top bars (data-tauri-drag-region).",
+  "description": "What the main window may do. Kept minimal: native access is added per feature. Dragging: the overlay title bar (macOS) moves the window from the app's top bars (data-tauri-drag-region). Destroying: the window closes itself once pending saves are written (onCloseRequested).",
   "windows": ["main"],
-  "permissions": ["core:default", "core:window:allow-start-dragging"]
+  "permissions": ["core:default", "core:window:allow-start-dragging", "core:window:allow-destroy"]
 }

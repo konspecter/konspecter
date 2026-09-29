@@ -38,15 +38,15 @@ Code: `apps/web/src/domain/document/document.ts` (pure, no UI or storage depende
 
 All fields are optional. `null` and an absent key mean the same thing.
 
-| Field         | Type                    | Meaning                                                                                           |
-| ------------- | ----------------------- | ------------------------------------------------------------------------------------------------- |
-| `title`       | text                    | Display title. Falls back to the body's first line.                                               |
-| `created`     | ISO 8601 date/date-time | When the note was created.                                                                        |
-| `updated`     | ISO 8601 date/date-time | When the note was last saved. Used for ordering.                                                  |
-| `author`      | text, or a list of text | Who wrote the note. A list (`[Ann, Bob]`) is shown as `Ann, Bob`.                                 |
-| `tags`        | list of tags, or text   | The note's tags besides those in the body (see [tags](tags.md)).                                  |
-| `cover`       | text (URL, path, data)  | Cover image: a URL, a path, or an uploaded image as a base64 `data:` URL.                         |
-| `conflict_of` | text (note id)          | Set on conflict copies: the note this one is a copy of (see [sync](sync.md#conflict-resolution)). |
+| Field         | Type                    | Meaning                                                                                                                                  |
+| ------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `title`       | text                    | Display title. Falls back to the body's first line.                                                                                      |
+| `created`     | ISO 8601 date/date-time | When the note was created.                                                                                                               |
+| `updated`     | ISO 8601 date/date-time | When the note was last saved. Used for ordering.                                                                                         |
+| `author`      | text, or a list of text | Who wrote the note. A list (`[Ann, Bob]`) is shown as `Ann, Bob`.                                                                        |
+| `tags`        | list of tags, or text   | The note's tags besides those in the body (see [tags](tags.md)).                                                                         |
+| `cover`       | text (URL, path, data)  | Cover image: a URL, a path, or an uploaded image as a base64 `data:` URL.                                                                |
+| `conflict_of` | text (note id)          | Set on conflict copies made before the last write won ([ADR-011](decisions/ADR-011-last-write-wins.md)): the note this one is a copy of. |
 
 - **Date spellings:** other tools write `create_at` and `updated_at`. They are read as
   `created` and `updated` (which win when a document has both). A save stamps the date under
@@ -74,10 +74,14 @@ The UI shows "Untitled" when both are empty.
   in which case an empty `---`/`---` block is written first. `parseDocument(serializeDocument(d))`
   returns `d`.
 - `updateMetadata` changes individual fields of an existing document's text. Setting a field
-  to `null` removes it. It keeps the rest of the frontmatter (unknown keys, comments, key
-  order) and the body byte for byte. The edited YAML block is re-emitted by the `yaml`
-  library, so unusual formatting inside it (indentation, quoting style) may be normalized.
-  A document without frontmatter gets a canonical block added. A field is written under the
+  to `null` removes it. Only the lines of the fields it sets change: the new `key: value` is
+  written in place of the old one (keeping its quotes, a flow list's style and a trailing
+  comment), a new key goes after the last one with the same indentation and line endings,
+  and a removed key's lines go. Every other byte of the frontmatter (blank lines, spacing,
+  comments, other keys' formatting) and the body stays as written, so the dates each save
+  writes never move what is being typed in the Markdown editor. Only YAML that cannot be
+  edited line by line (a flow map `{title: T}`, aliases) is re-emitted by the `yaml`
+  library. A document without frontmatter gets a canonical block added. A field is written under the
   spellings the document already has (see _Date spellings_).
 - `setFrontmatterTags` replaces the `tags` list the same way (a flow list `[a, b]` stays one)
   and removes the key when no tags are left.

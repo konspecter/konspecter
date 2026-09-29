@@ -20,28 +20,28 @@ server must allow `http://localhost:4174` (`KONSPECTER_ALLOWED_ORIGINS`). CI run
 
 ## What is tested where
 
-| Area                                                                | Tests                                                                                     |
-| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Document format (frontmatter, metadata, round-trips, validation)    | `domain/document/document.test.ts`                                                        |
-| Markdown → plain text                                               | `domain/document/plain-text.test.ts`                                                      |
-| Tags (parser, hierarchy, exclusions)                                | `domain/tag/tags.test.ts`                                                                 |
-| Notes, ordering, stamping                                           | `domain/note/note.test.ts`, `file-name.test.ts`                                           |
-| Search query parsing, snippets                                      | `domain/search/*.test.ts`                                                                 |
-| Conflict strategy                                                   | `domain/sync/conflicts.test.ts`                                                           |
-| Reading position, settings                                          | `domain/reading`, `domain/settings`                                                       |
-| Storage, migrations v1→v5, tag index, self-repair, recovery         | `infrastructure/storage/*.test.ts`                                                        |
-| Search index (ranking, prefix, fuzzy, combined)                     | `infrastructure/search/search-index.test.ts`                                              |
-| Sync engine (2–3 devices, offline queue, backoff, conflicts)        | `infrastructure/sync/sync-engine.test.ts` (fake server)                                   |
-| Sync against the real server                                        | `infrastructure/sync/real-server.e2e.test.ts`, `tests/e2e/sync.spec.ts`                   |
-| File Mode (discovery, write-back, watcher changes, renames, races)  | `infrastructure/folder/folder-store.test.ts`, Rust `folder.rs`/`lib.rs` tests             |
-| Import / export (validation, dedupe, ZIP round-trip)                | `application/library/import-export.test.ts`                                               |
-| Markdown rendering and HTML safety (XSS vectors)                    | `presentation/markdown/MarkdownView.test.tsx`, e2e "HTML in a note cannot run script"     |
-| Editors (lossless text mode, source mode, metadata fields, toolbar) | `presentation/editors/*.test.ts(x)`                                                       |
-| Autosave (coalescing, first save, conflicts, failures), note list   | `application/notes/autosave.test.ts`, `note-catalog.test.ts`                              |
-| Note page (no remount on create, caret kept, remote changes)        | `presentation/pages/NotePage.test.tsx`, `NotePage.reading.test.tsx`                       |
-| Shortcuts, highlighting, activity                                   | `presentation/app/shortcuts.test.ts`, `activity.test.ts`, `domain/search/snippet.test.ts` |
-| App flows (layout, sidebar, every page, state and setting)          | `presentation/app/App.test.tsx`                                                           |
-| Server API, auth, storage, concurrency                              | `apps/server/**/*_test.go`                                                                |
+| Area                                                                 | Tests                                                                                         |
+| -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Document format (frontmatter, metadata, round-trips, validation)     | `domain/document/document.test.ts`                                                            |
+| Markdown → plain text                                                | `domain/document/plain-text.test.ts`                                                          |
+| Tags (parser, hierarchy, exclusions)                                 | `domain/tag/tags.test.ts`                                                                     |
+| Notes, ordering, stamping                                            | `domain/note/note.test.ts`, `file-name.test.ts`                                               |
+| Search query parsing, snippets                                       | `domain/search/*.test.ts`                                                                     |
+| Conflict strategy (the later edit wins)                              | `domain/sync/conflicts.test.ts`                                                               |
+| Reading position, caret, last location, settings                     | `domain/reading`, `domain/settings`, `NotePage.reading.test.tsx`, `app/last-location.test.ts` |
+| Storage, migrations v1→v5, tag index, self-repair, recovery          | `infrastructure/storage/*.test.ts`                                                            |
+| Search index (ranking, prefix, fuzzy, combined)                      | `infrastructure/search/search-index.test.ts`                                                  |
+| Sync engine (2–3 devices, offline queue, backoff, conflicts, stream) | `infrastructure/sync/sync-engine.test.ts` (fake server), `change-stream.test.ts`              |
+| Sync against the real server                                         | `infrastructure/sync/real-server.e2e.test.ts`, `tests/e2e/sync.spec.ts`                       |
+| File Mode (discovery, write-back, watcher changes, renames, races)   | `infrastructure/folder/folder-store.test.ts`, Rust `folder.rs`/`lib.rs` tests                 |
+| Import / export (validation, dedupe, ZIP round-trip)                 | `application/library/import-export.test.ts`                                                   |
+| Markdown rendering and HTML safety (XSS vectors)                     | `presentation/markdown/MarkdownView.test.tsx`, e2e "HTML in a note cannot run script"         |
+| Editors (lossless text mode, source mode, metadata fields, toolbar)  | `presentation/editors/*.test.ts(x)`                                                           |
+| Autosave (coalescing, first save, overwrites, failures), note list   | `application/notes/autosave.test.ts`, `note-catalog.test.ts`                                  |
+| Note page (no remount on create, caret kept, remote changes)         | `presentation/pages/NotePage.test.tsx`, `NotePage.reading.test.tsx`                           |
+| Shortcuts, highlighting, activity                                    | `presentation/app/shortcuts.test.ts`, `activity.test.ts`, `domain/search/snippet.test.ts`     |
+| App flows (layout, sidebar, every page, state and setting)           | `presentation/app/App.test.tsx`                                                               |
+| Server API, auth, storage, concurrency, change events                | `apps/server/**/*_test.go`                                                                    |
 
 ## Critical flows (plan §27)
 
@@ -53,7 +53,7 @@ server must allow `http://localhost:4174` (`KONSPECTER_ALLOWED_ORIGINS`). CI run
 | layout at any window size, phones       | —                                                      | `accessibility.spec.ts`                                   |
 | local edit → sync → server              | sync engine vs fake server, vitest real-server test    | `sync.spec.ts` (two browser contexts)                     |
 | external file edit → watcher → document | FolderStore watcher tests, Rust real-watcher test      | — (needs the desktop app)                                 |
-| conflict → recovery                     | conflict strategy, engine conflicts, App conflict copy | `critical-flows.spec.ts` (two tabs)                       |
+| conflict → the later edit wins          | conflict strategy, engine conflicts, App and File Mode | `critical-flows.spec.ts` (two tabs)                       |
 | offline                                 | fake network in engine tests                           | `critical-flows.spec.ts` (service worker, offline reload) |
 
 ## Conventions

@@ -233,9 +233,8 @@ fn folder_write(
     state: State<'_, FolderState>,
     path: String,
     contents: String,
-    expected_modified_ms: Option<u64>,
 ) -> Result<FileEntry, CommandError> {
-    state.with(|f| f.write(&path, &contents, expected_modified_ms))
+    state.with(|f| f.write(&path, &contents))
 }
 
 #[tauri::command]
@@ -452,8 +451,8 @@ mod tests {
 
     #[test]
     fn folder_errors_carry_a_code() {
-        let error = CommandError::from(FolderError::ChangedOnDisk("a.md".into()));
-        assert_eq!(error.code, "changed_on_disk");
-        assert_eq!(error.message, "a.md was changed by another program");
+        let error = CommandError::from(FolderError::NotFound("a.md".into()));
+        assert_eq!(error.code, "not_found");
+        assert_eq!(error.message, "a.md does not exist");
     }
 }

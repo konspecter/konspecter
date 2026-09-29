@@ -399,6 +399,32 @@ mark {
   text-decoration: underline;
 }
 
+/* A tag and, when only the frontmatter lists it, the button that removes it. */
+.details-tag {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+}
+
+.details-tag-remove {
+  padding: 0 3px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--color-muted);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.details-tag-remove:hover {
+  color: var(--color-danger);
+}
+
+.details-tag-remove:focus-visible {
+  outline: 2px solid var(--color-accent);
+}
+
 .details-actions {
   display: flex;
   flex-wrap: wrap;

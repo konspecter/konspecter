@@ -9,6 +9,7 @@ import {
   type ServerConfig,
 } from "../http/api-client";
 import type { NoteStore } from "../storage/note-store";
+import { ChangeStream } from "./change-stream";
 
 export type SyncState = "disabled" | "idle" | "syncing" | "offline" | "error";
 
@@ -20,7 +21,7 @@ export type SyncStatus = {
   readonly lastSyncedAt: string | null;
   /** Local changes waiting to be pushed. */
   readonly pending: number;
-  /** Notes held back: conflicts or changes the server refused. */
+  /** Notes held back: changes the server refused. */
   readonly blocked: number;
   readonly error: string | null;
 };
@@ -48,14 +49,22 @@ export type SyncEngineOptions = {
   now?: () => Date;
   random?: () => number;
   isOnline?: () => boolean;
-  /** Ids for conflict copies. */
-  newId?: () => string;
+  /** Whether the page is shown; the change stream is closed while it is hidden. */
+  isVisible?: () => boolean;
   credentials?: CredentialStore;
 };
 
 const CONFIG_KEY = "syncConfig";
+/** Between cycles while the change stream reports changes as they happen. */
 const INTERVAL_MS = 60_000;
-const LOCAL_CHANGE_DELAY_MS = 1_500;
+/** Between cycles while it is down (or the server has none). */
+const POLL_MS = 10_000;
+/**
+ * After a local save: long enough to gather the writes of one action (an
+ * import), short enough that other devices see an edit about half a second
+ * after the typing pauses.
+ */
+const LOCAL_CHANGE_DELAY_MS = 100;
 const FIRST_RETRY_MS = 2_000;
 const MAX_RETRY_MS = 5 * 60_000;
 
@@ -72,9 +81,10 @@ const browserScheduler: Scheduler = {
  * engine exchanges changes whenever it can.
  *
  * A cycle pushes local changes (each based on the revision it was edited
- * from) and then pulls the server's changes since the last cursor. Anything
- * that changed on both sides is held back as a conflict, with both versions
- * kept, instead of being overwritten.
+ * from) and then pulls the server's changes since the last cursor. A note
+ * changed on both sides is settled at the end of the cycle: the later edit
+ * wins (see domain/sync/conflicts.ts). The server's change stream starts a
+ * cycle whenever something changes there.
  */
 export class SyncEngine {
   readonly #store: NoteStore;
@@ -83,7 +93,7 @@ export class SyncEngine {
   readonly #now: () => Date;
   readonly #random: () => number;
   readonly #isOnline: () => boolean;
-  readonly #newId: () => string;
+  readonly #isVisible: () => boolean;
   readonly #credentials: CredentialStore | null;
 
   #config: StoredConfig | null = null;
@@ -99,9 +109,12 @@ export class SyncEngine {
   readonly #listeners = new Set<() => void>();
   #timer: unknown = null;
   #running: Promise<void> | null = null;
-  #again = false;
+  /** The cycle queued to follow the running one. */
+  #next: Promise<void> | null = null;
   #failures = 0;
   #stopListening: (() => void) | null = null;
+  #stream: ChangeStream | null = null;
+  #streaming = false;
 
   constructor(store: NoteStore, options: SyncEngineOptions = {}) {
     this.#store = store;
@@ -110,7 +123,7 @@ export class SyncEngine {
     this.#now = options.now ?? (() => new Date());
     this.#random = options.random ?? Math.random;
     this.#isOnline = options.isOnline ?? (() => navigator.onLine);
-    this.#newId = options.newId ?? (() => crypto.randomUUID());
+    this.#isVisible = options.isVisible ?? (() => document.visibilityState === "visible");
     this.#credentials = options.credentials ?? null;
   }
 
@@ -140,6 +153,7 @@ export class SyncEngine {
         account: this.#config.account,
         serverUrl: this.#config.serverUrl,
       });
+      this.#openStream();
       await this.syncNow();
     }
   }
@@ -147,6 +161,7 @@ export class SyncEngine {
   stop(): void {
     this.#stopListening?.();
     this.#stopListening = null;
+    this.#closeStream();
     this.#cancelTimer();
   }
 
@@ -161,16 +176,19 @@ export class SyncEngine {
     const previous = this.#config;
     const sameAccount = previous?.serverUrl === serverUrl && previous.account.id === account.id;
     if (!sameAccount) await this.#store.resetSync();
+    this.#closeStream();
     this.#config = { serverUrl, token, account };
     await this.#saveConfig(this.#config);
     this.#failures = 0;
     this.#setStatus({ state: "idle", account, serverUrl, error: null });
+    this.#openStream();
     await this.syncNow();
     return account;
   }
 
   /** Stops syncing. Local notes stay; reconnecting to the same account resumes. */
   async disconnect(): Promise<void> {
+    this.#closeStream();
     this.#cancelTimer();
     await this.#running;
     this.#config = null;
@@ -205,9 +223,17 @@ export class SyncEngine {
 
   #listen(): void {
     if (this.#stopListening) return;
-    const onOnline = () => void this.syncNow();
+    const onOnline = () => {
+      this.#openStream();
+      void this.syncNow();
+    };
     const onVisible = () => {
-      if (document.visibilityState === "visible") void this.syncNow();
+      if (!this.#isVisible()) {
+        this.#closeStream(); // Nothing to show meanwhile; saves the connection.
+        return;
+      }
+      this.#openStream();
+      void this.syncNow();
     };
     const offChange = this.#store.onChange((change) => {
       if (change.source === "local") this.#schedule(LOCAL_CHANGE_DELAY_MS, { sooner: true });
@@ -219,6 +245,31 @@ export class SyncEngine {
       window.removeEventListener("online", onOnline);
       document.removeEventListener("visibilitychange", onVisible);
     };
+  }
+
+  // --- The change stream ---------------------------------------------------
+
+  #openStream(): void {
+    const config = this.#config;
+    if (!config || !this.#isVisible()) return;
+    this.#stream ??= new ChangeStream(
+      this.#client(config),
+      {
+        onChange: () => void this.syncNow(),
+        onConnected: (connected) => {
+          this.#streaming = connected;
+          if (!connected) this.#schedule(POLL_MS, { sooner: true });
+        },
+      },
+      { scheduler: this.#scheduler, random: this.#random },
+    );
+    this.#stream.start();
+  }
+
+  #closeStream(): void {
+    this.#stream?.stop();
+    this.#stream = null;
+    this.#streaming = false;
   }
 
   // --- Scheduling ----------------------------------------------------------
@@ -246,19 +297,22 @@ export class SyncEngine {
 
   // --- A sync cycle --------------------------------------------------------
 
-  /** Runs a cycle now. If one is running, another follows it. */
+  /**
+   * Runs a cycle now. If one is running, another follows it (one, however
+   * often this is called meanwhile), and the promise waits for that one: it
+   * sees every change made before the call.
+   */
   syncNow(): Promise<void> {
     if (!this.#config) return Promise.resolve();
     if (this.#running) {
-      this.#again = true;
-      return this.#running;
+      this.#next ??= this.#running.then(() => {
+        this.#next = null;
+        return this.syncNow();
+      });
+      return this.#next;
     }
     this.#running = this.#cycle().finally(() => {
       this.#running = null;
-      if (this.#again) {
-        this.#again = false;
-        void this.syncNow();
-      }
     });
     return this.#running;
   }
@@ -277,7 +331,7 @@ export class SyncEngine {
       await this.#push(client);
       await this.#pull(client);
       if (await this.#resolveConflicts(client)) {
-        await this.#push(client); // Upload the conflict copies right away.
+        await this.#push(client); // Upload the local versions that won right away.
       }
       this.#failures = 0;
       await this.#refreshCounts({
@@ -285,7 +339,7 @@ export class SyncEngine {
         lastSyncedAt: this.#now().toISOString(),
         error: null,
       });
-      this.#schedule(INTERVAL_MS);
+      this.#schedule(this.#streaming ? INTERVAL_MS : POLL_MS);
     } catch (error) {
       this.#failures += 1;
       const offline = error instanceof NetworkError;
@@ -338,8 +392,6 @@ export class SyncEngine {
         await this.#store.markPushed(noteId, "deleted"); // Deleted on both sides.
       } else if (error instanceof RevisionConflictError) {
         await this.#store.blockSync(noteId, { reason: "conflict", remote: error.current });
-      } else if (error instanceof ApiError && error.code === "exists") {
-        await this.#store.blockSync(noteId, { reason: "conflict", remote: null });
       } else if (error instanceof ApiError && error.status === 404) {
         if (entry.deleted) {
           await this.#store.markPushed(noteId, "deleted"); // Already gone.
@@ -376,9 +428,8 @@ export class SyncEngine {
   }
 
   /**
-   * Settles every note held back as a conflict, deterministically and without
-   * losing a version (see domain/sync/conflicts.ts). Returns whether any
-   * conflict was settled.
+   * Settles every note held back as a conflict: the later edit wins (see
+   * domain/sync/conflicts.ts). Returns whether any conflict was settled.
    */
   async #resolveConflicts(client: ApiClient): Promise<boolean> {
     let resolved = false;
@@ -386,19 +437,13 @@ export class SyncEngine {
       if (entry.blocked?.reason !== "conflict") continue;
       const remote = entry.blocked.remote ?? (await this.#serverVersion(client, entry.noteId));
       const local = entry.deleted ? null : ((await this.#store.get(entry.noteId)) ?? null);
-      const now = this.#now();
-      await this.#store.applyResolution(
-        entry.noteId,
-        planResolution(local, remote, now),
-        now,
-        this.#newId(),
-      );
+      await this.#store.applyResolution(entry.noteId, planResolution(local, remote));
       resolved = true;
     }
     return resolved;
   }
 
-  /** The server's version, or a tombstone if it has none. */
+  /** The server's version, or (revision 0) none: the note is not on the server. */
   async #serverVersion(client: ApiClient, noteId: string): Promise<RemoteNote> {
     return (
       (await client.getNote(noteId)) ?? { id: noteId, markdown: "", revision: 0, deleted: true }

@@ -12,6 +12,7 @@ import {
   folderBridge,
   isDesktop,
   keychainCredentials,
+  onWindowClose,
   pickFolder,
 } from "./infrastructure/desktop/desktop";
 import { FolderStore } from "./infrastructure/folder/folder-store";
@@ -19,6 +20,8 @@ import { isNativeMobile } from "./infrastructure/mobile/mobile";
 import { openNoteStore } from "./infrastructure/storage/note-store";
 import { SyncEngine } from "./infrastructure/sync/sync-engine";
 import { App } from "./presentation/app/App";
+import { flushBeforeClosing } from "./presentation/app/closing";
+import { restoreLocation } from "./presentation/app/last-location";
 import type { LibraryControls } from "./presentation/app/library";
 import type { UpdateSource } from "./presentation/app/updates";
 import { isMac } from "./presentation/app/shortcuts";
@@ -88,6 +91,12 @@ try {
         importFolder: () => importFolder(folderBridge, store),
       }
     : undefined;
+
+  // Closing the desktop window waits for the open note's pending writes.
+  if (isDesktop()) void onWindowClose(flushBeforeClosing);
+
+  // Back to where the app was last time, before the router reads the address.
+  await restoreLocation(async (id) => (await repository.get(id)) !== undefined);
 
   // Sync runs in the background for the app library; the UI never waits for it.
   // On the desktop the access token lives in the OS keychain.

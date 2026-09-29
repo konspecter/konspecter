@@ -4,7 +4,13 @@ import { exportFiles } from "../../application/library/export-notes";
 import type { NoteRepository } from "../../application/notes/note-repository";
 import { otherMetadata } from "../../domain/document/document";
 import { documentStats } from "../../domain/document/stats";
-import { noteUpdated, noteWrittenTags, readNote, type Note } from "../../domain/note/note";
+import {
+  listedOnlyTags,
+  noteUpdated,
+  noteWrittenTags,
+  readNote,
+  type Note,
+} from "../../domain/note/note";
 import { parseTagName } from "../../domain/tag/tags";
 import { exportToFolder, isDesktop } from "../../infrastructure/desktop/desktop";
 import { downloadFile } from "../../infrastructure/files/files";
@@ -22,19 +28,23 @@ type NoteDetailsProps = {
   store: NoteRepository;
   showMetadata: boolean;
   onToggleMetadata: () => void;
+  /** Removes a tag from the frontmatter's `tags` list (one the body does not write). */
+  onRemoveTag?: (written: string) => void;
   onDelete: () => Promise<void>;
 };
 
 /**
  * The open note's details, shown in the sidebar's footer: what the document
  * says about itself (dates, author, length, tags, cover, other frontmatter fields)
- * and the less frequent actions, as icon buttons.
+ * and the less frequent actions, as icon buttons. A tag only the frontmatter
+ * lists can be removed here; one written in the text is removed there.
  */
 export function NoteDetails({
   note,
   store,
   showMetadata,
   onToggleMetadata,
+  onRemoveTag,
   onDelete,
 }: NoteDetailsProps) {
   const headingId = useId();
@@ -78,17 +88,33 @@ export function NoteDetails({
             ].join(" · "),
       ]);
       const tags = noteWrittenTags(read);
+      const removable = new Set(listedOnlyTags(read));
       if (tags.length > 0) {
         rows.push([
           t("details.tags"),
           <span className="details-tags">
             {tags.map((written) => {
               const tag = parseTagName(written);
-              return tag ? (
-                <Link key={tag.name} to={`/?q=${encodeURIComponent(`#${tag.name}`)}`}>
-                  #{written}
-                </Link>
-              ) : null;
+              if (!tag) return null;
+              const label = t("details.removeTag", { tag: `#${written}` });
+              return (
+                <span key={tag.name} className="details-tag">
+                  <Link to={`/?q=${encodeURIComponent(`#${tag.name}`)}`}>#{written}</Link>
+                  {onRemoveTag && removable.has(written) && (
+                    <button
+                      type="button"
+                      className="details-tag-remove"
+                      aria-label={label}
+                      title={label}
+                      onClick={() => {
+                        onRemoveTag(written);
+                      }}
+                    >
+                      ×
+                    </button>
+                  )}
+                </span>
+              );
             })}
           </span>,
         ]);

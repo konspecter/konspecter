@@ -30,7 +30,7 @@ describe("a new note", () => {
     autosave.change(() => "# Draft");
     await autosave.flush();
     const created = on.onCreated.mock.calls[0]?.[0];
-    expect(on.onCreated).toHaveBeenCalledWith(expect.objectContaining({}), "new");
+    expect(on.onCreated).toHaveBeenCalledWith(expect.objectContaining({}));
     expect(autosave.note?.id).toBe(created?.id);
 
     autosave.change(() => "# Draft\n\nMore");
@@ -240,7 +240,7 @@ describe("problems", () => {
   });
 });
 
-describe("conflicts", () => {
+describe("a version changed elsewhere", () => {
   async function changedElsewhere() {
     const store = await newStore();
     const base = createNote("# Shared\n\noriginal", new Date("2024-01-01"), "shared");
@@ -252,59 +252,28 @@ describe("conflicts", () => {
     return { store, autosave, on, theirs };
   }
 
-  it("saves over a version changed elsewhere as a conflict copy, and continues there", async () => {
-    const { store, autosave, on, theirs } = await changedElsewhere();
-
-    autosave.change(() => "# Shared\n\nmine");
-    await autosave.flush();
-
-    expect((await mustGet(store, "shared")).markdown).toBe(theirs.markdown);
-    const copy = on.onCreated.mock.calls[0]?.[0];
-    expect(on.onCreated.mock.calls[0]?.[1]).toBe("conflict");
-    const { metadata, body } = parseDocument(copy?.markdown ?? "");
-    expect(metadata.conflictOf).toBe("shared");
-    expect(metadata.title).toBe("Shared (conflict copy 2024-03-01 12:00 UTC)");
-    expect(body).toContain("mine");
-
-    autosave.change(() => "# Shared\n\nmine, more");
-    await autosave.flush();
-    expect(await store.list()).toHaveLength(2);
-    expect((await mustGet(store, copy?.id ?? "")).markdown).toContain("mine, more");
-  });
-
-  it("keeps text typed while the copy was written in the copy", async () => {
+  it("is replaced by the next save: the last write wins", async () => {
     const { store, autosave, on } = await changedElsewhere();
-    const create = store.create.bind(store);
-    vi.spyOn(store, "create").mockImplementation(async (markdown, now) => {
-      autosave.change(() => "# Shared\n\nmine, typed meanwhile");
-      return create(markdown, now);
-    });
 
     autosave.change(() => "# Shared\n\nmine");
     await autosave.flush();
 
-    const copy = on.onCreated.mock.calls[0]?.[0];
-    const { metadata, body } = parseDocument(copy?.markdown ?? "");
-    expect(body).toContain("typed meanwhile");
-    expect(metadata.conflictOf).toBe("shared");
-    expect((await mustGet(store, copy?.id ?? "")).markdown).toBe(copy?.markdown);
-    expect(autosave.dirty).toBe(false);
+    const saved = await mustGet(store, "shared");
+    expect(parseDocument(saved.markdown).body).toBe("# Shared\n\nmine");
+    expect(parseDocument(saved.markdown).metadata.created).toBe("2024-01-01T00:00:00Z");
+    expect(await store.list()).toHaveLength(1);
+    expect(on.onCreated).not.toHaveBeenCalled();
+    expect(autosave.note?.id).toBe("shared");
   });
 
-  it("treats a write refused as changed underneath as a conflict", async () => {
-    const store = await newStore();
-    const base = createNote("# A", new Date("2024-01-01"), "a");
-    await store.put(base);
-    const on = events();
-    const refused = new Error("changed on disk");
-    vi.spyOn(store, "put").mockRejectedValueOnce(refused);
-    const autosave = new Autosave(store, base, on, {
-      changedUnderneath: (error) => error === refused,
-    });
+  it("comes back when the note was deleted elsewhere and is edited here", async () => {
+    const { store, autosave } = await changedElsewhere();
+    await store.delete("shared");
 
-    autosave.change(() => "# A\n\nmine");
+    autosave.change(() => "# Shared\n\nstill needed");
     await autosave.flush();
-    expect(on.onCreated).toHaveBeenCalledWith(expect.anything(), "conflict");
+
+    expect((await mustGet(store, "shared")).markdown).toContain("still needed");
   });
 
   it("adopts a version reloaded from elsewhere", async () => {

@@ -9,9 +9,9 @@ the user's Markdown documents with revisions so clients can sync
 ```text
 apps/server/
 ├── cmd/server/             entry point: serve, migrate, create-user, create-token
-├── internal/notes/         Note, validation, ErrNotFound / ErrExists / ConflictError
+├── internal/notes/         Note, validation, ErrNotFound / ConflictError
 ├── internal/auth/          User, API tokens (generate, hash, parse bearer header), email
-├── internal/httpapi/       HTTP/JSON handlers; declares the interfaces it consumes
+├── internal/httpapi/       HTTP/JSON handlers, change event streams; declares the interfaces it consumes
 ├── internal/storage/postgres/  users, tokens, notes, migration runner
 └── migrations/             ordered SQL files, embedded into the binary
 ```
@@ -52,25 +52,59 @@ header, not cookies, the API is not exposed to CSRF.
 JSON in and out. Request bodies must be `application/json`, are limited to about 10 MB, and
 may not contain unknown fields. Errors look like `{"error": {"code": "…", "message": "…"}}`.
 
-| Method & path                | Body / query                 | Success                                           | Errors                       |
-| ---------------------------- | ---------------------------- | ------------------------------------------------- | ---------------------------- |
-| `GET /healthz`               | (no auth)                    | 200                                               |                              |
-| `GET /api/me`                |                              | 200 `{id, email}`                                 | 401                          |
-| `GET /api/notes`             |                              | 200 `{notes: [...]}` (not deleted)                | 401                          |
-| `GET /api/notes/{id}`        |                              | 200 note                                          | 404                          |
-| `POST /api/notes`            | `{id, markdown}`             | 201 note, `Location`                              | 400, 409 `exists`            |
-| `PUT /api/notes/{id}`        | `{markdown, base_revision}`  | 200 note                                          | 404, 409 `revision_conflict` |
-| `DELETE /api/notes/{id}`     | `?base_revision=N`           | 204                                               | 404, 409 `revision_conflict` |
-| `GET /api/sync`              | `?since=cursor&limit=1..500` | 200 `{notes, cursor, more}` (tombstones included) | 400                          |
-| `DELETE /api/tokens/current` |                              | 204 (this token stops working)                    | 401                          |
+| Method & path                | Body / query                 | Success                                            | Errors                                  |
+| ---------------------------- | ---------------------------- | -------------------------------------------------- | --------------------------------------- |
+| `GET /healthz`               | (no auth)                    | 200                                                |                                         |
+| `GET /api/me`                |                              | 200 `{id, email}`                                  | 401                                     |
+| `GET /api/notes`             |                              | 200 `{notes: [...]}` (not deleted)                 | 401                                     |
+| `GET /api/notes/{id}`        |                              | 200 note                                           | 404                                     |
+| `POST /api/notes`            | `{id, markdown}`             | 201 note, `Location`                               | 400, 409 `revision_conflict` (id taken) |
+| `PUT /api/notes/{id}`        | `{markdown, base_revision}`  | 200 note (restores a deleted note at its revision) | 404, 409 `revision_conflict`            |
+| `DELETE /api/notes/{id}`     | `?base_revision=N`           | 204                                                | 404, 409 `revision_conflict`            |
+| `GET /api/sync`              | `?since=cursor&limit=1..500` | 200 `{notes, cursor, more}` (tombstones included)  | 400                                     |
+| `GET /api/events`            |                              | 200 `text/event-stream` (see below)                | 401, 429 `too_many_streams`, 503        |
+| `DELETE /api/tokens/current` |                              | 204 (this token stops working)                     | 401                                     |
 
 A note is `{id, markdown, revision, created_at, updated_at, deleted_at?}`.
 
 **Optimistic concurrency:** `PUT` and `DELETE` apply only if the note is still at
 `base_revision`. Otherwise the response is `409` with `"current"`: the server's version, so
-the client can reconcile without overwriting anything. Changing a deleted note is also a
+the client can reconcile without overwriting anything. `POST` with an id that is taken (by
+a live or a deleted note) is the same `409` with `"current"`. A `PUT` at a deleted note's
+current revision restores it (edits beat deletions); deleting a deleted note is a
 conflict, and `current.deleted_at` shows why. Of concurrent writers with the same base
 revision, exactly one wins (tested with 8 in parallel).
+
+## Change events
+
+`GET /api/events` is a Server-Sent Events stream
+([ADR-012](decisions/ADR-012-change-events.md)) that tells the user's clients when to sync; the data still comes from `GET /api/sync`. Authenticated like every `/api/*` call,
+so browsers read it with `fetch` (the token stays in the header). Headers:
+`Content-Type: text/event-stream`, `Cache-Control: no-store`, `X-Accel-Buffering: no`.
+
+```text
+event: changes
+data: {}
+
+: ping
+
+```
+
+`changes` is sent on connect and after each committed create, update (restore) or delete of
+the user's notes, by any connection; bursts may coalesce into one. `: ping` is a heartbeat
+comment every 25 s.
+
+- **In-process hub:** each stream has a one-slot buffer; handlers publish after the
+  repository has committed, without blocking. One server binary, so no broker.
+- **Token re-check:** on each heartbeat the token is resolved again; a revoked token ends
+  the stream.
+- **Limit:** at most 16 open streams per user; more get `429 too_many_streams`.
+- **Deadlines:** each write sets its own one-minute write deadline, so the server's 30 s
+  `WriteTimeout` does not end the stream. The stream ends when the client leaves or a write
+  fails.
+- **Shutdown:** `serve` registers `Handler.CloseStreams` with `RegisterOnShutdown`: open
+  streams end and new ones get `503 shutting_down`, so graceful shutdown does not wait for
+  them.
 
 ## CORS
 

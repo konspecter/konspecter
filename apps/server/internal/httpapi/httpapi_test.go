@@ -73,8 +73,8 @@ func (f *fakeRepository) CreateNote(_ context.Context, userID, id, markdown stri
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	key := userID + "/" + id
-	if _, ok := f.notes[key]; ok {
-		return notes.Note{}, notes.ErrExists
+	if n, ok := f.notes[key]; ok {
+		return notes.Note{}, &notes.ConflictError{Current: n}
 	}
 	now := time.Date(2026, 9, 28, 10, 0, 0, 0, time.UTC)
 	n := notes.Note{ID: id, Markdown: markdown, Revision: 1, CreatedAt: now, UpdatedAt: now}
@@ -83,7 +83,9 @@ func (f *fakeRepository) CreateNote(_ context.Context, userID, id, markdown stri
 	return n, nil
 }
 
-func (f *fakeRepository) change(userID, id string, base int64, apply func(*notes.Note)) (notes.Note, error) {
+// change applies a change at base. Only an update may change a deleted note
+// (restoring it); a deletion of one conflicts.
+func (f *fakeRepository) change(userID, id string, base int64, restores bool, apply func(*notes.Note)) (notes.Note, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	key := userID + "/" + id
@@ -91,7 +93,7 @@ func (f *fakeRepository) change(userID, id string, base int64, apply func(*notes
 	if !ok {
 		return notes.Note{}, notes.ErrNotFound
 	}
-	if n.Revision != base || n.Deleted() {
+	if n.Revision != base || n.Deleted() && !restores {
 		return notes.Note{}, &notes.ConflictError{Current: n}
 	}
 	apply(&n)
@@ -102,11 +104,14 @@ func (f *fakeRepository) change(userID, id string, base int64, apply func(*notes
 }
 
 func (f *fakeRepository) UpdateNote(_ context.Context, userID, id, markdown string, base int64) (notes.Note, error) {
-	return f.change(userID, id, base, func(n *notes.Note) { n.Markdown = markdown })
+	return f.change(userID, id, base, true, func(n *notes.Note) {
+		n.Markdown = markdown
+		n.DeletedAt = nil
+	})
 }
 
 func (f *fakeRepository) DeleteNote(_ context.Context, userID, id string, base int64) (notes.Note, error) {
-	return f.change(userID, id, base, func(n *notes.Note) {
+	return f.change(userID, id, base, false, func(n *notes.Note) {
 		now := time.Now()
 		n.DeletedAt = &now
 	})
@@ -158,16 +163,29 @@ const (
 
 func newTestServer(t *testing.T) (*httptest.Server, *fakeRepository) {
 	t.Helper()
+	server, repository, _ := newTestServerWith(t, Options{})
+	return server, repository
+}
+
+// newTestServerWith starts a server with options (CORS for app.example.com is
+// always added). Open event streams end before the server closes.
+func newTestServerWith(t *testing.T, options Options) (*httptest.Server, *fakeRepository, *Handler) {
+	t.Helper()
+	handler, repository := newTestHandler(options)
+	server := httptest.NewServer(handler)
+	t.Cleanup(server.Close)
+	t.Cleanup(handler.CloseStreams) // Runs first: Close waits for active requests.
+	return server, repository, handler
+}
+
+func newTestHandler(options Options) (*Handler, *fakeRepository) {
 	repository := newFakeRepository()
 	users := fakeAuth{
 		adaToken: {ID: "user-ada", Email: "ada@example.com"},
 		bobToken: {ID: "user-bob", Email: "bob@example.com"},
 	}
-	server := httptest.NewServer(NewHandler(repository, users, slog.New(slog.DiscardHandler), Options{
-		AllowedOrigins: []string{"https://app.example.com"},
-	}))
-	t.Cleanup(server.Close)
-	return server, repository
+	options.AllowedOrigins = append(options.AllowedOrigins, "https://app.example.com")
+	return NewHandler(repository, users, slog.New(slog.DiscardHandler), options), repository
 }
 
 type response struct {
@@ -275,8 +293,38 @@ func TestStaleChangesReturnTheCurrentVersion(t *testing.T) {
 	if r := call(t, server, "DELETE", "/api/notes/n1?base_revision=1", adaToken, ""); r.status != http.StatusConflict {
 		t.Errorf("stale delete = %d", r.status)
 	}
-	if r := call(t, server, "POST", "/api/notes", adaToken, `{"id":"n1","markdown":"x"}`); r.status != http.StatusConflict || errorCode(r) != "exists" {
+	r = call(t, server, "POST", "/api/notes", adaToken, `{"id":"n1","markdown":"x"}`)
+	current, _ = r.body["current"].(map[string]any)
+	if r.status != http.StatusConflict || errorCode(r) != "revision_conflict" || current["markdown"] != "v2 from A" {
 		t.Errorf("duplicate create = %d %v", r.status, r.body)
+	}
+}
+
+func TestDeletedNotes(t *testing.T) {
+	server, _ := newTestServer(t)
+	call(t, server, "POST", "/api/notes", adaToken, `{"id":"n1","markdown":"v1"}`)
+	call(t, server, "DELETE", "/api/notes/n1?base_revision=1", adaToken, "")
+
+	// Creating over a tombstone conflicts, with the tombstone as current.
+	r := call(t, server, "POST", "/api/notes", adaToken, `{"id":"n1","markdown":"again"}`)
+	current, _ := r.body["current"].(map[string]any)
+	if r.status != http.StatusConflict || errorCode(r) != "revision_conflict" || current["revision"] != 2.0 || current["deleted_at"] == nil {
+		t.Errorf("create over tombstone = %d %v", r.status, r.body)
+	}
+	// A stale base still conflicts.
+	if r := call(t, server, "PUT", "/api/notes/n1", adaToken, `{"markdown":"stale","base_revision":1}`); r.status != http.StatusConflict || errorCode(r) != "revision_conflict" {
+		t.Errorf("stale update of tombstone = %d %v", r.status, r.body)
+	}
+	// An edit at the tombstone's revision restores the note.
+	r = call(t, server, "PUT", "/api/notes/n1", adaToken, `{"markdown":"restored","base_revision":2}`)
+	if r.status != http.StatusOK || r.body["revision"] != 3.0 || r.body["deleted_at"] != nil || r.body["markdown"] != "restored" {
+		t.Errorf("restore = %d %v", r.status, r.body)
+	}
+	if r := call(t, server, "GET", "/api/notes/n1", adaToken, ""); r.status != http.StatusOK || r.body["markdown"] != "restored" {
+		t.Errorf("get after restore = %d %v", r.status, r.body)
+	}
+	if r := call(t, server, "PUT", "/api/notes/missing", adaToken, `{"markdown":"x","base_revision":1}`); r.status != http.StatusNotFound {
+		t.Errorf("update of missing note = %d", r.status)
 	}
 }
 

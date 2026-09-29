@@ -168,6 +168,32 @@ export function noteWrittenTags(read: ReadNote): string[] {
 }
 
 /**
+ * The note's tags as written (`noteWrittenTags`) that only its frontmatter's
+ * `tags` field lists: those can be removed from the list (`withoutTag`). A tag
+ * also written in the body is part of the text and is removed there.
+ */
+export function listedOnlyTags(read: ReadNote): string[] {
+  if (!read.valid) return [];
+  const inBody = new Set(
+    writtenTags(read.document.body).map((written) => parseTagName(written)?.name),
+  );
+  return noteWrittenTags(read).filter((written) => !inBody.has(parseTagName(written)?.name));
+}
+
+/**
+ * `markdown` without the tag `written` (by name, any spelling) in its
+ * frontmatter's `tags` field; everything else stays as written. Returns
+ * `markdown` itself when the field does not list it. Throws
+ * InvalidDocumentError for invalid frontmatter.
+ */
+export function withoutTag(markdown: string, written: string): string {
+  const name = parseTagName(written)?.name;
+  const listed = frontmatterTags(markdown);
+  const kept = listed.filter((entry) => parseTagName(entry)?.name !== name);
+  return kept.length === listed.length ? markdown : setFrontmatterTags(markdown, kept);
+}
+
+/**
  * The title a body's first non-blank line gives, as readable text: without
  * heading markers or inline Markdown (`# Using **maps**` → `Using maps`).
  */

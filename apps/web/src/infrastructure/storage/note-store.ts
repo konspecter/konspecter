@@ -4,7 +4,11 @@ import type { NoteRepository, UnreadableRecord } from "../../application/notes/n
 import { createNote, parseNote, type Note } from "../../domain/note/note";
 import type { Resolution } from "../../domain/sync/conflicts";
 import type { Tag } from "../../domain/tag/tags";
-import { parseReadingState, type ReadingState } from "../../domain/reading/reading";
+import {
+  parseReadingState,
+  type EditorSelection,
+  type ReadingState,
+} from "../../domain/reading/reading";
 import type { SearchQuery } from "../../domain/search/query";
 import { parseSettings, type Settings } from "../../domain/settings/settings";
 import {
@@ -229,8 +233,8 @@ export class NoteStore implements NoteRepository {
 
   /**
    * Applies a note received from the server, unless the local copy has
-   * changes of its own: then it is a conflict and the server version is kept
-   * aside in the sync entry, so neither version is lost.
+   * changes of its own: then it is a conflict, and the server version is kept
+   * in the sync entry until the cycle settles it (the later edit wins).
    */
   async applyRemote(remote: RemoteNote): Promise<RemoteApplyResult> {
     const tx = this.#db.transaction(["notes", "tags", "reading", "sync"], "readwrite");
@@ -288,33 +292,42 @@ export class NoteStore implements NoteRepository {
 
   /**
    * Settles a conflict (see domain/sync/conflicts.ts) in one transaction: the
-   * note takes the server's version, and a local version that differs is
-   * saved as a new note queued for upload. Returns the copy's id, if any.
+   * note takes the server's version, or the local version is queued again on
+   * top of it (created anew if the server has none).
    */
-  async applyResolution(
-    noteId: string,
-    resolution: Resolution,
-    now: Date,
-    copyId: string = crypto.randomUUID(),
-  ): Promise<string | null> {
+  async applyResolution(noteId: string, resolution: Resolution): Promise<void> {
     const { remote } = resolution;
-    const copy =
-      resolution.kind === "copy-local" ? createNote(resolution.copyMarkdown, now, copyId) : null;
     const tx = this.#db.transaction(["notes", "tags", "reading", "sync"], "readwrite");
     const notes = tx.objectStore("notes");
     const tags = tx.objectStore("tags");
     const sync = tx.objectStore("sync");
-    const writes: Promise<unknown>[] = [];
+    if (resolution.kind === "keep-local") {
+      const entry = await readEntry(sync.get(noteId));
+      if (entry === null) {
+        await tx.done;
+        return;
+      }
+      const baseRevision = remote.revision > 0 ? remote.revision : null;
+      await Promise.all([
+        sync.put(
+          { ...entry, baseRevision, dirty: true, blocked: null } satisfies SyncEntry,
+          noteId,
+        ),
+        tx.done,
+      ]);
+      return;
+    }
     if (remote.deleted) {
-      writes.push(
+      await Promise.all([
         notes.delete(noteId),
         tags.delete(noteId),
         tx.objectStore("reading").delete(noteId),
         sync.delete(noteId),
-      );
+        tx.done,
+      ]);
     } else {
       const note: Note = { id: noteId, markdown: remote.markdown };
-      writes.push(
+      await Promise.all([
         notes.put(note, noteId),
         tags.put(tagEntry(note)),
         sync.put(
@@ -327,33 +340,13 @@ export class NoteStore implements NoteRepository {
           } satisfies SyncEntry,
           noteId,
         ),
-      );
+        tx.done,
+      ]);
     }
-    if (copy) {
-      writes.push(
-        notes.put(copy, copy.id),
-        tags.put(tagEntry(copy)),
-        sync.put(
-          {
-            noteId: copy.id,
-            baseRevision: null,
-            dirty: true,
-            deleted: false,
-            blocked: null,
-          } satisfies SyncEntry,
-          copy.id,
-        ),
-      );
-    }
-    await Promise.all([...writes, tx.done]);
-
     const search = await this.#search;
     if (remote.deleted) search?.remove(noteId);
     else search?.upsert({ id: noteId, markdown: remote.markdown });
-    if (copy) search?.upsert(copy);
     this.#emit({ noteId, source: "remote" });
-    if (copy) this.#emit({ noteId: copy.id, source: "remote" });
-    return copy?.id ?? null;
   }
 
   /**
@@ -423,8 +416,29 @@ export class NoteStore implements NoteRepository {
   }
 
   async saveReadingPosition(noteId: string, position: number, now = new Date()): Promise<void> {
-    const state: ReadingState = { noteId, position, updatedAt: now.toISOString() };
-    await this.#db.put("reading", parseReadingState(state), noteId);
+    await this.#updateReading(noteId, (state) => ({ ...state, position }), now);
+  }
+
+  async saveEditorSelection(noteId: string, selection: EditorSelection, now = new Date()) {
+    await this.#updateReading(noteId, (state) => ({ ...state, selection }), now);
+  }
+
+  /** Changes part of a note's reading state, keeping the rest, in one transaction. */
+  async #updateReading(
+    noteId: string,
+    change: (state: ReadingState) => ReadingState,
+    now: Date,
+  ): Promise<void> {
+    const tx = this.#db.transaction("reading", "readwrite");
+    let current: ReadingState = { noteId, position: 0, updatedAt: now.toISOString() };
+    try {
+      const record: unknown = await tx.store.get(noteId);
+      if (record !== undefined) current = parseReadingState(record);
+    } catch {
+      // An unreadable state is replaced; losing a position is harmless.
+    }
+    const next = parseReadingState({ ...change(current), updatedAt: now.toISOString() });
+    await Promise.all([tx.store.put(next, noteId), tx.done]);
   }
 
   /** The saved settings, with defaults for anything missing or invalid. */

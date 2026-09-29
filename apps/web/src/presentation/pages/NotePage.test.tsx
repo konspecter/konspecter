@@ -1,9 +1,10 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState, type ReactNode } from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { parseDocument } from "../../domain/document/document";
 import { createNote } from "../../domain/note/note";
+import type { EditorMode } from "../../domain/settings/settings";
 import { openNoteStore, type NoteStore } from "../../infrastructure/storage/note-store";
 import { Activity } from "../app/activity";
 import { DetailsSlot } from "../components/details-slot";
@@ -37,8 +38,13 @@ function WithDetails({ children }: { children: ReactNode }) {
 }
 
 /** Both routes render one element, as in App, so a saved new note keeps its editor. */
-function renderNotePage(store: NoteStore, path: string, activity = new Activity()) {
-  const page = <NotePage store={store} mode="text" activity={activity} />;
+function renderNotePage(
+  store: NoteStore,
+  path: string,
+  activity = new Activity(),
+  mode: EditorMode = "text",
+) {
+  const page = <NotePage store={store} mode={mode} activity={activity} />;
   render(
     <MemoryRouter initialEntries={[path]}>
       <WithDetails>
@@ -152,7 +158,8 @@ describe("an existing note", () => {
     const store = await newStore();
     await synced(store, "java", "# Java\n\nold");
     renderNotePage(store, "/notes/java");
-    await textBox();
+    const box = await textBox();
+    const put = vi.spyOn(store, "put");
 
     await store.applyRemote({
       id: "java",
@@ -162,9 +169,13 @@ describe("an existing note", () => {
     });
 
     expect(await screen.findByText("from the server")).toBeInTheDocument();
+    // In place: the same editor (no reload, no blink), and nothing to save back.
+    expect(await textBox()).toBe(box);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    expect(put).not.toHaveBeenCalled();
   });
 
-  it("keeps an edit that crossed a change from elsewhere as a conflict copy", async () => {
+  it("keeps an edit that crossed a change from elsewhere: the later edit wins", async () => {
     const store = await newStore();
     await synced(store, "shared", "# Shared\n\nold");
     renderNotePage(store, "/notes/shared");
@@ -181,19 +192,32 @@ describe("an existing note", () => {
     });
 
     await waitFor(async () => {
-      expect(await store.list()).toHaveLength(2);
+      expect((await store.get("shared"))?.markdown).toContain("old mine");
     });
-    expect((await store.get("shared"))?.markdown).toBe("# Shared\n\ntheirs");
-    const copy = (await store.list()).find((note) => note.id !== "shared");
-    expect(copy?.markdown).toContain("old mine");
-    await waitFor(() => {
-      expect(location()).toHaveTextContent(`/notes/${copy?.id ?? ""}`);
-    });
-    expect(await screen.findByRole("note")).toHaveTextContent("This is a conflict copy");
-    expect(screen.getByRole("link", { name: "the original" })).toHaveAttribute(
-      "href",
-      "/notes/shared",
+    expect(await store.list()).toHaveLength(1);
+    expect(location()).toHaveTextContent("/notes/shared");
+    expect(await textBox()).toHaveTextContent("old mine");
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+  });
+
+  it("says when the open note was deleted elsewhere, and brings it back when edited", async () => {
+    const store = await newStore();
+    await synced(store, "gone", "# Gone\n\ntext");
+    renderNotePage(store, "/notes/gone");
+    const box = await textBox();
+
+    await store.applyRemote({ id: "gone", revision: 2, markdown: "", deleted: true });
+    expect(await screen.findByRole("note")).toHaveTextContent(
+      "This conspect was deleted elsewhere. Editing it brings it back.",
     );
+
+    await userEvent.click(box);
+    caretAtEnd(box);
+    await userEvent.keyboard(" again");
+    await waitFor(async () => {
+      expect((await store.get("gone"))?.markdown).toContain("text again");
+    });
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
   });
 
   it("explains invalid frontmatter instead of saving it", async () => {
@@ -218,6 +242,29 @@ describe("an existing note", () => {
       "Not saved: Frontmatter",
     );
     expect((await store.get("broken"))?.markdown).toBe("---\ntitle: [\n---\n\nStill here.");
+  });
+
+  it("removes a tag only the frontmatter lists from the Details, in either editor", async () => {
+    for (const mode of ["text", "markdown"] as const) {
+      const store = await newStore();
+      await store.put(createNote("---\ntags: [extra, go]\n---\n\n# N #go", new Date(), "n"));
+      renderNotePage(store, "/notes/n", new Activity(), mode);
+      const details = await screen.findByRole("region", { name: "Details" });
+
+      // #go is written in the text: it is removed there.
+      expect(within(details).queryByRole("button", { name: "Remove #go" })).toBeNull();
+      await userEvent.click(within(details).getByRole("button", { name: "Remove #extra" }));
+
+      await waitFor(async () => {
+        expect((await store.get("n"))?.markdown).toContain("tags: [go]\n");
+      });
+      expect(within(details).queryByRole("link", { name: "#extra" })).toBeNull();
+      if (mode === "markdown") {
+        const source = screen.getByRole("textbox", { name: "Markdown" });
+        expect(source).toHaveTextContent("tags: [go]");
+      }
+      cleanup();
+    }
   });
 
   it("shows not found for an unknown note", async () => {

@@ -1,6 +1,7 @@
 # ADR-010: Notes open in the editor and save themselves
 
-Status: accepted (2026-09-28)
+Status: accepted (2026-09-28). §4 (conflict copies on save) is superseded by
+[ADR-011](ADR-011-last-write-wins.md): a save goes over a version changed elsewhere.
 
 ## Context
 
@@ -20,7 +21,7 @@ silently overwritten ([ADR-009](ADR-009-file-mode-and-sync.md)).
    cannot represent losslessly is shown rendered (the former reader) and is edited in
    Markdown mode. The Text/Markdown switch is in the top bar and is remembered.
 2. **Autosave** (`application/notes/autosave.ts`) replaces Save/Cancel. Changes are
-   coalesced (400 ms quiet, at most 2 s while typing), one write is in flight, the latest
+   coalesced (400 ms quiet, at most 1 s while typing; 2 s until 2026-09-29), one write is in flight, the latest
    text wins, and pending text is flushed when leaving the note, hiding the tab or pressing
    ⌘/Ctrl+S. The editor hands over a function that produces the text, so serializing happens
    per save, not per keystroke.

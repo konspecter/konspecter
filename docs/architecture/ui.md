@@ -21,13 +21,14 @@ interface speaks English and Russian ([i18n](i18n.md)).
   position keeps using the window's scroll). No app header, brand or menu.
 - **Sidebar** (`Sidebar.tsx`): toggle, Settings, All notes (`/`), New note; the tag tree (tags as folders,
   notes as documents inside them; a tag's name opens `/?q=#tag`, see [tags](tags.md)); recent notes, most recently edited first, with the open
-  one marked. Hidden or shown per device (`localStorage`); on narrow screens it starts hidden
+  one marked. Hidden or shown per device (`localStorage`); while it is hidden, its toggle, All notes and New note sit at the start of the top bar; on narrow screens it starts hidden
   and slides over the content. While it is hidden, its toggle and New note sit in the top bar.
 - **Details** (`NoteDetails.tsx`, the sidebar's footer): on the note page only (new or
   existing), the note page renders its details into the sidebar through a portal
   (`details-slot.tsx`: the layout provides the element, `<Details>` renders into it). What the
   document says about itself: created and edited dates, author, length (words, characters, reading
-  time; `domain/document/stats.ts`), tags as written (links to their lists), cover, the file
+  time; `domain/document/stats.ts`), tags as written (links to their lists; a tag only the frontmatter lists has a × that removes
+  it from `tags`, applied through the open editor as an edit: `NoteEditor`'s `edit`), cover, the file
   (File Mode) and any other frontmatter fields (`otherMetadata`). Below, the actions as icon
   buttons with titles: properties, download or export (open externally and show in
   Finder in File Mode), delete. Delete asks first in the app's own dialog

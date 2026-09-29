@@ -94,7 +94,9 @@ Text mode is the default for new and existing notes.
 
 ## Properties
 
-`MetadataFields` edits `title`, `author`, `tags` and `cover` in the frontmatter. Text mode
+`MetadataFields` edits `title`, `author` and `cover` in the frontmatter. There is no tags
+field: tags are written in the text, and a tag only the frontmatter lists is removed in the
+note's Details (the × next to it), which hands the editor an `edit` to apply in any mode. Text mode
 also writes the body's first line and tags into `title` and `tags` as it serializes
 (`withBody`). While the fields are empty or only repeat the body they stay hidden (the body's
 heading is the title); a note that has them shows
@@ -127,18 +129,24 @@ over the dates never causes another save.
 - The editor reports every change at once with a function that returns the whole document.
   The ProseMirror → Markdown serialization runs only when that function is called, at save
   time, not per keystroke.
-- Saves are coalesced: 400 ms after typing pauses, at most every 2 s while it continues, one
+- Saves are coalesced: 400 ms after typing pauses, at most every second while it continues, one
   write in flight, latest text wins. Leaving the note, hiding the tab (`visibilitychange`,
   `pagehide`) and ⌘/Ctrl+S save at once.
 - A new note is created by its first non-blank save. Until its first line is finished that
   save waits 2 s, because File Mode names the file after the title. The URL then changes to
   the note's id **without remounting the editor**: both routes render one element and the
   session keeps its React key, so focus, caret and undo history survive.
-- Before each save the stored version is compared with the last one the session saw. If it
-  changed elsewhere (sync, another program, another tab), or File Mode refuses the write as
-  `changed_on_disk`, the text is saved as a conflict copy and editing continues there (the
-  editor reloads with the copy's frontmatter; text typed meanwhile is kept). A change from
-  elsewhere while nothing is unsaved simply replaces the editor's content.
+- The last write wins ([ADR-011](decisions/ADR-011-last-write-wins.md)): a save goes over
+  whatever changed the stored version meanwhile (sync, another program, another tab), since
+  the edit being saved is the latest. A change from elsewhere while nothing is unsaved
+  replaces the editor's content **in place**: a diff (`editors/diff.ts`, Myers) finds the
+  stretches that changed, by lines in Markdown and by blocks in the text editor, each narrowed
+  to its characters, and only those are replaced. The editor does not reload, and the caret
+  and scroll position stay, even with changes both above and below the caret (the
+  frontmatter's `updated` date always changes). The change is not reported as an edit
+  (nothing is saved back), and undo does not take it back. Only a version that needs another
+  kind of view (for example, rendered instead of rich text) opens anew. A note deleted elsewhere while open says so, and the next
+  edit brings it back.
 - Invalid frontmatter is not saved; the page says so until it is fixed. A failed write keeps
   the text and is tried again on the next change.
 - The antenna in the top bar shows a save from its first pending change until it is written.

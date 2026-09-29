@@ -112,6 +112,9 @@ describe("layout", () => {
     expect(localStorage.getItem("konspecter.sidebar")).toBe("closed");
     // Its controls move to the top bar meanwhile.
     expect(within(topBar()).getByRole("link", { name: "New conspect" })).toBeInTheDocument();
+    const allNotes = within(topBar()).getByRole("link", { name: "All conspects" });
+    expect(allNotes).toHaveAttribute("href", "/");
+    expect(allNotes).toHaveAttribute("title", "All conspects (Esc)");
 
     await userEvent.click(topBarButton("Show sidebar"));
     expect(sidebar()).toBeInTheDocument();
@@ -318,7 +321,7 @@ describe("a note", () => {
     expect(await textEditor()).toHaveTextContent("ArrayList");
   });
 
-  it("saves a tag and author set in the properties into the frontmatter, and lists the tag", async () => {
+  it("saves an author set in the properties into the frontmatter", async () => {
     const store = await newStore();
     await store.put(javaNote);
     renderApp(store, "/notes/java");
@@ -326,13 +329,9 @@ describe("a note", () => {
     await textEditor();
     await userEvent.click(screen.getByRole("button", { name: "Properties" }));
     await userEvent.type(screen.getByRole("textbox", { name: "Author" }), "Ann");
-    await userEvent.type(screen.getByRole("textbox", { name: "Tags" }), "Java#Collections{Enter}");
+    expect(screen.queryByRole("textbox", { name: "Tags" })).not.toBeInTheDocument();
 
-    await stored(store, "java", (markdown) =>
-      markdown.includes("author: Ann\ntags:\n  - Java#Collections\n"),
-    );
-    const tree = await within(sidebar()).findByRole("navigation", { name: "Tags" });
-    expect(await within(tree).findByRole("link", { name: "Java" })).toBeInTheDocument();
+    await stored(store, "java", (markdown) => markdown.includes("author: Ann\n"));
     const details = within(sidebar()).getByRole("region", { name: "Details" });
     await waitFor(() => {
       expect(details).toHaveTextContent("AuthorAnn");
@@ -1166,7 +1165,7 @@ describe("sync", () => {
     ).toHaveAttribute("href", "/settings");
   });
 
-  it("saves an edit as a conflict copy when a sync replaced the note meanwhile", async () => {
+  it("keeps an edit made while a sync replaced the note: the later edit wins", async () => {
     const store = await newStore();
     await store.put(javaNote);
     // Synced: the server's version may replace it.
@@ -1184,21 +1183,13 @@ describe("sync", () => {
     });
 
     await waitFor(
-      () => {
-        expect(screen.getByRole("note")).toHaveTextContent("This is a conflict copy");
+      async () => {
+        expect((await store.get("java"))?.markdown).toContain("# My edit");
       },
       { timeout: 3000 },
     );
-    const banner = screen.getByRole("note");
-    expect(within(banner).getByRole("link", { name: "the original" })).toHaveAttribute(
-      "href",
-      "/notes/java",
-    );
-    expect(
-      screen.getByRole("heading", { level: 1, name: /My edit \(conflict copy/ }),
-    ).toBeInTheDocument();
-    expect((await store.get("java"))?.markdown).toBe("# From another device");
-    expect(await store.list()).toHaveLength(2);
+    expect(await store.list()).toHaveLength(1);
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
   });
 });
 
@@ -1295,7 +1286,7 @@ describe("file mode", () => {
     expect(folder.revealed).toEqual(["ext.md"]);
   });
 
-  it("keeps both versions when a file changes on disk during an edit", async () => {
+  it("writes an edit over a file changed on disk meanwhile: the later edit wins", async () => {
     const { folder, store, render: show } = await folderApp("/notes/race.md");
     folder.edit("race.md", "# Race\n\noriginal");
     await store.watch();
@@ -1307,16 +1298,17 @@ describe("file mode", () => {
     folder.edit("race.md", "# Race\n\nsaved in VS Code");
     folder.notify({ paths: ["race.md"], rescan: false });
 
-    expect(
-      await screen.findByText(/This is a conflict copy/, {}, { timeout: 3000 }),
-    ).toBeInTheDocument();
-    expect(folder.files.get("race.md")?.text).toBe("# Race\n\nsaved in VS Code");
-    const copy = [...folder.files].find(([path]) => path !== "race.md");
-    expect(copy?.[1].text).toContain("my edit");
-    expect(copy?.[1].text).toContain("conflict_of: race.md");
+    await waitFor(
+      () => {
+        expect(folder.files.get("race.md")?.text).toContain("my edit");
+      },
+      { timeout: 3000 },
+    );
+    expect([...folder.files.keys()]).toEqual(["race.md"]);
+    expect(screen.queryByText(/conflict copy/)).not.toBeInTheDocument();
   });
 
-  it("keeps both versions when the file changes just before saving", async () => {
+  it("writes over a change another program made just before saving", async () => {
     const { folder, render: show } = await folderApp("/notes/race.md");
     folder.edit("race.md", "# Race\n\noriginal");
     show();
@@ -1326,10 +1318,13 @@ describe("file mode", () => {
     folder.edit("race.md", "# Race\n\nunreported change");
     setSourceValue(editor, "# Race\n\nmy edit");
 
-    expect(
-      await screen.findByText(/This is a conflict copy/, {}, { timeout: 3000 }),
-    ).toBeInTheDocument();
-    expect(folder.files.get("race.md")?.text).toBe("# Race\n\nunreported change");
+    await waitFor(
+      () => {
+        expect(folder.files.get("race.md")?.text).toContain("my edit");
+      },
+      { timeout: 3000 },
+    );
+    expect([...folder.files.keys()]).toEqual(["race.md"]);
   });
 
   it("shows the library choice in settings", async () => {

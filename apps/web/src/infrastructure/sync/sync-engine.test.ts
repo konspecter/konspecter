@@ -1,5 +1,5 @@
 import { parseDocument } from "../../domain/document/document";
-import { createNote, updateNote } from "../../domain/note/note";
+import { createNote, updateNote, type Note } from "../../domain/note/note";
 import { openNoteStore, type NoteStore } from "../storage/note-store";
 import { FakeServer } from "./fake-server";
 import { SyncEngine, type Scheduler } from "./sync-engine";
@@ -8,6 +8,7 @@ import { mustGet } from "../storage/test-utils";
 let databaseCount = 0;
 const config = { serverUrl: "https://sync.example.com", token: "ksp_ada" };
 const date = new Date("2026-09-28T10:00:00Z");
+const minutesLater = (minutes: number) => new Date(date.getTime() + minutes * 60_000);
 
 /** Records scheduled callbacks so tests decide when time passes. */
 class ManualScheduler implements Scheduler {
@@ -34,8 +35,6 @@ type Device = {
 
 async function device(server: FakeServer): Promise<Device> {
   databaseCount += 1;
-  let copies = 0;
-  const deviceId = databaseCount;
   const store = await openNoteStore(`sync-test-${String(databaseCount)}`);
   const scheduler = new ManualScheduler();
   const online = { value: true };
@@ -45,21 +44,17 @@ async function device(server: FakeServer): Promise<Device> {
     random: () => 0.5,
     isOnline: () => online.value,
     now: () => date,
-    newId: () => {
-      copies += 1;
-      return `copy-${String(deviceId)}-${String(copies)}`;
-    },
+    isVisible: () => true,
   });
   return { store, engine, scheduler, online };
 }
 
-/** Conflict copies of a note, as their Markdown bodies. */
-async function copiesOf(store: NoteStore, id: string): Promise<string[]> {
-  return (await store.list())
-    .map((note) => parseDocument(note.markdown))
-    .filter((doc) => doc.metadata.conflictOf === id)
-    .map((doc) => doc.body);
+/** Edits the note on a device, as saved at `when`. */
+async function edit(d: Device, id: string, body: string, when: Date): Promise<void> {
+  await d.store.put(updateNote(await mustGet(d.store, id), body, when));
 }
+
+const bodyOf = (note: Note | undefined) => (note ? parseDocument(note.markdown).body : undefined);
 
 async function markdownOf(store: NoteStore, id: string) {
   return (await store.get(id))?.markdown;
@@ -204,7 +199,7 @@ describe("SyncEngine", () => {
     expect(await a.store.syncEntry("n1")).toMatchObject({ baseRevision: 2, dirty: false });
   });
 
-  it("settles a note changed on both sides: server version keeps it, local becomes a copy", async () => {
+  it("settles a note changed on both sides: the later edit wins everywhere", async () => {
     const server = new FakeServer();
     const a = await device(server);
     const b = await device(server);
@@ -212,40 +207,54 @@ describe("SyncEngine", () => {
     await a.engine.connect(config);
     await b.engine.connect(config);
 
-    await a.store.put(updateNote(await mustGet(a.store, "n1"), "# Plan\n\nedited on A", date));
-    await b.store.put(updateNote(await mustGet(b.store, "n1"), "# Plan\n\nedited on B", date));
-    await a.engine.syncNow();
-    await b.engine.syncNow();
-    await a.engine.syncNow();
+    await edit(b, "n1", "# Plan\n\nedited on B, later", minutesLater(5));
+    await edit(a, "n1", "# Plan\n\nedited on A", minutesLater(1));
+    await a.engine.syncNow(); // A reaches the server first...
+    await b.engine.syncNow(); // ...but B's later edit wins,
+    await a.engine.syncNow(); // and A takes it.
 
     for (const store of [a.store, b.store]) {
-      expect(await markdownOf(store, "n1")).toContain("edited on A");
-      expect(await copiesOf(store, "n1")).toEqual(["# Plan\n\nedited on B"]);
+      expect(bodyOf(await store.get("n1"))).toBe("# Plan\n\nedited on B, later");
+      expect(await store.list()).toHaveLength(1);
       expect(await store.pendingSync()).toEqual([]);
     }
-    const copyNote = (await b.store.list()).find((note) => note.id !== "n1");
-    expect(parseDocument(copyNote?.markdown ?? "").metadata.title).toBe(
-      "Plan (conflict copy 2026-09-28 10:00 UTC)",
-    );
-    expect(server.notes.get(copyNote?.id ?? "")?.markdown).toContain("edited on B");
+    expect(bodyOf(server.notes.get("n1"))).toBe("# Plan\n\nedited on B, later");
     expect(b.engine.getStatus()).toMatchObject({ state: "idle", pending: 0, blocked: 0 });
   });
 
-  it("keeps a local edit of a note deleted elsewhere as a copy", async () => {
+  it("lets an older offline edit that arrives late lose to a newer one", async () => {
+    const server = new FakeServer();
+    const a = await device(server);
+    const b = await device(server);
+    await a.store.put(createNote("# Plan\n\noriginal", date, "n1"));
+    await a.engine.connect(config);
+    await b.engine.connect(config);
+
+    b.online.value = false;
+    await edit(b, "n1", "# Plan\n\nold offline edit", minutesLater(1));
+    await edit(a, "n1", "# Plan\n\nnewer edit", minutesLater(5));
+    await a.engine.syncNow();
+    b.online.value = true;
+    await b.engine.syncNow();
+
+    expect(bodyOf(await b.store.get("n1"))).toBe("# Plan\n\nnewer edit");
+    expect(bodyOf(server.notes.get("n1"))).toBe("# Plan\n\nnewer edit");
+  });
+
+  it("keeps a local edit of a note deleted elsewhere, and restores it on the server", async () => {
     const server = new FakeServer();
     const a = await device(server);
     await a.store.put(createNote("# Draft", date, "n1"));
     await a.engine.connect(config);
     server.remove("n1");
-    await a.store.put(updateNote(await mustGet(a.store, "n1"), "# Draft\n\nmore work", date));
+    await edit(a, "n1", "# Draft\n\nmore work", minutesLater(1));
 
     await a.engine.syncNow();
 
-    expect(await a.store.get("n1")).toBeUndefined();
-    expect(await copiesOf(a.store, "n1")).toEqual(["# Draft\n\nmore work"]);
-    expect(
-      [...server.notes.values()].filter((n) => n.deletedAt === null).map((n) => n.markdown),
-    ).toEqual([expect.stringContaining("more work")]);
+    expect(bodyOf(await a.store.get("n1"))).toBe("# Draft\n\nmore work");
+    expect(server.notes.get("n1")).toMatchObject({ deletedAt: null });
+    expect(bodyOf(server.notes.get("n1"))).toBe("# Draft\n\nmore work");
+    expect(await a.store.pendingSync()).toEqual([]);
   });
 
   it("brings back a note deleted here but edited elsewhere", async () => {
@@ -282,30 +291,23 @@ describe("SyncEngine", () => {
     });
   });
 
-  it("converges three devices editing the same note, keeping every version", async () => {
+  it("converges three devices editing the same note on the latest edit", async () => {
     const server = new FakeServer();
     const devices = [await device(server), await device(server), await device(server)];
     const [a, b, c] = devices as [Device, Device, Device];
     await a.store.put(createNote("start", date, "n1"));
     for (const d of devices) await d.engine.connect(config);
 
-    for (const [name, d] of [
-      ["A", a],
-      ["B", b],
-      ["C", c],
-    ] as const) {
-      await d.store.put(updateNote(await mustGet(d.store, "n1"), `version ${name}`, date));
-    }
+    await edit(a, "n1", "version A", minutesLater(1));
+    await edit(b, "n1", "version B, the latest", minutesLater(3));
+    await edit(c, "n1", "version C", minutesLater(2));
     for (let round = 0; round < 2; round += 1) {
       for (const d of devices) await d.engine.syncNow();
     }
 
-    const texts = async (d: Device) =>
-      (await d.store.list()).map((note) => parseDocument(note.markdown).body).sort();
-    const expected = await texts(a);
-    expect(expected).toEqual(["version A", "version B", "version C"]);
-    expect(await texts(b)).toEqual(expected);
-    expect(await texts(c)).toEqual(expected);
+    for (const d of devices) {
+      expect((await d.store.list()).map(bodyOf)).toEqual(["version B, the latest"]);
+    }
   });
 
   it("holds back a note the server refuses and syncs the rest", async () => {
@@ -347,7 +349,7 @@ describe("SyncEngine", () => {
     server.failWith = null;
     await a.engine.syncNow();
     expect(a.engine.getStatus()).toMatchObject({ state: "idle", pending: 0, error: null });
-    expect(a.scheduler.nextDelay).toBe(60_000);
+    expect(a.scheduler.nextDelay).toBe(10_000); // This server has no change stream: poll.
   });
 
   it("syncs soon after a local change", async () => {
@@ -358,11 +360,74 @@ describe("SyncEngine", () => {
 
     await a.store.put(createNote("new", date, "n1"));
 
-    expect(a.scheduler.nextDelay).toBe(1500);
+    expect(a.scheduler.nextDelay).toBe(100);
     a.scheduler.pending.at(-1)?.callback();
     await a.engine.syncNow();
     expect(server.notes.has("n1")).toBe(true);
     a.engine.stop();
+  });
+
+  it("brings another device's edit at once through the change stream", async () => {
+    const server = new FakeServer();
+    server.eventStreams = true;
+    const a = await device(server);
+    const b = await device(server);
+    await a.store.put(createNote("# Live", date, "n1"));
+    await a.engine.connect(config);
+    await b.engine.connect(config);
+    await vi.waitFor(() => {
+      expect(server.openStreams).toBe(2);
+    });
+
+    await edit(a, "n1", "# Live\n\ntyped on A", minutesLater(1));
+    await a.engine.syncNow();
+
+    // B never syncs by itself here: the event from the server starts its cycle.
+    await vi.waitFor(async () => {
+      expect(bodyOf(await b.store.get("n1"))).toBe("# Live\n\ntyped on A");
+    });
+    await vi.waitFor(() => {
+      expect(b.scheduler.nextDelay).toBe(60_000); // While streaming, polling is a safety net.
+    });
+    a.engine.stop();
+    b.engine.stop();
+    expect(server.openStreams).toBe(0);
+  });
+
+  it("polls while the change stream is down, and reconnects with backoff", async () => {
+    const server = new FakeServer();
+    server.eventStreams = true;
+    const a = await device(server);
+    await a.engine.connect(config);
+    await vi.waitFor(() => {
+      expect(server.openStreams).toBe(1);
+    });
+
+    server.dropStreams();
+    await vi.waitFor(() => {
+      expect(a.scheduler.pending.map((task) => task.delayMs)).toEqual(
+        expect.arrayContaining([1000, 10_000]),
+      );
+    });
+
+    a.scheduler.pending.find((task) => task.delayMs === 1000)?.callback();
+    await vi.waitFor(() => {
+      expect(server.openStreams).toBe(1);
+    });
+    expect(server.requests.filter((r) => r === "GET /api/events")).toHaveLength(2);
+    a.engine.stop();
+  });
+
+  it("does without a change stream on a server that has none", async () => {
+    const server = new FakeServer();
+    const a = await device(server);
+    await a.engine.connect(config);
+    await a.engine.syncNow();
+
+    await vi.waitFor(() => {
+      expect(server.requests.filter((r) => r === "GET /api/events")).toHaveLength(1);
+    });
+    expect(a.scheduler.pending.map((task) => task.delayMs)).toEqual([10_000]);
   });
 
   it("rejects bad credentials without connecting", async () => {

@@ -27,6 +27,17 @@ async function invoke(command: string, args?: Record<string, unknown>): Promise<
   return core.invoke(command, args);
 }
 
+/**
+ * Lets `beforeClose` finish before the desktop window closes (the window
+ * closes once it resolves).
+ */
+export async function onWindowClose(beforeClose: () => Promise<void>): Promise<void> {
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  await getCurrentWindow().onCloseRequested(async () => {
+    await beforeClose();
+  });
+}
+
 /** Details of the running desktop app (native command `app_info`). */
 export async function appInfo(): Promise<AppInfo> {
   const value = await invoke("app_info");
@@ -48,7 +59,7 @@ export type FileEntry = {
 };
 export type FileContents = { readonly entry: FileEntry; readonly text: string };
 
-/** A native folder operation failed; `code` is e.g. "changed_on_disk", "not_found". */
+/** A native folder operation failed; `code` is e.g. "not_found", "too_large". */
 export class FolderError extends Error {
   override readonly name = "FolderError";
   constructor(
@@ -63,7 +74,8 @@ export class FolderError extends Error {
 export type FolderBridge = {
   list(): Promise<FileEntry[]>;
   read(path: string): Promise<FileContents>;
-  write(path: string, contents: string, expectedModifiedMs: number | null): Promise<FileEntry>;
+  /** Writes the file atomically, over whatever is there (the last write wins). */
+  write(path: string, contents: string): Promise<FileEntry>;
   create(title: string, contents: string): Promise<FileEntry>;
   trash(path: string): Promise<void>;
   openExternally(path: string): Promise<void>;
@@ -123,8 +135,8 @@ export const folderBridge: FolderBridge = {
     if (typeof value?.text !== "string") throw new FolderError("invalid_response", "Invalid file");
     return { entry: parseEntry(value.entry), text: value.text };
   },
-  async write(path, contents, expectedModifiedMs) {
-    return parseEntry(await folderCommand("folder_write", { path, contents, expectedModifiedMs }));
+  async write(path, contents) {
+    return parseEntry(await folderCommand("folder_write", { path, contents }));
   },
   async create(title, contents) {
     return parseEntry(await folderCommand("folder_create", { title, contents }));

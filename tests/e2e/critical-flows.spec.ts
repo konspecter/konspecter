@@ -129,7 +129,7 @@ test("HTML in a note cannot run script", async ({ page }) => {
   expect(dialogs).toEqual([]);
 });
 
-test("a conflict keeps both versions (editing while the note changes)", async ({ page }) => {
+test("the later edit wins (editing while the note changes in another tab)", async ({ page }) => {
   await createNote(page, ["# Shared", "original"]);
   const url = page.url();
   const editor = page.getByRole("textbox", { name: "Conspect text" });
@@ -150,17 +150,20 @@ test("a conflict keeps both versions (editing while the note changes)", async ({
     other.getByRole("img", { name: "Everything is stored on this device" }),
   ).toBeVisible();
 
-  // This tab still shows its version; editing it now keeps both.
+  // This tab still shows its version; editing it now is the later write, and it wins.
   await editor.getByText("original my edit").click();
   await page.keyboard.press("End");
   await page.keyboard.type(" again");
+  await expect(
+    page.getByRole("img", { name: "Everything is stored on this device" }),
+  ).toBeVisible();
 
-  await expect(page.getByText("This is a conflict copy")).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByRole("textbox", { name: "Conspect text" })).toContainText("my edit again");
-  await page.getByRole("link", { name: "the original" }).click();
-  await expect(page.getByRole("textbox", { name: "Conspect text" })).toContainText(
-    "other tab's edit",
-  );
+  await other.reload();
+  await expect(otherEditor).toContainText("original my edit again");
+  await expect(otherEditor).not.toContainText("other tab's edit");
+  await expect(page.getByText(/conflict copy/)).toHaveCount(0);
+  await page.goto("/");
+  await expect(list(page).getByRole("link", { name: /Shared/ })).toHaveCount(1);
 });
 
 test("global shortcuts work from the editor", async ({ page }) => {

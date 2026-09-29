@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -44,6 +45,43 @@ func TestServeShutsDownWhenContextIsCancelled(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("serve() did not return after cancellation")
+	}
+}
+
+// A long request (an event stream) must not hold up shutdown: the shutdown
+// hook ends it.
+func TestServeRunsShutdownHooks(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	closed := make(chan struct{})
+	started := make(chan struct{})
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		http.NewResponseController(w).Flush()
+		close(started)
+		<-closed
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- serveOn(ctx, ln, handler, func() { close(closed) }) }()
+
+	res, err := http.Get("http://" + ln.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	<-started
+	cancel()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("serve() = %v, want nil", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("serve() did not return: the shutdown hook did not run")
 	}
 }
 

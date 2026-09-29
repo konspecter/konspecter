@@ -1,6 +1,7 @@
 # ADR-003: Local-first
 
-Status: accepted (2026-09-28)
+Status: accepted (2026-09-28). The conflict rule ("never lose a document version") is
+superseded by [ADR-011](ADR-011-last-write-wins.md): the later edit wins.
 
 ## Context
 

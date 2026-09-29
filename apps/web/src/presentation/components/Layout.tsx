@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useMatch, useNavigate, useSearchParams } from "react-router";
 import { parseQuery } from "../../domain/search/query";
 import type { EditorMode, TagNames, Theme } from "../../domain/settings/settings";
@@ -6,12 +6,13 @@ import type { NoteCatalog } from "../../application/notes/note-catalog";
 import type { NoteRepository } from "../../application/notes/note-repository";
 import type { SyncEngine } from "../../infrastructure/sync/sync-engine";
 import type { Activity } from "../app/activity";
+import { rememberLocation } from "../app/last-location";
 import { SHORTCUTS } from "../app/shortcuts";
 import type { UpdateSource } from "../app/updates";
 import { useShortcuts } from "../hooks/use-shortcuts";
 import { Antenna } from "./Antenna";
 import { DetailsSlot } from "./details-slot";
-import { NewNoteIcon, SidebarIcon } from "./icons";
+import { ListIcon, NewNoteIcon, SidebarIcon } from "./icons";
 import { SearchBox } from "./SearchBox";
 import { ShortcutsDialog } from "./ShortcutsDialog";
 import { Sidebar, withShortcut } from "./Sidebar";
@@ -90,6 +91,10 @@ export function Layout({
   const barToggleRef = useRef<HTMLButtonElement>(null);
   const dark = useDarkTheme(theme);
   useScrollbarGutter();
+  // The app opens where it was last time.
+  useEffect(() => {
+    rememberLocation(location.pathname + location.search);
+  }, [location.pathname, location.search]);
 
   const query = location.pathname === "/" ? (searchParams.get("q") ?? "") : "";
   const activeTag = useMemo(() => {
@@ -185,6 +190,14 @@ export function Layout({
                 >
                   <SidebarIcon />
                 </button>
+                <Link
+                  to="/"
+                  className="icon-button"
+                  aria-label={t("sidebar.allNotes")}
+                  title={withShortcut(t("sidebar.allNotes"), SHORTCUTS.allNotes.keys)}
+                >
+                  <ListIcon />
+                </Link>
                 <Link
                   to="/notes/new"
                   className="icon-button"

@@ -4,12 +4,12 @@ What Konspecter protects, from whom, and how. Every item below has tests unless 
 
 ## Assets and threats
 
-| Asset                                | Threats                                                                                          |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| Notes (local and on the server)      | another user reading/changing them; malicious note content (XSS); loss through bugs or conflicts |
-| Access tokens                        | theft from storage or logs; guessing; reuse after compromise                                     |
-| The user's files (desktop File Mode) | the web view reaching files outside the chosen folder                                            |
-| The build                            | vulnerable or unlicensed dependencies                                                            |
+| Asset                                | Threats                                                                                           |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| Notes (local and on the server)      | another user reading/changing them; malicious note content (XSS); loss through bugs or overwrites |
+| Access tokens                        | theft from storage or logs; guessing; reuse after compromise                                      |
+| The user's files (desktop File Mode) | the web view reaching files outside the chosen folder                                             |
+| The build                            | vulnerable or unlicensed dependencies                                                             |
 
 ## Measures
 
@@ -18,7 +18,12 @@ What Konspecter protects, from whom, and how. Every item below has tests unless 
 - **Bearer tokens**: 256-bit random, shown once (`server create-user` / `create-token`),
   stored only as SHA-256 hashes; lookups are by hash, so no secret is compared in code.
 - **Revocation**: `DELETE /api/tokens/current` signs the calling token out;
-  `server revoke-tokens -email …` revokes every token of a user after a compromise.
+  `server revoke-tokens -email …` revokes every token of a user after a compromise. An open
+  change stream (`GET /api/events`) re-checks its token on every heartbeat (25 s) and ends
+  once it is revoked.
+- **Change streams are bounded**: at most 16 open per user (then `429`), each write has its
+  own deadline, and the events carry no note data (clients fetch changes with the token as
+  usual). The token is sent in the `Authorization` header, never in the URL.
 - **Failed-authentication rate limit**: 30 failures per client address per minute, then `429`
   with `Retry-After`. The connection address is used; forwarded headers are not trusted.
 - **Authorization**: every note query is scoped to the authenticated user (primary key

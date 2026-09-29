@@ -39,10 +39,10 @@ fixed ([Markdown format](markdown-format.md#validation-and-invalid-documents)).
 
 ## Recovery paths, summarized
 
-| Problem                             | Recovery                                                                |
-| ----------------------------------- | ----------------------------------------------------------------------- |
-| index damaged or outdated           | automatic on next start; _Rebuild indexes_                              |
-| a record unreadable                 | download the raw record, then remove it                                 |
-| frontmatter invalid                 | edit the note (Markdown mode)                                           |
-| device lost or storage cleared      | reconnect sync (server copy), or import the last export                 |
-| a version lost to a concurrent edit | not possible: conflicts keep both ([sync](sync.md#conflict-resolution)) |
+| Problem                            | Recovery                                                                                                      |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| index damaged or outdated          | automatic on next start; _Rebuild indexes_                                                                    |
+| a record unreadable                | download the raw record, then remove it                                                                       |
+| frontmatter invalid                | edit the note (Markdown mode)                                                                                 |
+| device lost or storage cleared     | reconnect sync (server copy), or import the last export                                                       |
+| a version replaced by a later edit | undo in the editor, an export, or file history in File Mode ([ADR-011](decisions/ADR-011-last-write-wins.md)) |

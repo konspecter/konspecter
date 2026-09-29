@@ -38,8 +38,6 @@ pub struct FileContents {
 pub enum FolderError {
     InvalidPath(String),
     NotFound(String),
-    /// The file changed on disk since the app read it.
-    ChangedOnDisk(String),
     TooLarge(String),
     Io(String),
 }
@@ -49,7 +47,6 @@ impl FolderError {
         match self {
             FolderError::InvalidPath(_) => "invalid_path",
             FolderError::NotFound(_) => "not_found",
-            FolderError::ChangedOnDisk(_) => "changed_on_disk",
             FolderError::TooLarge(_) => "too_large",
             FolderError::Io(_) => "io",
         }
@@ -61,7 +58,6 @@ impl fmt::Display for FolderError {
         match self {
             FolderError::InvalidPath(p) => write!(f, "invalid path {p:?}"),
             FolderError::NotFound(p) => write!(f, "{p} does not exist"),
-            FolderError::ChangedOnDisk(p) => write!(f, "{p} was changed by another program"),
             FolderError::TooLarge(p) => write!(f, "{p} is larger than 5 MB"),
             FolderError::Io(message) => write!(f, "{message}"),
         }
@@ -198,22 +194,12 @@ impl Folder {
         })
     }
 
-    /// Writes the file atomically (a temporary file renamed over it). With
-    /// `expected_modified_ms`, refuses if the file changed since then.
-    pub fn write(
-        &self,
-        relative: &str,
-        contents: &str,
-        expected_modified_ms: Option<u64>,
-    ) -> Result<FileEntry, FolderError> {
+    /// Writes the file atomically (a temporary file renamed over it), over
+    /// whatever is there: the last write wins.
+    pub fn write(&self, relative: &str, contents: &str) -> Result<FileEntry, FolderError> {
         let path = self.resolve(relative)?;
         if contents.len() as u64 > MAX_FILE_BYTES {
             return Err(FolderError::TooLarge(relative.to_string()));
-        }
-        if let (Some(expected), Ok(meta)) = (expected_modified_ms, fs::metadata(&path))
-            && modified_ms(&meta) != expected
-        {
-            return Err(FolderError::ChangedOnDisk(relative.to_string()));
         }
         let dir = path
             .parent()
@@ -455,7 +441,7 @@ mod tests {
     #[test]
     fn reads_and_writes_atomically() {
         let (_dir, folder) = folder();
-        let written = folder.write("note.md", "# Hi\n", None).unwrap();
+        let written = folder.write("note.md", "# Hi\n").unwrap();
         assert_eq!(written.path, "note.md");
         let read = folder.read("note.md").unwrap();
         assert_eq!(read.text, "# Hi\n");
@@ -465,18 +451,13 @@ mod tests {
     }
 
     #[test]
-    fn refuses_to_overwrite_a_file_changed_on_disk() {
+    fn overwrites_a_file_changed_on_disk() {
         let (_dir, folder) = folder();
-        let first = folder.write("note.md", "v1", None).unwrap();
-        std::thread::sleep(std::time::Duration::from_millis(20));
+        folder.write("note.md", "v1").unwrap();
         fs::write(folder.root().join("note.md"), "changed in another editor").unwrap();
 
-        let result = folder.write("note.md", "v2 from the app", Some(first.modified_ms));
-        assert_eq!(result, Err(FolderError::ChangedOnDisk("note.md".into())));
-        assert_eq!(
-            folder.read("note.md").unwrap().text,
-            "changed in another editor"
-        );
+        folder.write("note.md", "v2 from the app").unwrap();
+        assert_eq!(folder.read("note.md").unwrap().text, "v2 from the app");
     }
 
     #[test]
@@ -498,7 +479,7 @@ mod tests {
         assert_eq!(folder.read("bin.md").unwrap().text, "ok\u{fffd}");
         let huge = "x".repeat((MAX_FILE_BYTES + 1) as usize);
         assert!(matches!(
-            folder.write("big.md", &huge, None),
+            folder.write("big.md", &huge),
             Err(FolderError::TooLarge(_))
         ));
     }

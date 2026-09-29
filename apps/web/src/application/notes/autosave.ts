@@ -1,19 +1,10 @@
-import {
-  InvalidDocumentError,
-  parseDocument,
-  updateMetadata,
-} from "../../domain/document/document";
+import { InvalidDocumentError } from "../../domain/document/document";
 import { updateNote, type Note } from "../../domain/note/note";
-import { conflictCopyMarkdown } from "../../domain/sync/conflicts";
 import type { NoteRepository } from "./note-repository";
 
 export type AutosaveEvents = {
-  /**
-   * The editing continues under a new note: the first save of a new note, or
-   * a conflict copy (the stored version changed elsewhere meanwhile). A
-   * conflict copy has new frontmatter, so the editor should show `note`.
-   */
-  onCreated?: (note: Note, reason: "new" | "conflict") => void;
+  /** A new note's first save stored it: the editing continues under its id. */
+  onCreated?: (note: Note) => void;
   onSaved?: (note: Note) => void;
   /** A save failed or the text is not a valid document; `null` once a save succeeds. */
   onProblem?: (problem: unknown) => void;
@@ -33,8 +24,6 @@ export type AutosaveOptions = {
    */
   createDelay?: number;
   now?: () => Date;
-  /** Whether a failed write means the stored version changed underneath (File Mode). */
-  changedUnderneath?: (error: unknown) => boolean;
 };
 
 /** Per repository and note id, the saves running or waiting to run. */
@@ -73,10 +62,10 @@ export async function savesSettled(store: NoteRepository, noteId: string): Promi
  * flight at a time, and the latest text wins. The editor hands over a
  * function that produces its text, so it is serialized only when saved.
  *
- * A new note (no base) is created by its first non-blank save. Before every
- * save the stored version is compared with the last one this session saw: if
- * something else changed it (sync, another program), the text is saved as a
- * conflict copy instead, and editing continues on the copy.
+ * A new note (no base) is created by its first non-blank save. The last
+ * write wins: a save replaces whatever changed the stored version meanwhile
+ * (sync, another program), since the edit being saved is the newest, and it
+ * brings back a note deleted elsewhere.
  */
 export class Autosave {
   readonly #store: NoteRepository;
@@ -85,7 +74,6 @@ export class Autosave {
   readonly #maxWait: number;
   readonly #createDelay: number;
   readonly #now: () => Date;
-  readonly #changedUnderneath: (error: unknown) => boolean;
   /** The stored version this session last saw (loaded or written). */
   #base: Note | null;
   /** The editor text last written (or loaded), to skip saves that change nothing. */
@@ -114,10 +102,9 @@ export class Autosave {
     this.#written = base?.markdown ?? "";
     this.#events = events;
     this.#delay = options.delay ?? 400;
-    this.#maxWait = options.maxWait ?? 2000;
+    this.#maxWait = options.maxWait ?? 1000;
     this.#createDelay = options.createDelay ?? 2000;
     this.#now = options.now ?? (() => new Date());
-    this.#changedUnderneath = options.changedUnderneath ?? (() => false);
   }
 
   /** The stored note being edited; null until a new note's first save. */
@@ -233,43 +220,12 @@ export class Autosave {
       if (markdown.trim() === "") return;
       const note = await this.#store.create(markdown, now);
       this.#adopt(note, markdown);
-      if (this.#attached) this.#events.onCreated?.(note, "new");
-      return;
-    }
-    const current = await this.#store.get(base.id);
-    if (current?.markdown !== base.markdown) {
-      await this.#saveCopy(base, markdown, now);
+      if (this.#attached) this.#events.onCreated?.(note);
       return;
     }
     const next = updateNote(base, markdown, now);
-    try {
-      await this.#store.put(next);
-    } catch (error) {
-      if (!this.#changedUnderneath(error)) throw error;
-      await this.#saveCopy(base, markdown, now);
-      return;
-    }
+    await this.#store.put(next);
     this.#adopt(next, markdown);
-  }
-
-  async #saveCopy(original: Note, markdown: string, now: Date): Promise<void> {
-    // Validates first, so invalid text does not become a copy.
-    parseDocument(markdown);
-    let copy = await this.#store.create(
-      conflictCopyMarkdown({ id: original.id, markdown }, now),
-      now,
-    );
-    // Text typed while the copy was written belongs to the copy too.
-    const { title, conflictOf } = parseDocument(copy.markdown).metadata;
-    while (this.#pending !== null && !this.#disposed) {
-      const latest = updateMetadata(this.#pending(), { title, conflictOf });
-      this.#pending = null;
-      this.#pendingSince = null;
-      copy = updateNote(copy, latest, now);
-      await this.#store.put(copy);
-    }
-    this.#adopt(copy, copy.markdown);
-    if (this.#attached) this.#events.onCreated?.(copy, "conflict");
   }
 
   #adopt(note: Note, markdown: string): void {

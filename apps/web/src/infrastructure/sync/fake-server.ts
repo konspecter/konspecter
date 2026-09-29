@@ -1,7 +1,7 @@
 /**
  * Test double for the Go server: the same routes, revision rules, per-user
- * change sequence and tombstones, in memory, behind a `fetch` function.
- * Used only by tests.
+ * change sequence, tombstones and change events, in memory, behind a `fetch`
+ * function. Used only by tests.
  */
 type StoredNote = {
   id: string;
@@ -26,6 +26,9 @@ export class FakeServer {
   readonly requests: string[] = [];
   /** Tests use a tiny limit to exercise rejected notes; the real server allows 5 MB. */
   maxMarkdownLength = 1000;
+  /** Serves `GET /api/events`; off by default, like an older server (404). */
+  eventStreams = false;
+  readonly #streams = new Set<ReadableStreamDefaultController<Uint8Array>>();
 
   fetch = async (input: string, init?: RequestInit): Promise<Response> => {
     const url = new URL(input);
@@ -43,6 +46,9 @@ export class FakeServer {
     const noteId = /^\/api\/notes\/([^/]+)$/.exec(url.pathname)?.[1];
 
     if (method === "GET" && url.pathname === "/api/me") return json(200, user);
+    if (method === "GET" && url.pathname === "/api/events" && this.eventStreams) {
+      return this.#events(init?.signal ?? null);
+    }
     if (method === "GET" && url.pathname === "/api/sync") return this.#changes(url);
     if (method === "POST" && url.pathname === "/api/notes") return this.#create(body);
     if (method === "GET" && noteId) {
@@ -68,8 +74,46 @@ export class FakeServer {
       Object.assign(note, {
         revision: note.revision + 1,
         deletedAt: "2026-09-28T10:00:00Z",
-        seq: ++this.#seq,
+        seq: this.#nextSeq(),
       });
+  }
+
+  /** Ends every open event stream, as a dropped connection would. */
+  dropStreams(): void {
+    for (const stream of this.#streams) stream.close();
+    this.#streams.clear();
+  }
+
+  get openStreams(): number {
+    return this.#streams.size;
+  }
+
+  #nextSeq(): number {
+    this.#seq += 1;
+    // After the change is stored: a client that syncs on the event sees it.
+    queueMicrotask(() => {
+      for (const stream of this.#streams) send(stream);
+    });
+    return this.#seq;
+  }
+
+  #events(signal: AbortSignal | null): Response {
+    let controller: ReadableStreamDefaultController<Uint8Array> | null = null;
+    const body = new ReadableStream<Uint8Array>({
+      start: (c) => {
+        controller = c;
+        this.#streams.add(c);
+        send(c); // One on connect: the client catches up.
+      },
+      cancel: () => {
+        if (controller) this.#streams.delete(controller);
+      },
+    });
+    signal?.addEventListener("abort", () => {
+      if (!controller || !this.#streams.delete(controller)) return;
+      controller.error(new DOMException("The request was aborted", "AbortError"));
+    });
+    return new Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } });
   }
 
   /** A change made by another device, directly on the server. */
@@ -80,7 +124,7 @@ export class FakeServer {
       markdown,
       revision: (existing?.revision ?? 0) + 1,
       deletedAt: null,
-      seq: ++this.#seq,
+      seq: this.#nextSeq(),
     });
   }
 
@@ -89,13 +133,14 @@ export class FakeServer {
     if (typeof body.markdown === "string" && body.markdown.length > this.maxMarkdownLength) {
       return json(400, error("invalid_markdown", "note is too large"));
     }
-    if (this.notes.has(id)) return json(409, error("exists", "a note with this id already exists"));
+    const existing = this.notes.get(id);
+    if (existing) return conflict(existing);
     const note = {
       id,
       markdown: String(body.markdown),
       revision: 1,
       deletedAt: null,
-      seq: ++this.#seq,
+      seq: this.#nextSeq(),
     };
     this.notes.set(id, note);
     return json(201, wire(note));
@@ -104,11 +149,13 @@ export class FakeServer {
   #update(id: string, body: Json): Response {
     const note = this.notes.get(id);
     if (!note) return json(404, error("not_found", "note not found"));
-    if (note.revision !== body.base_revision || note.deletedAt !== null) return conflict(note);
+    if (note.revision !== body.base_revision) return conflict(note);
+    // At a deleted note's own revision, an update brings it back.
     Object.assign(note, {
       markdown: String(body.markdown),
       revision: note.revision + 1,
-      seq: ++this.#seq,
+      deletedAt: null,
+      seq: this.#nextSeq(),
     });
     return json(200, wire(note));
   }
@@ -120,7 +167,7 @@ export class FakeServer {
     Object.assign(note, {
       revision: note.revision + 1,
       deletedAt: "2026-09-28T10:00:00Z",
-      seq: ++this.#seq,
+      seq: this.#nextSeq(),
     });
     return new Response(null, { status: 204 });
   }
@@ -149,6 +196,10 @@ function wire(note: StoredNote): Json {
     updated_at: "2026-09-28T10:00:00Z",
     ...(note.deletedAt ? { deleted_at: note.deletedAt } : {}),
   };
+}
+
+function send(stream: ReadableStreamDefaultController<Uint8Array>): void {
+  stream.enqueue(new TextEncoder().encode("event: changes\ndata: {}\n\n"));
 }
 
 function conflict(note: StoredNote): Response {

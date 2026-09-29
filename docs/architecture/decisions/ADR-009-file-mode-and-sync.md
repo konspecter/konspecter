@@ -1,6 +1,7 @@
 # ADR-009: How File Mode and cloud sync interact
 
-Status: accepted (2026-09-28)
+Status: accepted (2026-09-28). Conflict copies and the changed-on-disk refusal (3) are
+superseded by [ADR-011](ADR-011-last-write-wins.md): the later write wins.
 
 ## Context
 

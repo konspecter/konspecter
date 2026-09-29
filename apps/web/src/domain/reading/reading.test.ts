@@ -21,6 +21,12 @@ describe("reading position", () => {
   it("validates stored state", () => {
     const valid = { noteId: "n", position: 0.25, updatedAt: "2026-09-28T10:00:00Z" };
     expect(parseReadingState({ ...valid, extra: 1 })).toEqual(valid);
+    const selection = { editor: "markdown", anchor: 3, head: 7, focused: true };
+    expect(parseReadingState({ ...valid, selection })).toEqual({ ...valid, selection });
+    // An invalid caret is forgotten; the scroll position stays.
+    for (const caret of [{ ...selection, editor: "vim" }, { ...selection, anchor: -1 }, "x"]) {
+      expect(parseReadingState({ ...valid, selection: caret })).toEqual(valid);
+    }
 
     for (const bad of [
       null,

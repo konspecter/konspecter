@@ -1,5 +1,6 @@
 // Package httpapi is the HTTP/JSON API. It authenticates requests with bearer
-// tokens and scopes every note operation to the authenticated user.
+// tokens, scopes every note operation to the authenticated user and streams
+// change events (Server-Sent Events) to the user's clients.
 package httpapi
 
 import (
@@ -42,10 +43,12 @@ const (
 )
 
 type api struct {
-	notes   NoteRepository
-	auth    Authenticator
-	logger  *slog.Logger
-	limiter *failureLimiter
+	notes     NoteRepository
+	auth      Authenticator
+	logger    *slog.Logger
+	limiter   *failureLimiter
+	hub       *hub
+	heartbeat time.Duration
 }
 
 // Options configures the handler.
@@ -53,11 +56,32 @@ type Options struct {
 	// AllowedOrigins may call the API from a browser (CORS), e.g.
 	// "https://notes.example.com". Empty means same-origin only.
 	AllowedOrigins []string
+	// heartbeat overrides defaultHeartbeat (tests).
+	heartbeat time.Duration
 }
 
+// Handler is the API's HTTP handler.
+type Handler struct {
+	http.Handler
+	hub *hub
+}
+
+// CloseStreams ends every open event stream and refuses new ones. Call it
+// when the server shuts down (http.Server.RegisterOnShutdown): Shutdown waits
+// for active handlers, and a stream would otherwise never finish.
+func (h *Handler) CloseStreams() { h.hub.close() }
+
 // NewHandler returns the API's HTTP handler.
-func NewHandler(repository NoteRepository, authenticator Authenticator, logger *slog.Logger, options Options) http.Handler {
-	a := &api{notes: repository, auth: authenticator, logger: logger, limiter: newFailureLimiter(authFailuresPerMinute, time.Minute, time.Now)}
+func NewHandler(repository NoteRepository, authenticator Authenticator, logger *slog.Logger, options Options) *Handler {
+	a := &api{
+		notes: repository, auth: authenticator, logger: logger,
+		limiter:   newFailureLimiter(authFailuresPerMinute, time.Minute, time.Now),
+		hub:       newHub(),
+		heartbeat: defaultHeartbeat,
+	}
+	if options.heartbeat > 0 {
+		a.heartbeat = options.heartbeat
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -70,11 +94,12 @@ func NewHandler(repository NoteRepository, authenticator Authenticator, logger *
 	mux.Handle("PUT /api/notes/{id}", a.authenticated(a.updateNote))
 	mux.Handle("DELETE /api/notes/{id}", a.authenticated(a.deleteNote))
 	mux.Handle("GET /api/sync", a.authenticated(a.changes))
+	mux.Handle("GET /api/events", a.authenticated(a.events))
 	mux.Handle("DELETE /api/tokens/current", a.authenticated(a.revokeCurrentToken))
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, _ *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "no such endpoint")
 	})
-	return a.logRequests(securityHeaders(cors(options.AllowedOrigins, mux)))
+	return &Handler{Handler: a.logRequests(securityHeaders(cors(options.AllowedOrigins, mux))), hub: a.hub}
 }
 
 // securityHeaders marks every response as data that must not be sniffed,
@@ -263,6 +288,7 @@ func (a *api) createNote(w http.ResponseWriter, r *http.Request, user auth.User)
 		a.noteError(w, r, err)
 		return
 	}
+	a.hub.publish(user.ID)
 	w.Header().Set("Location", "/api/notes/"+n.ID)
 	writeJSON(w, http.StatusCreated, toJSON(n))
 }
@@ -288,6 +314,7 @@ func (a *api) updateNote(w http.ResponseWriter, r *http.Request, user auth.User)
 		a.noteError(w, r, err)
 		return
 	}
+	a.hub.publish(user.ID)
 	writeJSON(w, http.StatusOK, toJSON(n))
 }
 
@@ -302,6 +329,7 @@ func (a *api) deleteNote(w http.ResponseWriter, r *http.Request, user auth.User)
 		a.noteError(w, r, err)
 		return
 	}
+	a.hub.publish(user.ID)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -347,11 +375,9 @@ func (a *api) noteError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, notes.ErrNotFound):
 		writeError(w, http.StatusNotFound, "not_found", "note not found")
-	case errors.Is(err, notes.ErrExists):
-		writeError(w, http.StatusConflict, "exists", "a note with this id already exists")
 	case errors.As(err, &conflict):
-		// The client's copy is stale; send the current version so nothing is
-		// overwritten and the client can reconcile.
+		// The client's copy is stale (or the id to create is taken); send the
+		// current version so nothing is overwritten and the client can reconcile.
 		writeJSON(w, http.StatusConflict, map[string]any{
 			"error":   errorBody{Code: "revision_conflict", Message: conflict.Error()},
 			"current": toJSON(conflict.Current),
@@ -390,6 +416,10 @@ func (s *statusRecorder) WriteHeader(status int) {
 	s.status = status
 	s.ResponseWriter.WriteHeader(status)
 }
+
+// Unwrap lets http.ResponseController reach the connection (flushing and
+// deadlines for event streams).
+func (s *statusRecorder) Unwrap() http.ResponseWriter { return s.ResponseWriter }
 
 func (a *api) logRequests(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

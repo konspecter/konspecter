@@ -3,7 +3,6 @@ import { parseDocument } from "../../domain/document/document";
 import { readNotes, updateNote } from "../../domain/note/note";
 import { parseQuery } from "../../domain/search/query";
 import { parseTagName, type Tag } from "../../domain/tag/tags";
-import { FolderError } from "../desktop/desktop";
 import { openNoteStore } from "../storage/note-store";
 import { mustGet } from "../storage/test-utils";
 import { FakeFolder } from "./fake-folder";
@@ -68,14 +67,14 @@ describe("FolderStore", () => {
     expect(folder.files.get("note.md")?.text).toContain("# Note, edited");
   });
 
-  it("refuses to overwrite a file another program changed", async () => {
+  it("writes over a file another program changed: the last write wins", async () => {
     const { folder, store } = await setup();
     folder.edit("note.md", "# Mine");
     const note = await mustGet(store, "note.md");
     folder.edit("note.md", "# Changed in Vim");
 
-    await expect(store.put(updateNote(note, "# Overwrite", now))).rejects.toThrow(FolderError);
-    expect(folder.files.get("note.md")?.text).toBe("# Changed in Vim");
+    await store.put(updateNote(note, "# Overwrite", now));
+    expect(folder.files.get("note.md")?.text).toContain("# Overwrite");
   });
 
   it("moves deleted notes to the trash", async () => {

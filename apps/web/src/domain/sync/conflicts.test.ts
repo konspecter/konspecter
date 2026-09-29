@@ -1,8 +1,9 @@
-import { parseDocument } from "../document/document";
-import { createNote } from "../note/note";
-import { conflictCopyMarkdown, planResolution } from "./conflicts";
+import { planResolution } from "./conflicts";
 
-const now = new Date("2026-09-28T10:15:42Z");
+const edited = (updated: string | null, body: string) => ({
+  id: "n1",
+  markdown: `${updated === null ? "" : `---\nupdated: ${updated}\n---\n`}# Java\n\n${body}`,
+});
 const remote = (markdown: string, deleted = false) => ({
   id: "n1",
   markdown,
@@ -11,59 +12,51 @@ const remote = (markdown: string, deleted = false) => ({
 });
 
 describe("planResolution", () => {
-  const local = createNote("# Java\n\nlocal edit", now, "n1");
+  const older = edited("2026-09-28T10:00:00Z", "older edit");
+  const newer = edited("2026-09-28T10:05:00Z", "newer edit");
 
-  it("keeps the server version and copies a different local edit", () => {
-    const plan = planResolution(local, remote("server edit"), now);
-
-    expect(plan.kind).toBe("copy-local");
-    expect(plan.remote.markdown).toBe("server edit");
+  it("keeps the local version when it was edited later", () => {
+    expect(planResolution(newer, remote(older.markdown)).kind).toBe("keep-local");
   });
 
-  it("copies a local edit when the server deleted the note", () => {
-    expect(planResolution(local, remote("", true), now).kind).toBe("copy-local");
+  it("takes the server version when it was edited later", () => {
+    const plan = planResolution(older, remote(newer.markdown));
+
+    expect(plan).toEqual({ kind: "take-remote", remote: remote(newer.markdown) });
   });
 
-  it("settles identical versions without a copy", () => {
-    expect(planResolution(local, remote(local.markdown), now)).toEqual({
-      kind: "take-remote",
-      remote: remote(local.markdown),
-    });
+  it("gives ties and versions without a date to the server", () => {
+    const sameTime = edited("2026-09-28T10:05:00Z", "same time, other text");
+    expect(planResolution(sameTime, remote(newer.markdown)).kind).toBe("take-remote");
+    expect(planResolution(edited(null, "undated"), remote(older.markdown)).kind).toBe(
+      "take-remote",
+    );
+    expect(planResolution(newer, remote(edited(null, "undated").markdown)).kind).toBe("keep-local");
+  });
+
+  it("reads other tools' updated_at, and treats invalid frontmatter as undated", () => {
+    const other = { id: "n1", markdown: "---\nupdated_at: 2026-09-28T11:00:00Z\n---\nother" };
+    expect(planResolution(other, remote(newer.markdown)).kind).toBe("keep-local");
+    const broken = { id: "n1", markdown: "---\nupdated: [\n---\nbroken" };
+    expect(planResolution(broken, remote(older.markdown)).kind).toBe("take-remote");
+  });
+
+  it("keeps a local edit when the server deleted the note", () => {
+    expect(planResolution(older, remote("", true)).kind).toBe("keep-local");
+  });
+
+  it("settles identical versions", () => {
+    expect(planResolution(newer, remote(newer.markdown)).kind).toBe("take-remote");
   });
 
   it("brings back a note deleted locally but edited elsewhere", () => {
-    expect(planResolution(null, remote("edited elsewhere"), now).kind).toBe("take-remote");
+    expect(planResolution(null, remote(older.markdown)).kind).toBe("take-remote");
   });
 
   it("settles a note deleted on both sides", () => {
-    expect(planResolution(null, remote("", true), now)).toEqual({
+    expect(planResolution(null, remote("", true))).toEqual({
       kind: "take-remote",
       remote: remote("", true),
     });
-  });
-});
-
-describe("conflictCopyMarkdown", () => {
-  it("labels the copy, links the original and keeps the content", () => {
-    const local = createNote("---\ntags: [a]\n---\n\n# Java\n\nlocal edit", now, "n1");
-
-    const copy = parseDocument(conflictCopyMarkdown(local, now));
-
-    expect(copy.metadata.title).toBe("Java (conflict copy 2026-09-28 10:15 UTC)");
-    expect(copy.metadata.conflictOf).toBe("n1");
-    expect(copy.body).toBe("# Java\n\nlocal edit");
-    expect(conflictCopyMarkdown(local, now)).toContain("tags: [a]");
-  });
-
-  it("names an untitled copy", () => {
-    const copy = conflictCopyMarkdown(createNote("", now, "n1"), now);
-    expect(parseDocument(copy).metadata.title).toBe(
-      "Untitled (conflict copy 2026-09-28 10:15 UTC)",
-    );
-  });
-
-  it("copies a document with invalid frontmatter unchanged", () => {
-    const broken = { id: "n1", markdown: "---\ntitle: [\n---\ntext" };
-    expect(conflictCopyMarkdown(broken, now)).toBe(broken.markdown);
   });
 });

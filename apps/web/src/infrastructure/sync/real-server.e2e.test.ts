@@ -25,7 +25,7 @@ describe.skipIf(!url || !token)("sync against a real server", () => {
     return { store, engine };
   }
 
-  it("syncs creates, edits, conflicts (keeping both versions) and deletes", async () => {
+  it("syncs creates, edits, the later of two edits, restores and deletes", async () => {
     const a = await device("a");
     const id = `e2e-${run}`;
     await a.store.put(createNote("# From A", new Date(), id));
@@ -34,30 +34,64 @@ describe.skipIf(!url || !token)("sync against a real server", () => {
     const b = await device("b");
     expect((await b.store.get(id))?.markdown).toContain("# From A");
 
-    const onB = await mustGet(b.store, id);
-    await b.store.put(updateNote(onB, "# Edited on B", new Date()));
+    await b.store.put(updateNote(await mustGet(b.store, id), "# Edited on B", new Date()));
     await b.engine.syncNow();
     await a.engine.syncNow();
     expect((await a.store.get(id))?.markdown).toContain("Edited on B");
 
-    const onA = await mustGet(a.store, id);
-    const onB2 = await mustGet(b.store, id);
-    await a.store.put(updateNote(onA, "# A wins the race", new Date()));
-    await b.store.put(updateNote(onB2, "# B loses the race", new Date()));
+    // B's edit is the later one: it wins, though A reaches the server first.
+    const now = Date.now();
+    await a.store.put(updateNote(await mustGet(a.store, id), "# Earlier on A", new Date(now)));
+    await b.store.put(
+      updateNote(await mustGet(b.store, id), "# Later on B", new Date(now + 60_000)),
+    );
     await a.engine.syncNow();
     await b.engine.syncNow();
     await a.engine.syncNow();
-    // The server's version keeps the note; B's edit survives as a conflict copy on both.
     for (const store of [a.store, b.store]) {
-      expect((await store.get(id))?.markdown).toContain("A wins the race");
-      const copy = (await store.list()).find((note) =>
-        note.markdown.includes(`conflict_of: ${id}`),
-      );
-      expect(copy?.markdown).toContain("B loses the race");
+      expect((await store.get(id))?.markdown).toContain("Later on B");
+      // No copy: the account may hold notes of earlier runs, but none has A's text.
+      const copies = (await store.list()).filter((note) => note.markdown.includes("Earlier on A"));
+      expect(copies).toEqual([]);
+    }
+
+    // Edits beat deletions: A deletes it, B edits it meanwhile, and it stays.
+    await a.store.delete(id);
+    await b.store.put(
+      updateNote(await mustGet(b.store, id), "# Still needed", new Date(now + 120_000)),
+    );
+    await a.engine.syncNow();
+    await b.engine.syncNow();
+    await a.engine.syncNow();
+    for (const store of [a.store, b.store]) {
+      expect((await store.get(id))?.markdown).toContain("Still needed");
     }
 
     await a.store.delete(id);
     await a.engine.syncNow();
+    await b.engine.syncNow();
+    expect(await b.store.get(id)).toBeUndefined();
     expect(a.engine.getStatus()).toMatchObject({ state: "idle", pending: 0 });
+    a.engine.stop();
+    b.engine.stop();
+  });
+
+  it("brings a change to the other device at once, through the change stream", async () => {
+    const a = await device("stream-a");
+    const b = await device("stream-b");
+    const id = `e2e-stream-${run}`;
+
+    await a.store.put(createNote("# Pushed", new Date(), id));
+    await a.engine.syncNow();
+
+    // B never calls syncNow: the server's event starts its cycle.
+    await vi.waitFor(
+      async () => {
+        expect((await b.store.get(id))?.markdown).toContain("# Pushed");
+      },
+      { timeout: 5000 },
+    );
+    a.engine.stop();
+    b.engine.stop();
   });
 });

@@ -4,10 +4,11 @@ import { yamlFrontmatter } from "@codemirror/lang-yaml";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
 import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
-import { EditorState, Prec, Transaction } from "@codemirror/state";
+import { Annotation, EditorSelection, EditorState, Prec, Transaction } from "@codemirror/state";
 import { EditorView, drawSelection, keymap, placeholder, type Command } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 import { memo, useEffect, useRef } from "react";
+import { textChanges } from "./diff";
 import { sourceEditorMarks } from "./source-marks";
 import { t } from "../i18n/i18n";
 import { TITLE_MAX_LENGTH } from "./text-editor-setup";
@@ -17,30 +18,38 @@ type MarkdownSourceEditorProps = {
   /** Read once, when the editor mounts. */
   initialValue: string;
   onChange: (value: string) => void;
+  /** Where the caret goes when the editor opens (clamped to the text). */
+  initialSelection?: Caret | null;
+  /** The caret moved, or the editor gained or lost the focus. */
+  onSelectionChange?: (caret: Caret) => void;
   autoFocus?: boolean;
   /** A new note: a short first line becomes the title when Enter ends it. */
   titleFromFirstLine?: boolean;
   /** The stored version: the dates each save writes are shown in the text at once. */
   saved?: Note | null;
+  /**
+   * A version from elsewhere to show instead, in place: the caret and the
+   * scroll position stay, and it is not reported as an edit (a new object
+   * each time).
+   */
+  replacement?: { readonly markdown: string } | null;
 };
 
+/** A caret in characters of the text, and whether the editor has the focus. */
+export type Caret = { readonly anchor: number; readonly head: number; readonly focused: boolean };
+
+/** Marks a change that shows a version from elsewhere: not an edit of this editor. */
+const fromElsewhere = Annotation.define<boolean>();
+
 /**
- * Makes `view`'s text `next` with the smallest change (the differing middle),
- * so the caret and the rest of the text stay where they are; not undoable.
+ * Makes `view`'s text `next` with the smallest changes: only the lines that
+ * differ, narrowed to their characters. The caret, the scroll position and the
+ * rest of the text stay where they are; not undoable.
  */
-function replaceInPlace(view: EditorView, next: string): void {
-  const current = view.state.doc.toString();
-  let from = 0;
-  while (from < current.length && from < next.length && current[from] === next[from]) from += 1;
-  let toCurrent = current.length;
-  let toNext = next.length;
-  while (toCurrent > from && toNext > from && current[toCurrent - 1] === next[toNext - 1]) {
-    toCurrent -= 1;
-    toNext -= 1;
-  }
+function replaceInPlace(view: EditorView, next: string, elsewhere = false): void {
   view.dispatch({
-    changes: { from, to: toCurrent, insert: next.slice(from, toNext) },
-    annotations: Transaction.addToHistory.of(false),
+    changes: textChanges(view.state.doc.toString(), next),
+    annotations: [Transaction.addToHistory.of(false), fromElsewhere.of(elsewhere)],
   });
 }
 
@@ -106,7 +115,10 @@ export const firstLineTitle: Command = (view) => {
 
 export function createSourceExtensions(
   onChange: (value: string) => void,
-  { titleFromFirstLine = false }: { titleFromFirstLine?: boolean } = {},
+  {
+    titleFromFirstLine = false,
+    onSelectionChange,
+  }: { titleFromFirstLine?: boolean; onSelectionChange?: (caret: Caret) => void } = {},
 ) {
   return [
     ...(titleFromFirstLine ? [Prec.high(keymap.of([{ key: "Enter", run: firstLineTitle }]))] : []),
@@ -129,7 +141,13 @@ export function createSourceExtensions(
       autocapitalize: "off",
     }),
     EditorView.updateListener.of((update) => {
-      if (update.docChanged) onChange(update.state.doc.toString());
+      if (update.selectionSet || update.focusChanged || update.docChanged) {
+        const { anchor, head } = update.state.selection.main;
+        onSelectionChange?.({ anchor, head, focused: update.view.hasFocus });
+      }
+      if (!update.docChanged) return;
+      if (update.transactions.some((transaction) => transaction.annotation(fromElsewhere))) return;
+      onChange(update.state.doc.toString());
     }),
   ];
 }
@@ -141,30 +159,43 @@ export const MarkdownSourceEditor = memo(function MarkdownSourceEditor({
   autoFocus = false,
   titleFromFirstLine = false,
   saved = null,
+  replacement = null,
+  initialSelection = null,
+  onSelectionChange,
 }: MarkdownSourceEditorProps) {
   const viewRef = useRef<EditorView | null>(null);
   const mountRef = useRef<HTMLDivElement>(null);
   const onChangeRef = useRef(onChange);
+  const onSelectionRef = useRef(onSelectionChange);
   const initialValueRef = useRef(initialValue);
-  const autoFocusRef = useRef(autoFocus);
+  const initialSelectionRef = useRef(initialSelection);
+  const autoFocusRef = useRef(autoFocus || initialSelection?.focused === true);
   const titleFromFirstLineRef = useRef(titleFromFirstLine);
 
   useEffect(() => {
     onChangeRef.current = onChange;
-  }, [onChange]);
+    onSelectionRef.current = onSelectionChange;
+  }, [onChange, onSelectionChange]);
 
   useEffect(() => {
     const parent = mountRef.current;
     if (!parent) return;
+    const doc = initialValueRef.current;
+    const caret = initialSelectionRef.current;
+    const at = (position: number) => Math.min(position, doc.length);
     const view = new EditorView({
       parent,
       state: EditorState.create({
-        doc: initialValueRef.current,
+        doc,
+        ...(caret ? { selection: EditorSelection.single(at(caret.anchor), at(caret.head)) } : {}),
         extensions: createSourceExtensions(
           (value) => {
             onChangeRef.current(value);
           },
-          { titleFromFirstLine: titleFromFirstLineRef.current },
+          {
+            titleFromFirstLine: titleFromFirstLineRef.current,
+            onSelectionChange: (next) => onSelectionRef.current?.(next),
+          },
         ),
       }),
     });
@@ -175,6 +206,13 @@ export const MarkdownSourceEditor = memo(function MarkdownSourceEditor({
       viewRef.current = null;
     };
   }, []);
+
+  // A version from elsewhere first: the stored version that comes with it
+  // then has the same dates, so the effect below changes nothing.
+  useEffect(() => {
+    const view = viewRef.current;
+    if (view && replacement) replaceInPlace(view, replacement.markdown, true);
+  }, [replacement]);
 
   // After each save, the frontmatter's dates follow the stored version.
   useEffect(() => {

@@ -77,7 +77,8 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout 
 				addr = defaultAddr
 			}
 			options := httpapi.Options{AllowedOrigins: splitList(getenv("KONSPECTER_ALLOWED_ORIGINS"))}
-			return serve(ctx, addr, httpapi.NewHandler(db, db, slog.Default(), options))
+			handler := httpapi.NewHandler(db, db, slog.Default(), options)
+			return serve(ctx, addr, handler, handler.CloseStreams)
 		})
 	case "migrate":
 		return withDB(ctx, databaseURL, func(db *postgres.DB) error { return db.Migrate(ctx) })
@@ -166,12 +167,17 @@ func issueToken(ctx context.Context, db *postgres.DB, create bool, email string,
 }
 
 // serve runs the HTTP server until ctx is cancelled, then shuts down gracefully.
-func serve(ctx context.Context, addr string, handler http.Handler) error {
+// onShutdown runs when shutdown starts, to end long-lived requests (event
+// streams) that Shutdown would otherwise wait for.
+func serve(ctx context.Context, addr string, handler http.Handler, onShutdown ...func()) error {
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", addr, err)
 	}
+	return serveOn(ctx, ln, handler, onShutdown...)
+}
 
+func serveOn(ctx context.Context, ln net.Listener, handler http.Handler, onShutdown ...func()) error {
 	srv := &http.Server{
 		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
@@ -179,6 +185,9 @@ func serve(ctx context.Context, addr string, handler http.Handler) error {
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       2 * time.Minute,
+	}
+	for _, f := range onShutdown {
+		srv.RegisterOnShutdown(f)
 	}
 
 	serveErr := make(chan error, 1)

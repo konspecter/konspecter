@@ -2,7 +2,8 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { NoteEditor, type EditorMode } from "./NoteEditor";
-import { setSourceValue, sourceValue, typeSubstituted } from "./test-helpers";
+import { undo } from "@codemirror/commands";
+import { setSourceValue, sourceValue, sourceView, typeSubstituted } from "./test-helpers";
 import { coverDataUrl, CoverImageError } from "../../infrastructure/files/cover-image";
 
 // jsdom cannot decode images; the conversion itself is tested on its own.
@@ -280,6 +281,30 @@ describe("Markdown source editor", () => {
     expect(sourceValue(sourceBox())).toBe("# Ti");
     expect(save()).toBe("# Ti");
   });
+
+  it("keeps the frontmatter being typed as it is when a save brings new dates", async () => {
+    const initial = "---\nupdated: 2026-09-28T10:00:00Z\n---\n\n# N";
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <NoteEditor initialMarkdown={initial} mode="markdown" onChange={onChange} />,
+    );
+    const source = await screen.findByRole("textbox", { name: "Markdown" });
+    const typed = "---\ntitle: Hash \n\ntags:\n- a\nupdated: 2026-09-28T10:00:00Z\n---\n\n# N";
+    setSourceValue(source, typed);
+    const view = sourceView(source);
+    const caret = typed.indexOf("Hash ") + "Hash ".length;
+    view.dispatch({ selection: { anchor: caret } });
+
+    const saved = { id: "n1", markdown: typed.replace("2026-09-28T10:00", "2026-09-29T08:00") };
+    rerender(
+      <NoteEditor initialMarkdown={initial} mode="markdown" onChange={onChange} saved={saved} />,
+    );
+
+    expect(sourceValue(source)).toBe(saved.markdown);
+    expect(view.state.selection.main.head).toBe(caret);
+    view.dispatch(view.state.replaceSelection("maps"));
+    expect(sourceValue(source)).toContain("title: Hash maps\n");
+  });
 });
 
 describe("metadata fields", () => {
@@ -384,36 +409,6 @@ describe("metadata fields", () => {
     expect(save()).toBe("---\ntitle: T\nauthor: Ann\n---\n\nBody");
   });
 
-  it("adds tags to the frontmatter on Enter or comma, once each", async () => {
-    const { save } = renderEditor("Body #inline", "text", true);
-    const tags = screen.getByRole("textbox", { name: "Tags" });
-
-    await userEvent.type(tags, "#Java#Collections{Enter}go,java#collections{Enter}");
-
-    expect(save()).toBe("---\ntags:\n  - Java#Collections\n  - go\n---\n\nBody #inline");
-    expect(tags).toHaveValue("");
-    expect(screen.getByRole("button", { name: "Remove #go" })).toBeInTheDocument();
-  });
-
-  it("explains a name that is not a tag and keeps it for fixing", async () => {
-    const { save } = renderEditor("Body", "text", true);
-    const tags = screen.getByRole("textbox", { name: "Tags" });
-
-    await userEvent.type(tags, "two words{Enter}");
-
-    expect(screen.getByRole("alert")).toHaveTextContent("“two words” is not a tag");
-    expect(tags).toHaveValue("two words");
-    expect(save()).toBe("Body");
-  });
-
-  it("removes a tag from the frontmatter, keeping the list's style", async () => {
-    const { save } = renderEditor("---\ntags: [java, go]\n---\n\nBody", "text");
-
-    await userEvent.click(screen.getByRole("button", { name: "Remove #java" }));
-
-    expect(save()).toBe("---\ntags: [go]\n---\n\nBody");
-  });
-
   it("reflects frontmatter edited in Markdown mode", async () => {
     renderEditor("Body", "text", true);
 
@@ -424,7 +419,7 @@ describe("metadata fields", () => {
     expect(titleField()).toHaveValue("Typed in source");
   });
 
-  it("reflects the author and tags edited in Markdown mode", async () => {
+  it("reflects the author edited in Markdown mode, and has no tags field", async () => {
     renderEditor("Body", "text", true);
 
     await userEvent.click(screen.getByRole("button", { name: "Markdown" }));
@@ -432,7 +427,7 @@ describe("metadata fields", () => {
     await userEvent.click(screen.getByRole("button", { name: "Text" }));
 
     expect(screen.getByRole("textbox", { name: "Author" })).toHaveValue("Bob");
-    expect(screen.getByRole("button", { name: "Remove #rust" })).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Tags" })).not.toBeInTheDocument();
   });
 });
 
@@ -466,12 +461,11 @@ describe("frontmatter following the text editor", () => {
     expect(save()).toBe("---\ntitle: T\ntags: [extra, go, rust]\n---\n\nT #go #rust");
   });
 
-  it("does not repeat the heading and body tags as fields, and lists body tags without remove", () => {
+  it("does not repeat the heading as a field, nor list the tags", () => {
     renderEditor("---\ntitle: Maps\ntags: [java, extra]\n---\n\n# Maps\n\n#java");
 
     expect(screen.queryByRole("textbox", { name: "Title" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Remove #java" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Remove #extra" })).toBeInTheDocument();
+    expect(screen.queryByText("#extra")).not.toBeInTheDocument();
   });
 });
 
@@ -503,5 +497,147 @@ describe("tags and code in the editors", () => {
     expect(typeSubstituted(box, inCode, '"', "«")).toBe(true);
     expect(sourceValue(box)).toBe('Text\n\n```json\n{"}\n```');
     expect(typeSubstituted(box, 4, '"', "«")).toBe(false);
+  });
+});
+
+describe("a version from elsewhere", () => {
+  // Changed before the caret (the date, the heading) and after it.
+  const first =
+    "---\nupdated: 2026-09-29T10:00:00Z\n---\n# Java\n\nfirst paragraph\n\nsecond paragraph";
+  const next = {
+    id: "n1",
+    markdown:
+      "---\nupdated: 2026-09-29T10:05:00Z\n---\n# Java, edited\n\nfirst paragraph\n\nsecond paragraph, changed elsewhere",
+  };
+
+  it("replaces the Markdown source in place: same editor, same caret, no edit reported", async () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <NoteEditor initialMarkdown={first} mode="markdown" onChange={onChange} />,
+    );
+    const source = await screen.findByRole("textbox", { name: "Markdown" });
+    const view = sourceView(source);
+    const caret = first.indexOf("first paragraph") + "first".length;
+    view.dispatch({ selection: { anchor: caret } });
+
+    rerender(
+      <NoteEditor initialMarkdown={first} mode="markdown" onChange={onChange} replacement={next} />,
+    );
+
+    expect(screen.getByRole("textbox", { name: "Markdown" })).toBe(source);
+    expect(sourceValue(source)).toBe(next.markdown);
+    // Still after "first", though text before it changed.
+    expect(view.state.selection.main.head).toBe(
+      next.markdown.indexOf("first paragraph") + "first".length,
+    );
+    expect(onChange).not.toHaveBeenCalled();
+    expect(undo(view)).toBe(false); // Undo does not take the other version back.
+  });
+
+  it("replaces the rich text in place: same editor, same caret, no edit reported", async () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <NoteEditor initialMarkdown={first} mode="text" onChange={onChange} />,
+    );
+    const box = await screen.findByRole("textbox", { name: "Conspect text" });
+    await userEvent.click(box);
+    const text = within(box).getByText("first paragraph").firstChild;
+    if (!(text instanceof Text)) throw new Error("no text node");
+    document.getSelection()?.collapse(text, "first".length);
+    document.dispatchEvent(new Event("selectionchange"));
+
+    rerender(
+      <NoteEditor initialMarkdown={first} mode="text" onChange={onChange} replacement={next} />,
+    );
+
+    expect(screen.getByRole("textbox", { name: "Conspect text" })).toBe(box);
+    expect(box).toHaveTextContent("Java, edited");
+    expect(box).toHaveTextContent("second paragraph, changed elsewhere");
+    expect(onChange).not.toHaveBeenCalled();
+
+    await userEvent.keyboard("X");
+    expect(within(box).getByText("firstX paragraph")).toBeInTheDocument();
+    expect(onChange).toHaveBeenCalled();
+  });
+
+  it("keeps the Markdown editor for any version, even one with broken frontmatter", async () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <NoteEditor initialMarkdown={first} mode="markdown" onChange={onChange} />,
+    );
+    const source = await screen.findByRole("textbox", { name: "Markdown" });
+
+    rerender(
+      <NoteEditor
+        initialMarkdown={first}
+        mode="markdown"
+        onChange={onChange}
+        replacement={{ id: "n1", markdown: "---\ntitle: [\n---\nbroken" }}
+      />,
+    );
+
+    // Markdown mode shows any text: still the same editor, now with the broken frontmatter.
+    expect(screen.getByRole("textbox", { name: "Markdown" })).toBe(source);
+    expect(sourceValue(source)).toBe("---\ntitle: [\n---\nbroken");
+  });
+
+  it("opens a version the rich text cannot hold in the view that can", async () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <NoteEditor initialMarkdown={first} mode="text" onChange={onChange} />,
+    );
+    await screen.findByRole("textbox", { name: "Conspect text" });
+
+    rerender(
+      <NoteEditor
+        initialMarkdown={first}
+        mode="text"
+        onChange={onChange}
+        replacement={{ id: "n1", markdown: "---\ntitle: [\n---\nbroken" }}
+      />,
+    );
+
+    const source = await screen.findByRole("textbox", { name: "Markdown" });
+    expect(sourceValue(source)).toBe("---\ntitle: [\n---\nbroken");
+    expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
+describe("an edit from outside the editor", () => {
+  const markdown = "---\ntags: [extra, go]\n---\n\nBody #go";
+  const edit = { apply: (text: string) => text.replace("[extra, go]", "[go]") };
+
+  it("applies to the Markdown source in place and is reported as an edit", async () => {
+    const onChange = vi.fn<(read: () => string) => void>();
+    const { rerender } = render(
+      <NoteEditor initialMarkdown={markdown} mode="markdown" onChange={onChange} />,
+    );
+    const source = await screen.findByRole("textbox", { name: "Markdown" });
+
+    rerender(
+      <NoteEditor initialMarkdown={markdown} mode="markdown" onChange={onChange} edit={edit} />,
+    );
+
+    expect(screen.getByRole("textbox", { name: "Markdown" })).toBe(source);
+    expect(sourceValue(source)).toBe("---\ntags: [go]\n---\n\nBody #go");
+    expect(onChange.mock.lastCall?.[0]()).toBe("---\ntags: [go]\n---\n\nBody #go");
+  });
+
+  it("applies to the frontmatter in text mode, keeping the rich text and its edits", async () => {
+    const onChange = vi.fn<(read: () => string) => void>();
+    const { rerender } = render(
+      <NoteEditor initialMarkdown={markdown} mode="text" onChange={onChange} />,
+    );
+    await typeAtEnd(" more");
+
+    rerender(<NoteEditor initialMarkdown={markdown} mode="text" onChange={onChange} edit={edit} />);
+
+    expect(onChange.mock.lastCall?.[0]()).toBe(
+      '---\ntags: [go]\ntitle: "Body #go more"\n---\n\nBody #go more',
+    );
+    // The same edit object again changes nothing more.
+    const calls = onChange.mock.calls.length;
+    rerender(<NoteEditor initialMarkdown={markdown} mode="text" onChange={onChange} edit={edit} />);
+    expect(onChange.mock.calls.length).toBe(calls);
   });
 });

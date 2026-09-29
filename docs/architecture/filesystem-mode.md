@@ -94,16 +94,14 @@ Konspecter  ⇄  ~/Notes/java.md  ⇄  VS Code / Vim / Neovim / …
   save) make it vanish briefly. A known file that is missing is checked again after 150 ms
   before it counts as deleted. Temporary and swap files are hidden or not `.md`, and are
   ignored.
-- **Race handling:** both editors may change the same file.
-  - While the in-app editor is open, a change on disk shows a banner: _changed elsewhere since
-    you opened it_.
-  - Saving then applies the sync rule ([sync](sync.md#conflict-resolution)): the file keeps
-    the other program's version, and the in-app edit becomes a **conflict copy** file (the
-    title marked, `conflict_of: <path>` in the frontmatter), which opens.
-  - If the other program writes after the check but before the save, which the watcher
-    has not reported yet, the atomic write's modification-time precondition refuses
-    (`changed_on_disk`) and the same conflict copy is made.
-  - Nothing is overwritten, and nothing is lost.
+- **Both editors on one file: the last write wins**
+  ([ADR-011](decisions/ADR-011-last-write-wins.md)).
+  - While nothing is unsaved in the app, a change on disk replaces the open note's content.
+  - With unsaved text in the app, its next save writes over the other program's change: the
+    edit being saved is the latest. Writes are atomic, without a modification-time
+    precondition.
+  - A file deleted elsewhere while open says so; editing it writes it again.
+  - No conflict copies are made. File-level history (Git, Time Machine) is the way back.
 
 ## The native side (Rust)
 

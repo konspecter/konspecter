@@ -64,8 +64,7 @@ export const en = {
   "note.conflictCopy":
     "This is a conflict copy: it holds a version that was changed in two places at once. Compare it with {original}, keep what you need, then delete this copy.",
   "note.theOriginal": "the original",
-  "note.changedElsewhere":
-    "This conspect was changed elsewhere while you were editing it. Your version is saved as a conflict copy, and the other one stays in this conspect.",
+  "note.deletedElsewhere": "This conspect was deleted elsewhere. Editing it brings it back.",
   "note.resumeAt": "You were {percent}% through this conspect.",
   "note.continueReading": "Continue reading",
   "note.startFromTop": "Start from the top",
@@ -85,6 +84,7 @@ export const en = {
   "details.characters": { one: "{count} character", other: "{count} characters" },
   "details.readingTime": "{minutes} min read",
   "details.tags": "Tags",
+  "details.removeTag": "Remove {tag}",
   "details.cover": "Cover",
   "details.frontmatter": "Frontmatter",
   "details.unreadable": "Not readable",
@@ -158,11 +158,6 @@ source, or delete this conspect when you are done.
   "editor.sourcePlaceholder": "# Title",
   "editor.title": "Title",
   "editor.author": "Author",
-  "editor.tags": "Tags",
-  "editor.addTag": "Add a tag",
-  "editor.removeTag": "Remove {tag}",
-  "editor.tagInText": "Written in the text: remove it there",
-  "editor.notATag": "“{tag}” is not a tag. Use letters, digits, _ and -, and # between levels.",
   "editor.cover": "Cover image",
   "editor.coverUpload": "Upload…",
   "editor.coverReplace": "Replace…",
@@ -236,7 +231,7 @@ source, or delete this conspect when you are done.
   "settings.library.folder":
     "Working on the Markdown files in {folder}. Changes are saved to the files; deleted conspects go to the system trash.",
   "settings.library.folderSync":
-    "Sync applies to the app library, which keeps syncing in the background. To have this folder on other devices, sync it with Git, iCloud Drive, Dropbox or Syncthing: Konspecter follows their changes, and edits made in two places at once are kept as conflict copies.",
+    "Sync applies to the app library, which keeps syncing in the background. To have this folder on other devices, sync it with Git, iCloud Drive, Dropbox or Syncthing: Konspecter follows their changes, and when a file is edited in two places, the later edit wins.",
   "settings.library.nothingToImport": "Nothing to import: the library already has these conspects.",
   "settings.library.imported": {
     one: "Imported {count} conspect into the app library.",
@@ -297,7 +292,7 @@ source, or delete this conspect when you are done.
   "sync.connectedTo": "Connected to {server} as {account}.",
   "sync.lastSynced": "last synced {date}",
   "sync.heldBack":
-    "Conspects changed on two devices at once are held back with both versions kept.",
+    "The server refused these conspects (for example, one is too large). They stay on this device.",
   "sync.now": "Sync now",
   "sync.disconnect": "Disconnect",
   "sync.intro":

@@ -72,8 +72,8 @@ export const ru: Dictionary = {
   "note.conflictCopy":
     "Это копия конфликта: в ней версия, изменённая в двух местах одновременно. Сравните её с {original}, оставьте нужное, затем удалите эту копию.",
   "note.theOriginal": "оригиналом",
-  "note.changedElsewhere":
-    "Пока вы редактировали, конспект изменили в другом месте. Ваша версия сохранена как копия конфликта, а другая осталась в этом конспекте.",
+  "note.deletedElsewhere":
+    "Этот конспект удалили в другом месте. Если продолжить редактирование, он вернётся.",
   "note.resumeAt": "Вы прочитали {percent}% этого конспекта.",
   "note.continueReading": "Продолжить чтение",
   "note.startFromTop": "Начать сначала",
@@ -104,6 +104,7 @@ export const ru: Dictionary = {
   },
   "details.readingTime": "{minutes} мин чтения",
   "details.tags": "Теги",
+  "details.removeTag": "Убрать {tag}",
   "details.cover": "Обложка",
   "details.frontmatter": "Frontmatter",
   "details.unreadable": "Не читается",
@@ -179,11 +180,6 @@ Map<String, Integer> counts = new HashMap<>();
   "editor.sourcePlaceholder": "# Заголовок",
   "editor.title": "Заголовок",
   "editor.author": "Автор",
-  "editor.tags": "Теги",
-  "editor.addTag": "Добавить тег",
-  "editor.removeTag": "Убрать {tag}",
-  "editor.tagInText": "Написан в тексте: уберите его там",
-  "editor.notATag": "«{tag}» — не тег. Используйте буквы, цифры, _ и -, а между уровнями #.",
   "editor.cover": "Обложка",
   "editor.coverUpload": "Загрузить…",
   "editor.coverReplace": "Заменить…",
@@ -258,7 +254,7 @@ Map<String, Integer> counts = new HashMap<>();
   "settings.library.folder":
     "Работа с файлами Markdown в папке {folder}. Изменения сохраняются в файлы; удалённые конспекты попадают в корзину системы.",
   "settings.library.folderSync":
-    "Синхронизация относится к библиотеке приложения и продолжается в фоне. Чтобы эта папка была на других устройствах, синхронизируйте её через Git, iCloud Drive, Dropbox или Syncthing: Konspecter следит за их изменениями, а правки, сделанные в двух местах одновременно, сохраняются как копии конфликта.",
+    "Синхронизация относится к библиотеке приложения и продолжается в фоне. Чтобы эта папка была на других устройствах, синхронизируйте её через Git, iCloud Drive, Dropbox или Syncthing: Konspecter следит за их изменениями, а если файл правят в двух местах, побеждает более поздняя правка.",
   "settings.library.nothingToImport": "Импортировать нечего: эти конспекты уже есть в библиотеке.",
   "settings.library.imported": {
     one: "В библиотеку приложения импортирован {count} конспект.",
@@ -351,7 +347,7 @@ Map<String, Integer> counts = new HashMap<>();
   "sync.connectedTo": "Подключено к {server} как {account}.",
   "sync.lastSynced": "последняя синхронизация {date}",
   "sync.heldBack":
-    "Конспекты, изменённые на двух устройствах одновременно, задержаны; обе версии сохранены.",
+    "Сервер не принял эти конспекты (например, один слишком большой). Они остаются на этом устройстве.",
   "sync.now": "Синхронизировать",
   "sync.disconnect": "Отключиться",
   "sync.intro":

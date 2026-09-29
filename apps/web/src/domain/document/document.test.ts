@@ -215,6 +215,37 @@ describe("updateMetadata", () => {
     expect(updateMetadata("---\nauthor: Ann\n---\nX", { author: null })).toBe("---\n---\nX");
   });
 
+  it("rewrites only the lines of the fields it sets, keeping the rest byte for byte", () => {
+    const frontmatter =
+      "title:   Java   # mine\n\n\ntags:\n- a\n- b\nnote: >\n  folded\n  text\nx: {a: 1}\n";
+    const markdown = `---\n${frontmatter}updated: 2020-01-01 # auto\n---\n\nBody`;
+
+    expect(updateMetadata(markdown, { updated: "2026-09-29T10:00:00Z", author: "Ann" })).toBe(
+      `---\n${frontmatter}updated: 2026-09-29T10:00:00Z # auto\nauthor: Ann\n---\n\nBody`,
+    );
+    expect(updateMetadata(markdown, { title: null })).toBe(
+      `---\n\n\ntags:\n- a\n- b\nnote: >\n  folded\n  text\nx: {a: 1}\nupdated: 2020-01-01 # auto\n---\n\nBody`,
+    );
+  });
+
+  it("keeps a field's quotes, the text's line endings and the keys' indentation", () => {
+    expect(updateMetadata('---\ntitle: "Old"\n---\n', { title: "New" })).toBe(
+      '---\ntitle: "New"\n---\n',
+    );
+    expect(updateMetadata("---\r\ntitle: T \r\n---\r\n\r\nBody", { cover: "c.png" })).toBe(
+      "---\r\ntitle: T \r\ncover: c.png\r\n---\r\n\r\nBody",
+    );
+    expect(updateMetadata("---\n  title: T\n---\n", { cover: "c.png" })).toBe(
+      "---\n  title: T\n  cover: c.png\n---\n",
+    );
+  });
+
+  it("writes a field into frontmatter written as a flow map", () => {
+    expect(updateMetadata("---\n{title: T}\n---\n", { cover: "c.png" })).toBe(
+      "---\n{title: T, cover: c.png}\n---\n",
+    );
+  });
+
   it("rejects invalid documents and invalid values", () => {
     expect(() => updateMetadata("---\ntitle: [\n---\n", { title: "T" })).toThrow(
       InvalidDocumentError,
@@ -343,6 +374,12 @@ describe("setFrontmatterTags", () => {
   it("keeps a flow-style list in flow style", () => {
     expect(setFrontmatterTags("---\ntags: [a, b]\n---\nBody", ["a"])).toBe(
       "---\ntags: [a]\n---\nBody",
+    );
+  });
+
+  it("rewrites only the tags' lines", () => {
+    expect(setFrontmatterTags("---\ntitle:  T \n\ntags:\n- a\n# end\n---\nBody", ["a", "b"])).toBe(
+      "---\ntitle:  T \n\ntags:\n  - a\n  - b\n# end\n---\nBody",
     );
   });
 

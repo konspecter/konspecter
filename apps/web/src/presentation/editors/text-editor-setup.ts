@@ -17,9 +17,16 @@ import { keymap } from "prosemirror-keymap";
 import { schema } from "prosemirror-markdown";
 import type { MarkType, Node, NodeType } from "prosemirror-model";
 import { liftListItem, sinkListItem, splitListItem, wrapInList } from "prosemirror-schema-list";
-import { EditorState, Plugin, TextSelection, type Command } from "prosemirror-state";
+import {
+  EditorState,
+  Plugin,
+  TextSelection,
+  type Command,
+  type Transaction,
+} from "prosemirror-state";
 import { Decoration, DecorationSet } from "prosemirror-view";
 import { tagRanges } from "../../domain/tag/tags";
+import { diffSequences, offsets } from "./diff";
 import { t, type TextKey } from "../i18n/i18n";
 
 const { nodes, marks } = schema;
@@ -170,6 +177,74 @@ type TextEditorOptions = {
   /** A new note: its short first line becomes the title (see `firstLineTitle`). */
   titleFromFirstLine?: boolean;
 };
+
+/**
+ * Meta of a transaction that shows a version from elsewhere (sync, another
+ * program): not an edit of this editor, so it is neither reported nor undone.
+ */
+export const FROM_ELSEWHERE = "konspecter.fromElsewhere";
+
+/**
+ * A transaction that makes the document `next` with the smallest changes: only
+ * the blocks that differ, and within a block that changed into one of the same
+ * kind only the part that differs. The caret, the scroll position and the rest
+ * of the text stay where they are. Null when nothing differs.
+ */
+export function replaceDocument(state: EditorState, next: Node): Transaction | null {
+  const current = state.doc;
+  if (current.eq(next)) return null;
+  const blocksA = childrenOf(current);
+  const blocksB = childrenOf(next);
+  const hunks = diffSequences(blocksA, blocksB, (x, y) => x.eq(y)) ?? [
+    { fromA: 0, toA: blocksA.length, fromB: 0, toB: blocksB.length },
+  ];
+  const startsA = offsets(blocksA.map((block) => ({ length: block.nodeSize })));
+  const startsB = offsets(blocksB.map((block) => ({ length: block.nodeSize })));
+  const tr = state.tr;
+  // From the end, so the positions of the earlier ones stay valid.
+  for (const hunk of [...hunks].reverse()) {
+    const a = blocksA[hunk.fromA];
+    const b = blocksB[hunk.fromB];
+    let fromA = startsA[hunk.fromA] ?? 0;
+    let toA = startsA[hunk.toA] ?? 0;
+    let fromB = startsB[hunk.fromB] ?? 0;
+    let toB = startsB[hunk.toB] ?? 0;
+    if (hunk.toA - hunk.fromA === 1 && hunk.toB - hunk.fromB === 1 && a && b && a.sameMarkup(b)) {
+      // One block edited: replace only what differs inside it.
+      const inside = narrowInside(a, b);
+      if (inside === null) continue;
+      toA = fromA + 1 + inside.endA;
+      toB = fromB + 1 + inside.endB;
+      fromA += 1 + inside.start;
+      fromB += 1 + inside.start;
+    }
+    tr.replace(fromA, toA, next.slice(fromB, toB));
+  }
+  return tr.setMeta(FROM_ELSEWHERE, true).setMeta("addToHistory", false);
+}
+
+function childrenOf(node: Node): Node[] {
+  const children: Node[] = [];
+  node.forEach((child) => children.push(child));
+  return children;
+}
+
+/** Where two blocks' contents differ, relative to the contents' start. */
+function narrowInside(a: Node, b: Node): { start: number; endA: number; endB: number } | null {
+  const start = a.content.findDiffStart(b.content);
+  if (start === null) return null;
+  let { a: endA, b: endB } = a.content.findDiffEnd(b.content) ?? {
+    a: a.content.size,
+    b: b.content.size,
+  };
+  // Repeated text can make the ends overlap the start: move them after it.
+  const overlap = start - Math.min(endA, endB);
+  if (overlap > 0) {
+    endA += overlap;
+    endB += overlap;
+  }
+  return { start, endA, endB };
+}
 
 export function createTextEditorState(
   doc: Node,

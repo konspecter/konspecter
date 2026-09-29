@@ -50,14 +50,15 @@ Konspecter is a local-first personal knowledge base for technical notes.
 
 All planned phases are done. New work needs a new plan in `.claude/plans/`.
 
-| Package   | Scope                                                                      | Status |
-| --------- | -------------------------------------------------------------------------- | ------ |
-| Updates 1 | Two-panel UI, editor-first notes with autosave, search UX, shortcuts, font | Done   |
-| Updates 2 | Owl icon, English/Russian UI, sidebar details, toolbar, tags, highlighting | Done   |
-| Markdown  | Single source of truth audit: author, frontmatter tags in UI, date aliases | Done   |
+| Package   | Scope                                                                       | Status |
+| --------- | --------------------------------------------------------------------------- | ------ |
+| Updates 1 | Two-panel UI, editor-first notes with autosave, search UX, shortcuts, font  | Done   |
+| Updates 2 | Owl icon, English/Russian UI, sidebar details, toolbar, tags, highlighting  | Done   |
+| Markdown  | Single source of truth audit: author, frontmatter tags in UI, date aliases  | Done   |
+| LWW sync  | Last write wins (no conflict copies), live open notes, server change events | Done   |
 
 Specs and notes: `.claude/plans/updates-1.md` (+ `updates-1-implementation.md`), `updates-2.md`
-(+ `updates-2-implementation.md`), `markdown-single-source.md`. UI architecture: `docs/architecture/ui.md`; languages:
+(+ `updates-2-implementation.md`), `markdown-single-source.md`, `last-write-wins.md`. UI architecture: `docs/architecture/ui.md`; languages:
 `docs/architecture/i18n.md`.
 
 ## Working rules

@@ -288,52 +288,6 @@
   color: var(--color-danger);
 }
 
-/* The frontmatter's tags, then the field that adds one, wrapping as a line of text. */
-.tag-chips {
-  display: flex;
-  flex: 1;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.25rem 0.75rem;
-  min-width: 0;
-}
-
-.tag-chip {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.15rem;
-  color: var(--color-fg);
-  font-weight: 560;
-}
-
-.tag-chip-remove {
-  padding: 0 0.2rem;
-  border: 0;
-  border-radius: 3px;
-  background: transparent;
-  color: var(--color-muted);
-  font: inherit;
-  font-weight: 400;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.tag-chip-remove:hover {
-  color: var(--color-fg);
-}
-
-.tag-chip-remove:focus-visible {
-  outline: 2px solid var(--color-accent);
-}
-
-.tag-input {
-  flex-basis: 8rem;
-}
-
-.tag-input[aria-invalid="true"] {
-  border-bottom-color: var(--color-danger);
-}
-
 /* Monospace has no weight between medium and semibold. */
 .markdown-source .md-tag {
   font-weight: 500;

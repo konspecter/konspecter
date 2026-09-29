@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 
@@ -147,8 +148,9 @@ func TestNoteLifecycle(t *testing.T) {
 	if created.Revision != 1 || created.Markdown != "# One" || created.Deleted() {
 		t.Errorf("created = %+v", created)
 	}
-	if _, err := db.CreateNote(ctx, user.ID, "n1", "again"); !errors.Is(err, notes.ErrExists) {
-		t.Errorf("duplicate create error = %v", err)
+	var conflict *notes.ConflictError
+	if _, err := db.CreateNote(ctx, user.ID, "n1", "again"); !errors.As(err, &conflict) || conflict.Current.Markdown != "# One" || conflict.Current.Revision != 1 {
+		t.Errorf("duplicate create error = %v, want ConflictError with the current note", err)
 	}
 
 	updated, err := db.UpdateNote(ctx, user.ID, "n1", "# One, edited", 1)
@@ -209,12 +211,64 @@ func TestStaleRevisionsConflict(t *testing.T) {
 	if _, err := db.DeleteNote(ctx, user.ID, "n1", 2); err != nil {
 		t.Fatal(err)
 	}
-	_, err = db.UpdateNote(ctx, user.ID, "n1", "edit after delete", 3)
-	if !errors.As(err, &conflict) || !conflict.Current.Deleted() {
-		t.Errorf("update of deleted note error = %v, want conflict with deleted current", err)
+	_, err = db.UpdateNote(ctx, user.ID, "n1", "stale edit after delete", 2)
+	if !errors.As(err, &conflict) || !conflict.Current.Deleted() || conflict.Current.Revision != 3 {
+		t.Errorf("stale update of deleted note error = %v, want conflict with deleted current", err)
+	}
+	if _, err := db.DeleteNote(ctx, user.ID, "n1", 3); !errors.As(err, &conflict) || !conflict.Current.Deleted() {
+		t.Errorf("delete of deleted note error = %v, want conflict", err)
 	}
 	if _, err := db.UpdateNote(ctx, user.ID, "missing", "x", 1); !errors.Is(err, notes.ErrNotFound) {
 		t.Errorf("update of missing note error = %v", err)
+	}
+}
+
+func TestDeletedNotes(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	user := createUser(t, db, "ada@example.com")
+	if _, err := db.CreateNote(ctx, user.ID, "n1", "v1"); err != nil {
+		t.Fatal(err)
+	}
+	deleted, err := db.DeleteNote(ctx, user.ID, "n1", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Creating over a tombstone conflicts, with the tombstone as current.
+	_, err = db.CreateNote(ctx, user.ID, "n1", "again")
+	var conflict *notes.ConflictError
+	if !errors.As(err, &conflict) || !conflict.Current.Deleted() || conflict.Current.Revision != 2 || conflict.Current.Markdown != "v1" {
+		t.Fatalf("create over tombstone error = %v, want ConflictError with the tombstone", err)
+	}
+
+	// An edit at the tombstone's revision restores the note (edits beat deletions).
+	restored, err := db.UpdateNote(ctx, user.ID, "n1", "v2, restored", 2)
+	if err != nil {
+		t.Fatalf("restore: %v", err)
+	}
+	if restored.Deleted() || restored.Revision != 3 || restored.Markdown != "v2, restored" || restored.UpdatedAt.Before(deleted.UpdatedAt) {
+		t.Errorf("restored = %+v", restored)
+	}
+	if got, err := db.GetNote(ctx, user.ID, "n1"); err != nil || got.Markdown != "v2, restored" {
+		t.Errorf("GetNote after restore = %+v, %v", got, err)
+	}
+	if list, _ := db.ListNotes(ctx, user.ID); len(list) != 1 {
+		t.Errorf("restored note not listed: %+v", list)
+	}
+
+	// The failed create took no sequence number; each change is in the log.
+	changed, cursor, err := db.Changes(ctx, user.ID, 2, 10)
+	if err != nil || len(changed) != 1 || changed[0].Deleted() || cursor != 3 {
+		t.Errorf("Changes after restore = %+v, %d, %v", changed, cursor, err)
+	}
+	rows, err := db.pool.Query(ctx, `SELECT operation FROM sync_changes WHERE user_id = $1 ORDER BY seq`, user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	operations, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil || strings.Join(operations, ",") != "create,delete,update" {
+		t.Errorf("sync_changes = %v, %v", operations, err)
 	}
 }
 

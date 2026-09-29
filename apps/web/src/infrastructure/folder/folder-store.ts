@@ -1,7 +1,7 @@
 import type { NoteChange, NoteRepository } from "../../application/notes/note-repository";
 import { documentTitle, parseDocument } from "../../domain/document/document";
 import { createNote, type Note } from "../../domain/note/note";
-import type { ReadingState } from "../../domain/reading/reading";
+import type { EditorSelection, ReadingState } from "../../domain/reading/reading";
 import type { SearchQuery } from "../../domain/search/query";
 import type { Tag } from "../../domain/tag/tags";
 import {
@@ -18,6 +18,7 @@ import { countTags, tagEntry, type TagCount, type TagEntry } from "../storage/ta
 export type ReadingStateStore = {
   readingState(noteId: string): Promise<ReadingState | null>;
   saveReadingPosition(noteId: string, position: number): Promise<void>;
+  saveEditorSelection(noteId: string, selection: EditorSelection): Promise<void>;
 };
 
 type CachedFile = {
@@ -122,7 +123,11 @@ export class FolderStore implements NoteRepository {
     for (const file of [...added, ...changed]) this.#remember(file.entry, file.text);
     for (const [newPath, oldPath] of renames) {
       const state = await this.#reading.readingState(readingKey(oldPath));
-      if (state) await this.#reading.saveReadingPosition(readingKey(newPath), state.position);
+      if (!state) continue;
+      await this.#reading.saveReadingPosition(readingKey(newPath), state.position);
+      if (state.selection) {
+        await this.#reading.saveEditorSelection(readingKey(newPath), state.selection);
+      }
     }
 
     const renamedFrom = new Set(renames.values());
@@ -215,13 +220,12 @@ export class FolderStore implements NoteRepository {
   }
 
   /**
-   * Writes the file, but only if it has not changed on disk since it was read;
-   * otherwise the write fails with FolderError "changed_on_disk".
+   * Writes the file, over whatever another program wrote meanwhile: the last
+   * write wins. A file deleted meanwhile is written again.
    */
   async put(note: Note): Promise<void> {
     await this.#ensureLoaded();
-    const expected = this.#files.get(note.id)?.modifiedMs ?? null;
-    const entry = await this.#folder.write(note.id, note.markdown, expected);
+    const entry = await this.#folder.write(note.id, note.markdown);
     this.#remember(entry, note.markdown);
     this.#emit({ noteId: note.id, source: "local" });
   }
@@ -257,6 +261,10 @@ export class FolderStore implements NoteRepository {
 
   saveReadingPosition(noteId: string, position: number): Promise<void> {
     return this.#reading.saveReadingPosition(readingKey(noteId), position);
+  }
+
+  saveEditorSelection(noteId: string, selection: EditorSelection): Promise<void> {
+    return this.#reading.saveEditorSelection(readingKey(noteId), selection);
   }
 
   onChange(listener: (change: NoteChange) => void): () => void {

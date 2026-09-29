@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { InvalidDocumentError } from "../../domain/document/document";
-import { readNote, type Note } from "../../domain/note/note";
-import type { ReadingPositionMode } from "../../domain/reading/reading";
+import { readNote, withoutTag, type Note } from "../../domain/note/note";
+import type { EditorSelection, ReadingPositionMode } from "../../domain/reading/reading";
 import type { EditorMode } from "../../domain/settings/settings";
 import { Autosave, savesSettled } from "../../application/notes/autosave";
 import type { NoteRepository } from "../../application/notes/note-repository";
-import { FolderError } from "../../infrastructure/desktop/desktop";
 import { requestPersistence } from "../../infrastructure/storage/persistence";
+import { saveBeforeClosing } from "../app/closing";
 import type { Activity } from "../app/activity";
 import { CoverImage } from "../components/CoverImage";
 import { ErrorState, errorMessage } from "../components/ErrorState";
@@ -16,6 +16,7 @@ import { NoteDetails } from "../components/NoteDetails";
 import { NoteNotFound } from "../components/NoteNotFound";
 import { displayTitle } from "../components/note-title";
 import { LazyNoteEditor } from "../editors/LazyNoteEditor";
+import type { DocumentEdit } from "../editors/NoteEditor";
 import { useAsync } from "../hooks/use-async";
 import { useReadingPosition } from "../hooks/use-reading-position";
 import { useShortcuts } from "../hooks/use-shortcuts";
@@ -35,8 +36,8 @@ type Adopted = { readonly id: string; readonly key: string; readonly note: Note 
 /**
  * A new note (/notes/new) or an existing one (/notes/:id), open in the
  * editor. Both routes render this component, so when a new note's first
- * save gives it an id, or an edit becomes a conflict copy, the URL changes
- * but the editing session (and the editor, caret and all) stays mounted.
+ * save gives it an id, the URL changes but the editing session (and the
+ * editor, caret and all) stays mounted.
  */
 export function NotePage({ store, mode, activity, readingPosition = "restore" }: NotePageProps) {
   const { id } = useParams();
@@ -47,14 +48,17 @@ export function NotePage({ store, mode, activity, readingPosition = "restore" }:
 
   const target = id !== undefined && continued === null ? id : null;
   // After any save of the note still running (the editor just left it), so
-  // the text shown is its latest.
-  const load = useCallback(
-    () =>
-      target === null
-        ? Promise.resolve(undefined)
-        : savesSettled(store, target).then(() => store.get(target)),
-    [store, target],
-  );
+  // the text shown is its latest. With it, where the caret was, to restore.
+  const restoreCaret = readingPosition === "restore";
+  const load = useCallback(async () => {
+    if (target === null) return undefined;
+    await savesSettled(store, target);
+    const [found, reading] = await Promise.all([
+      store.get(target),
+      restoreCaret ? store.readingState(target).catch(() => null) : null,
+    ]);
+    return found && { note: found, selection: reading?.selection ?? null };
+  }, [store, target, restoreCaret]);
   const loaded = useAsync(load);
 
   const sessionKey =
@@ -68,6 +72,7 @@ export function NotePage({ store, mode, activity, readingPosition = "restore" }:
   );
 
   let note: Note | null;
+  let selection: EditorSelection | null = null;
   if (id === undefined) {
     note = null;
   } else if (continued) {
@@ -80,12 +85,13 @@ export function NotePage({ store, mode, activity, readingPosition = "restore" }:
   } else if (!loaded.value) {
     return <NoteNotFound />;
   } else {
-    note = loaded.value;
+    ({ note, selection } = loaded.value);
   }
   return (
     <NoteSession
       key={sessionKey}
       initial={note}
+      initialSelection={selection}
       store={store}
       mode={mode}
       activity={activity}
@@ -97,6 +103,8 @@ export function NotePage({ store, mode, activity, readingPosition = "restore" }:
 
 type NoteSessionProps = {
   initial: Note | null;
+  /** Where the caret was when the note was last open. */
+  initialSelection: EditorSelection | null;
   store: NoteRepository;
   mode: EditorMode;
   activity: Activity;
@@ -104,11 +112,9 @@ type NoteSessionProps = {
   onAdopt: (note: Note) => void;
 };
 
-const changedOnDisk = (error: unknown) =>
-  error instanceof FolderError && error.code === "changed_on_disk";
-
 function NoteSession({
   initial,
+  initialSelection,
   store,
   mode,
   activity,
@@ -116,47 +122,43 @@ function NoteSession({
   onAdopt,
 }: NoteSessionProps) {
   const navigate = useNavigate();
-  // What the editor was opened with; a new key remounts it with other text.
-  const [opened, setOpened] = useState({ markdown: initial?.markdown ?? "", key: 0 });
+  // A version stored elsewhere, for the editor to show in place.
+  const [replacement, setReplacement] = useState<Note | null>(null);
+  // A change made in the Details (a tag removed), for the editor to apply.
+  const [edit, setEdit] = useState<DocumentEdit | null>(null);
   // The latest stored version: title, dates and cover come from it.
   const [saved, setSaved] = useState(initial);
   const [problem, setProblem] = useState<unknown>(null);
-  const [changedElsewhere, setChangedElsewhere] = useState(false);
+  const [deletedElsewhere, setDeletedElsewhere] = useState(false);
   const [ready, setReady] = useState(false);
   const [showMetadata, setShowMetadata] = useState(false);
 
   // `onAdopt` stays the same for a session: its key is the session's key.
   const [autosave] = useState(() => {
     let endActivity: (() => void) | null = null;
-    return new Autosave(
-      store,
-      initial,
-      {
-        onSaved: setSaved,
-        onProblem: setProblem,
-        onCreated: (note, reason) => {
-          onAdopt(note);
-          if (reason === "new") {
-            // Now there is something worth keeping: ask the browser not to evict it.
-            void requestPersistence();
-          } else {
-            setChangedElsewhere(false);
-            setOpened((previous) => ({ markdown: note.markdown, key: previous.key + 1 }));
-          }
-        },
-        onBusy: (busy) => {
-          endActivity?.();
-          endActivity = busy ? activity.begin() : null;
-        },
+    return new Autosave(store, initial, {
+      onSaved: (note) => {
+        setSaved(note);
+        setDeletedElsewhere(false); // Saving brought it back.
       },
-      { changedUnderneath: changedOnDisk },
-    );
+      onProblem: setProblem,
+      onCreated: (note) => {
+        onAdopt(note);
+        // Now there is something worth keeping: ask the browser not to evict it.
+        void requestPersistence();
+      },
+      onBusy: (busy) => {
+        endActivity?.();
+        endActivity = busy ? activity.begin() : null;
+      },
+    });
   });
 
   // Save whatever is pending when leaving the note, the page or the tab. Once
   // this session is gone, its saves no longer steer the page (no navigation).
   useEffect(() => {
     autosave.attach();
+    const unregister = saveBeforeClosing(() => autosave.flush());
     const flush = () => void autosave.flush();
     const onVisibility = () => {
       if (document.visibilityState === "hidden") flush();
@@ -164,6 +166,7 @@ function NoteSession({
     window.addEventListener("pagehide", flush);
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
+      unregister();
       autosave.detach();
       window.removeEventListener("pagehide", flush);
       document.removeEventListener("visibilitychange", onVisibility);
@@ -171,8 +174,9 @@ function NoteSession({
     };
   }, [autosave]);
 
-  // The note changed elsewhere (sync, another program): show that version if
-  // nothing is unsaved here; otherwise the next save keeps both.
+  // The note changed elsewhere (sync, another program): show that version,
+  // unless something is unsaved here. Then the next save wins: the last write
+  // wins, and this edit is the latest.
   useEffect(() => {
     let active = true;
     const stop = store.onChange((change) => {
@@ -182,20 +186,14 @@ function NoteSession({
         void navigate(`/notes/${encodeURIComponent(change.noteId)}`, { replace: true });
         return;
       }
-      if (change.noteId !== current.id) return;
-      if (autosave.dirty) {
-        setChangedElsewhere(true);
-        return;
-      }
+      if (change.noteId !== current.id || autosave.dirty) return;
       void store.get(current.id).then((note) => {
         if (!active || autosave.dirty || autosave.note?.id !== current.id) return;
-        if (!note) {
-          setChangedElsewhere(true);
-          return;
-        }
+        setDeletedElsewhere(!note);
+        if (!note) return;
         autosave.rebase(note);
         setSaved(note);
-        setOpened((previous) => ({ markdown: note.markdown, key: previous.key + 1 }));
+        setReplacement(note);
       });
     });
     return () => {
@@ -243,9 +241,9 @@ function NoteSession({
           })}
         </p>
       )}
-      {changedElsewhere && (
+      {deletedElsewhere && (
         <p role="note" className="conflict-banner">
-          {t("note.changedElsewhere")}
+          {t("note.deletedElsewhere")}
         </p>
       )}
       {reading.resumePosition !== null && (
@@ -260,8 +258,9 @@ function NoteSession({
         </div>
       )}
       <LazyNoteEditor
-        key={opened.key}
-        initialMarkdown={opened.markdown}
+        initialMarkdown={initial?.markdown ?? ""}
+        replacement={replacement}
+        edit={edit}
         mode={mode}
         onChange={handleChange}
         onReady={handleReady}
@@ -269,6 +268,8 @@ function NoteSession({
         titleFromFirstLine={initial === null}
         saved={saved}
         showMetadata={showMetadata}
+        initialSelection={initialSelection}
+        onSelectionChange={reading.rememberSelection}
       />
       {problem !== null && (
         <p role="alert" className="inline-error">
@@ -284,6 +285,9 @@ function NoteSession({
           showMetadata={showMetadata}
           onToggleMetadata={() => {
             setShowMetadata((shown) => !shown);
+          }}
+          onRemoveTag={(written) => {
+            setEdit({ apply: (markdown) => withoutTag(markdown, written) });
           }}
           onDelete={async () => {
             if (!saved) return;

@@ -28,15 +28,12 @@ type Note struct {
 // Deleted reports whether the note has been deleted.
 func (n Note) Deleted() bool { return n.DeletedAt != nil }
 
-var (
-	// ErrNotFound means the user has no (undeleted) note with that id.
-	ErrNotFound = errors.New("note not found")
-	// ErrExists means a note with that id already exists, possibly deleted.
-	ErrExists = errors.New("note already exists")
-)
+// ErrNotFound means the user has no (undeleted) note with that id.
+var ErrNotFound = errors.New("note not found")
 
-// ConflictError is returned when a change was based on an old revision. It
-// carries the current version so the client can resolve the conflict.
+// ConflictError is returned when a change was based on an old revision, or
+// when a note to create already exists (possibly deleted). It carries the
+// current version so the client can resolve the conflict.
 type ConflictError struct {
 	Current Note
 }

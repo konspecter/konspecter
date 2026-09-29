@@ -100,6 +100,25 @@ export class ApiClient {
     return { notes: notes.map(parseRemoteNote), cursor, more };
   }
 
+  /**
+   * The server's change events (`GET /api/events`, Server-Sent Events) as a
+   * byte stream, open until `signal` aborts or the server ends it.
+   */
+  async events(signal: AbortSignal): Promise<ReadableStream<Uint8Array>> {
+    let response: Response;
+    try {
+      response = await this.#fetch(new URL("api/events", this.#base).toString(), {
+        headers: { Authorization: `Bearer ${this.#token}`, Accept: "text/event-stream" },
+        signal,
+      });
+    } catch (error) {
+      throw new NetworkError(`Could not reach the server: ${String(error)}`);
+    }
+    if (!response.ok) await failure(response);
+    if (!response.body) throw invalid("event stream");
+    return response.body;
+  }
+
   async #request(method: string, path: string, body?: unknown): Promise<unknown> {
     let response: Response;
     try {
@@ -115,25 +134,32 @@ export class ApiClient {
       throw new NetworkError(`Could not reach the server: ${String(error)}`);
     }
     if (response.status === 204) return null;
-
-    let json: unknown = null;
+    if (!response.ok) return failure(response);
     try {
-      json = await response.json();
+      return (await response.json()) as unknown;
     } catch {
-      if (response.ok) throw invalid("response");
+      throw invalid("response");
     }
-    if (response.ok) return json;
-
-    const record = asRecord(json);
-    const error = asRecord(record.error);
-    const code = typeof error.code === "string" ? error.code : "http_error";
-    const message =
-      typeof error.message === "string" ? error.message : `Server error ${String(response.status)}`;
-    if (response.status === 409 && code === "revision_conflict") {
-      throw new RevisionConflictError(message, parseRemoteNote(record.current));
-    }
-    throw new ApiError(response.status, code, message);
   }
+}
+
+/** Throws the error a failed response describes. */
+async function failure(response: Response): Promise<never> {
+  let json: unknown = null;
+  try {
+    json = await response.json();
+  } catch {
+    // No JSON body: the status says enough.
+  }
+  const record = asRecord(json);
+  const error = asRecord(record.error);
+  const code = typeof error.code === "string" ? error.code : "http_error";
+  const message =
+    typeof error.message === "string" ? error.message : `Server error ${String(response.status)}`;
+  if (response.status === 409 && code === "revision_conflict") {
+    throw new RevisionConflictError(message, parseRemoteNote(record.current));
+  }
+  throw new ApiError(response.status, code, message);
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

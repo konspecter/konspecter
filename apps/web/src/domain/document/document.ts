@@ -1,4 +1,12 @@
-import { Document, isMap, isSeq, parseDocument as parseYaml } from "yaml";
+import {
+  Document,
+  isCollection,
+  isMap,
+  isScalar,
+  Scalar,
+  parseDocument as parseYaml,
+  type Node,
+} from "yaml";
 
 /**
  * A note's Markdown text is the canonical document. It may start with a YAML
@@ -75,6 +83,8 @@ const YAML_OPTIONS = { lineWidth: 0, flowCollectionPadding: false } as const;
 type Split = {
   /** The YAML between the delimiters, or null when there is no frontmatter. */
   readonly yaml: string | null;
+  /** Where the YAML starts in the text (after the opening delimiter line). */
+  readonly start: number;
   /** Everything after the closing delimiter line (or the whole text). */
   readonly rest: string;
 };
@@ -86,15 +96,16 @@ type Split = {
 function splitFrontmatter(markdown: string): Split {
   const opening = OPENING_DELIMITER.exec(markdown);
   if (!opening) {
-    return { yaml: null, rest: markdown };
+    return { yaml: null, start: 0, rest: markdown };
   }
   const afterOpening = markdown.slice(opening[0].length);
   const closing = CLOSING_DELIMITER.exec(afterOpening);
   if (!closing) {
-    return { yaml: null, rest: markdown };
+    return { yaml: null, start: 0, rest: markdown };
   }
   return {
     yaml: afterOpening.slice(0, closing.index),
+    start: opening[0].length,
     rest: afterOpening.slice(closing.index + closing[0].length),
   };
 }
@@ -291,21 +302,16 @@ export function updateMetadata(markdown: string, changes: Partial<Metadata>): st
     parseDocument(result);
     return result;
   }
-  return editFrontmatter(markdown, (frontmatter) => {
-    for (const field of METADATA_KEYS) {
-      const value = changes[field];
-      if (value === undefined) continue;
-      const spellings = FRONTMATTER_KEYS[field];
-      if (value === null) {
-        for (const key of spellings) frontmatter.delete(key);
-        continue;
-      }
-      const present = spellings.filter((key) => frontmatter.has(key));
-      for (const key of present.length > 0 ? present : [spellings[0]]) {
-        frontmatter.set(key, value);
-      }
-    }
+  const fields = fieldsOf(parseFrontmatter(yaml));
+  const edits = METADATA_KEYS.flatMap((field): FieldEdit[] => {
+    const value = changes[field];
+    if (value === undefined) return [];
+    const spellings = FRONTMATTER_KEYS[field];
+    if (value === null) return spellings.map((key) => ({ key, value: null }));
+    const present = spellings.filter((key) => fields.has(key));
+    return (present.length > 0 ? present : [spellings[0]]).map((key) => ({ key, value }));
   });
+  return editFrontmatter(markdown, edits);
 }
 
 /**
@@ -321,28 +327,129 @@ export function setFrontmatterTags(markdown: string, tags: readonly string[]): s
     const block = new Document({ [TAGS_KEY]: [...tags] }).toString(YAML_OPTIONS);
     return `---\n${block}---\n\n${markdown.replace(/^\uFEFF/, "")}`;
   }
-  return editFrontmatter(markdown, (frontmatter) => {
-    if (tags.length === 0) {
-      frontmatter.delete(TAGS_KEY);
-      return;
-    }
-    const previous = frontmatter.get(TAGS_KEY, true);
-    const list = frontmatter.createNode([...tags]);
-    if (isSeq(previous) && previous.flow) list.flow = true;
-    frontmatter.set(TAGS_KEY, list);
-  });
+  return editFrontmatter(markdown, [
+    { key: TAGS_KEY, value: tags.length === 0 ? null : [...tags] },
+  ]);
 }
 
-/** Applies `edit` to an existing frontmatter block and keeps the body as written. */
-function editFrontmatter(markdown: string, edit: (frontmatter: Document) => void): string {
-  const { yaml, rest } = splitFrontmatter(markdown);
-  const frontmatter = parseFrontmatter(yaml ?? "");
-  edit(frontmatter);
-  readMetadata(frontmatter);
+/** A frontmatter key set to a value (text or a list of texts), or removed with null. */
+type FieldEdit = { readonly key: string; readonly value: string | readonly string[] | null };
 
+/** The keys a frontmatter block has (none when it is empty). */
+function fieldsOf(frontmatter: Document): Set<string> {
+  const { contents } = frontmatter;
+  if (!isMap(contents)) return new Set();
+  return new Set(
+    contents.items.flatMap((pair) => (isScalar(pair.key) ? [String(pair.key.value)] : [])),
+  );
+}
+
+/**
+ * Applies `edits` to an existing frontmatter block. Only the lines of the
+ * edited keys change: every other line, and the delimiters and the body, stay
+ * byte for byte as written (an editor showing the text sees nothing else
+ * move). Throws InvalidDocumentError if the document or the result is invalid.
+ */
+function editFrontmatter(markdown: string, edits: readonly FieldEdit[]): string {
+  const { yaml, start } = splitFrontmatter(markdown);
+  const original = yaml ?? "";
+  let edited = original;
+  for (const edit of edits) edited = editField(edited, edit);
+  const result = parseFrontmatter(edited);
+  readMetadata(result);
+  return markdown.slice(0, start) + edited + markdown.slice(start + original.length);
+}
+
+/** `yaml` with one field set or removed, rewriting only that field's lines. */
+function editField(yaml: string, { key, value }: FieldEdit): string {
+  const frontmatter = parseFrontmatter(yaml);
+  const { contents } = frontmatter;
+  if (contents !== null && (!isMap(contents) || contents.flow)) {
+    return rewriteField(frontmatter, key, value);
+  }
+  const pair = contents?.items.find((item) => isScalar(item.key) && item.key.value === key);
+  const newline = yaml.includes("\r\n") ? "\r\n" : "\n";
+  let edited: string;
+  if (pair === undefined) {
+    if (value === null) return yaml;
+    // A new key goes last, indented like the others.
+    const first = contents?.items[0]?.key;
+    const indent = isScalar(first) && first.range ? columnOf(yaml, first.range[0]) : "";
+    const lines = yaml === "" || yaml.endsWith("\n") ? yaml : yaml + newline;
+    edited = lines + indent + renderField(key, value, null, indent, newline) + newline;
+  } else {
+    const keyNode = pair.key as Scalar;
+    const valueNode = isScalar(pair.value) || isCollection(pair.value) ? pair.value : null;
+    const from = keyNode.range?.[0] ?? 0;
+    // Up to the end of the value, not the line breaks or comment after it.
+    let to = Math.max(keyNode.range?.[1] ?? from, valueNode?.range?.[1] ?? from);
+    while (to > from && /\s/.test(yaml[to - 1] ?? "")) to -= 1;
+    if (value === null) {
+      const lineStart = yaml.lastIndexOf("\n", from - 1) + 1;
+      const lineEnd = yaml.indexOf("\n", to);
+      edited = yaml.slice(0, lineStart) + (lineEnd === -1 ? "" : yaml.slice(lineEnd + 1));
+    } else {
+      const indent = columnOf(yaml, from);
+      edited =
+        yaml.slice(0, from) + renderField(key, value, valueNode, indent, newline) + yaml.slice(to);
+    }
+  }
+  // Whatever YAML the lines turn out to mean, the field must say just this.
+  const check = parseYaml(edited);
+  const written: unknown = isMap(check.contents) ? check.get(key) : undefined;
+  const expected = value === null ? undefined : value;
+  if (check.errors.length > 0 || JSON.stringify(toJS(written)) !== JSON.stringify(expected)) {
+    return rewriteField(frontmatter, key, value);
+  }
+  return edited;
+}
+
+function toJS(value: unknown): unknown {
+  return value !== null && typeof value === "object" && "toJSON" in value
+    ? (value as { toJSON: () => unknown }).toJSON()
+    : value;
+}
+
+/** The whitespace between the start of `offset`'s line and `offset`. */
+function columnOf(text: string, offset: number): string {
+  const indent = text.slice(text.lastIndexOf("\n", offset - 1) + 1, offset);
+  return /^[ \t]*$/.test(indent) ? indent : "";
+}
+
+/**
+ * `key: value` as YAML, in the style of the value it replaces: a list stays
+ * in flow style (`[a, b]`), a quoted text keeps its quotes.
+ */
+function renderField(
+  key: string,
+  value: string | readonly string[],
+  previous: Node | null,
+  indent: string,
+  newline: string,
+): string {
+  const document = new Document({});
+  const node = document.createNode(value);
+  if (isCollection(node) && isCollection(previous) && previous.flow) node.flow = true;
+  if (
+    isScalar(node) &&
+    isScalar(previous) &&
+    (previous.type === Scalar.QUOTE_DOUBLE || previous.type === Scalar.QUOTE_SINGLE)
+  ) {
+    node.type = previous.type;
+  }
+  document.set(key, node);
+  return document
+    .toString(YAML_OPTIONS)
+    .replace(/\n$/, "")
+    .replace(/\n/g, newline + indent);
+}
+
+/** The fallback for YAML whose lines cannot be edited one field at a time: rewrites it all. */
+function rewriteField(frontmatter: Document, key: string, value: FieldEdit["value"]): string {
+  if (value === null) frontmatter.delete(key);
+  else frontmatter.set(key, frontmatter.createNode(value));
   const hasContent = isMap(frontmatter.contents) && frontmatter.contents.items.length > 0;
-  const updatedYaml = hasContent ? frontmatter.toString(YAML_OPTIONS) : "";
-  return `---\n${updatedYaml}---\n${rest}`;
+  return hasContent ? frontmatter.toString(YAML_OPTIONS) : "";
 }
 
 /**

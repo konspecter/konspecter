@@ -40,8 +40,8 @@ UI, and is tested in `tags.test.ts`.
 
   A single string works as well (`tags: java, go` or `tags: java go`). A note's tags are its
   frontmatter tags, then its body tags, each once (`noteTags`, `frontmatterTags`); entries
-  that are not tags (`2024`, `a b`) are skipped. The editor's **Tags** field adds and removes
-  frontmatter tags (`setFrontmatterTags`), and tags typed in the body in Text mode are
+  that are not tags (`2024`, `a b`) are skipped. A tag only the frontmatter lists is removed with
+  the × next to it in the note's Details (`withoutTag`, `setFrontmatterTags`), and tags typed in the body in Text mode are
   added to the list too (see [editing metadata](markdown-format.md#editing-metadata)).
 
 The result is deduplicated and ordered by first appearance.

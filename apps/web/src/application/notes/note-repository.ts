@@ -1,5 +1,5 @@
 import type { Note } from "../../domain/note/note";
-import type { ReadingState } from "../../domain/reading/reading";
+import type { EditorSelection, ReadingState } from "../../domain/reading/reading";
 import type { SearchQuery } from "../../domain/search/query";
 import type { Tag } from "../../domain/tag/tags";
 import type { SearchHit } from "../../infrastructure/search/search-index";
@@ -41,7 +41,10 @@ export interface NoteRepository {
   notesWithTag(tag: Tag): Promise<Note[]>;
   search(query: SearchQuery): Promise<SearchHit[]>;
   readingState(noteId: string): Promise<ReadingState | null>;
+  /** Saves the scroll position; the saved caret stays. */
   saveReadingPosition(noteId: string, position: number): Promise<void>;
+  /** Saves the caret; the saved scroll position stays. */
+  saveEditorSelection(noteId: string, selection: EditorSelection): Promise<void>;
   onChange(listener: (change: NoteChange) => void): () => void;
   /** App library only: stored records that are not readable notes (see Recovery). */
   unreadableRecords?(): Promise<UnreadableRecord[]>;

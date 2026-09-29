@@ -7,8 +7,10 @@ import {
   noteTitle,
   noteUpdated,
   noteWrittenTags,
+  listedOnlyTags,
   withBody,
   withSavedDates,
+  withoutTag,
   parseNote,
   readNote,
   readNotes,
@@ -177,10 +179,35 @@ describe("withSavedDates", () => {
     );
   });
 
+  it("leaves the frontmatter being typed as it is, but for the dates", () => {
+    // A space typed at the end of a line and blank lines stay: the next key
+    // or word goes where the author put the caret.
+    const typing = "---\ntitle: Hash \n\n\ntags:\n- a\nupdated: 2023-01-01T00:00:00Z\n---\n\n# N";
+
+    expect(withSavedDates(typing, saved)).toBe(
+      "---\ntitle: Hash \n\n\ntags:\n- a\nupdated: 2024-02-02T00:00:00Z\ncreated: 2024-01-01T00:00:00Z\n---\n\n# N",
+    );
+  });
+
   it("returns the text itself when the dates already match or it is invalid", () => {
     expect(withSavedDates(saved.markdown, saved)).toBe(saved.markdown);
     const invalid = "---\ntitle: [\n---\n";
     expect(withSavedDates(invalid, saved)).toBe(invalid);
+  });
+});
+
+describe("removing a listed tag", () => {
+  const markdown = "---\ntitle: T\ntags: [Java, go, extra]\n---\n\nT #go";
+
+  it("offers only the tags the frontmatter lists and the body does not write", () => {
+    expect(listedOnlyTags(readNote({ id: "n", markdown }))).toEqual(["Java", "extra"]);
+    expect(listedOnlyTags(readNote({ id: "n", markdown: "---\ntags: [\n---\n" }))).toEqual([]);
+  });
+
+  it("drops the tag from the list by name, keeping the list's style", () => {
+    expect(withoutTag(markdown, "java")).toBe("---\ntitle: T\ntags: [go, extra]\n---\n\nT #go");
+    expect(withoutTag("---\ntags:\n- a\n---\n", "a")).toBe("---\n---\n");
+    expect(withoutTag(markdown, "missing")).toBe(markdown);
   });
 });
 

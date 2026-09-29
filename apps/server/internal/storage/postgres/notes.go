@@ -64,7 +64,8 @@ func (db *DB) currentNote(ctx context.Context, q querier, userID, id string) (no
 	return n, nil
 }
 
-// CreateNote stores a new note at revision 1.
+// CreateNote stores a new note at revision 1. If the id is taken, by a live
+// or a deleted note, it returns a *notes.ConflictError with that note.
 func (db *DB) CreateNote(ctx context.Context, userID, id, markdown string) (notes.Note, error) {
 	var result notes.Note
 	err := pgx.BeginFunc(ctx, db.pool, func(tx pgx.Tx) error {
@@ -77,7 +78,11 @@ func (db *DB) CreateNote(ctx context.Context, userID, id, markdown string) (note
 			ON CONFLICT DO NOTHING
 			RETURNING `+noteColumns, userID, id, markdown, seq))
 		if errors.Is(err, pgx.ErrNoRows) {
-			return notes.ErrExists
+			current, err := db.currentNote(ctx, tx, userID, id)
+			if err != nil {
+				return err
+			}
+			return &notes.ConflictError{Current: current}
 		}
 		if err != nil {
 			return fmt.Errorf("create note: %w", err)
@@ -111,12 +116,13 @@ func recordChange(ctx context.Context, tx pgx.Tx, userID string, seq int64, n no
 	return nil
 }
 
-// UpdateNote replaces the Markdown if the note is still at baseRevision.
-// Otherwise it returns a *notes.ConflictError with the current version.
+// UpdateNote replaces the Markdown if the note is still at baseRevision. A
+// deleted note at baseRevision is restored: edits beat deletions. Otherwise it
+// returns a *notes.ConflictError with the current version.
 func (db *DB) UpdateNote(ctx context.Context, userID, id, markdown string, baseRevision int64) (notes.Note, error) {
 	return db.change(ctx, userID, id, baseRevision, "update", `
-		UPDATE notes SET markdown = $5, revision = revision + 1, updated_at = now(), change_seq = $4
-		WHERE user_id = $1 AND id = $2 AND revision = $3 AND deleted_at IS NULL
+		UPDATE notes SET markdown = $5, revision = revision + 1, updated_at = now(), deleted_at = NULL, change_seq = $4
+		WHERE user_id = $1 AND id = $2 AND revision = $3
 		RETURNING `+noteColumns, markdown)
 }
 
@@ -130,7 +136,8 @@ func (db *DB) DeleteNote(ctx context.Context, userID, id string, baseRevision in
 }
 
 // change runs a conditional UPDATE. When no row matches, it reports why: the
-// note does not exist, or it changed (or was deleted) since baseRevision.
+// note does not exist, or it changed (or, for a deletion, was already
+// deleted) since baseRevision.
 func (db *DB) change(ctx context.Context, userID, id string, baseRevision int64, operation, sql string, extra ...any) (notes.Note, error) {
 	var result notes.Note
 	err := pgx.BeginFunc(ctx, db.pool, func(tx pgx.Tx) error {

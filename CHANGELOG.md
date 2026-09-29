@@ -2,8 +2,27 @@
 
 ## Unreleased — updates package 2
 
+- The Tags field over the text is gone: tags are written in the text. A tag listed only in the
+  frontmatter has a × next to it in Details that removes it, in either editor mode.
+- **Frontmatter stays as you type it.** Saving no longer rewrites the whole YAML block in
+  the Markdown editor (which dropped a space just typed at the end of a line, blank lines and
+  comments' spacing, and re-indented lists): only the lines of the fields the app sets (the
+  dates, and the title, cover or tags when edited elsewhere) change.
+- **The app opens as you left it:** on the page you were on (a conspect, a search, settings),
+  scrolled where you were, and when you were editing, with the cursor where it was and the
+  editor focused. The desktop window waits for the last changes to be saved before it closes.
+- **The later edit wins.** A conspect changed in two places (two devices, the app and another
+  program, two tabs) no longer splits into a "conflict copy": the version edited later
+  replaces the other everywhere, and edits still beat deletions. An open conspect follows
+  changes from elsewhere while nothing is unsaved in it, in place: the editor does not
+  reload and the cursor stays where it was.
+- **Edits arrive at once.** The server tells connected apps when something changed
+  (`GET /api/events`, Server-Sent Events), and each save is uploaded right away, so an edit
+  shows on the other devices about half a second after the typing pauses (at least every
+  second while it goes on); without the event stream they check every 10 s.
 - An "All conspects" button (a list icon) in the sidebar between Settings and New conspect,
-  and <kbd>Esc</kbd> to get there from anywhere, also from the editor.
+  and in the top bar while the sidebar is hidden, and <kbd>Esc</kbd> to get there from
+  anywhere, also from the editor.
 - A new app icon: the Konspecter owl, a simple, friendly orange owl with big amber eyes
   holding an ancient parchment scroll on wooden rods, a flat mascot with fine brown outlines
   on a warm cream plate, drawn in

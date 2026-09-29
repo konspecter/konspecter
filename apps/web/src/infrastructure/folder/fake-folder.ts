@@ -68,13 +68,7 @@ export class FakeFolder implements FolderBridge {
     return Promise.resolve({ entry: this.#entry(path), text: file.text });
   }
 
-  write(path: string, contents: string, expectedModifiedMs: number | null) {
-    const current = this.files.get(path);
-    if (current && expectedModifiedMs !== null && current.modifiedMs !== expectedModifiedMs) {
-      return Promise.reject(
-        new FolderError("changed_on_disk", `${path} was changed by another program`),
-      );
-    }
+  write(path: string, contents: string) {
     this.edit(path, contents);
     return Promise.resolve(this.#entry(path));
   }
