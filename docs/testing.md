@@ -10,7 +10,7 @@ flows run end to end in a real browser.
 pnpm test                          # web: Vitest (jsdom), ~370 tests
 pnpm --filter @konspecter/web coverage   # with coverage (text summary + HTML in apps/web/coverage)
 pnpm e2e                           # Playwright, real Chromium, production build + service worker
-cd server && go test -race ./...   # PostgreSQL tests need KONSPECTER_TEST_DATABASE_URL
+cd apps/server && go test -race ./...   # PostgreSQL tests need KONSPECTER_TEST_DATABASE_URL
 cd apps/desktop/src-tauri && cargo test
 ```
 
@@ -41,7 +41,7 @@ server must allow `http://localhost:4174` (`KONSPECTER_ALLOWED_ORIGINS`). CI run
 | Note page (no remount on create, caret kept, remote changes)        | `presentation/pages/NotePage.test.tsx`, `NotePage.reading.test.tsx`                       |
 | Shortcuts, highlighting, activity                                   | `presentation/app/shortcuts.test.ts`, `activity.test.ts`, `domain/search/snippet.test.ts` |
 | App flows (layout, sidebar, every page, state and setting)          | `presentation/app/App.test.tsx`                                                           |
-| Server API, auth, storage, concurrency                              | `server/**/*_test.go`                                                                     |
+| Server API, auth, storage, concurrency                              | `apps/server/**/*_test.go`                                                                |
 
 ## Critical flows (plan §27)
 

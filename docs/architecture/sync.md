@@ -127,7 +127,7 @@ Settings → **Sync**: connect with a server URL and an access token (from
 `server create-user` / `create-token`). The token is checked with `GET /api/me`. Then the
 status, last sync, waiting and held-back counts, _Sync now_ and _Disconnect_ are shown.
 Connecting to a different account queues every local note for upload to it. Disconnecting
-keeps all notes. The top bar shows "Offline", "Sync failed" or "N not synced" when sync needs
+keeps all notes. The top bar shows "Sync failed" or "N not synced" when sync needs
 attention, and its antenna transmits while a sync cycle runs.
 
 ## Testing
@@ -139,7 +139,7 @@ attention, and its antenna transmits while a sync cycle runs.
 - `real-server.e2e.test.ts` runs the two-device flow against a real server:
 
   ```sh
-  cd server && KONSPECTER_DATABASE_URL=… go run ./cmd/server create-user -email e2e@example.com
+  cd apps/server && KONSPECTER_DATABASE_URL=… go run ./cmd/server create-user -email e2e@example.com
   KONSPECTER_DATABASE_URL=… KONSPECTER_ADDR=127.0.0.1:8080 go run ./cmd/server &
   cd apps/web && KONSPECTER_E2E_URL=http://127.0.0.1:8080 KONSPECTER_E2E_TOKEN=ksp_… pnpm exec vitest run real-server
   ```

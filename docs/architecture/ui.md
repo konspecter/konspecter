@@ -8,7 +8,7 @@ interface speaks English and Russian ([i18n](i18n.md)).
 
 ```text
 ┌─ Sidebar ─────────────┬─ Top bar: [ search ]  (theme) (mode)               (antenna) ─┐
-│ ☰            ⚙  ✎     ├────────────────────────────────────────────────────────────────┤
+│ ☰         ⚙  ≡  ✎     ├────────────────────────────────────────────────────────────────┤
 │ Tags (tree)           │                                                                │
 │ Recent (by last edit) │   Main content: note list · editor · settings                  │
 │ ───────────────────── │                                                                │
@@ -19,7 +19,7 @@ interface speaks English and Russian ([i18n](i18n.md)).
 - Two panels over the whole window (`components/Layout.tsx`): the sidebar is sticky at full
   height and scrolls on its own; the page scrolls under a sticky top bar (so the reading
   position keeps using the window's scroll). No app header, brand or menu.
-- **Sidebar** (`Sidebar.tsx`): toggle, Settings, New note; the tag tree (tags as folders,
+- **Sidebar** (`Sidebar.tsx`): toggle, Settings, All notes (`/`), New note; the tag tree (tags as folders,
   notes as documents inside them; a tag's name opens `/?q=#tag`, see [tags](tags.md)); recent notes, most recently edited first, with the open
   one marked. Hidden or shown per device (`localStorage`); on narrow screens it starts hidden
   and slides over the content. While it is hidden, its toggle and New note sit in the top bar.
@@ -97,8 +97,9 @@ moment; the editor chunk is preloaded when the browser is idle after start-up, a
 search index. The **antenna** is the only activity indicator, in three states: light gray and
 still while idle, darker with animated waves while saving or syncing (the dark theme inverts
 the emphasis so it stays visible; `prefers-reduced-motion` stops the animation), and crossed
-out in orange while sync is set up but there is no connection (notes keep saving on the
-device and sync when it is back).
+out with an orange X while sync is set up but there is no connection (notes keep saving on the
+device and sync when it is back). That is the only sign of it: the top bar shows text only when
+sync fails or holds notes back.
 
 ## Keyboard
 
@@ -109,6 +110,7 @@ matched, so the shortcuts work on Cyrillic layouts.
 | Keys    | Action                          | Where                       |
 | ------- | ------------------------------- | --------------------------- |
 | `Mod+P` | Search                          | everywhere, also in editors |
+| `Esc`   | All notes (the list, `/`)       | everywhere, also in editors |
 | `Mod+N` | New note                        | everywhere, also in editors |
 | `Mod+,` | Settings                        | everywhere, also in editors |
 | `Mod+\` | Show or hide the sidebar        | everywhere, also in editors |
@@ -119,7 +121,9 @@ matched, so the shortcuts work on Cyrillic layouts.
 
 Modifier shortcuts are caught in the capture phase, before editors and the browser (no print
 dialog on `Mod+P`), and go no further (CodeMirror's own `Mod-/` does not comment the line).
-`Mod+\` and `Mod+/` leave the caret where it is: in the editor after hiding the sidebar, and in
+`Esc` leaves the editor for the list, but gives way where Escape already means something: an
+open dialog closes, the search box and other form fields let go of the focus, and CodeMirror's
+search panel closes. `Mod+\` and `Mod+/` leave the caret where it is: in the editor after hiding the sidebar, and in
 the other editor after switching. On a Russian layout they are the keys that type `ё`/`\` and
 `.`: the physical key (`Backslash`, `Slash`) is what counts. Browsers keep `Ctrl+N` for themselves in ordinary tabs; it works in the
 desktop app and in the installed PWA, and `n` works everywhere.

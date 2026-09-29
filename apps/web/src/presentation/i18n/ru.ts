@@ -16,6 +16,7 @@ export const ru: Dictionary = {
   "sidebar.show": "Показать боковую панель",
   "sidebar.hide": "Скрыть боковую панель",
   "sidebar.settings": "Настройки",
+  "sidebar.allNotes": "Все конспекты",
   "sidebar.newNote": "Новый конспект",
   "sidebar.tags": "Теги",
   "sidebar.tagsHint": "Напишите в конспекте {tag} или {nested}.",
@@ -41,7 +42,6 @@ export const ru: Dictionary = {
   "antenna.idle": "Всё сохранено на этом устройстве",
   "antenna.active": "Сохранение и синхронизация",
   "antenna.offline": "Нет связи: конспекты сохраняются на этом устройстве и синхронизируются позже",
-  "syncHint.offline": "Нет связи",
   "syncHint.failed": "Ошибка синхронизации",
   "syncHint.blocked": {
     one: "{count} не синхронизирована",
@@ -52,6 +52,7 @@ export const ru: Dictionary = {
   "syncHint.label": "Синхронизация: {text}",
 
   "shortcut.search": "Поиск",
+  "shortcut.allNotes": "Все конспекты",
   "shortcut.newNote": "Новый конспект",
   "shortcut.settings": "Настройки",
   "shortcut.save": "Сохранить сейчас (конспекты сохраняются и при наборе)",

@@ -30,14 +30,14 @@ to, and export as ordinary `.md` files.
 - **Android:** install the APK from a release.
 
 Conspects save themselves as you type. Keyboard shortcuts (<kbd>⌘</kbd> on macOS, <kbd>Ctrl</kbd>
-elsewhere): <kbd>⌘P</kbd> search, <kbd>⌘N</kbd> new conspect, <kbd>⌘,</kbd> settings,
+elsewhere): <kbd>⌘P</kbd> search, <kbd>Esc</kbd> all conspects, <kbd>⌘N</kbd> new conspect, <kbd>⌘,</kbd> settings,
 <kbd>⌘S</kbd> save now; outside text fields also <kbd>/</kbd>, <kbd>n</kbd> and <kbd>?</kbd>
 (all shortcuts).
 
 ### Sync server (optional)
 
 ```sh
-docker build -t konspecter-server server/
+docker build -t konspecter-server apps/server/
 docker run -e KONSPECTER_DATABASE_URL=postgres://user:pass@db/konspecter \
   -e KONSPECTER_ALLOWED_ORIGINS=https://notes.example.com,https://localhost \
   -p 8080:8080 konspecter-server
@@ -57,7 +57,7 @@ pnpm install
 pnpm dev                                    # web app on http://localhost:5173
 pnpm check                                  # format, lint, typecheck, test, build, licenses
 pnpm e2e                                    # end-to-end tests in Chromium
-cd server && go test ./...                  # server (see docs for the PostgreSQL tests)
+cd apps/server && go test ./...                  # server (see docs for the PostgreSQL tests)
 pnpm --filter @konspecter/desktop dev       # desktop app
 pnpm --filter @konspecter/mobile android:debug
 ```

@@ -2,6 +2,8 @@
 
 ## Unreleased — updates package 2
 
+- An "All conspects" button (a list icon) in the sidebar between Settings and New conspect,
+  and <kbd>Esc</kbd> to get there from anywhere, also from the editor.
 - A new app icon: the Konspecter owl, a simple, friendly orange owl with big amber eyes
   holding an ancient parchment scroll on wooden rods, a flat mascot with fine brown outlines
   on a warm cream plate, drawn in
@@ -35,7 +37,8 @@
   capital letter (setting "Tag names").
 - Markdown mode highlights the Markdown and fenced code (```json and others) in colour; a
   typed `"` stays straight in code and frontmatter instead of turning into «».
-- The antenna shows a third state: crossed out in orange when sync has no connection.
+- The antenna shows a third state: crossed out with an orange X when sync has no connection;
+  it is the only sign of it (no "Offline" text in the top bar).
 - The page no longer shifts sideways when a scrollbar appears.
 - The desktop app no longer opens the web inspector.
 - The dates each save writes (`created`, `updated`) appear in the editor at once, also in

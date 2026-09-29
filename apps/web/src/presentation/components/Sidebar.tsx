@@ -17,7 +17,7 @@ import {
 import type { NoteRepository } from "../../application/notes/note-repository";
 import type { TagNames } from "../../domain/settings/settings";
 import { formatKeys, SHORTCUTS } from "../app/shortcuts";
-import { GearIcon, NewNoteIcon, SidebarIcon } from "./icons";
+import { GearIcon, ListIcon, NewNoteIcon, SidebarIcon } from "./icons";
 import { summaryTitle } from "./note-title";
 import { TagTreeView } from "./TagTreeView";
 import { t } from "../i18n/i18n";
@@ -97,6 +97,14 @@ export const Sidebar = memo(function Sidebar({
           title={withShortcut(t("sidebar.settings"), SHORTCUTS.settings.keys)}
         >
           <GearIcon />
+        </Link>
+        <Link
+          to="/"
+          className="icon-button"
+          aria-label={t("sidebar.allNotes")}
+          title={withShortcut(t("sidebar.allNotes"), SHORTCUTS.allNotes.keys)}
+        >
+          <ListIcon />
         </Link>
         <Link
           to="/notes/new"

@@ -1,13 +1,13 @@
 # Server
 
-A single Go binary (`server/`), stdlib `net/http`, PostgreSQL via `pgx`. It stores
+A single Go binary (`apps/server/`), stdlib `net/http`, PostgreSQL via `pgx`. It stores
 the user's Markdown documents with revisions so clients can sync
 ([ADR-001](decisions/ADR-001-http-json.md), [ADR-005](decisions/ADR-005-domain-oriented-packages.md)).
 
 ## Packages
 
 ```text
-server/
+apps/server/
 ├── cmd/server/             entry point: serve, migrate, create-user, create-token
 ├── internal/notes/         Note, validation, ErrNotFound / ErrExists / ConflictError
 ├── internal/auth/          User, API tokens (generate, hash, parse bearer header), email

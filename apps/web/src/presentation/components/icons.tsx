@@ -39,6 +39,18 @@ export function GearIcon() {
   );
 }
 
+/** A bulleted list: every conspect. */
+export function ListIcon() {
+  return (
+    <Icon>
+      <path d="M9.5 6.5h10M9.5 12h10M9.5 17.5h10" />
+      <circle cx="5" cy="6.5" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="5" cy="12" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="5" cy="17.5" r="1.2" fill="currentColor" stroke="none" />
+    </Icon>
+  );
+}
+
 /** A blank page with a pencil. */
 export function NewNoteIcon() {
   return (
@@ -151,13 +163,13 @@ export function AntennaIcon() {
   );
 }
 
-/** The antenna without waves, crossed out: no connection. */
+/** The antenna without waves, crossed out with an X: no connection. */
 export function AntennaOffIcon() {
   return (
     <Icon className="icon-antenna">
       <circle cx="12" cy="9" r="1.5" />
       <path d="M12 10.5L9.5 20.5M12 10.5l2.5 10M10.4 16.8h3.2" />
-      <path d="M4.5 4.5l15 15" />
+      <path d="M5 5l14 14M19 5L5 19" />
     </Icon>
   );
 }

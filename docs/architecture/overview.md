@@ -49,7 +49,7 @@ apps/web/src/
     ├── markdown/            MarkdownView: GFM rendering, sanitizing, highlighting (lazy chunk)
     └── pages/               Notes (list + search), Note (editor + autosave), Settings, NotFound
 
-server/
+apps/server/
 ├── cmd/server/              serve, migrate, create-user, create-token
 ├── internal/                notes, auth, httpapi, storage/postgres
 └── migrations/              embedded SQL

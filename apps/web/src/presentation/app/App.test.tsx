@@ -126,11 +126,18 @@ describe("layout", () => {
     expect(topBarButton("Show sidebar")).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("opens settings and a new note from the sidebar", async () => {
-    renderApp(await newStore());
+  it("opens settings, every note and a new note from the sidebar", async () => {
+    const store = await newStore();
+    await store.put(javaNote);
+    renderApp(store);
 
     await userEvent.click(within(sidebar()).getByRole("link", { name: "Settings" }));
     expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument();
+
+    const allNotes = within(sidebar()).getByRole("link", { name: "All conspects" });
+    expect(allNotes).toHaveAttribute("title", "All conspects (Esc)");
+    await userEvent.click(allNotes);
+    expect(await listTitles()).toEqual(["Java Collections"]);
 
     await userEvent.click(within(sidebar()).getByRole("link", { name: "New conspect" }));
     expect(await textEditor()).toHaveFocus();
@@ -1547,6 +1554,43 @@ describe("keyboard shortcuts", () => {
     await userEvent.keyboard("/");
     expect(searchBox()).toHaveFocus();
     expect(await listTitles()).toHaveLength(1);
+  });
+
+  it("goes to every note with Escape, also from the editor", async () => {
+    const store = await newStore();
+    await store.put(javaNote);
+    renderApp(store, "/notes/java");
+    await userEvent.click(await textEditor());
+
+    await userEvent.keyboard("{Escape}");
+    expect(await listTitles()).toEqual(["Java Collections"]);
+    expect(screen.queryByRole("textbox", { name: "Conspect text" })).not.toBeInTheDocument();
+  });
+
+  it("leaves Escape to dialogs, the search box and CodeMirror's search panel", async () => {
+    const store = await newStore();
+    await store.put(javaNote);
+    renderApp(store, "/notes/java", { ...DEFAULT_SETTINGS, defaultEditor: "markdown" });
+    const source = await screen.findByRole("textbox", { name: "Markdown" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+
+    await userEvent.click(searchBox());
+    await userEvent.keyboard("{Escape}");
+    expect(searchBox()).not.toHaveFocus();
+
+    await userEvent.click(source);
+    await userEvent.keyboard("{Control>}f{/Control}");
+    // CodeMirror's search panel: Escape closes it and stays in the note.
+    const panel = () => document.querySelector(".cm-search");
+    expect(panel()).not.toBeNull();
+    await userEvent.keyboard("{Escape}");
+    expect(panel()).toBeNull();
+
+    expect(screen.getByRole("textbox", { name: "Markdown" })).toBeInTheDocument();
+    expect(await store.get("java")).toEqual(javaNote);
   });
 
   it("shows the shortcuts dialog and closes it with Escape", async () => {

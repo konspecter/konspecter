@@ -104,7 +104,7 @@ apps/web/                 React + Vite web app (the shared UI for all clients)
 apps/mobile/              Capacitor 8 Android app around apps/web (android/: generated Gradle project)
 apps/desktop/             Tauri 2 desktop shell around apps/web
   src-tauri/src/          Rust: lib.rs (commands), folder.rs (File Mode file access)
-server/                   Go HTTP server (module konspecter/server)
+apps/server/              Go HTTP server (module konspecter/server)
   cmd/server/             entry point (serve, migrate, create-user, create-token, revoke-tokens)
   internal/               notes, auth, httpapi, storage/postgres
   migrations/             embedded SQL migrations
@@ -120,8 +120,8 @@ scripts/render-icons.mjs  the app icon (owl) for every platform: `pnpm icons`
 .github/workflows/ci.yml
 ```
 
-The plan's target layout (`packages/*`) is introduced
-phase by phase, only when there is real code to put there.
+Every application (web, mobile, desktop, server) lives in `apps/`. Libraries shared between
+applications go in `packages/`, introduced only when there is real shared code to put there.
 
 ## Commands
 
@@ -148,7 +148,7 @@ pnpm --filter @konspecter/desktop dev      # desktop window on the web dev serve
 pnpm --filter @konspecter/desktop bundle   # release .app and .dmg
 pnpm --filter @konspecter/mobile android:debug   # debug APK (JDK 21 + Android SDK)
 
-cd server
+cd apps/server
 gofmt -l .            # must print nothing
 go vet ./...
 go test -race ./...   # PostgreSQL tests need KONSPECTER_TEST_DATABASE_URL (see docs/architecture/server.md)

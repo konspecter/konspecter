@@ -12,10 +12,27 @@ function isTyping(target: EventTarget | null): boolean {
 }
 
 /**
+ * Whether Escape belongs to something else here: an open dialog closes, a form
+ * field (the search box) lets go of the focus, CodeMirror closes its search
+ * panel. In the editors themselves it is ours.
+ */
+function escapeTaken(target: EventTarget | null): boolean {
+  if (document.querySelector("[aria-modal='true']") !== null) return true;
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.closest("input, textarea, select") !== null) return true;
+  return target.closest(".cm-editor")?.querySelector(".cm-search") != null;
+}
+
+function blocked(keys: string, target: EventTarget | null): boolean {
+  if (keys.startsWith("Mod+")) return false;
+  return keys === "Escape" ? escapeTaken(target) : isTyping(target);
+}
+
+/**
  * Handles shortcuts from the registry (app/shortcuts.ts) for as long as the
  * component is mounted. Modifier shortcuts are caught before editors and the
  * browser see them (no print dialog on Ctrl+P); single keys are ignored while
- * typing.
+ * typing, and Escape wherever something else uses it.
  */
 export function useShortcuts(handlers: ShortcutHandlers): void {
   const latest = useRef(handlers);
@@ -28,7 +45,7 @@ export function useShortcuts(handlers: ShortcutHandlers): void {
       for (const [name, handler] of Object.entries(latest.current)) {
         const { keys } = SHORTCUTS[name as ShortcutName];
         if (!matchesShortcut(keys, event)) continue;
-        if (!keys.startsWith("Mod+") && isTyping(event.target)) return;
+        if (blocked(keys, event.target)) return;
         // Ours alone: an editor's own binding for the keys (CodeMirror's Mod-/) does not run.
         event.preventDefault();
         event.stopPropagation();

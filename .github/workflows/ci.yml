@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: server
+        working-directory: apps/server
     services:
       postgres:
         image: postgres:17-alpine
@@ -57,8 +57,8 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
-          go-version-file: server/go.mod
-          cache-dependency-path: server/go.sum
+          go-version-file: apps/server/go.mod
+          cache-dependency-path: apps/server/go.sum
       - name: gofmt
         run: |
           unformatted="$(gofmt -l .)"
@@ -155,12 +155,12 @@ jobs:
           cache: pnpm
       - uses: actions/setup-go@v7
         with:
-          go-version-file: server/go.mod
-          cache-dependency-path: server/go.sum
+          go-version-file: apps/server/go.mod
+          cache-dependency-path: apps/server/go.sum
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @konspecter/e2e exec playwright install --with-deps chromium
       - name: Start the server and create a test account
-        working-directory: server
+        working-directory: apps/server
         run: |
           go build -o bin/server ./cmd/server
           echo "KONSPECTER_E2E_TOKEN=$(./bin/server create-user -email e2e@example.com | awk '/^token/{print $2}')" >> "$GITHUB_ENV"

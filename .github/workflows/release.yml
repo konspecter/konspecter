@@ -43,15 +43,15 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
-          go-version-file: server/go.mod
-          cache-dependency-path: server/go.sum
+          go-version-file: apps/server/go.mod
+          cache-dependency-path: apps/server/go.sum
       - name: Build
-        working-directory: server
+        working-directory: apps/server
         run: |
           GOOS="${TARGET%/*}" GOARCH="${TARGET#*/}" CGO_ENABLED=0 go build -trimpath \
             -ldflags "-s -w -X main.version=${GITHUB_REF_NAME#v}" -o "out/server" ./cmd/server
           name="konspecter-server-${GITHUB_REF_NAME}-${TARGET%/*}-${TARGET#*/}"
-          tar -czf "../${name}.tar.gz" -C out server
+          tar -czf "../../${name}.tar.gz" -C out server
         env:
           TARGET: ${{ matrix.target }}
       - uses: softprops/action-gh-release@v2

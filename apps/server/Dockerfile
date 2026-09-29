@@ -1,5 +1,5 @@
 # Konspecter server: a static binary on a minimal, non-root base image.
-#   docker build -t konspecter-server server/
+#   docker build -t konspecter-server apps/server/
 #   docker run -e KONSPECTER_DATABASE_URL=postgres://… -p 8080:8080 konspecter-server
 FROM golang:1.27 AS build
 WORKDIR /src

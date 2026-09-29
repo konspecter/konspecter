@@ -54,6 +54,8 @@ describe("matchesShortcut", () => {
     expect(matchesShortcut("?", key({ key: "?", shiftKey: true }), false)).toBe(true);
     expect(matchesShortcut("n", key({ key: "n" }), false)).toBe(true);
     expect(matchesShortcut("n", key({ key: "n", ctrlKey: true }), false)).toBe(false);
+    expect(matchesShortcut("Escape", key({ key: "Escape" }), true)).toBe(true);
+    expect(matchesShortcut("Escape", key({ key: "Escape", metaKey: true }), true)).toBe(false);
   });
 });
 
@@ -62,5 +64,6 @@ describe("formatKeys", () => {
     expect(formatKeys("Mod+P", true)).toBe("⌘P");
     expect(formatKeys("Mod+,", false)).toBe("Ctrl+,");
     expect(formatKeys("?", true)).toBe("?");
+    expect(formatKeys("Escape", true)).toBe("Esc");
   });
 });

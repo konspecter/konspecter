@@ -6,10 +6,12 @@ import type { TextKey } from "../i18n/i18n";
  *
  * `Mod` is ⌘ on macOS and Ctrl elsewhere. Modifier shortcuts work
  * everywhere, also while typing in an editor; single keys only outside text
- * fields. Labels are message keys (translated where they are shown).
+ * fields, except Escape, which also works in the editors. Labels are message
+ * keys (translated where they are shown).
  */
 export const SHORTCUTS = {
   search: { keys: "Mod+P", label: "shortcut.search" },
+  allNotes: { keys: "Escape", label: "shortcut.allNotes" },
   newNote: { keys: "Mod+N", label: "shortcut.newNote" },
   settings: { keys: "Mod+,", label: "shortcut.settings" },
   save: { keys: "Mod+S", label: "shortcut.save" },
@@ -29,8 +31,9 @@ export function isMac(): boolean {
   return /mac|iphone|ipad|ipod/i.test(nav.userAgentData?.platform ?? nav.platform);
 }
 
-/** "Mod+P" as the user sees it: "⌘P" on macOS, "Ctrl+P" elsewhere. */
+/** "Mod+P" as the user sees it: "⌘P" on macOS, "Ctrl+P" elsewhere; "Escape" is "Esc". */
 export function formatKeys(keys: string, mac = isMac()): string {
+  if (keys === "Escape") return "Esc";
   if (!keys.startsWith("Mod+")) return keys;
   const key = keys.slice(4);
   return mac ? `⌘${key}` : `Ctrl+${key}`;

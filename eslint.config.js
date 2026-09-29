@@ -8,7 +8,7 @@ export default tseslint.config(
     ignores: [
       "**/dist/",
       "**/coverage/",
-      "server/",
+      "apps/server/",
       "apps/desktop/src-tauri/",
       "apps/mobile/android/",
     ],

@@ -15,7 +15,7 @@
 
 4. Check the draft, then publish it.
 
-The server image: `docker build --build-arg VERSION=0.1.0 -t konspecter-server server/`.
+The server image: `docker build --build-arg VERSION=0.1.0 -t konspecter-server apps/server/`.
 
 ## Signing (secrets to add before a public release)
 

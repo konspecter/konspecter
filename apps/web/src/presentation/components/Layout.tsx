@@ -135,6 +135,7 @@ export function Layout({
   useShortcuts({
     search: openSearch,
     quickSearch: openSearch,
+    allNotes: () => void navigate("/"),
     newNote,
     quickNewNote: newNote,
     settings: () => void navigate("/settings"),

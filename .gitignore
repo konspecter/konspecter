@@ -5,7 +5,7 @@ coverage/
 .DS_Store
 
 # Go
-/server/bin/
+/apps/server/bin/
 
 # Claude Code personal overrides
 .claude/settings.local.json
