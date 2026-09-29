@@ -1,0 +1,125 @@
+name: Release
+
+# Push a tag like v0.1.0 to build every artifact into a draft GitHub Release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: node scripts/check-versions.mjs "${GITHUB_REF_NAME}"
+
+  web:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @konspecter/web build
+      - run: cd apps/web/dist && zip -r "../../../konspecter-web-${GITHUB_REF_NAME}.zip" .
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: konspecter-web-*.zip
+
+  server:
+    needs: check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [linux/amd64, linux/arm64, darwin/arm64, darwin/amd64, windows/amd64]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - name: Build
+        working-directory: server
+        run: |
+          GOOS="${TARGET%/*}" GOARCH="${TARGET#*/}" CGO_ENABLED=0 go build -trimpath \
+            -ldflags "-s -w -X main.version=${GITHUB_REF_NAME#v}" -o "out/server" ./cmd/server
+          name="konspecter-server-${GITHUB_REF_NAME}-${TARGET%/*}-${TARGET#*/}"
+          tar -czf "../${name}.tar.gz" -C out server
+        env:
+          TARGET: ${{ matrix.target }}
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: konspecter-server-*.tar.gz
+
+  desktop:
+    needs: check
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            args: --target aarch64-apple-darwin
+          - os: macos-latest
+            args: --target x86_64-apple-darwin
+          - os: windows-latest
+            args: ""
+          - os: ubuntu-22.04
+            args: ""
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - run: pnpm install --frozen-lockfile
+      # Signing and notarization: set APPLE_* / TAURI_SIGNING_* secrets (docs/release.md).
+      - uses: tauri-apps/tauri-action@v0
+        with:
+          projectPath: apps/desktop
+          tauriScript: pnpm tauri
+          args: ${{ matrix.args }}
+          tagName: ${{ github.ref_name }}
+          releaseName: Konspecter ${{ github.ref_name }}
+          releaseDraft: true
+
+  android:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @konspecter/mobile sync
+      # A store-ready release build needs a signing keystore (docs/release.md);
+      # the debug APK installs directly for testing.
+      - working-directory: apps/mobile/android
+        run: ./gradlew assembleDebug
+      - run: cp apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk "konspecter-${GITHUB_REF_NAME}-debug.apk"
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: konspecter-*-debug.apk

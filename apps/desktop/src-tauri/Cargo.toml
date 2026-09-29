@@ -1,0 +1,32 @@
+[package]
+name = "konspecter-desktop"
+version = "0.1.0"
+description = "Konspecter desktop app"
+edition = "2024"
+license = "UNLICENSED"
+publish = false
+
+[lib]
+name = "konspecter_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+tauri-plugin-dialog = "2"
+trash = "5"
+serde_json = "1"
+notify-debouncer-mini = "0.7"
+open = "5"
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+strip = true
+
+[dev-dependencies]
+tempfile = "3"

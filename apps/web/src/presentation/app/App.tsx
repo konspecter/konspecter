@@ -1,0 +1,148 @@
+import { useCallback, useEffect, useState } from "react";
+import { Route, Routes } from "react-router";
+import {
+  DEFAULT_SETTINGS,
+  type EditorMode,
+  type Settings,
+  type Theme,
+} from "../../domain/settings/settings";
+import { NoteCatalog } from "../../application/notes/note-catalog";
+import type { NoteRepository } from "../../application/notes/note-repository";
+import type { SyncEngine } from "../../infrastructure/sync/sync-engine";
+import { Layout } from "../components/Layout";
+import { preloadEditor } from "../editors/LazyNoteEditor";
+import { NotFoundPage } from "../pages/NotFoundPage";
+import { NotePage } from "../pages/NotePage";
+import { NotesPage } from "../pages/NotesPage";
+import { SettingsPage } from "../pages/SettingsPage";
+import { Activity } from "./activity";
+import type { LibraryControls } from "./library";
+import type { UpdateSource } from "./updates";
+
+type AppProps = {
+  store: NoteRepository;
+  initialSettings?: Settings;
+  /** Persists settings; without it, changes last for the session. */
+  saveSettings?: (settings: Settings) => Promise<void>;
+  /** Desktop File Mode controls for Settings; absent in the browser. */
+  library?: LibraryControls | undefined;
+  /** Service worker updates; absent in tests and development. */
+  updates?: UpdateSource;
+  /** Background sync with a server; absent when not wired up (tests). */
+  sync?: SyncEngine | undefined;
+};
+
+/** Runs `task` once the browser has nothing more urgent to do. */
+function whenIdle(task: () => void): () => void {
+  if (typeof requestIdleCallback === "function") {
+    const handle = requestIdleCallback(task, { timeout: 2000 });
+    return () => {
+      cancelIdleCallback(handle);
+    };
+  }
+  const handle = setTimeout(task, 200);
+  return () => {
+    clearTimeout(handle);
+  };
+}
+
+export function App({
+  store,
+  initialSettings = DEFAULT_SETTINGS,
+  saveSettings: persistSettings,
+  library,
+  updates,
+  sync,
+}: AppProps) {
+  const [settings, setSettings] = useState(initialSettings);
+  const [catalog] = useState(() => new NoteCatalog(store));
+  const [activity] = useState(() => new Activity());
+
+  // Theme and font scale apply to the whole document, outside React's tree.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.theme = settings.theme;
+    root.style.setProperty("--font-scale", String(settings.fontScale));
+  }, [settings.theme, settings.fontScale]);
+
+  useEffect(() => catalog.start(), [catalog]);
+
+  // Nothing waits for these; they only make the first note and the first
+  // search immediate.
+  useEffect(
+    () =>
+      whenIdle(() => {
+        preloadEditor().catch(() => undefined);
+        store.search({ words: [], tags: [] }).catch(() => undefined);
+      }),
+    [store],
+  );
+
+  const saveSettings = useCallback(
+    async (next: Settings) => {
+      setSettings(next);
+      await persistSettings?.(next);
+    },
+    [persistSettings],
+  );
+  // The top bar's toggles change settings too; a failed save keeps the change
+  // for the session (Settings reports such failures).
+  const setTheme = useCallback(
+    (theme: Theme) => {
+      saveSettings({ ...settings, theme }).catch(() => undefined);
+    },
+    [saveSettings, settings],
+  );
+  const setMode = useCallback(
+    (defaultEditor: EditorMode) => {
+      saveSettings({ ...settings, defaultEditor }).catch(() => undefined);
+    },
+    [saveSettings, settings],
+  );
+
+  const notePage = (
+    <NotePage
+      store={store}
+      mode={settings.defaultEditor}
+      activity={activity}
+      readingPosition={settings.readingPosition}
+    />
+  );
+  return (
+    <Routes>
+      <Route
+        element={
+          <Layout
+            store={store}
+            catalog={catalog}
+            activity={activity}
+            theme={settings.theme}
+            onThemeChange={setTheme}
+            mode={settings.defaultEditor}
+            onModeChange={setMode}
+            updates={updates}
+            sync={sync}
+          />
+        }
+      >
+        <Route index element={<NotesPage store={store} catalog={catalog} />} />
+        {/* The same element for both, so a new note keeps its editor once saved. */}
+        <Route path="notes/new" element={notePage} />
+        <Route path="notes/:id" element={notePage} />
+        <Route
+          path="settings"
+          element={
+            <SettingsPage
+              settings={settings}
+              onChange={saveSettings}
+              sync={sync}
+              library={library}
+              store={store}
+            />
+          }
+        />
+        <Route path="*" element={<NotFoundPage />} />
+      </Route>
+    </Routes>
+  );
+}

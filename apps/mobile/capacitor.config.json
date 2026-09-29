@@ -1,0 +1,11 @@
+{
+  "appId": "app.konspecter.mobile",
+  "appName": "Konspecter",
+  "webDir": "../web/dist",
+  "android": {
+    "allowMixedContent": false
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

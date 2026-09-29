@@ -1,0 +1,19 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.DS_Store
+
+# Go
+/server/bin/
+
+# Claude Code personal overrides
+.claude/settings.local.json
+
+# Playwright
+tests/test-results/
+tests/playwright-report/
+
+# Local configuration and secrets
+.env
+.env.*

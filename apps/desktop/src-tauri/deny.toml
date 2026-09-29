@@ -1,0 +1,49 @@
+# License policy for the desktop crate's Rust dependencies. The rules and the
+# reasons for every exception are in docs/license-policy.md.
+[graph]
+all-features = false
+
+[licenses]
+allow = [
+  # Preferred.
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  # Also allowed: permissive, OSI-approved.
+  "Unicode-3.0",
+  "Zlib",
+  "CC0-1.0",
+]
+confidence-threshold = 0.9
+# Named exceptions; each needs a reason in docs/license-policy.md.
+exceptions = [
+  # Servo's CSS parsing, used by Tauri's HTML handling. MPL-2.0 is file-level
+  # copyleft: unmodified use in a binary is fine with notices and source available.
+  { allow = ["MPL-2.0"], crate = "cssparser" },
+  { allow = ["MPL-2.0"], crate = "cssparser-macros" },
+  { allow = ["MPL-2.0"], crate = "selectors" },
+  { allow = ["MPL-2.0"], crate = "dtoa-short" },
+  # Used by `dirs` to locate platform directories.
+  { allow = ["MPL-2.0"], crate = "option-ext" },
+]
+
+[licenses.private]
+# Our own, unpublished crate.
+ignore = true
+
+[bans]
+multiple-versions = "allow"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+
+[advisories]
+ignore = [
+  # proc-macro-error is unmaintained, not vulnerable: a build-time macro crate
+  # pulled in by Tauri's GTK dependencies. Revisit when Tauri drops it.
+  { id = "RUSTSEC-2024-0370", reason = "unmaintained build-time macro crate, no known vulnerability" },
+]

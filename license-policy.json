@@ -1,0 +1,68 @@
+{
+  "$comment": "Dependency license policy. See docs/license-policy.md before editing.",
+  "preferred": ["MIT", "BSD-2-Clause", "BSD-3-Clause", "Apache-2.0", "ISC"],
+  "alsoAllowed": [
+    {
+      "license": "0BSD",
+      "reason": "Public-domain-equivalent permissive license."
+    },
+    {
+      "license": "MIT-0",
+      "reason": "MIT without the attribution requirement."
+    },
+    {
+      "license": "CC0-1.0",
+      "reason": "Public-domain dedication."
+    },
+    {
+      "license": "BlueOak-1.0.0",
+      "reason": "Permissive license comparable to MIT; allows commercial use and redistribution."
+    },
+    {
+      "license": "Unlicense",
+      "reason": "Public-domain dedication (OSI-approved), like CC0-1.0."
+    }
+  ],
+  "exceptions": [
+    {
+      "package": "lightningcss",
+      "license": "MPL-2.0",
+      "scope": "dev",
+      "reason": "CSS minifier used by Vite at build time. File-level copyleft applies to its own sources only; it is not shipped in the app bundle."
+    },
+    {
+      "package": "lightningcss-*",
+      "license": "MPL-2.0",
+      "scope": "dev",
+      "reason": "Platform-specific native binaries of lightningcss (see above)."
+    },
+    {
+      "package": "caniuse-lite",
+      "license": "CC-BY-4.0",
+      "scope": "dev",
+      "reason": "Browser-support data read by build tooling. Not shipped in the app bundle."
+    },
+    {
+      "package": "argparse",
+      "license": "Python-2.0",
+      "reason": "Dependency of markdown-it (used by prosemirror-markdown), needed only by markdown-it's command-line tool and not bundled into the app. The PSF license is permissive: commercial use and redistribution are allowed, the notice must be kept."
+    },
+    {
+      "package": "axe-core",
+      "license": "MPL-2.0",
+      "scope": "dev",
+      "reason": "Accessibility checks in the end-to-end tests only; never shipped."
+    },
+    {
+      "package": "@axe-core/playwright",
+      "license": "MPL-2.0",
+      "scope": "dev",
+      "reason": "Accessibility checks in the end-to-end tests only; never shipped."
+    },
+    {
+      "package": "@fontsource-variable/inter",
+      "license": "OFL-1.1",
+      "reason": "The UI and reading font (Inter), shipped with the app for Latin and Cyrillic text. The SIL Open Font License is the standard free font license: use, bundling and redistribution are allowed, including commercially; the font may not be sold on its own and its license stays with it."
+    }
+  ]
+}

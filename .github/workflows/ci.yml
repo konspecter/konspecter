@@ -1,0 +1,175 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: Web (TypeScript)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm versions:check
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm --filter @konspecter/web coverage
+      - run: pnpm licenses:check
+      - name: Known vulnerabilities (npm advisories)
+        run: pnpm audit --audit-level moderate
+
+  server:
+    name: Server (Go)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: konspecter
+          POSTGRES_PASSWORD: konspecter
+          POSTGRES_DB: konspecter
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U konspecter"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      KONSPECTER_TEST_DATABASE_URL: postgres://konspecter:konspecter@localhost:5432/konspecter?sslmode=disable
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "Files need gofmt:"; echo "$unformatted"; exit 1
+          fi
+      - run: go vet ./...
+      - run: go test -race ./...
+      - name: Known vulnerabilities
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+      - name: Dependency licenses
+        run: >-
+          go run github.com/google/go-licenses/v2@v2.0.1 check ./...
+          --allowed_licenses=MIT,BSD-2-Clause,BSD-3-Clause,Apache-2.0,ISC
+          --ignore konspecter/server
+
+  desktop:
+    name: Desktop (Rust)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/desktop/src-tauri
+    steps:
+      - uses: actions/checkout@v7
+      - name: System libraries for Tauri
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - name: Placeholder web build for tauri::generate_context
+        run: mkdir -p ../../web/dist && echo '<!doctype html>' > ../../web/dist/index.html
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: apps/desktop/src-tauri/Cargo.toml
+          command: check licenses advisories
+
+  android:
+    name: Android (Capacitor)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: pnpm install --frozen-lockfile
+      - name: Build the web app and copy it into the Android project
+        run: pnpm --filter @konspecter/mobile sync
+      - name: Build a debug APK
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v5
+        with:
+          name: konspecter-debug-apk
+          path: apps/mobile/android/app/build/outputs/apk/debug/*.apk
+
+  e2e:
+    name: End-to-end (Playwright)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: konspecter
+          POSTGRES_PASSWORD: konspecter
+          POSTGRES_DB: konspecter
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U konspecter"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      KONSPECTER_DATABASE_URL: postgres://konspecter:konspecter@localhost:5432/konspecter?sslmode=disable
+      KONSPECTER_ADDR: 127.0.0.1:8080
+      KONSPECTER_ALLOWED_ORIGINS: http://localhost:4174
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @konspecter/e2e exec playwright install --with-deps chromium
+      - name: Start the server and create a test account
+        working-directory: server
+        run: |
+          go build -o bin/server ./cmd/server
+          echo "KONSPECTER_E2E_TOKEN=$(./bin/server create-user -email e2e@example.com | awk '/^token/{print $2}')" >> "$GITHUB_ENV"
+          ./bin/server serve &
+      - run: pnpm e2e
+        env:
+          KONSPECTER_E2E_URL: http://127.0.0.1:8080
+      - uses: actions/upload-artifact@v5
+        if: failure()
+        with:
+          name: playwright-traces
+          path: tests/test-results/

@@ -1,0 +1,9 @@
+pnpm-lock.yaml
+dist/
+coverage/
+server/
+.claude/plans/
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
+apps/desktop/src-tauri/icons/
+apps/mobile/android/

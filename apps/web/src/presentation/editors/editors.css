@@ -1,0 +1,171 @@
+.note-editor {
+  min-height: 60vh;
+}
+
+.editor-notice {
+  margin: 0 0 1rem;
+  color: var(--color-muted);
+  font-family: var(--font-ui);
+  font-size: 14px;
+}
+
+.text-editor {
+  position: relative;
+}
+
+/*
+ * The contextual toolbar: a vertical strip in the margin beside the block
+ * being edited. Absolutely positioned, so showing it never moves the text.
+ */
+.text-editor-toolbar {
+  position: absolute;
+  right: calc(100% + 10px);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--color-bg);
+  box-shadow:
+    0 0 0 1px var(--color-border),
+    0 4px 14px var(--color-shadow);
+  font-family: var(--font-ui);
+}
+
+.text-editor-toolbar[hidden] {
+  display: none;
+}
+
+.toolbar-button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--color-fg);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.toolbar-button:hover:not(:disabled) {
+  background: var(--color-hover);
+}
+
+.toolbar-button[aria-pressed="true"] {
+  background: var(--color-active);
+}
+
+.toolbar-button:disabled {
+  color: var(--color-muted);
+  cursor: default;
+  opacity: 0.45;
+}
+
+.text-editor-content {
+  min-height: 55vh;
+  outline: none;
+}
+
+.text-editor-content .placeholder::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: var(--color-muted);
+  pointer-events: none;
+}
+
+/* No margin to spare on phones: the toolbar floats at the right edge instead. */
+@media (max-width: 760px) {
+  .text-editor-toolbar {
+    right: 0;
+  }
+}
+
+.markdown-source .cm-editor {
+  min-height: 60vh;
+  background: transparent;
+  color: var(--color-fg);
+  font-size: calc(15px * var(--font-scale));
+}
+
+.markdown-source .cm-scroller {
+  font-family: var(--font-mono);
+  line-height: 1.6;
+}
+
+.markdown-source .cm-content {
+  caret-color: var(--color-fg);
+}
+
+.markdown-source .cm-placeholder {
+  color: var(--color-muted);
+}
+
+.markdown-source .cm-selectionBackground,
+.markdown-source .cm-editor.cm-focused .cm-selectionBackground {
+  background: color-mix(in srgb, var(--color-accent) 25%, transparent);
+}
+
+.markdown-source .cm-panels {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-ui);
+}
+
+.metadata-fields {
+  margin-bottom: 1rem;
+}
+
+.title-field {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-fg);
+  font-family: var(--font-text);
+  font-size: calc(32px * var(--font-scale));
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.title-field:focus,
+.cover-field:focus {
+  outline: none;
+}
+
+.title-field::placeholder {
+  color: var(--color-muted);
+  opacity: 0.6;
+}
+
+.metadata-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--color-muted);
+}
+
+.cover-field {
+  flex: 1;
+  min-width: 0;
+  padding: 0.15rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-fg);
+  font: inherit;
+}
+
+.cover-field:focus {
+  border-bottom-color: var(--color-muted);
+}
