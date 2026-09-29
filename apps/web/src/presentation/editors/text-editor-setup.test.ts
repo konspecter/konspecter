@@ -1,6 +1,7 @@
 import { defaultMarkdownParser } from "prosemirror-markdown";
+import { TextSelection } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
-import { createTextEditorState } from "./text-editor-setup";
+import { createTextEditorState, toolbarActions } from "./text-editor-setup";
 import { toolbarTopFor } from "./TextEditor";
 
 function editorWith(markdown: string) {
@@ -31,6 +32,30 @@ describe("text editor quotes", () => {
 
     type(2, '"', "«");
     expect(view.state.doc.textContent).toBe("x«");
+  });
+});
+
+describe("list tools", () => {
+  it("run on any selection in nested lists without failing", () => {
+    const state = createTextEditorState(
+      defaultMarkdownParser.parse("text\n\n- one\n  1. inner\n- two\n\nafter"),
+    );
+    const lists = toolbarActions.filter(
+      (action) => action.label === "tool.bulletList" || action.label === "tool.orderedList",
+    );
+    const size = state.doc.content.size;
+    const inText = (pos: number) => state.doc.resolve(pos).parent.inlineContent;
+    for (let from = 0; from <= size; from++) {
+      for (let to = from; to <= size; to++) {
+        if (!inText(from) || !inText(to)) continue;
+        const selected = state.apply(
+          state.tr.setSelection(TextSelection.create(state.doc, from, to)),
+        );
+        for (const { command } of lists) {
+          expect(() => command(selected, () => undefined)).not.toThrow();
+        }
+      }
+    }
   });
 });
 

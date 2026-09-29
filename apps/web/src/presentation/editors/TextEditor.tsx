@@ -19,6 +19,7 @@ import {
   isLinkActive,
   linkCommand,
   replaceDocument,
+  TOOL_USED,
   toolbarActions,
 } from "./text-editor-setup";
 import { t, type TextKey } from "../i18n/i18n";
@@ -59,6 +60,7 @@ type Tool = {
 };
 
 const TOOLBAR_KEY = "konspecter.toolbar";
+const LAST_TOOL_KEY = "konspecter.toolbar.last";
 
 /** The toolbar starts folded unless it was last unfolded on this device. */
 function initialFolded(): boolean {
@@ -74,6 +76,23 @@ function rememberFolded(folded: boolean): void {
     localStorage.setItem(TOOLBAR_KEY, folded ? "folded" : "open");
   } catch {
     // A per-device convenience; without storage the toolbar starts folded.
+  }
+}
+
+/** The tool last used on this device (unchecked: it may no longer exist). */
+function initialLastUsed(): string | null {
+  try {
+    return localStorage.getItem(LAST_TOOL_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function rememberLastUsed(id: TextKey): void {
+  try {
+    localStorage.setItem(LAST_TOOL_KEY, id);
+  } catch {
+    // A per-device convenience; without storage the folded toolbar shows Bold.
   }
 }
 
@@ -166,7 +185,12 @@ export const TextEditor = memo(function TextEditor({
   const [focused, setFocused] = useState(false);
   const [toolbarTop, setToolbarTop] = useState<number | null>(null);
   const [folded, setFolded] = useState(initialFolded);
-  const [lastUsed, setLastUsed] = useState<TextKey | null>(null);
+  const [lastUsed, setLastUsed] = useState(initialLastUsed);
+  /** A tool was used, from the toolbar or by its shortcut. */
+  const noteToolUsed = useCallback((id: TextKey) => {
+    setLastUsed(id);
+    rememberLastUsed(id);
+  }, []);
 
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -193,6 +217,8 @@ export const TextEditor = memo(function TextEditor({
           onChangeRef.current(next.doc);
         }
         if (transaction.selectionSet || transaction.docChanged) report();
+        const tool: unknown = transaction.getMeta(TOOL_USED);
+        if (typeof tool === "string") noteToolUsed(tool as TextKey);
       },
       handleDOMEvents: {
         focus: () => {
@@ -219,7 +245,7 @@ export const TextEditor = memo(function TextEditor({
       view.destroy();
       viewRef.current = null;
     };
-  }, [initialState, initialFocus]);
+  }, [initialState, initialFocus, noteToolUsed]);
 
   useEffect(() => {
     const view = viewRef.current;
@@ -308,12 +334,8 @@ export const TextEditor = memo(function TextEditor({
       command: null,
     },
   ];
-  // Folded, the toolbar keeps one tool: the one in effect at the caret, else
-  // the last one used, else Bold.
-  const pinned =
-    tools.find((tool) => tool.pressed === true) ??
-    tools.find((tool) => tool.id === lastUsed) ??
-    tools[0];
+  // Folded, the toolbar keeps one tool: the last one used, else Bold.
+  const pinned = tools.find((tool) => tool.id === lastUsed) ?? tools[0];
   const shown = folded ? tools.filter((tool) => tool === pinned) : tools;
 
   return (
@@ -343,7 +365,7 @@ export const TextEditor = memo(function TextEditor({
               event.preventDefault();
             }}
             onClick={() => {
-              setLastUsed(tool.id);
+              noteToolUsed(tool.id);
               if (tool.command) run(tool.command);
               else handleLink();
             }}

@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { NoteEditor, type EditorMode } from "./NoteEditor";
@@ -188,16 +188,66 @@ describe("text mode", () => {
     expect(localStorage.getItem("konspecter.toolbar")).toBe("open");
   });
 
-  it("keeps the tool in effect at the caret when folded", async () => {
+  it("keeps the last tool used when folded, also in the next editor", async () => {
     renderEditor("## Section");
+    const shownTools = () =>
+      within(screen.getByRole("toolbar", { name: "Formatting" }))
+        .getAllByRole("button")
+        .map((b) => b.getAttribute("aria-label"));
 
     await userEvent.click(textBox());
-    const toolbar = screen.getByRole("toolbar", { name: "Formatting" });
+    expect(shownTools()).toEqual(["Bold", "All formatting tools"]);
+
+    await userEvent.click(screen.getByRole("button", { name: "All formatting tools" }));
+    await userEvent.click(screen.getByRole("button", { name: "Quote" }));
+    await userEvent.click(screen.getByRole("button", { name: "All formatting tools" }));
+    expect(shownTools()).toEqual(["Quote", "All formatting tools"]);
+
+    cleanup();
+    renderEditor("Other text");
+    await userEvent.click(textBox());
+    expect(shownTools()).toEqual(["Quote", "All formatting tools"]);
+  });
+
+  it("counts a tool's shortcut as using it", async () => {
+    const { save } = renderEditor("");
+
+    await typeInText("{Control>}i{/Control}slanted");
     expect(
-      within(toolbar)
+      within(screen.getByRole("toolbar", { name: "Formatting" }))
         .getAllByRole("button")
         .map((b) => b.getAttribute("aria-label")),
-    ).toEqual(["Heading", "All formatting tools"]);
+    ).toEqual(["Italic", "All formatting tools"]);
+    expect(save()).toBe("---\ntitle: slanted\n---\n\n*slanted*");
+    expect(localStorage.getItem("konspecter.toolbar.last")).toBe("tool.italic");
+  });
+
+  it.each([
+    ["a bulleted list to a numbered one", "- one\n- two", "Numbered list", "1. one\n2. two"],
+    ["a numbered list to a bulleted one", "1. one\n2. two", "Bulleted list", "* one\n* two"],
+  ])("changes %s", async (_, markdown, tool, changed) => {
+    const { save } = renderEditor(markdown);
+
+    await userEvent.click(textBox());
+    await userEvent.click(screen.getByRole("button", { name: "All formatting tools" }));
+    await userEvent.click(screen.getByRole("button", { name: tool }));
+
+    expect(save()).toBe(`---\ntitle: one\n---\n\n${changed}`);
+  });
+
+  it.each([
+    ["bulleted", "- one\n- two", "Bulleted list", "one\n\n* two"],
+    ["numbered", "1. one\n2. two", "Numbered list", "one\n\n1. two"],
+  ])("takes the item out of a %s list with its own tool", async (_, markdown, tool, lifted) => {
+    const { save } = renderEditor(markdown);
+
+    await userEvent.click(textBox());
+    await userEvent.click(screen.getByRole("button", { name: "All formatting tools" }));
+    expect(screen.getByRole("button", { name: tool })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(screen.getByRole("button", { name: tool }));
+
+    expect(screen.getByRole("button", { name: tool })).toHaveAttribute("aria-pressed", "false");
+    expect(save()).toBe(`---\ntitle: one\n---\n\n${lifted}`);
   });
 
   it("toggles headings on the current block", async () => {

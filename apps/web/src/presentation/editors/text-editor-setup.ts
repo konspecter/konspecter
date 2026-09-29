@@ -260,9 +260,7 @@ export function createTextEditorState(
         "Mod-z": undo,
         "Shift-Mod-z": redo,
         "Mod-y": redo,
-        "Mod-b": toggleMark(marks.strong),
-        "Mod-i": toggleMark(marks.em),
-        "Mod-`": toggleMark(marks.code),
+        ...toolShortcuts(),
         Enter: splitListItem(nodes.list_item),
         "Mod-[": liftListItem(nodes.list_item),
         "Mod-]": sinkListItem(nodes.list_item),
@@ -295,6 +293,64 @@ function toggleBlock(type: NodeType, attrs: Record<string, unknown> = {}): Comma
     isBlockActive(state, type, attrs)
       ? setBlockType(nodes.paragraph)(state, dispatch)
       : setBlockType(type, attrs)(state, dispatch);
+}
+
+const isList = (node: Node) => node.type === nodes.bullet_list || node.type === nodes.ordered_list;
+
+/** The innermost list holding the whole selection, and its position; null outside lists. */
+function selectedList(state: EditorState): { list: Node; pos: number } | null {
+  const { $from, $to } = state.selection;
+  const range = $from.blockRange($to, isList);
+  return range ? { list: range.parent, pos: range.$from.before(range.depth) } : null;
+}
+
+/**
+ * A list tool, toggling like the block tools: in a list of `type` (the
+ * innermost one, when lists are nested) it lifts the selected items out of
+ * it; in a list of the other kind it changes that list's kind, keeping its
+ * items and spacing; elsewhere it wraps the selected blocks in a new list.
+ */
+function toggleList(type: NodeType): Command {
+  return (state, dispatch) => {
+    const selected = selectedList(state);
+    if (!selected) return wrapInList(type)(state, dispatch);
+    const { list, pos } = selected;
+    if (list.type === type) return liftListItem(nodes.list_item)(state, dispatch);
+    if (dispatch) {
+      const tight: unknown = list.attrs.tight;
+      dispatch(state.tr.setNodeMarkup(pos, type, { tight }).scrollIntoView());
+    }
+    return true;
+  };
+}
+
+function isListActive(state: EditorState, type: NodeType): boolean {
+  return selectedList(state)?.list.type === type;
+}
+
+/** Meta of a transaction made by a toolbar tool's shortcut: the tool's label. */
+export const TOOL_USED = "konspecter.toolUsed";
+
+/**
+ * The toolbar tools' shortcuts, each running its tool and marking the
+ * transaction with it (`TOOL_USED`), so a shortcut counts as using the tool.
+ * Shortcuts are written for display ("Mod-B"); a keymap reads an upper-case
+ * letter as one typed with Shift, so the keys are lower-cased.
+ */
+function toolShortcuts(): Record<string, Command> {
+  const bindings: Record<string, Command> = {};
+  for (const { shortcut, label, command } of toolbarActions) {
+    if (!shortcut) continue;
+    bindings[shortcut.toLowerCase()] = (state, dispatch) =>
+      command(
+        state,
+        dispatch &&
+          ((tr) => {
+            dispatch(tr.setMeta(TOOL_USED, label));
+          }),
+      );
+  }
+  return bindings;
 }
 
 export type ToolbarAction = {
@@ -341,8 +397,18 @@ export const toolbarActions: readonly ToolbarAction[] = [
     isActive: (state) => isBlockActive(state, nodes.heading, { level: 3 }),
   },
   { label: "tool.quote", text: "❝", command: wrapIn(nodes.blockquote) },
-  { label: "tool.bulletList", text: "•", command: wrapInList(nodes.bullet_list) },
-  { label: "tool.orderedList", text: "1.", command: wrapInList(nodes.ordered_list) },
+  {
+    label: "tool.bulletList",
+    text: "•",
+    command: toggleList(nodes.bullet_list),
+    isActive: (state) => isListActive(state, nodes.bullet_list),
+  },
+  {
+    label: "tool.orderedList",
+    text: "1.",
+    command: toggleList(nodes.ordered_list),
+    isActive: (state) => isListActive(state, nodes.ordered_list),
+  },
   {
     label: "tool.codeBlock",
     text: "{ }",

@@ -29,12 +29,13 @@ with a contextual formatting toolbar and Markdown-style shortcuts.
   rest it is flat and pale (no frame, muted buttons); pointing at it or moving the focus into
   it brings up its frame.
 - **Folding:** the toolbar starts folded (remembered per device, `localStorage`): one tool,
-  the one in effect at the caret (a heading, bold…), else the last one used, else Bold, and a
-  chevron that unfolds all of them. Unfolded, the chevron folds it again.
+  the last one used, from the toolbar or by its shortcut (also remembered per device), else
+  Bold, and a chevron that unfolds all of them. Unfolded, the chevron folds it again.
 
 - **Formatting:** bold, italic, inline code, link, heading (H2), subheading (H3), quote,
   bulleted and numbered lists, and code block. The toolbar shows which marks and blocks
-  are active.
+  are active. A list tool toggles: in a list of its kind it takes the selected items out, in
+  a list of the other kind it changes that list's kind (the innermost list, when nested).
 - **Shortcuts:** typing `#`–`######` + space makes a heading, `>` a quote, `-`/`*`/`+` a
   list, `1.` a numbered list, and ` ```lang ` + space a code block. Backspace right
   after a shortcut undoes it. `Mod-B/I/\`` toggle marks, `Mod-Z`/`Mod-Shift-Z`undo and redo,`Mod-[`/`Mod-]`outdent and indent list items, and`Shift-Enter` inserts a line break.
