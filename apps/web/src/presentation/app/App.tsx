@@ -15,6 +15,7 @@ import { NotFoundPage } from "../pages/NotFoundPage";
 import { NotePage } from "../pages/NotePage";
 import { NotesPage } from "../pages/NotesPage";
 import { SettingsPage } from "../pages/SettingsPage";
+import { applyLanguage } from "../i18n/setup";
 import { Activity } from "./activity";
 import type { LibraryControls } from "./library";
 import type { UpdateSource } from "./updates";
@@ -81,10 +82,12 @@ export function App({
 
   const saveSettings = useCallback(
     async (next: Settings) => {
+      // Before the re-render, so that it is in the new language.
+      if (next.language !== settings.language) applyLanguage(next.language);
       setSettings(next);
       await persistSettings?.(next);
     },
-    [persistSettings],
+    [persistSettings, settings.language],
   );
   // The top bar's toggles change settings too; a failed save keeps the change
   // for the session (Settings reports such failures).
@@ -109,8 +112,10 @@ export function App({
       readingPosition={settings.readingPosition}
     />
   );
+  // A new language renders everything again: labels are looked up when
+  // rendering, and memoized parts would otherwise keep the old ones.
   return (
-    <Routes>
+    <Routes key={settings.language}>
       <Route
         element={
           <Layout

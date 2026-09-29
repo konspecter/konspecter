@@ -22,7 +22,7 @@ describe("Antenna", () => {
     const antenna = screen.getByRole("img");
     expect(antenna).toHaveAttribute("data-state", "offline");
     expect(antenna).toHaveAccessibleName(
-      "No connection: notes are stored on this device and sync later",
+      "No connection: conspects are stored on this device and sync later",
     );
   });
 

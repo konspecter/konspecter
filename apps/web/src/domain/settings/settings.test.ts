@@ -9,12 +9,18 @@ describe("parseSettings", () => {
       readingPosition: "ask",
       tagNames: "as-written",
       editingArea: "plain",
+      language: "ru",
     };
     expect(parseSettings(settings)).toEqual(settings);
   });
 
   it("names tags with a capital letter and highlights the editing area by default", () => {
     expect(DEFAULT_SETTINGS).toMatchObject({ tagNames: "capitalized", editingArea: "highlighted" });
+  });
+
+  it("follows the system's language by default, and ignores languages it does not speak", () => {
+    expect(DEFAULT_SETTINGS.language).toBe("system");
+    expect(parseSettings({ language: "de" }).language).toBe("system");
   });
 
   it("uses defaults for missing data", () => {

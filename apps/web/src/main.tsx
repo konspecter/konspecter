@@ -1,5 +1,5 @@
 // First: sets the interface language before any other module runs.
-import { t } from "./presentation/i18n/setup";
+import { applyLanguage, t } from "./presentation/i18n/setup";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
@@ -66,6 +66,7 @@ const updates: UpdateSource = {
 try {
   const store = await openNoteStore();
   const settings = await store.loadSettings();
+  applyLanguage(settings.language);
 
   // On the desktop the library can be a folder of Markdown files (File Mode),
   // a separate backend; the app library (IndexedDB, synced) is the default.

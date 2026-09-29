@@ -6,6 +6,7 @@ apply and are saved immediately.
 | Setting          | Values                                              | Default              |
 | ---------------- | --------------------------------------------------- | -------------------- |
 | Theme            | System, Light, Dark                                 | System               |
+| Language         | System, English, Русский (see [i18n](i18n.md))      | System               |
 | Default editor   | Text, Markdown                                      | Text                 |
 | Text size        | Small (0.9×), Default, Large (1.15×), Larger (1.3×) | Default              |
 | Reading position | restore, ask, off (see [reading](reading.md))       | restore              |
@@ -36,7 +37,9 @@ are not synced. A separate strategy can be added with sync if needed.
   depend on it.
 - **Tag names:** the sidebar tree's labels start with a capital letter (`tagLabel(…, true)`),
   or show the tag as written. Links, filters and the index keep the lowercase name.
-
-The interface language is not a setting: it follows the system ([i18n](i18n.md)).
+- **Language:** `applyLanguage` sets the interface language and `<html lang>`: the system's
+  for "System", else the chosen one. `main.tsx` applies the saved choice before the first
+  render; a change applies at once, without a reload (`App` renders its routes again, keyed
+  by the language). Language names are shown in their own language.
 
 If saving fails, the change still applies for the session and the page says so.

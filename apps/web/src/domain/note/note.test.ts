@@ -7,6 +7,7 @@ import {
   noteTitle,
   noteUpdated,
   noteWrittenTags,
+  withBody,
   withSavedDates,
   parseNote,
   readNote,
@@ -53,6 +54,17 @@ describe("updateNote", () => {
       id: "n1",
       markdown: "---\ncreated: 2026-09-28T10:15:00Z\nupdated: 2026-09-29T08:00:00Z\n---\n\n# New",
     });
+  });
+
+  it("stamps the dates under the spellings another tool wrote, without adding others", () => {
+    const external = {
+      id: "n2",
+      markdown: "---\ncreate_at: 2020-01-01\nupdated_at: 2020-01-02\n---\n\nText",
+    };
+
+    expect(updateNote(external, `${external.markdown} more`, tuesday).markdown).toBe(
+      "---\ncreate_at: 2020-01-01\nupdated_at: 2026-09-29T08:00:00Z\n---\n\nText more",
+    );
   });
 
   it("keeps the created date when the new text drops the frontmatter", () => {
@@ -169,5 +181,44 @@ describe("withSavedDates", () => {
     expect(withSavedDates(saved.markdown, saved)).toBe(saved.markdown);
     const invalid = "---\ntitle: [\n---\n";
     expect(withSavedDates(invalid, saved)).toBe(invalid);
+  });
+});
+
+describe("withBody", () => {
+  it("writes the body's title and tags into the frontmatter", () => {
+    expect(withBody("", "# Java\n\nLists #java#collections and #go")).toBe(
+      "---\ntitle: Java\ntags:\n  - java#collections\n  - go\n---\n\n# Java\n\nLists #java#collections and #go",
+    );
+  });
+
+  it("keeps the title following the first line, and an author's own title", () => {
+    const synced = "---\ntitle: Old\nx: 1\n---\n\n# Old\n";
+    expect(withBody(synced, "# New\n")).toBe("---\ntitle: New\nx: 1\n---\n\n# New\n");
+    expect(withBody(synced, "")).toBe("---\nx: 1\n---\n\n");
+
+    const own = "---\ntitle: Mine\n---\n\n# Old\n";
+    expect(withBody(own, "# New\n")).toBe("---\ntitle: Mine\n---\n\n# New\n");
+  });
+
+  it("drops tags removed from the body, keeping tags only listed in the frontmatter", () => {
+    const markdown = "---\ntitle: T\ntags: [java, extra, Go]\n---\n\nT #java #go";
+
+    expect(withBody(markdown, "T #go #rust")).toBe(
+      "---\ntitle: T\ntags: [extra, Go, rust]\n---\n\nT #go #rust",
+    );
+  });
+
+  it("changes nothing in the frontmatter when the body says the same", () => {
+    const markdown = "---\n# mine\ntitle: T\ntags: java\n---\n\nT #java";
+
+    expect(withBody(markdown, "T #java, more")).toBe(
+      "---\n# mine\ntitle: T\ntags: java\n---\n\nT #java, more",
+    );
+  });
+
+  it("only replaces the body of a document with invalid frontmatter", () => {
+    expect(withBody("---\ntitle: [\n---\n\nOld", "# New #tag")).toBe(
+      "---\ntitle: [\n---\n\n# New #tag",
+    );
   });
 });

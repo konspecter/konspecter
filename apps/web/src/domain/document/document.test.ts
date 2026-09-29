@@ -8,6 +8,7 @@ import {
   parseDocument,
   replaceBody,
   serializeDocument,
+  setFrontmatterTags,
   updateMetadata,
   type MarkdownDocument,
 } from "./document";
@@ -28,7 +29,14 @@ ArrayList — dynamic array.
 HashMap stores key/value pairs.
 `;
 
-const noMetadata = { title: null, created: null, updated: null, cover: null, conflictOf: null };
+const noMetadata = {
+  title: null,
+  created: null,
+  updated: null,
+  author: null,
+  cover: null,
+  conflictOf: null,
+};
 
 describe("parseDocument", () => {
   it("reads the metadata and body of the reference document", () => {
@@ -37,6 +45,7 @@ describe("parseDocument", () => {
         title: "Java Collections",
         created: "2026-09-28T10:15:00Z",
         updated: "2026-09-28T10:15:00Z",
+        author: null,
         cover: null,
         conflictOf: null,
       },
@@ -71,6 +80,21 @@ describe("parseDocument", () => {
     expect(document.metadata).toEqual({ ...noMetadata, updated: "2026-09-28" });
   });
 
+  it("reads the dates spelled create_at and updated_at, preferring created and updated", () => {
+    expect(
+      parseDocument("---\ncreate_at: 2026-09-28\nupdated_at: 2026-09-29T10:00:00Z\n---\n").metadata,
+    ).toEqual({ ...noMetadata, created: "2026-09-28", updated: "2026-09-29T10:00:00Z" });
+    expect(
+      parseDocument("---\ncreated: 2026-01-01\ncreate_at: 2026-02-02\nupdated_at: null\n---\n")
+        .metadata.created,
+    ).toBe("2026-01-01");
+  });
+
+  it("reads the author, and a list of authors as one text", () => {
+    expect(parseDocument("---\nauthor: Ann\n---\n").metadata.author).toBe("Ann");
+    expect(parseDocument("---\nauthor: [Ann, Bob]\n---\n").metadata.author).toBe("Ann, Bob");
+  });
+
   it("keeps quoted values that look like other types as text", () => {
     expect(parseDocument('---\ntitle: "2024"\n---\n').metadata.title).toBe("2024");
   });
@@ -82,6 +106,8 @@ describe("parseDocument", () => {
     ["a scalar instead of a mapping", "---\njust text\n---\n", /key: value pairs/],
     ["a non-text title", "---\ntitle: 2024\n---\n", /"title" must be text/],
     ["a non-text cover", "---\ncover: [a]\n---\n", /"cover" must be text/],
+    ["a non-text author", "---\nauthor: 7\n---\n", /"author" must be text/],
+    ["an invalid create_at", "---\ncreate_at: yesterday\n---\n", /"create_at" must be an ISO/],
     ["a date that is not ISO 8601", "---\ncreated: 28.09.2026\n---\n", /"created" must be an ISO/],
     ["a date-time without a time zone", "---\nupdated: 2026-09-28T10:15:00\n---\n", /"updated"/],
     ["an impossible date", "---\ncreated: 2026-13-45\n---\n", /"created"/],
@@ -99,13 +125,14 @@ describe("serializeDocument", () => {
         updated: "2026-09-29T08:00:00Z",
         created: "2026-09-28T10:15:00Z",
         title: "Java: Collections",
+        author: "Ann",
         conflictOf: null,
       },
       body: "# Java\n",
     });
 
     expect(markdown).toBe(
-      '---\ntitle: "Java: Collections"\ncreated: 2026-09-28T10:15:00Z\nupdated: 2026-09-29T08:00:00Z\ncover: images/cover.png\n---\n\n# Java\n',
+      '---\ntitle: "Java: Collections"\ncreated: 2026-09-28T10:15:00Z\nupdated: 2026-09-29T08:00:00Z\nauthor: Ann\ncover: images/cover.png\n---\n\n# Java\n',
     );
   });
 
@@ -162,6 +189,30 @@ describe("updateMetadata", () => {
 
   it("leaves an empty block when the last field is removed", () => {
     expect(updateMetadata("---\ntitle: T\n---\nBody", { title: null })).toBe("---\n---\nBody");
+  });
+
+  it("writes a date under the spelling the document uses, and removes every spelling", () => {
+    const markdown = "---\ncreate_at: 2026-01-01\nupdated_at: 2026-01-02\n---\n\nBody";
+
+    expect(updateMetadata(markdown, { updated: "2026-09-29T10:00:00Z" })).toBe(
+      "---\ncreate_at: 2026-01-01\nupdated_at: 2026-09-29T10:00:00Z\n---\n\nBody",
+    );
+    expect(updateMetadata(markdown, { created: null, updated: null })).toBe("---\n---\n\nBody");
+  });
+
+  it("keeps both spellings of a date in step when a document has both", () => {
+    expect(
+      updateMetadata("---\nupdated: 2026-01-01\nupdated_at: 2026-01-01\n---\n", {
+        updated: "2026-09-29",
+      }),
+    ).toBe("---\nupdated: 2026-09-29\nupdated_at: 2026-09-29\n---\n");
+  });
+
+  it("sets and removes the author", () => {
+    expect(updateMetadata("---\ntitle: T\nauthor: [Ann, Bob]\n---\nX", { author: "Eve" })).toBe(
+      "---\ntitle: T\nauthor: Eve\n---\nX",
+    );
+    expect(updateMetadata("---\nauthor: Ann\n---\nX", { author: null })).toBe("---\n---\nX");
   });
 
   it("rejects invalid documents and invalid values", () => {
@@ -248,12 +299,9 @@ describe("conflict_of", () => {
 describe("otherMetadata", () => {
   it("lists the fields Konspecter does not manage, as text", () => {
     const markdown =
-      "---\ntitle: T\nauthor: Ann\ntags: [a, b]\nupdated: 2026-01-01\ndraft: true\nempty: null\n---\nBody";
+      "---\ntitle: T\nauthor: Ann\ntags: [a, b]\nupdated_at: 2026-01-01\ndraft: true\nempty: null\n---\nBody";
     // Tags are the note's tags, not another field.
-    expect(otherMetadata(markdown)).toEqual([
-      { key: "author", value: "Ann" },
-      { key: "draft", value: "true" },
-    ]);
+    expect(otherMetadata(markdown)).toEqual([{ key: "draft", value: "true" }]);
   });
 
   it("is empty without valid frontmatter", () => {
@@ -277,5 +325,41 @@ describe("frontmatterTags", () => {
     expect(frontmatterTags("---\ntitle: T\n---\n#body")).toEqual([]);
     expect(frontmatterTags("#body")).toEqual([]);
     expect(frontmatterTags("---\ntags: [\n---\n")).toEqual([]);
+  });
+});
+
+describe("setFrontmatterTags", () => {
+  it("writes the tags as a list and keeps everything else as written", () => {
+    expect(
+      setFrontmatterTags("---\n# mine\ntitle: T\ntags: java, go\nx: 1\n---\n\n# Body #inline\n", [
+        "java",
+        "parent#child",
+      ]),
+    ).toBe(
+      "---\n# mine\ntitle: T\ntags:\n  - java\n  - parent#child\nx: 1\n---\n\n# Body #inline\n",
+    );
+  });
+
+  it("keeps a flow-style list in flow style", () => {
+    expect(setFrontmatterTags("---\ntags: [a, b]\n---\nBody", ["a"])).toBe(
+      "---\ntags: [a]\n---\nBody",
+    );
+  });
+
+  it("adds frontmatter to a document without one, and removes the field when empty", () => {
+    expect(setFrontmatterTags("# Body", ["java"])).toBe("---\ntags:\n  - java\n---\n\n# Body");
+    expect(setFrontmatterTags("---\ntitle: T\ntags: [a]\n---\nBody", [])).toBe(
+      "---\ntitle: T\n---\nBody",
+    );
+    expect(setFrontmatterTags("# Body", [])).toBe("# Body");
+  });
+
+  it("round-trips through frontmatterTags", () => {
+    const tags = ["Java#Collections", "go", "c-sharp"];
+    expect(frontmatterTags(setFrontmatterTags("Body", tags))).toEqual(tags);
+  });
+
+  it("rejects an invalid document", () => {
+    expect(() => setFrontmatterTags("---\ntitle: [\n---\n", ["a"])).toThrow(InvalidDocumentError);
   });
 });

@@ -68,9 +68,9 @@ export function ImportExport({ store }: { store: NoteRepository }) {
             }
           : null;
       }
-      downloadFile("konspecter-notes.zip", zipFiles(files));
+      downloadFile("konspecter-conspects.zip", zipFiles(files));
       return {
-        text: tn("transfer.exportedZip", files.length, { file: "konspecter-notes.zip" }),
+        text: tn("transfer.exportedZip", files.length, { file: "konspecter-conspects.zip" }),
         details: [],
       };
     });

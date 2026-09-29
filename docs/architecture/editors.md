@@ -86,22 +86,21 @@ CodeMirror 6 over the whole document, frontmatter included (`MarkdownSourceEdito
   and `autocapitalize` are off.
 - **Editing:** undo and redo, search and replace (`Mod-F`), Tab indents, and long lines
   wrap.
-- **Found title and tags** (`SourceSummary.tsx`): a read-only line above the source shows the
-  title and tags the app reads from the document (the heading or `title:`, the `#tags` and the
-  `tags:` list), following the typing. They are not written into the frontmatter: the text is
-  their one source ([ADR-002](decisions/ADR-002-markdown-source-of-truth.md)); the
-  frontmatter holds only what is set explicitly, and the dates.
 - **No autocompletion**, by design, and no bracket closing, so what you type is what is
   saved.
 
 Markdown mode is always available. It is the way to edit whatever Text mode would change.
 Text mode is the default for new and existing notes.
 
-## Title and cover
+## Properties
 
-`MetadataFields` edits `title` and `cover` in the frontmatter. While they are empty the fields
-stay hidden (the body's heading is the title); a note that has them shows them, and _Title
-and cover_ in the sidebar's Details opens both.
+`MetadataFields` edits `title`, `author`, `tags` and `cover` in the frontmatter. Text mode
+also writes the body's first line and tags into `title` and `tags` as it serializes
+(`withBody`). While the fields are empty or only repeat the body they stay hidden (the body's
+heading is the title); a note that has them shows
+them, and _Properties_ in the sidebar's Details opens all of them. The cover can be typed as a URL or path, or
+uploaded: the image is stored in the frontmatter as a base64 `data:` URL
+([format](markdown-format.md#editing-metadata)).
 
 ## Editing area
 

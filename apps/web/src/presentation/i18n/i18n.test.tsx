@@ -32,15 +32,19 @@ describe("messages", () => {
   });
 
   it("uses each language's plural forms", () => {
-    expect([1, 2, 5].map((n) => tn("tree.notes", n))).toEqual(["1 note", "2 notes", "5 notes"]);
+    expect([1, 2, 5].map((n) => tn("tree.notes", n))).toEqual([
+      "1 conspect",
+      "2 conspects",
+      "5 conspects",
+    ]);
     setLocale("ru");
     // Russian groups thousands with a no-break space.
     expect([1, 2, 5, 21, 1000].map((n) => tn("tree.notes", n).replace(/\s/g, " "))).toEqual([
-      "1 заметка",
-      "2 заметки",
-      "5 заметок",
-      "21 заметка",
-      "1 000 заметок",
+      "1 конспект",
+      "2 конспекта",
+      "5 конспектов",
+      "21 конспект",
+      "1 000 конспектов",
     ]);
   });
 
@@ -68,9 +72,9 @@ it("shows the app in Russian", async () => {
   );
 
   const sidebar = screen.getByRole("complementary", { name: "Боковая панель" });
-  const tags = await within(sidebar).findByRole("navigation", { name: "Конспекты" });
+  const tags = await within(sidebar).findByRole("navigation", { name: "Теги" });
   expect(await within(tags).findByRole("link", { name: "Новые технологии" })).toBeInTheDocument();
-  expect(within(tags).getByLabelText("1 заметка")).toBeInTheDocument();
-  expect(screen.getByRole("heading", { level: 1, name: "Заметки" })).toBeInTheDocument();
-  expect(screen.getByRole("searchbox", { name: "Поиск по заметкам" })).toBeInTheDocument();
+  expect(within(tags).getByLabelText("1 конспект")).toBeInTheDocument();
+  expect(screen.getByRole("heading", { level: 1, name: "Конспекты" })).toBeInTheDocument();
+  expect(screen.getByRole("searchbox", { name: "Поиск по конспектам" })).toBeInTheDocument();
 });

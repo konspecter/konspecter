@@ -237,7 +237,7 @@
 }
 
 .title-field:focus,
-.cover-field:focus {
+.metadata-input:focus {
   outline: none;
 }
 
@@ -256,7 +256,12 @@
   color: var(--color-muted);
 }
 
-.cover-field {
+.metadata-label {
+  flex: none;
+  min-width: 6.5rem;
+}
+
+.metadata-input {
   flex: 1;
   min-width: 0;
   padding: 0.15rem 0;
@@ -267,8 +272,66 @@
   font: inherit;
 }
 
-.cover-field:focus {
+.metadata-input:focus {
   border-bottom-color: var(--color-muted);
+}
+
+/* An uploaded cover reads as a value, not as an editable field. */
+.cover-uploaded {
+  border-bottom-color: transparent;
+}
+
+.metadata-error {
+  margin: 0.35rem 0 0;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--color-danger);
+}
+
+/* The frontmatter's tags, then the field that adds one, wrapping as a line of text. */
+.tag-chips {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+  min-width: 0;
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.15rem;
+  color: var(--color-fg);
+  font-weight: 560;
+}
+
+.tag-chip-remove {
+  padding: 0 0.2rem;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--color-muted);
+  font: inherit;
+  font-weight: 400;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tag-chip-remove:hover {
+  color: var(--color-fg);
+}
+
+.tag-chip-remove:focus-visible {
+  outline: 2px solid var(--color-accent);
+}
+
+.tag-input {
+  flex-basis: 8rem;
+}
+
+.tag-input[aria-invalid="true"] {
+  border-bottom-color: var(--color-danger);
 }
 
 /* Monospace has no weight between medium and semibold. */
@@ -292,35 +355,4 @@
 
 .markdown-source .cm-code-first.cm-code-last {
   border-radius: 6px;
-}
-
-/* Above the Markdown source: the title and tags read from it (read-only). */
-.source-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 20px;
-  margin: 0 0 14px;
-  color: var(--color-faint);
-  font-family: var(--font-ui);
-  font-size: 12px;
-}
-
-.source-summary div {
-  display: flex;
-  gap: 6px;
-  min-width: 0;
-}
-
-.source-summary dt {
-  flex-shrink: 0;
-}
-
-.source-summary dd {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 8px;
-  min-width: 0;
-  margin: 0;
-  color: var(--color-muted);
-  overflow-wrap: anywhere;
 }

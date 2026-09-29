@@ -13,7 +13,7 @@ async function audit(page: Page) {
 
 async function seed(page: Page) {
   await page.goto("/notes/new");
-  await page.getByRole("textbox", { name: "Note text" }).click();
+  await page.getByRole("textbox", { name: "Conspect text" }).click();
   await page.keyboard.type("# Accessible note");
   await page.keyboard.press("Enter");
   await page.keyboard.type("Some text with #tag and a list:");
@@ -38,7 +38,7 @@ for (const scheme of ["light", "dark"] as const) {
       expect(await audit(page), path).toEqual([]);
     }
     await page.goto(note);
-    const editor = page.getByRole("textbox", { name: "Note text" });
+    const editor = page.getByRole("textbox", { name: "Conspect text" });
     await editor.click();
     await expect(page.getByRole("toolbar", { name: "Formatting" })).toBeVisible();
     expect(await audit(page), "text editor with its toolbar").toEqual([]);

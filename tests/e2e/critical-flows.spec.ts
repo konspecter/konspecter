@@ -9,9 +9,9 @@ async function createNote(page: Page, lines: string[]) {
   await page.goto("/");
   await page
     .getByRole("complementary", { name: "Sidebar" })
-    .getByRole("link", { name: "New note" })
+    .getByRole("link", { name: "New conspect" })
     .click();
-  const editor = page.getByRole("textbox", { name: "Note text" });
+  const editor = page.getByRole("textbox", { name: "Conspect text" });
   await expect(editor).toBeFocused();
   for (const [index, line] of lines.entries()) {
     if (index > 0) await page.keyboard.press("Enter");
@@ -24,7 +24,7 @@ async function createNote(page: Page, lines: string[]) {
   ).toBeVisible();
 }
 
-const list = (page: Page) => page.getByRole("list", { name: "Notes" });
+const list = (page: Page) => page.getByRole("list", { name: "Conspects" });
 
 /** The modifier the app uses for its shortcuts on this (possibly emulated) platform. */
 async function mod(page: Page): Promise<"Meta" | "Control"> {
@@ -40,7 +40,7 @@ test("Markdown → index → search, and Markdown → tags → navigation", asyn
   await createNote(page, ["# Networking", "TCP handshakes #net"]);
 
   await page.keyboard.press(`${await mod(page)}+p`);
-  const search = page.getByRole("searchbox", { name: "Search notes" });
+  const search = page.getByRole("searchbox", { name: "Search conspects" });
   await expect(search).toBeFocused();
   await expect(list(page).getByRole("link")).toHaveText(["Networking", "Hash maps"]);
   await search.fill("collis");
@@ -91,7 +91,7 @@ test("keeps working offline after the first visit", async ({ page, context }) =>
   await context.setOffline(true);
   await page.reload();
 
-  await expect(page.getByRole("textbox", { name: "Note text" })).toContainText(
+  await expect(page.getByRole("textbox", { name: "Conspect text" })).toContainText(
     "Written before going offline.",
   );
   await createNote(page, ["# Written offline", "Still works."]);
@@ -132,7 +132,7 @@ test("HTML in a note cannot run script", async ({ page }) => {
 test("a conflict keeps both versions (editing while the note changes)", async ({ page }) => {
   await createNote(page, ["# Shared", "original"]);
   const url = page.url();
-  const editor = page.getByRole("textbox", { name: "Note text" });
+  const editor = page.getByRole("textbox", { name: "Conspect text" });
   await page.keyboard.type(" my edit");
   await expect(
     page.getByRole("img", { name: "Everything is stored on this device" }),
@@ -141,7 +141,7 @@ test("a conflict keeps both versions (editing while the note changes)", async ({
   // Another tab opens the note and changes it.
   const other = await page.context().newPage();
   await other.goto(url);
-  const otherEditor = other.getByRole("textbox", { name: "Note text" });
+  const otherEditor = other.getByRole("textbox", { name: "Conspect text" });
   await expect(otherEditor).toContainText("my edit");
   await otherEditor.getByText("original my edit").click();
   await other.keyboard.press("End");
@@ -156,9 +156,11 @@ test("a conflict keeps both versions (editing while the note changes)", async ({
   await page.keyboard.type(" again");
 
   await expect(page.getByText("This is a conflict copy")).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByRole("textbox", { name: "Note text" })).toContainText("my edit again");
+  await expect(page.getByRole("textbox", { name: "Conspect text" })).toContainText("my edit again");
   await page.getByRole("link", { name: "the original" }).click();
-  await expect(page.getByRole("textbox", { name: "Note text" })).toContainText("other tab's edit");
+  await expect(page.getByRole("textbox", { name: "Conspect text" })).toContainText(
+    "other tab's edit",
+  );
 });
 
 test("global shortcuts work from the editor", async ({ page }) => {
@@ -168,7 +170,7 @@ test("global shortcuts work from the editor", async ({ page }) => {
   await page.keyboard.press(`${modifier}+Comma`);
   await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
   await page.keyboard.press(`${modifier}+p`);
-  await expect(page.getByRole("searchbox", { name: "Search notes" })).toBeFocused();
+  await expect(page.getByRole("searchbox", { name: "Search conspects" })).toBeFocused();
   await expect(list(page).getByRole("link")).toHaveText(["Shortcuts"]);
 });
 

@@ -1,4 +1,12 @@
-import { memo, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type KeyboardEvent,
+} from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { isEmptyQuery, parseQuery } from "../../domain/search/query";
 import { highlight, snippet, type SnippetPart } from "../../domain/search/snippet";
@@ -151,9 +159,27 @@ export function NotesPage({ store, catalog }: NotesPageProps) {
   );
 }
 
+/**
+ * ↑ and ↓ move between the rows; ↑ on the first goes back to the search box
+ * (whose ↓ comes here).
+ */
+function moveFocus(event: KeyboardEvent<HTMLOListElement>) {
+  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+  const links = [...event.currentTarget.querySelectorAll<HTMLAnchorElement>(".note-result-title")];
+  const index = links.findIndex((link) => link === document.activeElement);
+  if (index === -1) return;
+  const target =
+    event.key === "ArrowDown"
+      ? links[index + 1]
+      : (links[index - 1] ?? document.querySelector<HTMLInputElement>("[role=search] input"));
+  event.preventDefault();
+  target?.focus();
+}
+
 const ResultList = memo(function ResultList({ rows }: { rows: readonly Row[] }) {
   return (
-    <ol className="note-results" aria-label={t("list.notes")}>
+    <ol className="note-results" aria-label={t("list.notes")} onKeyDown={moveFocus}>
       {rows.map((row) => (
         <ResultRow key={row.id} row={row} />
       ))}

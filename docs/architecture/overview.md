@@ -77,8 +77,8 @@ See [File Mode](filesystem-mode.md).
   [reading](markdown-format.md#reading-rendering)). Edits save themselves (`Autosave`,
   [ADR-010](decisions/ADR-010-autosave-editor-first.md)); saving validates the document and
   stamps its dates. See [editors](editors.md).
-- The note page shows the cover image, the created and edited dates, and the title and cover
-  fields over the frontmatter (collapsed while empty).
+- The note page shows the cover image, the created and edited dates, and the title, author,
+  tags and cover fields over the frontmatter (collapsed while empty).
 - Notes with invalid frontmatter are listed and opened as "Unreadable note" so they can be
   fixed.
 - The app is an installable PWA that works fully offline. See [clients](clients.md).
@@ -90,7 +90,7 @@ See [File Mode](filesystem-mode.md).
   [domain model](domain-model.md).
 - The styling is plain CSS with custom properties: soft light and dark themes, the Inter
   font (Latin and Cyrillic), a 720px note column. See [user interface](ui.md) and
-  [settings](settings.md) for theme, text size, editor mode and reading behaviour.
+  [settings](settings.md) for theme, language, text size, editor mode and reading behaviour.
 
 ### Server
 

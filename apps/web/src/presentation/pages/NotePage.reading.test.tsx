@@ -94,7 +94,7 @@ describe("reading position", () => {
     await bodyRendered();
 
     const offer = await screen.findByRole("status");
-    expect(offer).toHaveTextContent("You were 42% through this note.");
+    expect(offer).toHaveTextContent("You were 42% through this conspect.");
     expect(scrollTo).not.toHaveBeenCalled();
 
     await userEvent.click(within(offer).getByRole("button", { name: "Continue reading" }));

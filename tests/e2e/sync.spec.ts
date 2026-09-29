@@ -28,9 +28,9 @@ test("a note written on one device reaches the server and another device", async
   const a = await device(browser);
   await a
     .getByRole("complementary", { name: "Sidebar" })
-    .getByRole("link", { name: "New note" })
+    .getByRole("link", { name: "New conspect" })
     .click();
-  await a.getByRole("textbox", { name: "Note text" }).click();
+  await a.getByRole("textbox", { name: "Conspect text" }).click();
   await a.keyboard.type(`# ${title}`);
   await a.keyboard.press("Enter");
   await a.keyboard.type("travels through the server");
@@ -47,6 +47,6 @@ test("a note written on one device reaches the server and another device", async
   const b = await device(browser);
   await b.goto("/");
   await expect(
-    b.getByRole("list", { name: "Notes" }).getByRole("link", { name: title }),
+    b.getByRole("list", { name: "Conspects" }).getByRole("link", { name: title }),
   ).toBeVisible();
 });

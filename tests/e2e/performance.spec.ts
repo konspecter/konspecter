@@ -35,7 +35,9 @@ test("a library of 2,000 notes stays fast", async ({ page }) => {
     })),
     { name: "huge.md", mimeType: "text/markdown", buffer: Buffer.from(note(99999, 200)) },
   ]);
-  await expect(page.getByText(`Imported ${(NOTES + 1).toLocaleString("en")} notes.`)).toBeVisible({
+  await expect(
+    page.getByText(`Imported ${(NOTES + 1).toLocaleString("en")} conspects.`),
+  ).toBeVisible({
     timeout: 120_000,
   });
   log(`import ${String(NOTES + 1)} files through the UI`, Date.now() - start);
@@ -48,14 +50,14 @@ test("a library of 2,000 notes stays fast", async ({ page }) => {
   expect(startup).toBeLessThan(5000);
 
   start = Date.now();
-  await page.getByRole("searchbox", { name: "Search notes" }).fill("hash");
+  await page.getByRole("searchbox", { name: "Search conspects" }).fill("hash");
   await expect(page.locator(".note-results mark").first()).toBeVisible();
   const firstSearch = Date.now() - start;
   log("first search (index warmed while idle)", firstSearch);
 
   start = Date.now();
   // The tag becomes a chip in the search box once a space follows it.
-  await page.getByRole("searchbox", { name: "Search notes" }).fill("#topic3 queue");
+  await page.getByRole("searchbox", { name: "Search conspects" }).fill("#topic3 queue");
   await expect(page.getByRole("list", { name: "Tag filters" })).toBeVisible();
   await expect(page.locator(".note-results mark").first()).toBeVisible();
   log("next search", Date.now() - start);
@@ -63,16 +65,16 @@ test("a library of 2,000 notes stays fast", async ({ page }) => {
 
   await page.goto("/");
   await page
-    .getByRole("list", { name: "Notes" })
+    .getByRole("list", { name: "Conspects" })
     .getByRole("link", { name: "Note 1", exact: true })
     .click();
-  await expect(page.getByRole("textbox", { name: "Note text" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Conspect text" })).toBeVisible();
   start = Date.now();
   await page
     .getByRole("complementary", { name: "Sidebar" })
     .getByRole("link", { name: "Note 2", exact: true })
     .click();
-  await expect(page.getByRole("textbox", { name: "Note text" })).toContainText("Note 2");
+  await expect(page.getByRole("textbox", { name: "Conspect text" })).toContainText("Note 2");
   const open = Date.now() - start;
   log("switch to another note (editor ready)", open);
   expect(open).toBeLessThan(1000);
@@ -82,13 +84,13 @@ test("a library of 2,000 notes stays fast", async ({ page }) => {
     .getByRole("complementary", { name: "Sidebar" })
     .getByRole("link", { name: "Note 99999" })
     .click();
-  await expect(page.getByRole("textbox", { name: "Note text" })).toContainText("Note 99999");
+  await expect(page.getByRole("textbox", { name: "Conspect text" })).toContainText("Note 99999");
   const render = Date.now() - start;
   log("open a 200 KB note in the editor", render);
   expect(render).toBeLessThan(5000);
 
   // Typing stays immediate in the large note; saving runs behind it.
-  const editor = page.getByRole("textbox", { name: "Note text" });
+  const editor = page.getByRole("textbox", { name: "Conspect text" });
   await editor.click();
   start = Date.now();
   await page.keyboard.type("typing in a large note");

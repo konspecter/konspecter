@@ -9,6 +9,9 @@ from it, and the app never keeps a second copy of them anywhere else
 title: Java Collections
 created: 2026-09-28T10:15:00Z
 updated: 2026-09-28T10:15:00Z
+author: Ann
+tags:
+  - java#collections
 cover: null
 ---
 
@@ -40,16 +43,22 @@ All fields are optional. `null` and an absent key mean the same thing.
 | `title`       | text                    | Display title. Falls back to the body's first line.                                               |
 | `created`     | ISO 8601 date/date-time | When the note was created.                                                                        |
 | `updated`     | ISO 8601 date/date-time | When the note was last saved. Used for ordering.                                                  |
-| `cover`       | text (URL or path)      | Cover image. Parsed and validated, not displayed yet.                                             |
+| `author`      | text, or a list of text | Who wrote the note. A list (`[Ann, Bob]`) is shown as `Ann, Bob`.                                 |
+| `tags`        | list of tags, or text   | The note's tags besides those in the body (see [tags](tags.md)).                                  |
+| `cover`       | text (URL, path, data)  | Cover image: a URL, a path, or an uploaded image as a base64 `data:` URL.                         |
 | `conflict_of` | text (note id)          | Set on conflict copies: the note this one is a copy of (see [sync](sync.md#conflict-resolution)). |
 
+- **Date spellings:** other tools write `create_at` and `updated_at`. They are read as
+  `created` and `updated` (which win when a document has both). A save stamps the date under
+  every spelling the document already uses, so `updated_at` stays `updated_at` and never gets
+  a second, diverging `updated`. New documents get `created` and `updated`.
 - **Dates** are `YYYY-MM-DD` or a date-time **with** a time zone (`Z` or `±hh:mm`), for
   example `2026-09-28T10:15:00Z` or `2026-09-28T12:15:00+02:00`. Date-times without a zone
   are rejected as ambiguous, and so are impossible dates (`2026-02-30`). The app writes
   second-precision UTC (`2026-09-28T10:15:00Z`) and compares instants, not strings.
 - **Text** must be a YAML string. `title: 2024` is a number and is rejected. Write
   `title: "2024"` instead.
-- **Unknown keys** (e.g. `tags: [a, b]` added by another tool) are allowed and preserved.
+- **Unknown keys** (e.g. `project: Konspecter` added by another tool) are allowed and preserved.
 
 ## Title fallback
 
@@ -60,7 +69,7 @@ The UI shows "Untitled" when both are empty.
 ## Writing documents
 
 - `serializeDocument` writes the **canonical form**: non-null fields in the order `title`,
-  `created`, `updated`, `cover`, then `---`, a blank line and the body. A document without
+  `created`, `updated`, `author`, `cover`, then `---`, a blank line and the body. A document without
   metadata is written as its body alone, unless the body itself would read as frontmatter,
   in which case an empty `---`/`---` block is written first. `parseDocument(serializeDocument(d))`
   returns `d`.
@@ -68,7 +77,10 @@ The UI shows "Untitled" when both are empty.
   to `null` removes it. It keeps the rest of the frontmatter (unknown keys, comments, key
   order) and the body byte for byte. The edited YAML block is re-emitted by the `yaml`
   library, so unusual formatting inside it (indentation, quoting style) may be normalized.
-  A document without frontmatter gets a canonical block added.
+  A document without frontmatter gets a canonical block added. A field is written under the
+  spellings the document already has (see _Date spellings_).
+- `setFrontmatterTags` replaces the `tags` list the same way (a flow list `[a, b]` stays one)
+  and removes the key when no tags are left.
 
 ## How the app stamps dates
 
@@ -81,19 +93,44 @@ When a note is saved (`createNote`, `updateNote` in `domain/note/note.ts`):
 
 ## Editing metadata
 
-In Text mode, the editor shows a **title** field and a **cover** field above the body
-(`editors/MetadataFields.tsx`). In Markdown mode the frontmatter is edited directly. Both
+In Text mode, the editor shows **title**, **author**, **tags** and **cover** fields above the
+body (`editors/MetadataFields.tsx`). In Markdown mode the frontmatter is edited directly. Both
 views read from the same document text, so switching modes always shows the current values.
 
 - Each field writes its key with `updateMetadata`, which keeps comments, unknown keys and
   the body as written. Clearing a field removes the key.
-- **Title sync:** an empty title field means "use the first line". The field's placeholder
-  shows that derived title, so the explicit title and the heading never silently disagree.
-  Setting a title makes it win over the heading.
+- **Tags:** the frontmatter's `tags` are shown as `#tag` with a remove button. The field after
+  them adds a tag on Enter or a comma (with or without `#`); a name the tag rules reject is
+  explained and kept for fixing, and a tag already listed (in any case) is not added twice.
+  Tags written in the body stay in the text; Details lists all of the note's tags.
+- **The frontmatter follows the text editor** (`withBody` in `domain/note/note.ts`). Every
+  edit made in Text mode writes what the body says into the frontmatter, so the title and tags
+  the app shows are the document's own `title` and `tags`:
+  - `title` is set to the body's first line as readable text (`# Using **maps**` →
+    `Using maps`, `firstLineTitle`) while it is absent or still equal to the previous first
+    line. A title set to something else (in the field, in Markdown mode or by another program)
+    is the author's and stays; clearing the field lets it follow the first line again.
+  - `tags` lists every tag written in the body. A tag deleted from the body leaves the list;
+    tags only ever listed in the frontmatter stay. A tag written in the body and also added by
+    hand leaves the list with the body's.
+  - Markdown mode edits the text as written and changes nothing by itself. Switching to it
+    shows the frontmatter Text mode wrote.
+- The title field and the tags row stay hidden while they only repeat the body (the heading,
+  the tags written in it). Tags written in the body are listed without a remove button:
+  they are removed in the text.
 - **Dates** are shown read-only under the text (`Created …`, `Edited …`), from the stored
   version. They are stamped on save as described above.
-- **Cover:** any text is stored, including paths for File Mode. The note page shows it only
-  when it is an absolute `http(s)` URL, the same rule as for images in the body.
+- **Cover:** any text is stored, including paths for File Mode. The note page shows it when
+  it is an absolute `http(s)` URL (the same rule as for images in the body) or an uploaded
+  image.
+- **Uploaded cover:** _Upload…_ next to the field stores the image in the document itself, as
+  `cover: data:image/webp;base64,…`, so it travels with the note through sync, File Mode and
+  export without a separate file (`infrastructure/files/cover-image.ts`). An image over
+  1600 px or 256 KB is scaled to at most 1600 px on its longest side and re-encoded as WebP
+  (JPEG on white where the browser cannot encode WebP); a smaller PNG, JPEG, GIF, WebP or AVIF
+  is kept byte for byte. Only those raster types are displayed (no SVG). The field then shows
+  "Uploaded image, 180 kB" instead of the base64, with _Replace…_ and _Remove_; Markdown mode
+  shows the whole line.
 
 ## Validation and invalid documents
 

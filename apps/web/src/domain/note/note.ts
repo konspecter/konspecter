@@ -2,11 +2,15 @@ import {
   frontmatterTags,
   InvalidDocumentError,
   documentTitle,
+  bodyFirstLine,
   formatTimestamp,
   parseDocument,
+  replaceBody,
+  setFrontmatterTags,
   updateMetadata,
   type MarkdownDocument,
 } from "../document/document";
+import { plainText } from "../document/plain-text";
 import { parseTagName, writtenTags, type Tag } from "../tag/tags";
 
 /**
@@ -161,4 +165,61 @@ export function noteWrittenTags(read: ReadNote): string[] {
     if (tag && !seen.has(tag.name)) seen.set(tag.name, written);
   }
   return [...seen.values()];
+}
+
+/**
+ * The title a body's first non-blank line gives, as readable text: without
+ * heading markers or inline Markdown (`# Using **maps**` → `Using maps`).
+ */
+export function firstLineTitle(body: string): string {
+  return plainText(bodyFirstLine(body)).replace(/\s+/g, " ").trim();
+}
+
+/**
+ * `markdown` with its body replaced by `body` (the text editor's), and its
+ * frontmatter following what the body now says, so the title and tags the
+ * app shows are always the document's own `title` and `tags`:
+ *
+ * - `title` becomes the body's first line (`firstLineTitle`) while it is
+ *   absent or still equal to the previous body's first line. A title set to
+ *   something else is the author's and is kept.
+ * - `tags` lists every tag written in the body. A tag that was in the
+ *   previous body and no longer is leaves the list; tags only ever listed in
+ *   the frontmatter stay.
+ *
+ * Everything else is kept as written. With invalid frontmatter only the body
+ * is replaced.
+ */
+export function withBody(markdown: string, body: string): string {
+  let previous: MarkdownDocument;
+  try {
+    previous = parseDocument(markdown);
+  } catch (error) {
+    if (error instanceof InvalidDocumentError) return replaceBody(markdown, body);
+    throw error;
+  }
+  let result = replaceBody(markdown, body);
+
+  const current = previous.metadata.title?.trim() ?? "";
+  const following = current === "" || current === firstLineTitle(previous.body);
+  const next = firstLineTitle(body);
+  if (following && next !== current) {
+    result = updateMetadata(result, { title: next === "" ? null : next });
+  }
+
+  const tagName = (written: string) => parseTagName(written)?.name;
+  const before = new Set(writtenTags(previous.body).map(tagName));
+  const written = writtenTags(body);
+  const now = new Set(written.map(tagName));
+  const listed = frontmatterTags(markdown);
+  const kept = listed.filter((entry) => {
+    const name = tagName(entry);
+    return name === undefined || !before.has(name) || now.has(name);
+  });
+  const keptNames = new Set(kept.map(tagName));
+  const tags = [...kept, ...written.filter((entry) => !keptNames.has(tagName(entry)))];
+  if (tags.length !== listed.length || tags.some((entry, index) => entry !== listed[index])) {
+    result = setFrontmatterTags(result, tags);
+  }
+  return result;
 }

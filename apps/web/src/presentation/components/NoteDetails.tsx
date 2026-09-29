@@ -14,6 +14,7 @@ import { NoteDate } from "./NoteDate";
 import { displayTitle } from "./note-title";
 import { t, tn } from "../i18n/i18n";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { isEmbeddedCover, uploadedCoverLabel } from "./CoverImage";
 
 type NoteDetailsProps = {
   /** The stored note; null while a new note has not been saved yet. */
@@ -26,7 +27,7 @@ type NoteDetailsProps = {
 
 /**
  * The open note's details, shown in the sidebar's footer: what the document
- * says about itself (dates, length, tags, cover, other frontmatter fields)
+ * says about itself (dates, author, length, tags, cover, other frontmatter fields)
  * and the less frequent actions, as icon buttons.
  */
 export function NoteDetails({
@@ -63,6 +64,8 @@ export function NoteDetails({
     if (created !== null) rows.push([t("details.created"), <NoteDate value={created} withTime />]);
     if (updated !== null) rows.push([t("details.edited"), <NoteDate value={updated} withTime />]);
     if (read.valid) {
+      const { author } = read.document.metadata;
+      if (author) rows.push([t("details.author"), author]);
       const stats = documentStats(read.document.body);
       rows.push([
         t("details.length"),
@@ -90,8 +93,9 @@ export function NoteDetails({
           </span>,
         ]);
       }
-      if (read.document.metadata.cover) {
-        rows.push([t("details.cover"), read.document.metadata.cover]);
+      const { cover } = read.document.metadata;
+      if (cover) {
+        rows.push([t("details.cover"), isEmbeddedCover(cover) ? uploadedCoverLabel(cover) : cover]);
       }
       for (const { key, value } of otherMetadata(note.markdown)) rows.push([key, value]);
     } else {
@@ -117,8 +121,8 @@ export function NoteDetails({
         <button
           type="button"
           className="icon-button"
-          aria-label={t("details.titleAndCover")}
-          title={t("details.titleAndCover")}
+          aria-label={t("details.properties")}
+          title={t("details.properties")}
           aria-expanded={showMetadata}
           onClick={onToggleMetadata}
         >

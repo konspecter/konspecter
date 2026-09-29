@@ -26,10 +26,10 @@ interface speaks English and Russian ([i18n](i18n.md)).
 - **Details** (`NoteDetails.tsx`, the sidebar's footer): on the note page only (new or
   existing), the note page renders its details into the sidebar through a portal
   (`details-slot.tsx`: the layout provides the element, `<Details>` renders into it). What the
-  document says about itself: created and edited dates, length (words, characters, reading
+  document says about itself: created and edited dates, author, length (words, characters, reading
   time; `domain/document/stats.ts`), tags as written (links to their lists), cover, the file
   (File Mode) and any other frontmatter fields (`otherMetadata`). Below, the actions as icon
-  buttons with titles: title and cover, download or export (open externally and show in
+  buttons with titles: properties, download or export (open externally and show in
   Finder in File Mode), delete. Delete asks first in the app's own dialog
   (`ConfirmDialog.tsx`: Cancel focused, Escape cancels), since the browser's `confirm()` is
   not shown by every web view. Smaller (12px) and quieter (`--color-faint`, still WCAG AA)
@@ -59,12 +59,15 @@ interface speaks English and Russian ([i18n](i18n.md)).
 | `/notes/:id` | The editor on a note; its details and actions in the sidebar's footer |
 | `/settings`  | Settings, including the keyboard shortcuts                            |
 
-- **Search** (`pages/NotesPage.tsx`, `SearchBox.tsx`): focusing the search box shows the list;
-  typing filters it (words and `#tag` filters, [search](search.md)), keeping the recent-edit
+- **Search** (`pages/NotesPage.tsx`, `SearchBox.tsx`): focusing the search box shows the list,
+  except over an open note (new or existing): that stays while the field is empty, and
+  emptying the field again returns to it (the list's router state remembers it). Typing
+  filters the list (words and `#tag` filters, [search](search.md)), keeping the recent-edit
   order. Matches are marked in titles and snippets like a highlighter pen (`highlight` and
   `snippet` in `domain/search/snippet.ts`, Unicode-aware, so Cyrillic works). The previous
   results stay while the next search runs, so typing never blanks the list. ↓ moves into the
-  results, Enter opens the first. Neither the list nor the results have a visible heading.
+  results, ↑ and ↓ move between them (↑ on the first returns to the box), Enter opens the
+  first. Neither the list nor the results have a visible heading.
 - **Tag chips:** the query's tag filters are chips inside the search box, before the text
   (`queryParts`, `takeTags`, `joinQuery` in `domain/search/query.ts`). A typed tag becomes a
   chip when a space follows it (or the field is left), a tag chosen in the sidebar arrives as

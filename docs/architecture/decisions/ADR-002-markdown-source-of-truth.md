@@ -10,7 +10,8 @@ in any editor, and recover them when an index is corrupted.
 ## Decision
 
 Each note is a Markdown document with a small YAML frontmatter block (`title`, `created`,
-`updated`, `cover`). Tag indexes, search indexes and reading positions are derived data
+`updated`, `author`, `tags`, `cover`). Everything the UI shows about a note, and every edit
+made through it (title, author, tags, …), is read from and written to that text. Tag indexes, search indexes and reading positions are derived data
 kept outside the document and are always rebuildable from the documents. Reading state
 never modifies the Markdown.
 

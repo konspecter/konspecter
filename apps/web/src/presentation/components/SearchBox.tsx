@@ -1,5 +1,5 @@
 import { useId, useState, type Ref } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router";
+import { useLocation, useMatch, useNavigate, useSearchParams } from "react-router";
 import { joinQuery, queryParts, takeTags, type QueryParts } from "../../domain/search/query";
 import type { Tag } from "../../domain/tag/tags";
 import { formatKeys, SHORTCUTS } from "../app/shortcuts";
@@ -13,16 +13,29 @@ type Shown = QueryParts & {
   readonly sent: readonly string[];
 };
 
+/** The note a search was started over (router state), if it was. */
+function startedOver(state: unknown): string | null {
+  return typeof state === "object" &&
+    state !== null &&
+    "from" in state &&
+    typeof state.from === "string"
+    ? state.from
+    : null;
+}
+
 function firstResult(): HTMLAnchorElement | null {
   return document.querySelector<HTMLAnchorElement>("#content .note-results a");
 }
 
 /**
- * The top bar's search. Focusing it shows the note list; typing filters it
- * (the query lives in the list's URL, `/?q=`). Tag filters are chips inside
+ * The top bar's search. Focusing it shows the note list, except over an open
+ * note: that stays while the field is empty, and emptying the field again
+ * returns to it. Typing filters the list (the query lives in the list's URL,
+ * `/?q=`). Tag filters are chips inside
  * the field, before the text: a tag becomes one when a space follows it, a
  * tag chosen elsewhere (the sidebar) arrives as one, × or Backspace at the
- * start removes one. ↓ moves into the results and Enter opens the first one.
+ * start removes one. ↓ moves into the results (↑ and ↓ move on there, see
+ * `NotesPage`) and Enter opens the first one.
  */
 export function SearchBox({ inputRef }: { inputRef?: Ref<HTMLInputElement> }) {
   const id = useId();
@@ -30,6 +43,7 @@ export function SearchBox({ inputRef }: { inputRef?: Ref<HTMLInputElement> }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const onList = location.pathname === "/";
+  const onNote = useMatch("/notes/:id") !== null;
   const query = onList ? (searchParams.get("q") ?? "") : "";
 
   // The query split into chips and text. The URL is the truth: when it
@@ -52,7 +66,15 @@ export function SearchBox({ inputRef }: { inputRef?: Ref<HTMLInputElement> }) {
   function change(nextTags: readonly Tag[], nextText: string) {
     const next = joinQuery(nextTags, nextText);
     setShown({ query: next, tags: nextTags, text: nextText, sent: [...shown.sent, next] });
-    void navigate(next ? `/?q=${encodeURIComponent(next)}` : "/", { replace: onList });
+    const from = onNote ? location.pathname : onList ? startedOver(location.state) : null;
+    if (next === "" && onList && from !== null) {
+      void navigate(from, { replace: true });
+      return;
+    }
+    void navigate(next ? `/?q=${encodeURIComponent(next)}` : "/", {
+      replace: onList,
+      ...(from !== null ? { state: { from } } : {}),
+    });
   }
 
   function withTags(added: readonly Tag[]): Tag[] {
@@ -104,7 +126,7 @@ export function SearchBox({ inputRef }: { inputRef?: Ref<HTMLInputElement> }) {
         autoComplete="off"
         spellCheck={false}
         onFocus={() => {
-          if (!onList) void navigate("/");
+          if (!onList && !onNote) void navigate("/");
         }}
         onChange={(event) => {
           const typed = takeTags(event.target.value);

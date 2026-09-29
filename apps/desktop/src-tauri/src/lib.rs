@@ -193,7 +193,7 @@ async fn folder_pick(
     let Some(picked) = app
         .dialog()
         .file()
-        .set_title("Choose a folder of Markdown notes")
+        .set_title("Choose a folder of Markdown conspects")
         .blocking_pick_folder()
     else {
         return Ok(None); // Cancelled.
@@ -279,7 +279,7 @@ async fn export_to_folder(
     let Some(picked) = app
         .dialog()
         .file()
-        .set_title("Export notes to a folder")
+        .set_title("Export conspects to a folder")
         .blocking_pick_folder()
     else {
         return Ok(None);

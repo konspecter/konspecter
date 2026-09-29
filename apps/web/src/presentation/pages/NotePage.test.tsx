@@ -57,7 +57,7 @@ async function synced(store: NoteStore, id: string, markdown: string) {
   await store.applyRemote({ id, markdown, revision: 1, deleted: false });
 }
 
-const textBox = () => screen.findByRole("textbox", { name: "Note text" });
+const textBox = () => screen.findByRole("textbox", { name: "Conspect text" });
 const location = () => screen.getByRole("status", { name: "Location" });
 
 /** Puts the caret after the last character (user-event cannot press End in contenteditable). */
@@ -224,7 +224,7 @@ describe("an existing note", () => {
     const store = await newStore();
     renderNotePage(store, "/notes/nowhere");
 
-    expect(await screen.findByRole("heading", { name: "Note not found" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Conspect not found" })).toBeInTheDocument();
   });
 });
 
@@ -233,7 +233,7 @@ it("shows an error instead of crashing when the renderer cannot be loaded", asyn
   await store.put(createNote("# Table\n\n| a |\n| - |\n| b |", new Date(), "table"));
   renderNotePage(store, "/notes/table");
 
-  expect(await screen.findByRole("alert")).toHaveTextContent("Could not load the note reader");
+  expect(await screen.findByRole("alert")).toHaveTextContent("Could not load the conspect reader");
   expect(screen.getByRole("heading", { level: 1, name: "Table" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
 });

@@ -49,7 +49,7 @@ export default defineConfig({
       manifest: {
         name: "Konspecter",
         short_name: "Konspecter",
-        description: "Local-first technical notes in Markdown.",
+        description: "Local-first technical conspects in Markdown.",
         start_url: "/",
         scope: "/",
         display: "standalone",

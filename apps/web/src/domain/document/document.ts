@@ -1,4 +1,4 @@
-import { Document, isMap, parseDocument as parseYaml } from "yaml";
+import { Document, isMap, isSeq, parseDocument as parseYaml } from "yaml";
 
 /**
  * A note's Markdown text is the canonical document. It may start with a YAML
@@ -8,13 +8,15 @@ import { Document, isMap, parseDocument as parseYaml } from "yaml";
  *     title: Java Collections
  *     created: 2026-09-28T10:15:00Z
  *     updated: 2026-09-28T10:15:00Z
+ *     author: Ann
  *     cover: null
  *     ---
  *
  *     # Java Collections
  *
  * Every field is optional; `null` and an absent key mean the same thing.
- * Unknown keys are allowed and preserved when metadata is updated.
+ * The dates are also read as `create_at` and `updated_at`. Unknown keys are
+ * allowed and preserved when metadata is updated.
  * See docs/architecture/markdown-format.md.
  */
 export type Metadata = {
@@ -23,6 +25,8 @@ export type Metadata = {
   readonly created: string | null;
   /** ISO 8601 date or date-time with a time zone. */
   readonly updated: string | null;
+  /** Who wrote the note; a list of authors reads as one text. */
+  readonly author: string | null;
   /** URL or path of a cover image. */
   readonly cover: string | null;
   /** Id of the note this one is a conflict copy of (frontmatter `conflict_of`). */
@@ -38,21 +42,26 @@ export class InvalidDocumentError extends Error {
   override readonly name = "InvalidDocumentError";
 }
 
-const METADATA_KEYS = ["title", "created", "updated", "cover", "conflictOf"] as const;
+const METADATA_KEYS = ["title", "created", "updated", "author", "cover", "conflictOf"] as const;
 
-/** How each field is spelled in the frontmatter. */
-const FRONTMATTER_KEY: Record<keyof Metadata, string> = {
-  title: "title",
-  created: "created",
-  updated: "updated",
-  cover: "cover",
-  conflictOf: "conflict_of",
+/**
+ * How each field may be spelled in the frontmatter, the spelling the app
+ * writes first. Other tools write `create_at` and `updated_at`.
+ */
+const FRONTMATTER_KEYS: Record<keyof Metadata, readonly [string, ...string[]]> = {
+  title: ["title"],
+  created: ["created", "create_at"],
+  updated: ["updated", "updated_at"],
+  author: ["author"],
+  cover: ["cover"],
+  conflictOf: ["conflict_of"],
 };
 
 const EMPTY_METADATA: Metadata = {
   title: null,
   created: null,
   updated: null,
+  author: null,
   cover: null,
   conflictOf: null,
 };
@@ -117,13 +126,29 @@ function readMetadata(frontmatter: Document): Metadata {
     return EMPTY_METADATA;
   }
   const record = values as Record<string, unknown>;
+  const key = (field: keyof Metadata) => spellingOf(record, field);
   return {
-    title: readText(record, "title"),
-    created: readTimestamp(record, "created"),
-    updated: readTimestamp(record, "updated"),
-    cover: readText(record, "cover"),
-    conflictOf: readText(record, "conflict_of"),
+    title: readText(record, key("title")),
+    created: readTimestamp(record, key("created")),
+    updated: readTimestamp(record, key("updated")),
+    author: readAuthor(record, key("author")),
+    cover: readText(record, key("cover")),
+    conflictOf: readText(record, key("conflictOf")),
   };
+}
+
+/** The first spelling of the field that has a value, else the canonical one. */
+function spellingOf(record: Record<string, unknown>, field: keyof Metadata): string {
+  const spellings = FRONTMATTER_KEYS[field];
+  return spellings.find((key) => record[key] !== null && record[key] !== undefined) ?? spellings[0];
+}
+
+function readAuthor(record: Record<string, unknown>, key: string): string | null {
+  const value = record[key];
+  if (Array.isArray(value) && value.every((item) => typeof item === "string")) {
+    return value.length === 0 ? null : value.join(", ");
+  }
+  return readText(record, key);
 }
 
 function readText(record: Record<string, unknown>, key: string): string | null {
@@ -203,7 +228,7 @@ export function frontmatterTags(markdown: string): string[] {
 
 /**
  * The frontmatter fields Konspecter does not manage itself (anything but
- * title, dates, cover and conflict_of), in written order, with each value as
+ * title, dates, author, cover, conflict_of and tags), in written order, with each value as
  * display text. Empty when there is no valid frontmatter.
  */
 export function otherMetadata(markdown: string): { key: string; value: string }[] {
@@ -217,7 +242,7 @@ export function otherMetadata(markdown: string): { key: string; value: string }[
   }
   if (values === null || typeof values !== "object") return [];
   // Tags are shown with the note's other tags (`frontmatterTags`).
-  const managed = new Set<string>([...Object.values(FRONTMATTER_KEY), TAGS_KEY]);
+  const managed = new Set<string>([...Object.values(FRONTMATTER_KEYS).flat(), TAGS_KEY]);
   return Object.entries(values as Record<string, unknown>)
     .filter(([key, value]) => !managed.has(key) && value !== null && value !== undefined)
     .map(([key, value]) => ({ key, value: displayValue(value) }));
@@ -238,7 +263,7 @@ export function serializeDocument(document: MarkdownDocument): string {
   const fields = Object.fromEntries(
     METADATA_KEYS.flatMap((key) => {
       const value = document.metadata[key];
-      return value === null ? [] : [[FRONTMATTER_KEY[key], value]];
+      return value === null ? [] : [[FRONTMATTER_KEYS[key][0], value]];
     }),
   );
   const hasMetadata = Object.keys(fields).length > 0;
@@ -254,28 +279,65 @@ export function serializeDocument(document: MarkdownDocument): string {
 /**
  * Sets (or, with null, removes) metadata fields in a document's text. The rest
  * of the frontmatter, including unknown keys and comments, and the body are
- * kept as written. Throws InvalidDocumentError if the document or the result
- * is invalid.
+ * kept as written. A field is written under the spellings the document
+ * already uses (`updated_at` stays `updated_at`). Throws InvalidDocumentError
+ * if the document or the result is invalid.
  */
 export function updateMetadata(markdown: string, changes: Partial<Metadata>): string {
-  const { yaml, rest } = splitFrontmatter(markdown);
+  const { yaml } = splitFrontmatter(markdown);
   if (yaml === null) {
     const metadata = { ...parseDocument(markdown).metadata, ...changes };
     const result = serializeDocument({ metadata, body: markdown.replace(/^\uFEFF/, "") });
     parseDocument(result);
     return result;
   }
-
-  const frontmatter = parseFrontmatter(yaml);
-  for (const key of METADATA_KEYS) {
-    const value = changes[key];
-    if (value === undefined) continue;
-    if (value === null) {
-      frontmatter.delete(FRONTMATTER_KEY[key]);
-    } else {
-      frontmatter.set(FRONTMATTER_KEY[key], value);
+  return editFrontmatter(markdown, (frontmatter) => {
+    for (const field of METADATA_KEYS) {
+      const value = changes[field];
+      if (value === undefined) continue;
+      const spellings = FRONTMATTER_KEYS[field];
+      if (value === null) {
+        for (const key of spellings) frontmatter.delete(key);
+        continue;
+      }
+      const present = spellings.filter((key) => frontmatter.has(key));
+      for (const key of present.length > 0 ? present : [spellings[0]]) {
+        frontmatter.set(key, value);
+      }
     }
+  });
+}
+
+/**
+ * Replaces the frontmatter's `tags` field with `tags` (as written, without a
+ * leading "#"), or removes it when there are none. A field written as
+ * `[a, b]` keeps that style. Everything else is kept as written. Throws
+ * InvalidDocumentError if the document is invalid.
+ */
+export function setFrontmatterTags(markdown: string, tags: readonly string[]): string {
+  const { yaml } = splitFrontmatter(markdown);
+  if (yaml === null) {
+    if (tags.length === 0) return markdown;
+    const block = new Document({ [TAGS_KEY]: [...tags] }).toString(YAML_OPTIONS);
+    return `---\n${block}---\n\n${markdown.replace(/^\uFEFF/, "")}`;
   }
+  return editFrontmatter(markdown, (frontmatter) => {
+    if (tags.length === 0) {
+      frontmatter.delete(TAGS_KEY);
+      return;
+    }
+    const previous = frontmatter.get(TAGS_KEY, true);
+    const list = frontmatter.createNode([...tags]);
+    if (isSeq(previous) && previous.flow) list.flow = true;
+    frontmatter.set(TAGS_KEY, list);
+  });
+}
+
+/** Applies `edit` to an existing frontmatter block and keeps the body as written. */
+function editFrontmatter(markdown: string, edit: (frontmatter: Document) => void): string {
+  const { yaml, rest } = splitFrontmatter(markdown);
+  const frontmatter = parseFrontmatter(yaml ?? "");
+  edit(frontmatter);
   readMetadata(frontmatter);
 
   const hasContent = isMap(frontmatter.contents) && frontmatter.contents.items.length > 0;
@@ -288,14 +350,15 @@ export function updateMetadata(markdown: string, changes: Partial<Metadata>): st
  * the body without ATX heading markers. Empty for a document with neither.
  */
 export function documentTitle(document: MarkdownDocument): string {
-  const title = document.metadata.title?.trim();
-  if (title) {
-    return title;
-  }
-  const firstLine = document.body.split("\n").find((line) => line.trim() !== "") ?? "";
-  const heading = /^ {0,3}#{1,6}(?=\s|$)(.*)$/.exec(firstLine);
+  return document.metadata.title?.trim() || bodyFirstLine(document.body);
+}
+
+/** A body's first non-blank line without ATX heading markers ("## Title ##" → "Title"). */
+export function bodyFirstLine(body: string): string {
+  const line = body.split("\n").find((text) => text.trim() !== "") ?? "";
+  const heading = /^ {0,3}#{1,6}(?=\s|$)(.*)$/.exec(line);
   if (!heading) {
-    return firstLine.trim();
+    return line.trim();
   }
   // Drop the optional closing sequence, as in "## Title ##".
   return (heading[1] ?? "").replace(/(?:^|\s)#+\s*$/, "").trim();

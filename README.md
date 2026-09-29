@@ -1,20 +1,20 @@
 # Konspecter
 
-A local-first knowledge base for technical notes. **Every note is a plain Markdown
+A local-first knowledge base for technical conspects. **Every conspect is a plain Markdown
 document**, and everything else (tags, search, reading positions) is derived from it and can be
-rebuilt at any time. Your notes work offline, sync in the background when you want them
+rebuilt at any time. Your conspects work offline, sync in the background when you want them
 to, and export as ordinary `.md` files.
 
 ## Features
 
 - **Two editors:** a Telegraph-like text editor, and a Markdown source editor (CodeMirror) with
-  frontmatter and code highlighting. Switching never changes what a note means.
+  frontmatter and code highlighting. Switching never changes what a conspect means.
 - **Reading:** GitHub-flavored Markdown with syntax highlighting. Raw HTML is sanitized, and
   the app remembers where you stopped reading.
 - **Tags anywhere in the text:** `#java` or nested `#java#collections`, with a tag tree and
   filtering.
 - **Search:** fast full-text search, offline, combined with tag filters (`hashmap #java`).
-- **Local-first:** notes live on your device (IndexedDB) and the app is an installable PWA.
+- **Local-first:** conspects live on your device (IndexedDB) and the app is an installable PWA.
   Sync with a Konspecter server is optional, with conflict handling that never loses a
   version.
 - **Desktop (Tauri):** work directly on a folder of `.md` files, alongside VS Code, Vim or Git.
@@ -29,8 +29,8 @@ to, and export as ordinary `.md` files.
   → _Open a Markdown folder…_ works on real files.
 - **Android:** install the APK from a release.
 
-Notes save themselves as you type. Keyboard shortcuts (<kbd>⌘</kbd> on macOS, <kbd>Ctrl</kbd>
-elsewhere): <kbd>⌘P</kbd> search, <kbd>⌘N</kbd> new note, <kbd>⌘,</kbd> settings,
+Conspects save themselves as you type. Keyboard shortcuts (<kbd>⌘</kbd> on macOS, <kbd>Ctrl</kbd>
+elsewhere): <kbd>⌘P</kbd> search, <kbd>⌘N</kbd> new conspect, <kbd>⌘,</kbd> settings,
 <kbd>⌘S</kbd> save now; outside text fields also <kbd>/</kbd>, <kbd>n</kbd> and <kbd>?</kbd>
 (all shortcuts).
 

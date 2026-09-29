@@ -1,8 +1,15 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { NoteEditor, type EditorMode } from "./NoteEditor";
 import { setSourceValue, sourceValue, typeSubstituted } from "./test-helpers";
+import { coverDataUrl, CoverImageError } from "../../infrastructure/files/cover-image";
+
+// jsdom cannot decode images; the conversion itself is tested on its own.
+vi.mock("../../infrastructure/files/cover-image", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../infrastructure/files/cover-image")>()),
+  coverDataUrl: vi.fn(),
+}));
 
 /** The editor with a mode switch, as the top bar drives it. */
 function Harness({
@@ -63,7 +70,7 @@ function renderEditor(
   return { save, onChange };
 }
 
-const textBox = () => screen.getByRole("textbox", { name: "Note text" });
+const textBox = () => screen.getByRole("textbox", { name: "Conspect text" });
 const sourceBox = () => screen.getByRole("textbox", { name: "Markdown" });
 
 async function typeInText(keys: string) {
@@ -106,7 +113,7 @@ describe("text mode", () => {
 
     expect(onChange).toHaveBeenCalledTimes(" and more".length);
     const read = onChange.mock.calls.at(-1)?.[0];
-    expect(read?.()).toBe("Start and more");
+    expect(read?.()).toBe("---\ntitle: Start and more\n---\n\nStart and more");
   });
 
   it("writes Markdown for typed text and keeps the frontmatter as written", async () => {
@@ -122,7 +129,7 @@ describe("text mode", () => {
 
     await typeInText("# Title{Enter}- first{Enter}second");
 
-    expect(save()).toBe("# Title\n\n* first\n\n* second");
+    expect(save()).toBe("---\ntitle: Title\n---\n\n# Title\n\n* first\n\n* second");
   });
 
   it("shows the formatting toolbar only while the text has focus", async () => {
@@ -158,7 +165,7 @@ describe("text mode", () => {
     await userEvent.keyboard("bold");
 
     expect(screen.getByRole("button", { name: "Bold" })).toHaveAttribute("aria-pressed", "true");
-    expect(save()).toBe("plain **bold**");
+    expect(save()).toBe("---\ntitle: plain bold\n---\n\nplain **bold**");
   });
 
   it("folds to one tool and its toggle, and unfolds to all of them", async () => {
@@ -200,19 +207,19 @@ describe("text mode", () => {
     await userEvent.click(screen.getByRole("button", { name: "Heading" }));
 
     expect(screen.getByRole("button", { name: "Heading" })).toHaveAttribute("aria-pressed", "true");
-    expect(save()).toBe("## Section");
+    expect(save()).toBe("---\ntitle: Section\n---\n\n## Section");
   });
 });
 
 describe("notes the text editor cannot represent", () => {
   it.each([
-    ["tables", "| a |\n| - |\n| b |", "This note uses tables"],
-    ["HTML", "Press <kbd>K</kbd>", "This note uses HTML"],
+    ["tables", "| a |\n| - |\n| b |", "This conspect uses tables"],
+    ["HTML", "Press <kbd>K</kbd>", "This conspect uses HTML"],
   ])("with %s are shown rendered, and edited in Markdown mode", async (_, markdown, notice) => {
     renderEditor(markdown);
 
     expect(screen.getByRole("status")).toHaveTextContent(notice);
-    expect(screen.queryByRole("textbox", { name: "Note text" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Conspect text" })).not.toBeInTheDocument();
     expect(await screen.findByText(/K|b/, { selector: ".markdown *" })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Markdown" }));
@@ -325,12 +332,86 @@ describe("metadata fields", () => {
     expect(save()).toBe("---\n---\n\nBody");
   });
 
+  it("uploads a cover image into the frontmatter and shows it by size", async () => {
+    vi.mocked(coverDataUrl).mockResolvedValue("data:image/webp;base64,AQID");
+    const { save } = renderEditor("Body", "text", true);
+
+    const image = new File(["img"], "c.png", { type: "image/png" });
+    await userEvent.upload(screen.getByLabelText("Upload…"), image);
+
+    expect(coverDataUrl).toHaveBeenCalledWith(image);
+    expect(save()).toBe("---\ncover: data:image/webp;base64,AQID\n---\n\nBody");
+    expect(screen.getByText("Uploaded image, 1 kB")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Cover image" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Replace…" })).toBeInTheDocument();
+  });
+
+  it("removes an uploaded cover, leaving the field for a URL", async () => {
+    const { save } = renderEditor("---\ncover: data:image/png;base64,AQID\n---\n\nBody", "text");
+
+    await userEvent.click(screen.getByRole("button", { name: "Remove" }));
+
+    expect(save()).toBe("---\n---\n\nBody");
+    expect(coverField()).toHaveValue("");
+  });
+
+  it("explains an image it cannot use and keeps the cover", async () => {
+    vi.mocked(coverDataUrl).mockRejectedValue(new CoverImageError("broken"));
+    renderEditor("---\ncover: https://example.com/c.png\n---\n\nBody", "text");
+
+    await userEvent.upload(
+      screen.getByLabelText("Upload…"),
+      new File(["x"], "c.png", { type: "image/png" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("cannot be used as a cover");
+    expect(coverField()).toHaveValue("https://example.com/c.png");
+  });
+
   it("follows the body's first line as it is typed", async () => {
     renderEditor("", "text", true);
 
     await typeInText("# Fresh title");
 
     expect(titleField()).toHaveAttribute("placeholder", "Fresh title");
+  });
+
+  it("writes the author into the frontmatter", async () => {
+    const { save } = renderEditor("---\ntitle: T\n---\n\nBody", "text", true);
+
+    await userEvent.type(screen.getByRole("textbox", { name: "Author" }), "Ann");
+
+    expect(save()).toBe("---\ntitle: T\nauthor: Ann\n---\n\nBody");
+  });
+
+  it("adds tags to the frontmatter on Enter or comma, once each", async () => {
+    const { save } = renderEditor("Body #inline", "text", true);
+    const tags = screen.getByRole("textbox", { name: "Tags" });
+
+    await userEvent.type(tags, "#Java#Collections{Enter}go,java#collections{Enter}");
+
+    expect(save()).toBe("---\ntags:\n  - Java#Collections\n  - go\n---\n\nBody #inline");
+    expect(tags).toHaveValue("");
+    expect(screen.getByRole("button", { name: "Remove #go" })).toBeInTheDocument();
+  });
+
+  it("explains a name that is not a tag and keeps it for fixing", async () => {
+    const { save } = renderEditor("Body", "text", true);
+    const tags = screen.getByRole("textbox", { name: "Tags" });
+
+    await userEvent.type(tags, "two words{Enter}");
+
+    expect(screen.getByRole("alert")).toHaveTextContent("“two words” is not a tag");
+    expect(tags).toHaveValue("two words");
+    expect(save()).toBe("Body");
+  });
+
+  it("removes a tag from the frontmatter, keeping the list's style", async () => {
+    const { save } = renderEditor("---\ntags: [java, go]\n---\n\nBody", "text");
+
+    await userEvent.click(screen.getByRole("button", { name: "Remove #java" }));
+
+    expect(save()).toBe("---\ntags: [go]\n---\n\nBody");
   });
 
   it("reflects frontmatter edited in Markdown mode", async () => {
@@ -341,6 +422,56 @@ describe("metadata fields", () => {
     await userEvent.click(screen.getByRole("button", { name: "Text" }));
 
     expect(titleField()).toHaveValue("Typed in source");
+  });
+
+  it("reflects the author and tags edited in Markdown mode", async () => {
+    renderEditor("Body", "text", true);
+
+    await userEvent.click(screen.getByRole("button", { name: "Markdown" }));
+    setSourceValue(sourceBox(), "---\nauthor: Bob\ntags: [rust]\n---\n\nBody");
+    await userEvent.click(screen.getByRole("button", { name: "Text" }));
+
+    expect(screen.getByRole("textbox", { name: "Author" })).toHaveValue("Bob");
+    expect(screen.getByRole("button", { name: "Remove #rust" })).toBeInTheDocument();
+  });
+});
+
+describe("frontmatter following the text editor", () => {
+  it("writes a title and tags typed in the body into the frontmatter, shown in Markdown mode", async () => {
+    const { save } = renderEditor("");
+
+    await typeInText("# Maps{Enter}Hash maps #java#collections");
+
+    const written =
+      "---\ntitle: Maps\ntags:\n  - java#collections\n---\n\n# Maps\n\nHash maps #java#collections";
+    expect(save()).toBe(written);
+    await userEvent.click(screen.getByRole("button", { name: "Markdown" }));
+    expect(sourceValue(sourceBox())).toBe(written);
+  });
+
+  it("keeps the title following the heading, and a title set to something else", async () => {
+    const { save } = renderEditor("---\ntitle: Own\n---\n\n# Old", "text");
+
+    await typeAtEnd("er");
+
+    expect(save()).toBe("---\ntitle: Own\n---\n\n# Older");
+    expect(screen.getByRole("textbox", { name: "Title" })).toHaveValue("Own");
+  });
+
+  it("adds a tag typed in the body next to the ones only listed in the frontmatter", async () => {
+    const { save } = renderEditor("---\ntitle: T\ntags: [extra, go]\n---\n\nT #go");
+
+    await typeAtEnd(" #rust");
+
+    expect(save()).toBe("---\ntitle: T\ntags: [extra, go, rust]\n---\n\nT #go #rust");
+  });
+
+  it("does not repeat the heading and body tags as fields, and lists body tags without remove", () => {
+    renderEditor("---\ntitle: Maps\ntags: [java, extra]\n---\n\n# Maps\n\n#java");
+
+    expect(screen.queryByRole("textbox", { name: "Title" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove #java" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove #extra" })).toBeInTheDocument();
   });
 });
 
@@ -372,32 +503,5 @@ describe("tags and code in the editors", () => {
     expect(typeSubstituted(box, inCode, '"', "«")).toBe(true);
     expect(sourceValue(box)).toBe('Text\n\n```json\n{"}\n```');
     expect(typeSubstituted(box, 4, '"', "«")).toBe(false);
-  });
-});
-
-describe("the title and tags found in the Markdown source", () => {
-  it("shows them above the source, read-only, and follows the typing", async () => {
-    renderEditor("# Заголовок\n\nНовый текст\n\n#go#to\n\n#goto", "markdown");
-
-    const found = screen.getByLabelText("Title and tags found in the text");
-    expect(found).toHaveTextContent("TitleЗаголовок");
-    expect([...found.querySelectorAll(".md-tag")].map((tag) => tag.textContent)).toEqual([
-      "#go#to",
-      "#goto",
-    ]);
-
-    setSourceValue(sourceBox(), "---\ntags: [meta]\n---\n# Other\n\n#goto");
-    await waitFor(() => {
-      expect(found).toHaveTextContent("TitleOther");
-    });
-    expect([...found.querySelectorAll(".md-tag")].map((tag) => tag.textContent)).toEqual([
-      "#meta",
-      "#goto",
-    ]);
-  });
-
-  it("is not shown in the text editor, or when there is nothing to show", () => {
-    renderEditor("# Title", "text");
-    expect(screen.queryByLabelText("Title and tags found in the text")).not.toBeInTheDocument();
   });
 });

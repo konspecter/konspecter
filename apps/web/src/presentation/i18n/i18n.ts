@@ -3,11 +3,13 @@ import { ru } from "./ru";
 
 /**
  * The interface languages. English is the default; the system's preferred
- * languages pick another one (see docs/architecture/i18n.md).
+ * languages or the Language setting pick another one (see docs/architecture/i18n.md).
  */
 export const LOCALES = ["en", "ru"] as const;
 export type Locale = (typeof LOCALES)[number];
 export const DEFAULT_LOCALE: Locale = "en";
+/** Each language's name in that language, as the Language setting lists them. */
+export const LOCALE_NAMES: Record<Locale, string> = { en: "English", ru: "Русский" };
 
 /** Plural forms, chosen by `Intl.PluralRules`: English uses one/other, Russian one/few/many. */
 export type Plural = {
@@ -43,7 +45,7 @@ export function detectLocale(languages: readonly string[]): Locale {
 
 let current: Locale = DEFAULT_LOCALE;
 
-/** Sets the interface language; call before rendering (the app does not switch while running). */
+/** Sets the interface language; text rendered afterwards uses it (see `applyLanguage`). */
 export function setLocale(locale: Locale): void {
   current = locale;
 }

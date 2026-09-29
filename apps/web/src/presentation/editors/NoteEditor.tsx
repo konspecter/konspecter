@@ -1,21 +1,15 @@
 import type { Node } from "prosemirror-model";
 import { lazy, memo, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import {
-  InvalidDocumentError,
-  documentTitle,
-  parseDocument,
-  replaceBody,
-} from "../../domain/document/document";
+import { InvalidDocumentError, documentTitle, parseDocument } from "../../domain/document/document";
 import type { EditorMode } from "../../domain/settings/settings";
 import { ErrorState } from "../components/ErrorState";
 import { markdownToTextDoc, textDocToMarkdown } from "./text-markdown";
 import { MarkdownSourceEditor } from "./MarkdownSourceEditor";
 import { MetadataFields } from "./MetadataFields";
-import { SourceSummary } from "./SourceSummary";
 import { TextEditor } from "./TextEditor";
 import "./editors.css";
 import { t } from "../i18n/i18n";
-import { withSavedDates, type Note } from "../../domain/note/note";
+import { withBody, withSavedDates, type Note } from "../../domain/note/note";
 
 export type { EditorMode };
 
@@ -98,8 +92,9 @@ function viewFor(mode: EditorMode, markdown: string, key: number): View {
 }
 
 /**
- * Edits a whole note document. Text mode edits the body as rich text and
- * keeps the frontmatter as written; Markdown mode edits the raw document.
+ * Edits a whole note document. Text mode edits the body as rich text, and the
+ * frontmatter's title and tags follow what the body says (`withBody`);
+ * Markdown mode edits the raw document as written.
  * There is no save button: every edit is reported through `onChange`.
  */
 export const NoteEditor = memo(function NoteEditor({
@@ -142,7 +137,7 @@ export const NoteEditor = memo(function NoteEditor({
 
   if (mode !== shown.mode) {
     // Switching modes carries the edits over, serialized once.
-    const current = doc ? replaceBody(markdown, textDocToMarkdown(doc)) : markdown;
+    const current = doc ? withBody(markdown, textDocToMarkdown(doc)) : markdown;
     view = viewFor(mode, current, view.key + 1);
     setMarkdown(current);
     setDoc(null);
@@ -157,13 +152,24 @@ export const NoteEditor = memo(function NoteEditor({
   // Edits are reported at once (a sync arriving meanwhile must see them as
   // unsaved), with functions that serialize only when called.
   const session = view.key;
+  // Serializing the rich text also brings the frontmatter held here up to
+  // date (a title or tag typed in the body), so the fields show what is saved.
+  const serialize = useCallback((edited: Node) => {
+    const current = markdownRef.current;
+    const next = withBody(current, textDocToMarkdown(edited));
+    if (next !== current) {
+      markdownRef.current = next;
+      setMarkdown(next);
+    }
+    return next;
+  }, []);
   const handleTextChange = useCallback(
     (next: Node) => {
       docRef.current = { session, doc: next };
       setDoc(next);
-      onChange(() => replaceBody(markdownRef.current, textDocToMarkdown(next)));
+      onChange(() => serialize(next));
     },
-    [session, onChange],
+    [session, onChange, serialize],
   );
   const handleSourceChange = useCallback(
     (next: string) => {
@@ -178,9 +184,9 @@ export const NoteEditor = memo(function NoteEditor({
       markdownRef.current = next;
       setMarkdown(next);
       const edited = docRef.current?.session === session ? docRef.current.doc : null;
-      onChange(() => (edited ? replaceBody(next, textDocToMarkdown(edited)) : next));
+      onChange(() => (edited ? serialize(edited) : next));
     },
-    [session, onChange],
+    [session, onChange, serialize],
   );
 
   // The title field's placeholder follows the body's first line as it is typed.
@@ -218,7 +224,6 @@ export const NoteEditor = memo(function NoteEditor({
           titleFromFirstLine={titleFromFirstLine}
         />
       )}
-      {view.kind === "source" && <SourceSummary markdown={markdown} />}
       {view.kind === "source" && (
         <MarkdownSourceEditor
           key={view.key}

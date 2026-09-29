@@ -7,7 +7,8 @@
   on a warm cream plate, drawn in
   each system's style (macOS squircle with shadow, full-bleed iOS/Apple touch icon, Windows
   tile, Android adaptive and themed icon, PWA maskable icon), and new Android splash screens.
-- English and Russian, chosen from the system's language (English otherwise).
+- English and Russian, chosen from the system's language (English otherwise) or in Settings →
+  Language; a change applies at once.
 - The note's details move to the sidebar's footer, "Details": dates, length, tags, cover and
   other frontmatter fields, with the actions as icon buttons; smaller and quieter text.
 - The formatting toolbar is flat and pale until pointed at, folds to one tool, always stays on
@@ -20,8 +21,16 @@
   editor and Markdown, from anywhere, also on a Russian layout.
 - The note list and search results have no heading; tag filters are chips inside the search
   box (a typed `#tag` becomes one after a space; × or Backspace removes it).
+- ↑ and ↓ move through the note list and search results; ↑ on the first goes back to the
+  search box.
+- Over an open note, focusing the search box (also ⌘/Ctrl+P or `/`) keeps the note; the list
+  appears once something is typed, and clearing the field returns to the note.
+- A cover image can be uploaded (_Upload…_ next to the cover field): it is scaled down and
+  stored in the note itself as a base64 `data:` URL, so it syncs and exports with the note.
 - In a new note, a first line shorter than 50 characters becomes the title when Enter ends it.
-- In Russian the sidebar's tag tree is called «Конспекты».
+- The interface calls notes "conspects" (in Russian «конспекты»), everywhere they are shown; the
+  sidebar's tag tree is «Теги» in Russian. The export ZIP is `konspecter-conspects.zip`. Code,
+  storage, the server API and URLs (`/notes/…`) keep the name "note".
 - Tags in notes are a little heavier than the text; tag names in the sidebar start with a
   capital letter (setting "Tag names").
 - Markdown mode highlights the Markdown and fenced code (```json and others) in colour; a
@@ -29,8 +38,6 @@
 - The antenna shows a third state: crossed out in orange when sync has no connection.
 - The page no longer shifts sideways when a scrollbar appears.
 - The desktop app no longer opens the web inspector.
-- Markdown mode shows the title and tags found in the text on a read-only line above the
-  source (they are not copied into the frontmatter).
 - The dates each save writes (`created`, `updated`) appear in the editor at once, also in
   Markdown mode's source, so the editor and the stored note never differ.
 - Tags listed in the frontmatter's `tags` field count as the note's tags: in the sidebar
@@ -39,6 +46,14 @@
   until later; opening a note now waits for its save still running.
 - Fixed: a tag with `_` in Cyrillic (`#новые_технологии`) typed in the text editor was saved
   as `#новые\_технологии` and cut to `новые`.
+- The author (`author`) and the frontmatter's tags can be edited in the note's properties
+  (_Properties_ in Details, formerly _Title and cover_); Details shows the author. Everything
+  is written into the Markdown's frontmatter, keeping the rest of it as written.
+- Text mode keeps the frontmatter in step with the text: the first line becomes `title`
+  (unless a different title was set) and every `#tag` typed is listed in `tags`; a tag
+  deleted from the text leaves the list.
+- Dates written by other tools as `create_at` / `updated_at` are understood, and saving keeps
+  those names instead of adding `created` / `updated` beside them.
 
 ## Unreleased — updates package 1
 

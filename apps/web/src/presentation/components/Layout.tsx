@@ -126,7 +126,8 @@ export function Layout({
   }, []);
 
   const openSearch = () => {
-    if (location.pathname !== "/") void navigate("/");
+    // An open note stays until something is typed.
+    if (location.pathname !== "/" && noteMatch === null) void navigate("/");
     searchRef.current?.focus();
     searchRef.current?.select();
   };

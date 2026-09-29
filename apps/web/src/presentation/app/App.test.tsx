@@ -13,6 +13,7 @@ import { FolderStore } from "../../infrastructure/folder/folder-store";
 import { FakeServer } from "../../infrastructure/sync/fake-server";
 import { SyncEngine } from "../../infrastructure/sync/sync-engine";
 import type { NoteRepository } from "../../application/notes/note-repository";
+import { applyLanguage } from "../i18n/setup";
 import { App } from "./App";
 
 let databaseCount = 0;
@@ -34,7 +35,7 @@ beforeEach(() => {
 });
 
 /** The rich-text editor (the default mode). It is loaded lazily. */
-const textEditor = () => screen.findByRole("textbox", { name: "Note text" });
+const textEditor = () => screen.findByRole("textbox", { name: "Conspect text" });
 
 /** Switches to Markdown mode (the top bar's toggle) and returns the source text box. */
 async function markdownEditor() {
@@ -45,8 +46,8 @@ async function markdownEditor() {
 const sidebar = () => screen.getByRole("complementary", { name: "Sidebar" });
 const topBar = () => screen.getByRole("banner");
 const topBarButton = (name: string) => within(topBar()).getByRole("button", { name });
-const searchBox = () => screen.getByRole("searchbox", { name: "Search notes" });
-const noteList = () => screen.findByRole("list", { name: "Notes" });
+const searchBox = () => screen.getByRole("searchbox", { name: "Search conspects" });
+const noteList = () => screen.findByRole("list", { name: "Conspects" });
 const recentNav = () => within(sidebar()).getByRole("navigation", { name: "Recent" });
 const recentTitles = () =>
   within(recentNav())
@@ -110,7 +111,7 @@ describe("layout", () => {
     expect(screen.queryByRole("complementary", { name: "Sidebar" })).not.toBeInTheDocument();
     expect(localStorage.getItem("konspecter.sidebar")).toBe("closed");
     // Its controls move to the top bar meanwhile.
-    expect(within(topBar()).getByRole("link", { name: "New note" })).toBeInTheDocument();
+    expect(within(topBar()).getByRole("link", { name: "New conspect" })).toBeInTheDocument();
 
     await userEvent.click(topBarButton("Show sidebar"));
     expect(sidebar()).toBeInTheDocument();
@@ -131,7 +132,7 @@ describe("layout", () => {
     await userEvent.click(within(sidebar()).getByRole("link", { name: "Settings" }));
     expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument();
 
-    await userEvent.click(within(sidebar()).getByRole("link", { name: "New note" }));
+    await userEvent.click(within(sidebar()).getByRole("link", { name: "New conspect" }));
     expect(await textEditor()).toHaveFocus();
   });
 
@@ -150,14 +151,14 @@ describe("the note list", () => {
     await store.put(brokenNote);
     renderApp(store);
 
-    expect(await listTitles()).toEqual(["Java Collections", "Untitled", "Unreadable note"]);
+    expect(await listTitles()).toEqual(["Java Collections", "Untitled", "Unreadable conspect"]);
     const list = await noteList();
     expect(within(list).getByRole("link", { name: "Java Collections" })).toHaveAttribute(
       "href",
       "/notes/java",
     );
     expect(within(list).getByText("ArrayList — dynamic array.")).toBeInTheDocument();
-    expect(recentTitles()).toEqual(["Java Collections", "Untitled", "Unreadable note"]);
+    expect(recentTitles()).toEqual(["Java Collections", "Untitled", "Unreadable conspect"]);
   });
 
   it("shows an error when notes cannot be loaded, and retries", async () => {
@@ -167,7 +168,7 @@ describe("the note list", () => {
     renderApp(store);
 
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("Could not load notes");
+    expect(alert).toHaveTextContent("Could not load conspects");
     expect(alert).toHaveTextContent("Disk on fire");
 
     await userEvent.click(within(alert).getByRole("button", { name: "Try again" }));
@@ -201,7 +202,7 @@ describe("creating a note", () => {
     const store = await newStore();
     renderApp(store);
 
-    await userEvent.click(within(sidebar()).getByRole("link", { name: "New note" }));
+    await userEvent.click(within(sidebar()).getByRole("link", { name: "New conspect" }));
     await userEvent.type(await textEditor(), "# Hash maps{Enter}Buckets.");
 
     await waitFor(async () => {
@@ -301,13 +302,34 @@ describe("a note", () => {
 
     await textEditor();
     expect(screen.queryByRole("textbox", { name: "Title" })).not.toBeInTheDocument();
-    const toggle = screen.getByRole("button", { name: "Title and cover" });
+    const toggle = screen.getByRole("button", { name: "Properties" });
     await userEvent.click(toggle);
 
     expect(toggle).toHaveAttribute("aria-expanded", "true");
     await userEvent.type(screen.getByRole("textbox", { name: "Title" }), "Collections");
     await stored(store, "java", (markdown) => markdown.includes("title: Collections"));
     expect(await textEditor()).toHaveTextContent("ArrayList");
+  });
+
+  it("saves a tag and author set in the properties into the frontmatter, and lists the tag", async () => {
+    const store = await newStore();
+    await store.put(javaNote);
+    renderApp(store, "/notes/java");
+
+    await textEditor();
+    await userEvent.click(screen.getByRole("button", { name: "Properties" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "Author" }), "Ann");
+    await userEvent.type(screen.getByRole("textbox", { name: "Tags" }), "Java#Collections{Enter}");
+
+    await stored(store, "java", (markdown) =>
+      markdown.includes("author: Ann\ntags:\n  - Java#Collections\n"),
+    );
+    const tree = await within(sidebar()).findByRole("navigation", { name: "Tags" });
+    expect(await within(tree).findByRole("link", { name: "Java" })).toBeInTheDocument();
+    const details = within(sidebar()).getByRole("region", { name: "Details" });
+    await waitFor(() => {
+      expect(details).toHaveTextContent("AuthorAnn");
+    });
   });
 
   it("shows notes the text editor cannot represent rendered, with highlighted code", async () => {
@@ -322,7 +344,7 @@ describe("a note", () => {
     renderApp(store, "/notes/maps");
 
     expect(await screen.findByRole("table")).toHaveTextContent("TreeMap");
-    expect(screen.getByRole("status")).toHaveTextContent("This note uses tables");
+    expect(screen.getByRole("status")).toHaveTextContent("This conspect uses tables");
     expect(document.querySelector("pre code.language-java .hljs-keyword")).toHaveTextContent("new");
 
     const editor = await markdownEditor();
@@ -388,8 +410,8 @@ describe("a note", () => {
   it("shows not found for an unknown note", async () => {
     renderApp(await newStore(), "/notes/missing");
 
-    expect(await screen.findByRole("heading", { name: "Note not found" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Back to notes" })).toHaveAttribute("href", "/");
+    expect(await screen.findByRole("heading", { name: "Conspect not found" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back to conspects" })).toHaveAttribute("href", "/");
   });
 
   it("is deleted after confirmation", async () => {
@@ -398,7 +420,7 @@ describe("a note", () => {
     renderApp(store, "/notes/java");
 
     await userEvent.click(await screen.findByRole("button", { name: "Delete" }));
-    const dialog = screen.getByRole("alertdialog", { name: "Delete this note?" });
+    const dialog = screen.getByRole("alertdialog", { name: "Delete this conspect?" });
     expect(dialog).toHaveAccessibleDescription(
       "“Java Collections” will be deleted. This cannot be undone.",
     );
@@ -446,7 +468,7 @@ describe("tags", () => {
     const tree = await tagTree();
     const java = within(tree).getByRole("link", { name: "Java" });
     const javaRow = java.closest("li") as HTMLElement;
-    expect(within(javaRow).getByLabelText("2 notes")).toBeInTheDocument();
+    expect(within(javaRow).getByLabelText("2 conspects")).toBeInTheDocument();
     expect(within(tree).queryByRole("link", { name: "Collections" })).not.toBeInTheDocument();
 
     await userEvent.click(within(tree).getByRole("button", { name: "Expand #java" }));
@@ -527,7 +549,7 @@ describe("tags", () => {
     renderApp(await newStore());
 
     const tree = await tagTree();
-    expect(tree).toHaveTextContent("Write #tag or #parent#child in a note.");
+    expect(tree).toHaveTextContent("Write #tag or #parent#child in a conspect.");
   });
 
   it("filters the list by a tag, including child tags, until the filter is removed", async () => {
@@ -585,15 +607,44 @@ describe("search", () => {
     return store;
   }
 
-  it("opens with Ctrl+P from a note, listing every note by recent edit", async () => {
-    renderApp(await storeWithNotes(), "/notes/maps");
-    const editor = await textEditor();
-    await userEvent.click(editor);
+  it("opens with Ctrl+P, listing every note by recent edit", async () => {
+    renderApp(await storeWithNotes(), "/settings");
+    await screen.findByRole("heading", { level: 1, name: "Settings" });
 
     await userEvent.keyboard("{Control>}p{/Control}");
 
     expect(searchBox()).toHaveFocus();
     expect(await listTitles()).toEqual(["Хеш-таблицы", "Networking", "Hash maps"]);
+  });
+
+  it("keeps an open note until something is typed, and returns to it when cleared", async () => {
+    renderApp(await storeWithNotes(), "/notes/maps");
+    const editor = await textEditor();
+    await userEvent.click(editor);
+
+    await userEvent.keyboard("{Control>}p{/Control}");
+    expect(searchBox()).toHaveFocus();
+    expect(await textEditor()).toHaveTextContent("Buckets and collisions.");
+    expect(screen.queryByRole("list", { name: "Conspects" })).not.toBeInTheDocument();
+
+    await userEvent.keyboard("tcp");
+    await waitFor(async () => {
+      expect(await listTitles()).toEqual(["Networking"]);
+    });
+
+    await userEvent.clear(searchBox());
+    expect(await textEditor()).toHaveTextContent("Buckets and collisions.");
+    expect(screen.queryByRole("list", { name: "Conspects" })).not.toBeInTheDocument();
+  });
+
+  it("keeps a new note when the search box is focused", async () => {
+    renderApp(await storeWithNotes(), "/notes/new");
+    await textEditor();
+
+    await userEvent.click(searchBox());
+
+    expect(await textEditor()).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Conspects" })).not.toBeInTheDocument();
   });
 
   it("filters as you type and marks the matching fragments", async () => {
@@ -694,7 +745,9 @@ describe("search", () => {
   it("says when nothing matches", async () => {
     renderApp(await storeWithNotes(), "/?q=quantum");
 
-    expect(await screen.findByRole("heading", { name: "No matching notes" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "No matching conspects" }),
+    ).toBeInTheDocument();
   });
 
   it("finds a note saved after the index was built", async () => {
@@ -708,12 +761,11 @@ describe("search", () => {
     });
   });
 
-  it("shows the list when the search box is clicked on a note, and opens results", async () => {
-    renderApp(await storeWithNotes(), "/notes/net");
+  it("searches from a note and opens results", async () => {
+    renderApp(await storeWithNotes(), "/notes/maps");
     await textEditor();
 
     await userEvent.click(searchBox());
-    expect(await listTitles()).toHaveLength(3);
     await userEvent.keyboard("tcp");
     await waitFor(async () => {
       expect(await listTitles()).toEqual(["Networking"]);
@@ -722,9 +774,33 @@ describe("search", () => {
 
     expect(await textEditor()).toHaveTextContent("TCP handshakes.");
   });
+  it("moves through the results with ↑ and ↓, back to the search box from the first", async () => {
+    renderApp(await storeWithNotes());
+    const list = await noteList();
+    const link = (name: string) => within(list).getByRole("link", { name });
+
+    await userEvent.click(searchBox());
+    await userEvent.keyboard("{ArrowDown}");
+    expect(link("Хеш-таблицы")).toHaveFocus();
+    await userEvent.keyboard("{ArrowDown}{ArrowDown}");
+    expect(link("Hash maps")).toHaveFocus();
+    await userEvent.keyboard("{ArrowDown}");
+    expect(link("Hash maps")).toHaveFocus();
+    await userEvent.keyboard("{ArrowUp}");
+    expect(link("Networking")).toHaveFocus();
+    await userEvent.keyboard("{ArrowUp}{ArrowUp}");
+    expect(searchBox()).toHaveFocus();
+
+    await userEvent.keyboard("{ArrowDown}{ArrowDown}{Enter}");
+    expect(await textEditor()).toHaveTextContent("TCP handshakes.");
+  });
 });
 
 describe("settings and the top bar", () => {
+  afterEach(() => {
+    applyLanguage("system");
+  });
+
   function renderWithSettings(store: NoteStore, path: string, settings?: Settings) {
     render(
       <MemoryRouter initialEntries={[path]}>
@@ -744,11 +820,32 @@ describe("settings and the top bar", () => {
 
     const tree = await within(sidebar()).findByRole("navigation", { name: "Tags" });
     expect(await within(tree).findByRole("link", { name: "Новые технологии" })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("radio", { name: "As written in notes" }));
+    await userEvent.click(screen.getByRole("radio", { name: "As written in conspects" }));
     expect(await within(tree).findByRole("link", { name: "новые технологии" })).toBeInTheDocument();
     await waitFor(async () => {
       expect(await store.loadSettings()).toMatchObject({ tagNames: "as-written" });
     });
+  });
+
+  it("switches the interface language at once and keeps it", async () => {
+    const store = await newStore();
+    renderWithSettings(store, "/settings");
+
+    await userEvent.click(screen.getByRole("radio", { name: "Русский" }));
+
+    expect(screen.getByRole("heading", { level: 1, name: "Настройки" })).toBeInTheDocument();
+    const russianSidebar = screen.getByRole("complementary", { name: "Боковая панель" });
+    expect(within(russianSidebar).getByRole("link", { name: "Настройки" })).toBeInTheDocument();
+    expect(document.documentElement.lang).toBe("ru");
+    expect(screen.getByRole("radio", { name: "Русский" })).toBeChecked();
+    await waitFor(async () => {
+      expect(await store.loadSettings()).toMatchObject({ language: "ru" });
+    });
+
+    const language = screen.getByRole("group", { name: "Язык" });
+    await userEvent.click(within(language).getByRole("radio", { name: "Как в системе" }));
+    expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument();
+    expect(document.documentElement.lang).toBe("en");
   });
 
   it("highlights the editing area unless turned off", async () => {
@@ -806,9 +903,9 @@ describe("settings and the top bar", () => {
       expect(await store.loadSettings()).toMatchObject({ defaultEditor: "markdown" });
     });
 
-    await userEvent.click(within(sidebar()).getByRole("link", { name: "New note" }));
+    await userEvent.click(within(sidebar()).getByRole("link", { name: "New conspect" }));
     expect(await screen.findByRole("textbox", { name: "Markdown" })).toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: "Note text" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Conspect text" })).not.toBeInTheDocument();
   });
 
   it("opens editors in the default mode chosen in settings", async () => {
@@ -816,7 +913,7 @@ describe("settings and the top bar", () => {
     renderWithSettings(store, "/settings");
 
     await userEvent.click(screen.getByRole("radio", { name: "Markdown" }));
-    await userEvent.click(within(sidebar()).getByRole("link", { name: "New note" }));
+    await userEvent.click(within(sidebar()).getByRole("link", { name: "New conspect" }));
 
     expect(await screen.findByRole("textbox", { name: "Markdown" })).toBeInTheDocument();
   });
@@ -831,7 +928,7 @@ describe("settings and the top bar", () => {
     });
     renderWithSettings(store, "/notes/java", { ...DEFAULT_SETTINGS, readingPosition: "ask" });
 
-    expect(await screen.findByText("You were 50% through this note.")).toBeInTheDocument();
+    expect(await screen.findByText("You were 50% through this conspect.")).toBeInTheDocument();
   });
 
   it("shows whether notes are stored persistently and can ask for it", async () => {
@@ -849,7 +946,7 @@ describe("settings and the top bar", () => {
     renderWithSettings(await newStore(), "/settings");
 
     expect(await screen.findByText(/the browser may clear them/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Keep my notes on this device" }));
+    await userEvent.click(screen.getByRole("button", { name: "Keep my conspects on this device" }));
 
     expect(await screen.findByText(/stored persistently on this device/)).toBeInTheDocument();
     Object.defineProperty(navigator, "storage", { configurable: true, value: undefined });
@@ -873,7 +970,7 @@ describe("settings and the top bar", () => {
 
     const section = screen.getByRole("region", { name: "Keyboard shortcuts" });
     expect(section).toHaveTextContent("Ctrl+PSearch");
-    expect(section).toHaveTextContent("Ctrl+NNew note");
+    expect(section).toHaveTextContent("Ctrl+NNew conspect");
     expect(section).toHaveTextContent("Ctrl+,Settings");
   });
 });
@@ -901,7 +998,7 @@ describe("a new note's first line", () => {
     const store = await newStore();
     renderApp(store, "/notes/new", settings);
     const box = await screen.findByRole("textbox", {
-      name: settings?.defaultEditor === "markdown" ? "Markdown" : "Note text",
+      name: settings?.defaultEditor === "markdown" ? "Markdown" : "Conspect text",
     });
     await userEvent.click(box);
     await userEvent.keyboard(keys);
@@ -951,8 +1048,8 @@ describe("note details", () => {
       "href",
       "/?q=%23java%23collections",
     );
-    expect(region).toHaveTextContent("authorAnn");
-    const actions = within(region).getByRole("group", { name: "Note actions" });
+    expect(region).toHaveTextContent("AuthorAnn");
+    const actions = within(region).getByRole("group", { name: "Conspect actions" });
     expect(within(actions).getByRole("button", { name: "Delete" })).toHaveAttribute(
       "title",
       "Delete",
@@ -968,7 +1065,7 @@ describe("note details", () => {
 
     const region = await within(sidebar()).findByRole("region", { name: "Details" });
     expect(region).toHaveTextContent("Not saved yet");
-    expect(within(region).getByRole("button", { name: "Title and cover" })).toBeInTheDocument();
+    expect(within(region).getByRole("button", { name: "Properties" })).toBeInTheDocument();
     expect(within(region).queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
   });
 });
@@ -1137,7 +1234,7 @@ describe("file mode", () => {
     });
 
     await userEvent.click(await screen.findByRole("button", { name: "Delete" }));
-    const dialog = screen.getByRole("alertdialog", { name: "Delete this note?" });
+    const dialog = screen.getByRole("alertdialog", { name: "Delete this conspect?" });
     expect(dialog).toHaveTextContent("will be moved to the system trash");
     await userEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
     expect(
@@ -1250,7 +1347,9 @@ describe("file mode", () => {
     expect(screen.getByText("/Users/ada/Notes")).toBeInTheDocument();
     expect(screen.getByText(/Sync applies to the app library/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Import into the app library" }));
-    expect(await screen.findByText("Imported 3 notes into the app library.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Imported 3 conspects into the app library."),
+    ).toBeInTheDocument();
     expect(importFolderSpy).toHaveBeenCalled();
   });
 });
@@ -1267,7 +1366,7 @@ describe("import and export", () => {
       new File(["no"], "notes.txt"),
     ]);
 
-    expect(await screen.findByText("Imported 1 note, 1 not imported.")).toBeInTheDocument();
+    expect(await screen.findByText("Imported 1 conspect, 1 not imported.")).toBeInTheDocument();
     expect(screen.getByText("notes.txt: not a Markdown file")).toBeInTheDocument();
     expect((await store.list())[0]?.markdown).toContain("from disk");
   });
@@ -1286,12 +1385,14 @@ describe("import and export", () => {
     renderApp(store, "/settings");
 
     await userEvent.click(screen.getByRole("button", { name: "Export all (.zip)" }));
-    expect(await screen.findByText("Exported 1 note as konspecter-notes.zip.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Exported 1 conspect as konspecter-conspects.zip."),
+    ).toBeInTheDocument();
 
     await userEvent.click(within(recentNav()).getByRole("link", { name: "Java Collections" }));
     await userEvent.click(await screen.findByRole("button", { name: "Download .md" }));
 
-    expect(downloads).toEqual(["konspecter-notes.zip", "Java Collections.md"]);
+    expect(downloads).toEqual(["konspecter-conspects.zip", "Java Collections.md"]);
   });
 });
 
@@ -1312,7 +1413,7 @@ describe("backup and recovery", () => {
 
     expect(await listTitles()).toEqual(["Java Collections"]);
     const banner = await screen.findByRole("note");
-    expect(banner).toHaveTextContent("Some stored notes could not be read");
+    expect(banner).toHaveTextContent("Some stored conspects could not be read");
     expect(within(banner).getByRole("link")).toHaveAttribute("href", "/settings");
   });
 
@@ -1343,7 +1444,7 @@ describe("backup and recovery", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Rebuild indexes" }));
 
-    expect(await screen.findByText("Indexes rebuilt from 1 note.")).toBeInTheDocument();
+    expect(await screen.findByText("Indexes rebuilt from 1 conspect.")).toBeInTheDocument();
   });
 });
 
@@ -1353,11 +1454,10 @@ describe("onboarding", () => {
     renderApp(store);
 
     const welcome = await screen.findByRole("region", { name: "Welcome to Konspecter" });
-    expect(within(welcome).getByRole("link", { name: "Create your first note" })).toHaveAttribute(
-      "href",
-      "/notes/new",
-    );
-    await userEvent.click(within(welcome).getByRole("button", { name: "Add an example note" }));
+    expect(
+      within(welcome).getByRole("link", { name: "Create your first conspect" }),
+    ).toHaveAttribute("href", "/notes/new");
+    await userEvent.click(within(welcome).getByRole("button", { name: "Add an example conspect" }));
 
     await waitFor(() => {
       expect(document.title).toBe("Welcome to Konspecter · Konspecter");
@@ -1454,7 +1554,7 @@ describe("keyboard shortcuts", () => {
 
     await userEvent.keyboard("?");
     const dialog = await screen.findByRole("dialog", { name: "Keyboard shortcuts" });
-    expect(dialog).toHaveTextContent("New note");
+    expect(dialog).toHaveTextContent("New conspect");
     expect(dialog).toHaveTextContent("Ctrl+P");
     expect(within(dialog).getByRole("button", { name: "Close" })).toHaveFocus();
 

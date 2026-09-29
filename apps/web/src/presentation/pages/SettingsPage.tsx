@@ -4,6 +4,7 @@ import {
   FONT_SCALES,
   type EditingArea,
   type EditorMode,
+  type Language,
   type Settings,
   type TagNames,
   type Theme,
@@ -23,7 +24,7 @@ import { ShortcutList } from "../components/ShortcutsDialog";
 import type { NoteRepository } from "../../application/notes/note-repository";
 import type { LibraryControls } from "../app/library";
 import { useAsync } from "../hooks/use-async";
-import { t, tn, type TextKey } from "../i18n/i18n";
+import { LOCALE_NAMES, LOCALES, t, tn, type TextKey } from "../i18n/i18n";
 import { rich } from "../i18n/rich";
 
 type SettingsPageProps = {
@@ -52,6 +53,10 @@ function options() {
       { value: "light", label: t("settings.theme.light") },
       { value: "dark", label: t("settings.theme.dark") },
     ] satisfies Option<Theme>[],
+    languages: [
+      { value: "system", label: t("settings.language.system") },
+      ...LOCALES.map((locale) => ({ value: locale, label: LOCALE_NAMES[locale] })),
+    ] satisfies Option<Language>[],
     editors: [
       { value: "text", label: t("settings.editor.text") },
       { value: "markdown", label: t("settings.editor.markdown") },
@@ -104,6 +109,14 @@ export function SettingsPage({ settings, onChange, sync, library, store }: Setti
           value={settings.theme}
           onChange={(value) => {
             update("theme", value);
+          }}
+        />
+        <Choice
+          legend={t("settings.language")}
+          options={choices.languages}
+          value={settings.language}
+          onChange={(value) => {
+            update("language", value);
           }}
         />
         <Choice
