@@ -130,7 +130,7 @@ describe("text mode", () => {
 
     await typeInText("# Title{Enter}- first{Enter}second");
 
-    expect(save()).toBe("---\ntitle: Title\n---\n\n# Title\n\n* first\n\n* second");
+    expect(save()).toBe("---\ntitle: Title\n---\n\n# Title\n\n* first\n* second");
   });
 
   it("shows the formatting toolbar only while the text has focus", async () => {

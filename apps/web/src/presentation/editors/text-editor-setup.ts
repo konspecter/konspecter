@@ -44,11 +44,11 @@ const markdownInputRules = inputRules({
       level: match[1]?.length ?? 1,
     })),
     wrappingInputRule(/^\s*>\s$/, nodes.blockquote),
-    wrappingInputRule(/^\s*[-+*]\s$/, nodes.bullet_list),
+    wrappingInputRule(/^\s*[-+*]\s$/, nodes.bullet_list, { tight: true }),
     wrappingInputRule(
       /^(\d+)\.\s$/,
       nodes.ordered_list,
-      (match) => ({ order: Number(match[1]) }),
+      (match) => ({ order: Number(match[1]), tight: true }),
       (match, node) => node.childCount + (node.attrs.order as number) === Number(match[1]),
     ),
     textblockTypeInputRule(/^```([\w-]*)\s$/, nodes.code_block, (match) => ({
@@ -422,12 +422,13 @@ function selectedList(state: EditorState): { list: Node; pos: number } | null {
  * A list tool, toggling like the block tools: in a list of `type` (the
  * innermost one, when lists are nested) it lifts the selected items out of
  * it; in a list of the other kind it changes that list's kind, keeping its
- * items and spacing; elsewhere it wraps the selected blocks in a new list.
+ * items and spacing; elsewhere it wraps the selected blocks in a new tight
+ * list (no blank line between its items).
  */
 function toggleList(type: NodeType): Command {
   return (state, dispatch) => {
     const selected = selectedList(state);
-    if (!selected) return wrapInList(type)(state, dispatch);
+    if (!selected) return wrapInList(type, { tight: true })(state, dispatch);
     const { list, pos } = selected;
     if (list.type === type) return liftListItem(nodes.list_item)(state, dispatch);
     if (dispatch) {

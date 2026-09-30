@@ -114,6 +114,23 @@
   outline: none;
 }
 
+/*
+ * Every list item holds a paragraph in the editor. In a tight list (no blank
+ * line between the items in the Markdown) that paragraph adds no margin, so
+ * the list looks as the reader shows it; a loose list keeps paragraph spacing.
+ */
+.text-editor-content :is(ul, ol)[data-tight] > li > p {
+  margin: 0;
+}
+
+/*
+ * A list stands off the line start: its markers sit inside the text column,
+ * not at its edge. Nested lists keep the usual step from their parent item.
+ */
+.markdown.text-editor-content > :is(ul, ol) {
+  padding-left: 2.6em;
+}
+
 .text-editor-content .placeholder::before {
   content: attr(data-placeholder);
   float: left;

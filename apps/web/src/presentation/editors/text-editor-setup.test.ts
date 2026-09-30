@@ -9,6 +9,7 @@ import {
   tagDecorations,
   toolbarActions,
 } from "./text-editor-setup";
+import { textDocToMarkdown } from "./text-markdown";
 import { toolbarTopFor } from "./TextEditor";
 
 function editorWith(markdown: string) {
@@ -100,6 +101,35 @@ describe("tag highlighting", () => {
 });
 
 describe("list tools", () => {
+  const listTool = (label: string) => {
+    const action = toolbarActions.find((candidate) => candidate.label === label);
+    if (!action) throw new Error(`no tool ${label}`);
+    return action.command;
+  };
+
+  it.each([
+    ["tool.bulletList", "* one\n* two"],
+    ["tool.orderedList", "1. one\n2. two"],
+  ])("%s makes a list with no blank line between its items", (label, markdown) => {
+    const { view } = editorWith("one\n\ntwo");
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 1, 9)));
+    listTool(label)(view.state, view.dispatch);
+    expect(textDocToMarkdown(view.state.doc)).toBe(markdown);
+  });
+
+  it("typing 1. makes a list with no blank line between its items", () => {
+    const { view, type } = editorWith("x");
+    view.dispatch(view.state.tr.delete(1, 2));
+    for (const key of "1.") type(view.state.selection.from, key, key);
+    type(view.state.selection.from, " ", " ");
+    view.dispatch(view.state.tr.insertText("one"));
+    view.someProp("handleKeyDown", (handle) =>
+      handle(view, new KeyboardEvent("keydown", { key: "Enter" })),
+    );
+    view.dispatch(view.state.tr.insertText("two"));
+    expect(textDocToMarkdown(view.state.doc)).toBe("1. one\n2. two");
+  });
+
   it("run on any selection in nested lists without failing", () => {
     const state = createTextEditorState(
       defaultMarkdownParser.parse("text\n\n- one\n  1. inner\n- two\n\nafter"),
