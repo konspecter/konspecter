@@ -42,13 +42,16 @@ with a contextual formatting toolbar and Markdown-style shortcuts.
   block's bottom and grows up (`toolbarTopFor`); scrolling and resizing place it again. At
   rest it is flat and pale (no frame, muted buttons); pointing at it or moving the focus into
   it brings up its frame.
-- **Folding:** the toolbar starts folded (remembered per device, `localStorage`): one tool,
-  the last one used, from the toolbar or by its shortcut (also remembered per device), else
-  Bold, and a chevron that unfolds all of them. Unfolded, the chevron folds it again.
+- **Folding:** the toolbar starts folded (remembered per device, `localStorage`): one tool
+  and a chevron that unfolds all of them. Unfolded, the chevron folds it again. The one tool
+  follows the caret: in formatted text it is the tool in effect there, the closest to the
+  text first (its marks, then its block, then the quotes and lists around it, inner ones
+  first; `toolsInEffect`), or the last one used when that is among them; in plain text it is
+  the last one used, from the toolbar or by its shortcut (remembered per device), else Bold.
 
 - **Formatting:** bold, italic, inline code, link, heading (H2), subheading (H3), quote,
   bulleted and numbered lists, and code block. The toolbar shows which marks and blocks
-  are active. A list tool toggles: in a list of its kind it takes the selected items out, in
+  are active (a quote while the selection is inside one). A list tool toggles: in a list of its kind it takes the selected items out, in
   a list of the other kind it changes that list's kind (the innermost list, when nested).
 - **Shortcuts:** typing `#`–`######` + space makes a heading, `>` a quote, `-`/`*`/`+` a
   list, `1.` a numbered list, and ` ```lang ` + space a code block. Backspace right

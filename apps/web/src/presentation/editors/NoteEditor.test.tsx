@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { NoteEditor, type EditorMode } from "./NoteEditor";
@@ -199,7 +199,7 @@ describe("text mode", () => {
   });
 
   it("keeps the last tool used when folded, also in the next editor", async () => {
-    renderEditor("## Section");
+    renderEditor("Section");
     const shownTools = () =>
       within(screen.getByRole("toolbar", { name: "Formatting" }))
         .getAllByRole("button")
@@ -217,6 +217,38 @@ describe("text mode", () => {
     renderEditor("Other text");
     await userEvent.click(textBox());
     expect(shownTools()).toEqual(["Quote", "All formatting tools"]);
+  });
+
+  it("keeps the tool in effect at the caret when folded, else the last one used", async () => {
+    localStorage.setItem("konspecter.toolbar.last", "tool.italic");
+    renderEditor("Plain **bold** text\n\n## Section\n\n- *leaning* and **heavy** item");
+    const shownTools = () =>
+      within(screen.getByRole("toolbar", { name: "Formatting" }))
+        .getAllByRole("button")
+        .map((b) => b.getAttribute("aria-label"));
+    const caretIn = async (word: string) => {
+      const walker = document.createTreeWalker(textBox(), NodeFilter.SHOW_TEXT);
+      while (walker.nextNode() && !walker.currentNode.textContent?.includes(word));
+      const text = walker.currentNode;
+      document.getSelection()?.collapse(text, (text.textContent ?? "").indexOf(word) + 1);
+      await act(async () => {
+        document.dispatchEvent(new Event("selectionchange"));
+        await Promise.resolve();
+      });
+    };
+
+    await userEvent.click(textBox());
+    await caretIn("Plain");
+    expect(shownTools()).toEqual(["Italic", "All formatting tools"]);
+    await caretIn("bold");
+    expect(shownTools()).toEqual(["Bold", "All formatting tools"]);
+    await caretIn("Section");
+    expect(shownTools()).toEqual(["Heading", "All formatting tools"]);
+    // Italic, the last one used, over the list around it.
+    await caretIn("leaning");
+    expect(shownTools()).toEqual(["Italic", "All formatting tools"]);
+    await caretIn("heavy");
+    expect(shownTools()).toEqual(["Bold", "All formatting tools"]);
   });
 
   it("counts a tool's shortcut as using it", async () => {

@@ -558,7 +558,15 @@ export const toolbarActions: readonly ToolbarAction[] = [
     command: toggleBlock(nodes.heading, { level: 3 }),
     isActive: (state) => isBlockActive(state, nodes.heading, { level: 3 }),
   },
-  { label: "tool.quote", text: "❝", command: wrapIn(nodes.blockquote) },
+  {
+    label: "tool.quote",
+    text: "❝",
+    command: wrapIn(nodes.blockquote),
+    isActive: (state) => {
+      const { $from, $to } = state.selection;
+      return $from.blockRange($to, (node) => node.type === nodes.blockquote) !== null;
+    },
+  },
   {
     label: "tool.bulletList",
     text: "•",
@@ -594,4 +602,52 @@ export function linkCommand(href: string | null): Command {
 
 export function isLinkActive(state: EditorState): boolean {
   return isMarkActive(state, marks.link);
+}
+
+const markTools: readonly (readonly [TextKey, MarkType])[] = [
+  ["tool.bold", marks.strong],
+  ["tool.italic", marks.em],
+  ["tool.code", marks.code],
+  ["tool.link", marks.link],
+];
+
+/** The block tool that makes `node`, if any. */
+function blockTool(node: Node): TextKey | null {
+  switch (node.type) {
+    case nodes.heading:
+      return node.attrs.level === 2
+        ? "tool.heading"
+        : node.attrs.level === 3
+          ? "tool.subheading"
+          : null;
+    case nodes.code_block:
+      return "tool.codeBlock";
+    case nodes.blockquote:
+      return "tool.quote";
+    case nodes.bullet_list:
+      return "tool.bulletList";
+    case nodes.ordered_list:
+      return "tool.orderedList";
+    default:
+      return null;
+  }
+}
+
+/**
+ * The tools in effect at the selection (those the toolbar shows pressed), the
+ * closest to its text first: its marks, then its block, then the quotes and
+ * lists around it, the inner ones first. Empty in plain text.
+ */
+export function toolsInEffect(state: EditorState): TextKey[] {
+  const marked = markTools.filter(([, type]) => isMarkActive(state, type)).map(([id]) => id);
+  const active = new Set(
+    toolbarActions.filter((action) => action.isActive?.(state)).map((action) => action.label),
+  );
+  const { $from } = state.selection;
+  const around: TextKey[] = [];
+  for (let depth = $from.depth; depth > 0; depth--) {
+    const id = blockTool($from.node(depth));
+    if (id && active.has(id) && !around.includes(id)) around.push(id);
+  }
+  return [...marked, ...around];
 }

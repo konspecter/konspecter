@@ -24,6 +24,7 @@ import {
   replaceDocument,
   TOOL_USED,
   toolbarActions,
+  toolsInEffect,
 } from "./text-editor-setup";
 import { t, type TextKey } from "../i18n/i18n";
 import { visibleArea, type Place } from "./place";
@@ -409,8 +410,12 @@ export const TextEditor = memo(function TextEditor({
       command: null,
     },
   ];
-  // Folded, the toolbar keeps one tool: the last one used, else Bold.
-  const pinned = tools.find((tool) => tool.id === lastUsed) ?? tools[0];
+  // Folded, the toolbar keeps one tool: in formatted text, the closest one in
+  // effect there (the last one used, if it is among them); in plain text, the
+  // last one used, else Bold.
+  const inEffect = toolsInEffect(editorState);
+  const pinnedId = inEffect.find((id) => id === lastUsed) ?? inEffect[0] ?? lastUsed;
+  const pinned = tools.find((tool) => tool.id === pinnedId) ?? tools[0];
   const shown = folded ? tools.filter((tool) => tool === pinned) : tools;
 
   return (

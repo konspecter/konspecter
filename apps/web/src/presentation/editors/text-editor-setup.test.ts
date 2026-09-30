@@ -8,6 +8,7 @@ import {
   foundMatches,
   tagDecorations,
   toolbarActions,
+  toolsInEffect,
 } from "./text-editor-setup";
 import { textDocToMarkdown } from "./text-markdown";
 import { toolbarTopFor } from "./TextEditor";
@@ -195,6 +196,53 @@ describe("list tools", () => {
         }
       }
     }
+  });
+});
+
+describe("tools in effect", () => {
+  /** The state of `markdown` with the caret inside the first `word`. */
+  const caretIn = (markdown: string, word: string) => {
+    const state = createTextEditorState(defaultMarkdownParser.parse(markdown));
+    let at = -1;
+    state.doc.descendants((node, pos) => {
+      const index = node.isText ? (node.text ?? "").indexOf(word) : -1;
+      if (at < 0 && index >= 0) at = pos + index + 1;
+    });
+    return state.apply(state.tr.setSelection(TextSelection.create(state.doc, at)));
+  };
+
+  it("are none in plain text", () => {
+    expect(toolsInEffect(caretIn("plain text", "text"))).toEqual([]);
+  });
+
+  it.each([
+    ["**bold** word", "bold", ["tool.bold"]],
+    ["*leaning* word", "leaning", ["tool.italic"]],
+    ["`code` word", "code", ["tool.code"]],
+    ["[linked](https://example.com) word", "linked", ["tool.link"]],
+    ["## Heading", "Heading", ["tool.heading"]],
+    ["### Sub", "Sub", ["tool.subheading"]],
+    ["```\nblock\n```", "block", ["tool.codeBlock"]],
+    ["> quoted", "quoted", ["tool.quote"]],
+    ["- item", "item", ["tool.bulletList"]],
+    ["1. item", "item", ["tool.orderedList"]],
+  ])("in %j", (markdown, word, tools) => {
+    expect(toolsInEffect(caretIn(markdown, word))).toEqual(tools);
+  });
+
+  it("list the closest first: marks, the block, then the inner containers", () => {
+    expect(toolsInEffect(caretIn("> - ***both***", "both"))).toEqual([
+      "tool.bold",
+      "tool.italic",
+      "tool.bulletList",
+      "tool.quote",
+    ]);
+    expect(toolsInEffect(caretIn("- > ## **Deep**", "Deep"))).toEqual([
+      "tool.bold",
+      "tool.heading",
+      "tool.quote",
+      "tool.bulletList",
+    ]);
   });
 });
 
