@@ -1,6 +1,7 @@
 /*
  * Soft colours only: no pure white, black, red, green or blue anywhere.
  * Light is the default; dark follows the system unless a theme is chosen.
+ * Dark is a dark grey with a slight yellow shade, never near black or brown.
  */
 :root {
   color-scheme: light dark;
@@ -54,30 +55,30 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --color-bg: #1c1d1f;
-    --color-sidebar: #161719;
-    --color-fg: #e5e5e2;
-    --color-muted: #9ba0a6;
-    --color-faint: #858a90;
-    --color-border: #2d2f32;
-    --color-hover: #26282b;
-    --color-active: #2e3034;
-    --color-field: #26282b;
-    --color-field-focus: #2e3034;
-    --color-editor: #131416;
-    --color-accent: #86b3df;
-    --color-danger: #eeb0aa;
-    --color-tree-folder: #7ea9d4;
-    --color-tree-guide: #3a3d41;
-    --color-focus-row: #525458;
-    --color-mark: #5b4d1f;
+    --color-bg: #31302d;
+    --color-sidebar: #292826;
+    --color-fg: #f0eee8;
+    --color-muted: #bfbdb5;
+    --color-faint: #acaaa1;
+    --color-border: #4e4d49;
+    --color-hover: #3b3a37;
+    --color-active: #43423e;
+    --color-field: #3b3a37;
+    --color-field-focus: #43423e;
+    --color-editor: #272624;
+    --color-accent: #a6c8e8;
+    --color-danger: #f5c3ba;
+    --color-tree-folder: #9dbedb;
+    --color-tree-guide: #5c5b55;
+    --color-focus-row: #76746e;
+    --color-mark: #6e5b28;
     --color-mark-fg: #f6ecc9;
     --color-mark-current: #d6a547;
     --color-mark-current-fg: #1d1708;
-    --color-antenna-idle: #474a4f;
-    --color-antenna-active: #b8bcc1;
+    --color-antenna-idle: #5f5e59;
+    --color-antenna-active: #d3d1c9;
     --color-antenna-offline: #e39a5b;
-    --color-shadow: rgb(8 9 10 / 45%);
+    --color-shadow: rgb(12 12 10 / 45%);
   }
 }
 
@@ -87,30 +88,30 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --color-bg: #1c1d1f;
-  --color-sidebar: #161719;
-  --color-fg: #e5e5e2;
-  --color-muted: #9ba0a6;
-  --color-faint: #858a90;
-  --color-border: #2d2f32;
-  --color-hover: #26282b;
-  --color-active: #2e3034;
-  --color-field: #26282b;
-  --color-field-focus: #2e3034;
-  --color-editor: #131416;
-  --color-accent: #86b3df;
-  --color-danger: #eeb0aa;
-  --color-tree-folder: #7ea9d4;
-  --color-tree-guide: #3a3d41;
-  --color-focus-row: #525458;
-  --color-mark: #5b4d1f;
+  --color-bg: #31302d;
+  --color-sidebar: #292826;
+  --color-fg: #f0eee8;
+  --color-muted: #bfbdb5;
+  --color-faint: #acaaa1;
+  --color-border: #4e4d49;
+  --color-hover: #3b3a37;
+  --color-active: #43423e;
+  --color-field: #3b3a37;
+  --color-field-focus: #43423e;
+  --color-editor: #272624;
+  --color-accent: #a6c8e8;
+  --color-danger: #f5c3ba;
+  --color-tree-folder: #9dbedb;
+  --color-tree-guide: #5c5b55;
+  --color-focus-row: #76746e;
+  --color-mark: #6e5b28;
   --color-mark-fg: #f6ecc9;
   --color-mark-current: #d6a547;
   --color-mark-current-fg: #1d1708;
-  --color-antenna-idle: #474a4f;
-  --color-antenna-active: #b8bcc1;
+  --color-antenna-idle: #5f5e59;
+  --color-antenna-active: #d3d1c9;
   --color-antenna-offline: #e39a5b;
-  --color-shadow: rgb(8 9 10 / 45%);
+  --color-shadow: rgb(12 12 10 / 45%);
 }
 
 /* Code colours, for the reader's highlighting and the Markdown editor (GitHub's palettes). */
@@ -129,30 +130,30 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --code-bg: #1f2124;
-    --code-fg: #e6edf3;
-    --code-comment: #8b949e;
+    --code-bg: #383734;
+    --code-fg: #f0eee8;
+    --code-comment: #b2b0a7;
     --code-keyword: #ff7b72;
     --code-string: #a5d6ff;
     --code-number: #79c0ff;
     --code-title: #d2a8ff;
     --code-type: #ffa657;
     --code-meta: #7ee787;
-    --quote-border: #3d444d;
+    --quote-border: #615f59;
   }
 }
 
 :root[data-theme="dark"] {
-  --code-bg: #1f2124;
-  --code-fg: #e6edf3;
-  --code-comment: #8b949e;
+  --code-bg: #383734;
+  --code-fg: #f0eee8;
+  --code-comment: #b2b0a7;
   --code-keyword: #ff7b72;
   --code-string: #a5d6ff;
   --code-number: #79c0ff;
   --code-title: #d2a8ff;
   --code-type: #ffa657;
   --code-meta: #7ee787;
-  --quote-border: #3d444d;
+  --quote-border: #615f59;
 }
 
 :root[data-titlebar="overlay"] {

@@ -168,7 +168,8 @@ desktop app and in the installed PWA, and `n` works everywhere.
   only its Latin and Cyrillic subsets are bundled (`app/fonts.css`) and precached. Code uses
   the system monospace font.
 - **Colours** are soft tokens on `:root` with a dark set (`app/app.css`): no pure white,
-  black, red, green or blue.
+  black, red, green or blue. The dark set is a dark grey with a slight yellow shade, not near
+  black.
 - **Focus:** text fields, the search box and the editors show focus by their background or
   caret, never an outline box. Buttons and links keep a focus ring for keyboard users.
 - The whole window is used at any size; the note column is at most 720px wide with room on
