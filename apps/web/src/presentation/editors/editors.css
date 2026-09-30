@@ -141,17 +141,19 @@
 
 /*
  * The editing area as a panel (setting "Editing area"): a shade darker than
- * the page, with the same gap on every side, and as tall as the note (no
- * empty space forced below the text). The toolbar stays on the left, in the
- * column's margin beside the panel.
+ * the page, with a narrower gap at the sides than at the top and bottom (the
+ * width goes to the text), and as tall as the note (no empty space forced
+ * below the text). The toolbar stays on the left, in the column's margin
+ * beside the panel.
  */
 .note-editor {
   --editor-gap: 28px;
+  --editor-side-gap: 16px;
 }
 
 :root[data-editing-area="highlighted"] .note-editor {
   min-height: 0;
-  padding: var(--editor-gap);
+  padding: var(--editor-gap) var(--editor-side-gap);
   border-radius: 14px;
   background: var(--color-editor);
 }
@@ -175,7 +177,7 @@
 }
 
 :root[data-editing-area="highlighted"] .text-editor-toolbar {
-  right: calc(100% + var(--editor-gap) + 8px);
+  right: calc(100% + var(--editor-side-gap) + 8px);
 }
 
 /*
@@ -186,6 +188,7 @@
 @media (max-width: 760px) {
   .note-editor {
     --editor-gap: 36px;
+    --editor-side-gap: 36px;
 
     padding-left: var(--editor-gap);
   }

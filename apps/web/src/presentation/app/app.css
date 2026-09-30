@@ -612,11 +612,12 @@ mark {
 .content {
   flex: 1;
   width: 100%;
-  max-width: calc(var(--column-width) + 2 * var(--content-inset));
+  /* A fixed width: a narrower inset gives the text the room, not the margins. */
+  max-width: calc(var(--column-width) + 112px);
   margin: 0 auto;
   padding: 20px var(--content-inset) calc(64px + env(safe-area-inset-bottom));
   /* Wide enough on the left for the text editor's toolbar. */
-  --content-inset: 56px;
+  --content-inset: 48px;
 }
 
 .content:focus {
