@@ -5,6 +5,7 @@ import {
   useMemo,
   useState,
   useSyncExternalStore,
+  type CSSProperties,
   type KeyboardEvent,
 } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
@@ -13,6 +14,7 @@ import { highlight, snippet, type SnippetPart } from "../../domain/search/snippe
 import type { NoteCatalog, NoteSummary } from "../../application/notes/note-catalog";
 import type { NoteRepository } from "../../application/notes/note-repository";
 import type { SearchHit } from "../../infrastructure/search/search-index";
+import { isDisplayableCover } from "../components/CoverImage";
 import { EmptyState } from "../components/EmptyState";
 import { ErrorState } from "../components/ErrorState";
 import { NoteDate } from "../components/NoteDate";
@@ -31,6 +33,9 @@ type Row = {
   readonly id: string;
   readonly title: readonly SnippetPart[];
   readonly updated: string | null;
+  readonly cover: string | null;
+  readonly tags: readonly string[];
+  /** Where a search matched the text; empty outside a search. */
   readonly text: readonly SnippetPart[];
 };
 
@@ -43,11 +48,13 @@ function summaryRow(note: NoteSummary): Row {
     id: note.id,
     title: [{ text: summaryTitle(note), match: false }],
     updated: note.updated,
-    text: note.excerpt === "" ? [] : [{ text: note.excerpt, match: false }],
+    cover: note.cover,
+    tags: note.tags,
+    text: [],
   };
 }
 
-function hitRow(hit: SearchHit): Row {
+function hitRow(hit: SearchHit, note: NoteSummary | undefined): Row {
   // The indexed text starts with the heading the row already shows as its title.
   const text =
     hit.title !== "" && hit.text.startsWith(hit.title)
@@ -57,6 +64,8 @@ function hitRow(hit: SearchHit): Row {
     id: hit.id,
     title: highlight(hit.title || t("note.untitled"), hit.terms),
     updated: hit.updated || null,
+    cover: note?.cover ?? null,
+    tags: note?.tags ?? [],
     text: snippet(text, hit.terms),
   };
 }
@@ -106,10 +115,13 @@ export function NotesPage({ store, catalog }: NotesPageProps) {
   );
   const unreadable = useAsync(loadUnreadable);
 
-  const hitRows = useMemo(
-    () => (found && "hits" in found ? found.hits.map(hitRow) : null),
-    [found],
-  );
+  const hitRows = useMemo(() => {
+    if (!found || !("hits" in found)) return null;
+    const notes = new Map(
+      library.status === "ready" ? library.notes.map((note) => [note.id, note]) : [],
+    );
+    return found.hits.map((hit) => hitRow(hit, notes.get(hit.id)));
+  }, [found, library]);
   const noteRows = useMemo(
     () => (library.status === "ready" ? library.notes.map(summaryRow) : []),
     [library],
@@ -160,21 +172,35 @@ export function NotesPage({ store, catalog }: NotesPageProps) {
 }
 
 /**
- * ↑ and ↓ move between the rows; ↑ on the first goes back to the search box
- * (whose ↓ comes here).
+ * The arrow keys move through the grid: ↑ and ↓ a row, ← and → a column
+ * (one column on small screens). ↑ on the first row goes back to the search
+ * box (whose ↓ comes here); ↓ under a short last row goes to its last note.
  */
 function moveFocus(event: KeyboardEvent<HTMLOListElement>) {
-  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+  const step = { ArrowDown: 1, ArrowUp: -1, ArrowRight: 1, ArrowLeft: -1 }[event.key];
+  if (step === undefined) return;
   if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
   const links = [...event.currentTarget.querySelectorAll<HTMLAnchorElement>(".note-result-title")];
   const index = links.findIndex((link) => link === document.activeElement);
   if (index === -1) return;
-  const target =
-    event.key === "ArrowDown"
-      ? links[index + 1]
-      : (links[index - 1] ?? document.querySelector<HTMLInputElement>("[role=search] input"));
+  const vertical = event.key === "ArrowDown" || event.key === "ArrowUp";
+  const columns = vertical ? gridColumns(event.currentTarget) : 1;
+  const next = index + step * columns;
+  let target: HTMLElement | null | undefined = links[next];
+  if (next < 0) {
+    target = document.querySelector<HTMLInputElement>("[role=search] input");
+  } else if (!target && vertical && step > 0) {
+    const lastRow = Math.floor((links.length - 1) / columns);
+    if (Math.floor(index / columns) < lastRow) target = links.at(-1);
+  }
   event.preventDefault();
   target?.focus();
+}
+
+/** How many columns the list's grid has now (one where there is no layout). */
+function gridColumns(list: HTMLElement): number {
+  const tracks = getComputedStyle(list).gridTemplateColumns.split(" ").filter(Boolean);
+  return Math.max(1, tracks.length);
 }
 
 const ResultList = memo(function ResultList({ rows }: { rows: readonly Row[] }) {
@@ -187,21 +213,73 @@ const ResultList = memo(function ResultList({ rows }: { rows: readonly Row[] }) 
   );
 });
 
+/**
+ * A conspect: its cover beside the title, the date it was last edited and its
+ * tags. While searching, also where the text matched.
+ */
 const ResultRow = memo(function ResultRow({ row }: { row: Row }) {
   return (
     <li className="note-result">
-      <div className="note-result-head">
+      <ListCover id={row.id} cover={row.cover} title={row.title} />
+      <div className="note-result-body">
         <Link to={`/notes/${encodeURIComponent(row.id)}`} className="note-result-title">
           {row.title.map((part, index) =>
             part.match ? <mark key={index}>{part.text}</mark> : part.text,
           )}
         </Link>
         {row.updated !== null && <NoteDate value={row.updated} />}
+        {row.tags.length > 0 && (
+          <p className="note-result-tags">{row.tags.map((tag) => `#${tag}`).join(" ")}</p>
+        )}
+        {row.text.length > 0 && <Snippet parts={row.text} />}
       </div>
-      {row.text.length > 0 && <Snippet parts={row.text} />}
     </li>
   );
 });
+
+/**
+ * The note's cover, or its title's first letter on a pastel colour that the
+ * note's id picks, so each note keeps its colour.
+ */
+function ListCover({
+  id,
+  cover,
+  title,
+}: {
+  id: string;
+  cover: string | null;
+  title: readonly SnippetPart[];
+}) {
+  if (cover !== null && isDisplayableCover(cover)) {
+    return <img className="note-result-cover" src={cover} alt="" loading="lazy" />;
+  }
+  const text = title.map((part) => part.text).join("");
+  const letter = (
+    /[\p{L}\p{N}]/u.exec(text)?.[0] ??
+    graphemes.segment(text)[Symbol.iterator]().next().value?.segment ??
+    ""
+  ).toLocaleUpperCase();
+  return (
+    <span
+      className="note-result-cover note-result-letter"
+      style={{ "--cover-hue": placeholderHue(id) } as CSSProperties}
+      aria-hidden="true"
+    >
+      {letter}
+    </span>
+  );
+}
+
+const graphemes = new Intl.Segmenter();
+
+/** A hue from 0 to 359 from the id's characters (FNV-1a). */
+function placeholderHue(id: string): number {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < id.length; index += 1) {
+    hash = Math.imul(hash ^ id.charCodeAt(index), 0x01000193);
+  }
+  return (hash >>> 0) % 360;
+}
 
 function Welcome({ store }: { store: NoteRepository }) {
   const navigate = useNavigate();

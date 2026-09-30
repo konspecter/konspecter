@@ -35,6 +35,10 @@
   --color-antenna-active: #55585d;
   --color-antenna-offline: #c9742c;
   --color-shadow: rgb(31 32 35 / 14%);
+  /* The list's cover placeholder: a pastel of the note's hue, with a darker letter. */
+  --cover-saturation: 70%;
+  --cover-lightness: 86%;
+  --cover-letter-lightness: 32%;
 
   --font-ui:
     "Inter Variable", system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
@@ -79,6 +83,9 @@
     --color-antenna-active: #d3d1c9;
     --color-antenna-offline: #e39a5b;
     --color-shadow: rgb(12 12 10 / 45%);
+    --cover-saturation: 32%;
+    --cover-lightness: 62%;
+    --cover-letter-lightness: 16%;
   }
 }
 
@@ -112,6 +119,9 @@
   --color-antenna-active: #d3d1c9;
   --color-antenna-offline: #e39a5b;
   --color-shadow: rgb(12 12 10 / 45%);
+  --cover-saturation: 32%;
+  --cover-lightness: 62%;
+  --cover-letter-lightness: 16%;
 }
 
 /* Code colours, for the reader's highlighting and the Markdown editor (GitHub's palettes). */
@@ -1076,19 +1086,28 @@ kbd {
   overflow-wrap: anywhere;
 }
 
+/* Two columns where they fit, one on small screens (and beside an open sidebar). */
 .note-results {
-  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 4px 12px;
+  margin: 0 -12px;
   padding: 0;
   list-style: none;
 }
 
 .note-result {
+  --list-cover-size: 96px;
   position: relative;
-  margin: 0 -12px;
+  display: grid;
+  grid-template-columns: var(--list-cover-size) minmax(0, 1fr);
+  align-items: start;
+  gap: 14px;
+  margin: 0;
   padding: 10px 12px;
   border-radius: 10px;
   content-visibility: auto;
-  contain-intrinsic-size: auto 84px;
+  contain-intrinsic-size: auto 116px;
 }
 
 .note-result:hover {
@@ -1099,19 +1118,57 @@ kbd {
   background: var(--color-hover);
 }
 
-.note-result-head {
+.note-result-body {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .note-result-title {
-  min-width: 0;
+  display: -webkit-box;
+  overflow: hidden;
   color: var(--color-fg);
   font-weight: 600;
+  line-height: 1.35;
   text-decoration: none;
   overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.note-result-cover {
+  width: var(--list-cover-size);
+  height: var(--list-cover-size);
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+/* No cover: the title's first letter on the note's own pastel colour. */
+.note-result-letter {
+  display: grid;
+  place-items: center;
+  background: hsl(var(--cover-hue) var(--cover-saturation) var(--cover-lightness));
+  color: hsl(var(--cover-hue) 30% var(--cover-letter-lightness));
+  font-family: var(--font-ui);
+  font-size: calc(var(--list-cover-size) * 0.42);
+  font-weight: 600;
+  user-select: none;
+}
+
+.note-result-tags {
+  display: -webkit-box;
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: var(--color-muted);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 /* The whole row opens the note. */
@@ -1126,7 +1183,6 @@ kbd {
 }
 
 .note-result time {
-  flex-shrink: 0;
   color: var(--color-muted);
   font-family: var(--font-ui);
   font-size: 13px;
@@ -1468,8 +1524,8 @@ kbd {
     display: none;
   }
 
-  .note-result-head {
-    flex-direction: column;
-    gap: 0;
+  .note-result {
+    --list-cover-size: 72px;
+    gap: 12px;
   }
 }

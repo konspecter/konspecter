@@ -19,14 +19,18 @@ async function ready(
 }
 
 describe("summarize", () => {
-  it("keeps the title, date and the start of the readable text", () => {
-    const note = createNote("# Hash maps\n\nBuckets **and** collisions.", new Date("2024-01-02"));
+  it("keeps the title, date, cover and tags", () => {
+    const note = createNote(
+      "---\ncover: https://example.com/maps.png\ntags: [Java#Collections]\n---\n# Hash maps\n\nBuckets #java #algorithms.",
+      new Date("2024-01-02"),
+    );
 
     expect(summarize(note)).toEqual({
       id: note.id,
       title: "Hash maps",
       updated: "2024-01-02T00:00:00Z",
-      excerpt: "Buckets and collisions.",
+      cover: "https://example.com/maps.png",
+      tags: ["Java", "Collections", "algorithms"],
       valid: true,
     });
   });
@@ -36,6 +40,8 @@ describe("summarize", () => {
       title: "",
       valid: false,
       updated: null,
+      cover: null,
+      tags: [],
     });
   });
 });

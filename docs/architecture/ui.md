@@ -61,6 +61,12 @@ interface speaks English and Russian ([i18n](i18n.md)).
 | `/notes/:id` | The editor on a note; its details and actions in the sidebar's footer |
 | `/settings`  | Settings, including the keyboard shortcuts                            |
 
+- **The list** (`pages/NotesPage.tsx`): two columns where they fit (at least 320px each), one
+  on small screens or beside a sidebar on a medium one; the arrow keys move through the grid
+  (↑/↓ a row, ←/→ a column). Each item is the cover beside the title (two lines at
+  most), the last-edit date and the tags (two lines at most); not the note's text. A note
+  without a displayable cover gets its title's first letter on a pastel colour, its hue
+  hashed from the note's id so it stays the same (`--cover-*` tokens per theme).
 - **Search** (`pages/NotesPage.tsx`, `SearchBox.tsx`): focusing the search box shows the list,
   except over an open note (new or existing): that stays while the field is empty, and
   emptying the field again returns to it (the list's router state remembers it). Typing
@@ -68,7 +74,7 @@ interface speaks English and Russian ([i18n](i18n.md)).
   order. Matches are marked in titles and snippets like a highlighter pen (`highlight` and
   `snippet` in `domain/search/snippet.ts`, Unicode-aware, so Cyrillic works). The previous
   results stay while the next search runs, so typing never blanks the list. ↓ moves into the
-  results, ↑ and ↓ move between them (↑ on the first returns to the box), Enter opens the
+  results, the arrow keys move between them (↑ on the first row returns to the box), Enter opens the
   first. Neither the list nor the results have a visible heading.
 - **Search in the note** (`note-find.ts`, [plan](../../.claude/plans/note-find.md)): on the
   note page (new or existing) the box searches the open note instead, unless it was opened
@@ -98,7 +104,7 @@ interface speaks English and Russian ([i18n](i18n.md)).
 
 ## Shared state
 
-- `application/notes/note-catalog.ts`: summaries of every note (title, date, excerpt),
+- `application/notes/note-catalog.ts`: summaries of every note (title, date, cover, tags),
   loaded once and updated one note at a time from repository change events. The sidebar and
   the list read it with `useSyncExternalStore`, so a save reorders Recent at once without
   re-reading the library.

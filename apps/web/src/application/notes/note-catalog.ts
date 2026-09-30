@@ -1,4 +1,3 @@
-import { plainText } from "../../domain/document/plain-text";
 import {
   noteTitle,
   noteUpdated,
@@ -6,7 +5,7 @@ import {
   readNote,
   type Note,
 } from "../../domain/note/note";
-import { parseTagChain, type Tag } from "../../domain/tag/tags";
+import { parseTagChain, writtenTagList, type Tag } from "../../domain/tag/tags";
 import type { NoteChange, NoteRepository } from "./note-repository";
 
 /** What lists show of a note, without keeping its whole text in memory. */
@@ -15,8 +14,10 @@ export type NoteSummary = {
   /** Empty when the note has no title. */
   readonly title: string;
   readonly updated: string | null;
-  /** The start of the note's readable text. */
-  readonly excerpt: string;
+  /** The cover's URL or path, as the frontmatter writes it. */
+  readonly cover: string | null;
+  /** The note's tags as written, a chain as its tags (`#java#maps` → java, maps). */
+  readonly tags: readonly string[];
   /** False when the frontmatter cannot be read. */
   readonly valid: boolean;
 };
@@ -26,23 +27,14 @@ export type CatalogState =
   | { readonly status: "error"; readonly error: unknown }
   | { readonly status: "ready"; readonly notes: readonly NoteSummary[] };
 
-const EXCERPT_SOURCE = 800;
-const EXCERPT_LENGTH = 200;
-
 export function summarize(note: Note): NoteSummary {
   const read = readNote(note);
-  const title = noteTitle(read);
-  const blocks = (
-    read.valid ? plainText(read.document.body.slice(0, EXCERPT_SOURCE)) : note.markdown
-  ).split("\n");
-  // Lists show the title already; do not repeat a leading heading.
-  if (title !== "" && blocks[0]?.trim() === title) blocks.shift();
-  const text = blocks.join(" ");
   return {
     id: note.id,
-    title,
+    title: noteTitle(read),
     updated: noteUpdated(read),
-    excerpt: text.replace(/\s+/g, " ").trim().slice(0, EXCERPT_LENGTH),
+    cover: read.valid ? read.document.metadata.cover : null,
+    tags: writtenTagList(noteWrittenTags(read)).map(({ written }) => written),
     valid: read.valid,
   };
 }

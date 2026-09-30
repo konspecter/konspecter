@@ -178,8 +178,33 @@ describe("the note list", () => {
       "href",
       "/notes/java",
     );
-    expect(within(list).getByText("ArrayList — dynamic array.")).toBeInTheDocument();
+    // A row is the cover, title, date and tags: not the start of the text.
+    expect(within(list).queryByText("ArrayList — dynamic array.")).not.toBeInTheDocument();
+    expect(list.querySelector("time")).toHaveAttribute("datetime", "2020-09-28T10:15:00Z");
     expect(recentTitles()).toEqual(["Java Collections", "Untitled", "Unreadable conspect"]);
+  });
+
+  it("shows each note's cover and tags, and a letter where there is no cover", async () => {
+    const store = await newStore();
+    const date = new Date("2020-01-01");
+    await store.put(
+      createNote(
+        "---\ncover: https://example.com/maps.png\ntags: [java#maps]\n---\n# Hash maps\n\n#algorithms",
+        date,
+        "maps",
+      ),
+    );
+    await store.put(createNote("# ёжик\n\nText.", date, "hedgehog"));
+    renderApp(store);
+
+    const list = await noteList();
+    // The same date: by id.
+    const [hedgehog, maps] = within(list).getAllByRole("listitem");
+    expect(maps?.querySelector("img")).toHaveAttribute("src", "https://example.com/maps.png");
+    expect(maps).toHaveTextContent("#java #maps #algorithms");
+    expect(hedgehog?.querySelector("img")).toBeNull();
+    expect(hedgehog?.querySelector(".note-result-letter")).toHaveTextContent("Ё");
+    expect(hedgehog).not.toHaveTextContent("Text.");
   });
 
   it("shows an error when notes cannot be loaded, and retries", async () => {
@@ -874,6 +899,29 @@ describe("search", () => {
 
     expect(await textEditor()).toHaveTextContent("TCP handshakes.");
   });
+  it("moves through two columns with the arrow keys", async () => {
+    renderApp(await storeWithNotes());
+    const list = await noteList();
+    // The layout's two columns (jsdom lays nothing out).
+    list.style.gridTemplateColumns = "320px 320px";
+    const link = (name: string) => within(list).getByRole("link", { name });
+
+    await userEvent.click(searchBox());
+    await userEvent.keyboard("{ArrowDown}");
+    expect(link("Хеш-таблицы")).toHaveFocus();
+    await userEvent.keyboard("{ArrowRight}");
+    expect(link("Networking")).toHaveFocus();
+    // Nothing under it in the short last row: its last note.
+    await userEvent.keyboard("{ArrowDown}");
+    expect(link("Hash maps")).toHaveFocus();
+    await userEvent.keyboard("{ArrowUp}");
+    expect(link("Хеш-таблицы")).toHaveFocus();
+    await userEvent.keyboard("{ArrowRight}{ArrowLeft}");
+    expect(link("Хеш-таблицы")).toHaveFocus();
+    await userEvent.keyboard("{ArrowUp}");
+    expect(searchBox()).toHaveFocus();
+  });
+
   it("moves through the results with ↑ and ↓, back to the search box from the first", async () => {
     renderApp(await storeWithNotes());
     const list = await noteList();
