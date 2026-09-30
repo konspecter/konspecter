@@ -1,38 +1,28 @@
-import { lazy, Suspense, type ComponentType } from "react";
 import type { NoteEditorProps } from "./NoteEditor";
 import { ErrorState } from "../components/ErrorState";
+import { moduleLoader, useModule } from "../hooks/use-module";
 import { t } from "../i18n/i18n";
 
-let editorModule: Promise<typeof import("./NoteEditor")> | null = null;
+const editor = moduleLoader(() => import("./NoteEditor"));
 
 /**
  * Loads the editor chunk (ProseMirror, CodeMirror, markdown-it). The app
- * calls this when the browser is idle after start-up, so opening a note does
- * not wait for the download or the parse.
+ * calls this when the browser is idle after start-up, and the note page
+ * while it reads the note, so opening a note does not wait for the download
+ * or the parse.
  */
 export function preloadEditor(): Promise<typeof import("./NoteEditor")> {
-  editorModule ??= import("./NoteEditor").catch((error: unknown) => {
-    editorModule = null; // Try again on the next request (e.g. back online).
-    throw error;
-  });
-  return editorModule;
+  return editor.load();
 }
 
-// A failed load (e.g. offline before the chunk was cached) shows an error.
-const NoteEditor = lazy<ComponentType<NoteEditorProps>>(() =>
-  preloadEditor().then(
-    (module) => ({ default: module.NoteEditor }),
-    (error: unknown) => ({
-      default: () => <ErrorState title={t("editor.loadFailed")} error={error} />,
-    }),
-  ),
-);
-
 export function LazyNoteEditor(props: NoteEditorProps) {
+  const loaded = useModule(editor);
+  // A failed load (e.g. offline before the chunk was cached) shows an error.
+  if (loaded.status === "error") {
+    return <ErrorState title={t("editor.loadFailed")} error={loaded.error} />;
+  }
   // No loading text: the space stays empty for the moment the chunk takes.
-  return (
-    <Suspense fallback={<div className="note-editor" />}>
-      <NoteEditor {...props} />
-    </Suspense>
-  );
+  if (loaded.status === "loading") return <div className="note-editor" />;
+  const { NoteEditor } = loaded.module;
+  return <NoteEditor {...props} />;
 }

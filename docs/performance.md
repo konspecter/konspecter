@@ -16,15 +16,16 @@ cd apps/desktop/src-tauri && cargo test --release -- --ignored # File Mode file 
 
 ### Real browser (Chromium, production build, `tests/e2e/performance.spec.ts`)
 
-| Scenario (2,001 notes)                | Time   | Budget |
-| ------------------------------------- | ------ | ------ |
-| cold start to the full note list      | 1.4 s  | 5 s    |
-| first search right after start-up     | 0.85 s | 10 s   |
-| next search                           | 90 ms  |        |
-| switch to another note (editor ready) | 145 ms | 1 s    |
-| open a 200 KB note in the editor      | 127 ms | 5 s    |
-| type 22 characters in the 200 KB note | 49 ms  |        |
-| import 2,001 files through the UI     | 27 s   |        |
+| Scenario (2,001 notes)                 | Time   | Budget |
+| -------------------------------------- | ------ | ------ |
+| cold start to the full note list       | 1.4 s  | 5 s    |
+| first search right after start-up      | 0.85 s | 10 s   |
+| next search                            | 90 ms  |        |
+| switch to another note (editor ready)  | 145 ms | 1 s    |
+| open a 200 KB note in the editor       | 127 ms | 5 s    |
+| type 22 characters in the 200 KB note  | 49 ms  |        |
+| open the app on a note (load → editor) | 182 ms | 2 s    |
+| import 2,001 files through the UI      | 27 s   |        |
 
 Measured after updates package 1 (editor-first UI, autosave). The list now renders 2,001
 rows with titles, dates and excerpts, and the sidebar another 2,001 recent entries, so the
@@ -75,6 +76,20 @@ The real-browser startup above confirms it.
   a time, so a save does not re-read the library. Typing no longer serializes the document:
   the ProseMirror → Markdown conversion runs once per autosave, not per keystroke. The editor
   and its toolbar re-render only for their own state (memoized, stable callbacks).
+
+- **Opening the first note (editor performance package):** the editor appeared about 300 ms
+  after its code and the note were there (469 ms from page load to editor, now 182 ms; a note
+  shown rendered, 336 ms → 73 ms after its placeholder). React holds back what follows a
+  Suspense fallback for up to 300 ms, and the editor and the renderer were loaded with
+  `React.lazy`. They now load through `useModule` (`presentation/hooks/use-module.ts`),
+  which does not suspend, and the note page reads the note and loads the editor at the same
+  time. The renderer is prepared while idle too, and `MarkdownView` renders again only when
+  its note changes (it re-parsed the whole note on every focus change).
+- **Typing in long notes:** tag highlighting rebuilt its decoration set for the whole
+  document on every keystroke, which grows faster than the note does. It now moves the
+  previous tags with the edit and looks for tags only in the text blocks the edit changed.
+  In the 200 KB note, main-thread time per keystroke fell from 7.6 ms to 4.0 ms (script
+  5.0 ms → 1.5 ms); in a 20 KB note it is under 1 ms.
 
 Nothing else is worth optimizing at these numbers. The list renders 2,000 rows in the
 startup time above without virtualization; rows off screen skip layout

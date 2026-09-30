@@ -73,32 +73,62 @@ function placeholder(text: string) {
   });
 }
 
-/** The tags in the document, marked for styling: text outside code, as the tag rules say. */
-function tagDecorations(doc: Node): DecorationSet {
+/** The tags in the text block at `pos`, as the tag rules say; none in code. */
+function blockTags(block: Node, pos: number): Decoration[] {
+  if (block.type === nodes.code_block) return [];
+  // The block's text, code replaced by spaces and breaks by newlines, so
+  // offsets match positions and code never looks like a tag.
+  let text = "";
+  block.forEach((child) => {
+    if (!child.isText) text += "\n";
+    else if (marks.code.isInSet(child.marks)) text += " ".repeat(child.nodeSize);
+    else text += child.text ?? "";
+  });
+  return tagRanges(text).map(({ from, to }) =>
+    Decoration.inline(pos + 1 + from, pos + 1 + to, { class: "md-tag" }),
+  );
+}
+
+/** The tags in the document, marked for styling. */
+export function tagDecorations(doc: Node): DecorationSet {
   const decorations: Decoration[] = [];
   doc.descendants((node, pos) => {
-    if (node.type === nodes.code_block) return false;
     if (!node.isTextblock) return true;
-    // The block's text, code replaced by spaces and breaks by newlines, so
-    // offsets match positions and code never looks like a tag.
-    let text = "";
-    node.forEach((child) => {
-      if (!child.isText) text += "\n";
-      else if (marks.code.isInSet(child.marks)) text += " ".repeat(child.nodeSize);
-      else text += child.text ?? "";
-    });
-    for (const { from, to } of tagRanges(text)) {
-      decorations.push(Decoration.inline(pos + 1 + from, pos + 1 + to, { class: "md-tag" }));
-    }
+    decorations.push(...blockTags(node, pos));
     return false;
   });
   return DecorationSet.create(doc, decorations);
 }
 
+/**
+ * The tags after `tr`: the previous ones moved with the text, and those of
+ * the text blocks it changed found anew. Building the set for a whole long
+ * document on every keystroke would make typing in it slow.
+ */
+function updatedTags(tr: Transaction, previous: DecorationSet): DecorationSet {
+  const mapped = previous.map(tr.mapping, tr.doc);
+  const start = tr.before.content.findDiffStart(tr.doc.content);
+  const end = tr.before.content.findDiffEnd(tr.doc.content);
+  if (start === null || end === null) return mapped;
+  // Repeated text can make the ends overlap the start: move them after it.
+  const to = end.b + Math.max(0, start - Math.min(end.a, end.b));
+  const size = tr.doc.content.size;
+  const stale: Decoration[] = [];
+  const fresh: Decoration[] = [];
+  // One position wider, so a change at a block's edge counts for that block.
+  tr.doc.nodesBetween(Math.max(0, start - 1), Math.min(size, to + 1), (node, pos) => {
+    if (!node.isTextblock) return true;
+    stale.push(...mapped.find(pos, pos + node.nodeSize));
+    fresh.push(...blockTags(node, pos));
+    return false;
+  });
+  return mapped.remove(stale).add(tr.doc, fresh);
+}
+
 const tags: Plugin<DecorationSet> = new Plugin<DecorationSet>({
   state: {
     init: (_, state) => tagDecorations(state.doc),
-    apply: (tr, previous) => (tr.docChanged ? tagDecorations(tr.doc) : previous),
+    apply: (tr, previous) => (tr.docChanged ? updatedTags(tr, previous) : previous),
   },
   props: {
     decorations(state) {

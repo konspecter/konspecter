@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { memo, useEffect, useMemo } from "react";
 import Markdown, { type Components, type Options } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import rehypeRaw from "rehype-raw";
@@ -8,7 +8,7 @@ import { omitLeadingTitle } from "./omit-leading-title";
 import { rehypeTags } from "./rehype-tags";
 import "./markdown.css";
 
-type MarkdownViewProps = {
+export type MarkdownViewProps = {
   /** The document body (without frontmatter). */
   markdown: string;
   /** The title the page already shows; a matching leading `# heading` is not repeated. */
@@ -54,20 +54,28 @@ const components: Components = {
  * in the Markdown is parsed and then sanitized with GitHub's allowlist, and
  * fenced code blocks with a language are syntax-highlighted.
  */
-export function MarkdownView({ markdown, title, titleDerived, onRendered }: MarkdownViewProps) {
+export const MarkdownView = memo(function MarkdownView({
+  markdown,
+  title,
+  titleDerived,
+  onRendered,
+}: MarkdownViewProps) {
   useEffect(() => {
     onRendered?.();
   }, [onRendered, markdown]);
 
-  const rehypePlugins: Options["rehypePlugins"] = [
-    rehypeRaw,
-    // Sanitizing must come after raw HTML is parsed and before anything adds
-    // markup of its own (highlighting spans).
-    rehypeSanitize,
-    [rehypeHighlight, { detect: false }],
-    rehypeTags,
-    [omitLeadingTitle, { title, derived: titleDerived }],
-  ];
+  const rehypePlugins = useMemo<Options["rehypePlugins"]>(
+    () => [
+      rehypeRaw,
+      // Sanitizing must come after raw HTML is parsed and before anything adds
+      // markup of its own (highlighting spans).
+      rehypeSanitize,
+      [rehypeHighlight, { detect: false }],
+      rehypeTags,
+      [omitLeadingTitle, { title, derived: titleDerived }],
+    ],
+    [title, titleDerived],
+  );
 
   return (
     <div className="markdown">
@@ -76,4 +84,4 @@ export function MarkdownView({ markdown, title, titleDerived, onRendered }: Mark
       </Markdown>
     </div>
   );
-}
+});

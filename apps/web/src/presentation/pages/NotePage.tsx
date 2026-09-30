@@ -15,7 +15,7 @@ import { Details } from "../components/details-slot";
 import { NoteDetails } from "../components/NoteDetails";
 import { NoteNotFound } from "../components/NoteNotFound";
 import { displayTitle } from "../components/note-title";
-import { LazyNoteEditor } from "../editors/LazyNoteEditor";
+import { LazyNoteEditor, preloadEditor } from "../editors/LazyNoteEditor";
 import type { DocumentEdit } from "../editors/NoteEditor";
 import { useAsync } from "../hooks/use-async";
 import { useReadingPosition } from "../hooks/use-reading-position";
@@ -48,14 +48,18 @@ export function NotePage({ store, mode, activity, readingPosition = "restore" }:
 
   const target = id !== undefined && continued === null ? id : null;
   // After any save of the note still running (the editor just left it), so
-  // the text shown is its latest. With it, where the caret was, to restore.
+  // the text shown is its latest. With it, where the caret was, to restore,
+  // and the editor's code (the first time), so the note opens in one step.
+  // An editor that fails to load reports that itself.
   const restoreCaret = readingPosition === "restore";
   const load = useCallback(async () => {
     if (target === null) return undefined;
+    const editor = preloadEditor().catch(() => undefined);
     await savesSettled(store, target);
     const [found, reading] = await Promise.all([
       store.get(target),
       restoreCaret ? store.readingState(target).catch(() => null) : null,
+      editor,
     ]);
     return found && { note: found, selection: reading?.selection ?? null };
   }, [store, target, restoreCaret]);

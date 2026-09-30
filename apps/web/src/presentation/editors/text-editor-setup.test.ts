@@ -1,7 +1,7 @@
-import { defaultMarkdownParser } from "prosemirror-markdown";
-import { TextSelection } from "prosemirror-state";
-import { EditorView } from "prosemirror-view";
-import { createTextEditorState, toolbarActions } from "./text-editor-setup";
+import { defaultMarkdownParser, schema } from "prosemirror-markdown";
+import { TextSelection, type EditorState } from "prosemirror-state";
+import { DecorationSet, EditorView } from "prosemirror-view";
+import { createTextEditorState, tagDecorations, toolbarActions } from "./text-editor-setup";
 import { toolbarTopFor } from "./TextEditor";
 
 function editorWith(markdown: string) {
@@ -32,6 +32,63 @@ describe("text editor quotes", () => {
 
     type(2, '"', "«");
     expect(view.state.doc.textContent).toBe("x«");
+  });
+});
+
+describe("tag highlighting", () => {
+  const ranges = (set: DecorationSet) => set.find().map(({ from, to }) => [from, to]);
+  const shown = (state: EditorState) =>
+    ranges(
+      state.plugins
+        .map((plugin) => plugin.getState(state) as unknown)
+        .find((value) => value instanceof DecorationSet) ?? DecorationSet.empty,
+    );
+
+  it("follows every edit as a rebuild of the whole document would", () => {
+    let state = createTextEditorState(
+      defaultMarkdownParser.parse("#one text `#code` #two\n\n- #item x\n\n```\n#no\n```\n\nend"),
+    );
+    // A fixed pseudo-random series of edits: typing, deleting, inline code,
+    // code blocks, splitting and joining blocks.
+    let seed = 7;
+    const random = (n: number) => {
+      seed = (seed * 1103515245 + 12345) % 2 ** 31;
+      return seed % n;
+    };
+    const inText = (pos: number) => state.doc.resolve(pos).parent.inlineContent;
+    const textPositions = () =>
+      Array.from({ length: state.doc.content.size + 1 }, (_, pos) => pos).filter(inText);
+    for (let step = 0; step < 400; step++) {
+      const positions = textPositions();
+      const at = positions[random(positions.length)] ?? 1;
+      const other = positions[random(positions.length)] ?? 1;
+      const [from, to] = at <= other ? [at, other] : [other, at];
+      const tr = state.tr;
+      switch (random(6)) {
+        case 0:
+        case 1:
+          tr.insertText(["#", "a", " ", "_", "/", "#b"][random(6)] ?? "#", at);
+          break;
+        case 2:
+          if (state.doc.resolve(from).sameParent(state.doc.resolve(to))) tr.delete(from, to);
+          break;
+        case 3:
+          tr.addMark(from, to, schema.marks.code.create());
+          break;
+        case 4:
+          tr.split(at);
+          break;
+        default:
+          tr.setBlockType(
+            from,
+            to,
+            random(2) === 0 ? schema.nodes.code_block : schema.nodes.paragraph,
+          );
+      }
+      if (!tr.docChanged) continue;
+      state = state.apply(tr);
+      expect(shown(state)).toEqual(ranges(tagDecorations(state.doc)));
+    }
   });
 });
 

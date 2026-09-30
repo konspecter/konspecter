@@ -1,9 +1,9 @@
 import type { Node } from "prosemirror-model";
-import { lazy, memo, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { InvalidDocumentError, documentTitle, parseDocument } from "../../domain/document/document";
 import type { EditorSelection } from "../../domain/reading/reading";
 import type { EditorMode } from "../../domain/settings/settings";
-import { ErrorState } from "../components/ErrorState";
+import { LazyMarkdownView } from "../markdown/LazyMarkdownView";
 import { markdownToTextDoc, textDocToMarkdown } from "./text-markdown";
 import { MarkdownSourceEditor } from "./MarkdownSourceEditor";
 import { MetadataFields } from "./MetadataFields";
@@ -13,17 +13,6 @@ import { t } from "../i18n/i18n";
 import { withBody, withSavedDates, type Note } from "../../domain/note/note";
 
 export type { EditorMode };
-
-// Only notes the text editor cannot represent are shown rendered; load the
-// renderer for them alone.
-const MarkdownView = lazy(() =>
-  import("../markdown/MarkdownView").then(
-    (module) => ({ default: module.MarkdownView }),
-    (error: unknown) => ({
-      default: () => <ErrorState title={t("editor.readerLoadFailed")} error={error} />,
-    }),
-  ),
-);
 
 export type NoteEditorProps = {
   /** Read when the editor mounts; remount (a new key) to open other text. */
@@ -341,14 +330,12 @@ export const NoteEditor = memo(function NoteEditor({
         />
       )}
       {view.kind === "rendered" && (
-        <Suspense fallback={null}>
-          <MarkdownView
-            markdown={view.body}
-            title={view.title}
-            titleDerived={view.titleDerived}
-            {...(onReady ? { onRendered: onReady } : {})}
-          />
-        </Suspense>
+        <LazyMarkdownView
+          markdown={view.body}
+          title={view.title}
+          titleDerived={view.titleDerived}
+          {...(onReady ? { onRendered: onReady } : {})}
+        />
       )}
     </div>
   );

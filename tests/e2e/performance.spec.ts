@@ -25,6 +25,10 @@ test("a library of 2,000 notes stays fast", async ({ page }) => {
     console.log(`PERF ${label}: ${ms.toFixed(0)} ms`);
   };
 
+  // Every visit of "/" opens the list: the app would go back to where it was last.
+  await page.addInitScript(() => {
+    localStorage.removeItem("konspecter.lastLocation");
+  });
   await page.goto("/settings");
   let start = Date.now();
   await page.getByLabel("Import .md files…").setInputFiles([
@@ -99,4 +103,26 @@ test("a library of 2,000 notes stays fast", async ({ page }) => {
   await expect(page.getByRole("img", { name: "Everything is stored on this device" })).toBeVisible({
     timeout: 10_000,
   });
+
+  // Opening the app on a note: nothing may hold the editor back once its code
+  // and the note are there (a Suspense fallback made React wait 300 ms).
+  await page.goto("/");
+  await page
+    .getByRole("complementary", { name: "Sidebar" })
+    .getByRole("link", { name: "Note 3", exact: true })
+    .click();
+  await expect(page.getByRole("textbox", { name: "Conspect text" })).toContainText("Note 3");
+  await page.reload();
+  const shown = await page.evaluate(
+    () =>
+      new Promise<number>((resolve) => {
+        const check = () => {
+          if (document.querySelector(".ProseMirror")) resolve(performance.now());
+          else requestAnimationFrame(check);
+        };
+        check();
+      }),
+  );
+  log("open the app on a note (page load to editor)", shown);
+  expect(shown).toBeLessThan(2000);
 });

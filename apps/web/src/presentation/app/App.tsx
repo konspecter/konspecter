@@ -11,6 +11,7 @@ import type { NoteRepository } from "../../application/notes/note-repository";
 import type { SyncEngine } from "../../infrastructure/sync/sync-engine";
 import { Layout } from "../components/Layout";
 import { preloadEditor } from "../editors/LazyNoteEditor";
+import { preloadReader } from "../markdown/LazyMarkdownView";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { NotePage } from "../pages/NotePage";
 import { NotesPage } from "../pages/NotesPage";
@@ -69,12 +70,14 @@ export function App({
 
   useEffect(() => catalog.start(), [catalog]);
 
-  // Nothing waits for these; they only make the first note and the first
-  // search immediate.
+  // Nothing waits for these; they only make the first note (rich text or
+  // rendered) and the first search immediate.
   useEffect(
     () =>
       whenIdle(() => {
-        preloadEditor().catch(() => undefined);
+        preloadEditor()
+          .then(preloadReader)
+          .catch(() => undefined);
         store.search({ words: [], tags: [] }).catch(() => undefined);
       }),
     [store],
