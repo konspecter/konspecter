@@ -105,6 +105,15 @@ export function ChevronIcon() {
   );
 }
 
+/** A cross: close a dialog. */
+export function CloseIcon() {
+  return (
+    <Icon>
+      <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />
+    </Icon>
+  );
+}
+
 /** A closed folder, lightly filled: a tag in the tag tree. */
 export function FolderIcon() {
   return (

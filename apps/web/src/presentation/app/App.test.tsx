@@ -1292,8 +1292,9 @@ describe("settings and the top bar", () => {
     renderWithSettings(await newStore(), "/settings");
 
     const section = screen.getByRole("region", { name: "Keyboard shortcuts" });
-    expect(section).toHaveTextContent("Ctrl+PSearch");
-    expect(section).toHaveTextContent("Ctrl+NNew conspect");
+    // One row per action, with every key that does it.
+    expect(section).toHaveTextContent("Ctrl+Por/Search");
+    expect(section).toHaveTextContent("Ctrl+NornNew conspect");
     expect(section).toHaveTextContent("Ctrl+,Settings");
   });
 });
@@ -1970,6 +1971,12 @@ describe("keyboard shortcuts", () => {
     expect(within(dialog).getByRole("button", { name: "Close" })).toHaveFocus();
 
     await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    // The close button (an icon in the dialog's corner) closes it too.
+    await userEvent.keyboard("?");
+    const reopened = await screen.findByRole("dialog", { name: "Keyboard shortcuts" });
+    await userEvent.click(within(reopened).getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });

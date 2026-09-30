@@ -59,6 +59,7 @@ export const en = {
   "shortcut.editorMode": "Switch between the text editor and Markdown",
   "shortcut.help": "Show these shortcuts",
   "shortcuts.title": "Keyboard shortcuts",
+  "shortcuts.or": "or",
 
   "note.untitled": "Untitled",
   "note.unreadable": "Unreadable conspect",

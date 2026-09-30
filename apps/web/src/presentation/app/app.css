@@ -1430,6 +1430,19 @@ kbd {
   font-size: 18px;
 }
 
+/* The title, and the close button in the top right corner. */
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: -0.25rem -0.75rem 1rem 0;
+}
+
+.dialog-header h2 {
+  margin: 0;
+}
+
 .dialog-message {
   margin: -0.25rem 0 0;
   color: var(--color-muted);
@@ -1458,6 +1471,27 @@ kbd {
 .shortcuts dt,
 .shortcuts dd {
   margin: 0;
+}
+
+/* Every key of the action on one line: "⌘P or /". */
+.shortcuts dt {
+  flex: none;
+}
+
+.shortcut-or {
+  margin: 0 0.35em;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+/* A description keeps to the right edge, also when it wraps. */
+.shortcuts dd {
+  text-align: right;
+}
+
+/* The dialog ends with the list: its padding is the gap below. */
+.dialog .shortcuts {
+  margin-bottom: 0;
 }
 
 .offline-storage .shortcuts {

@@ -25,6 +25,18 @@ export const SHORTCUTS = {
 
 export type ShortcutName = keyof typeof SHORTCUTS;
 
+/**
+ * The shortcuts as the user reads them: one row per action, with every key
+ * that does it ("Mod+P" and "/" both search), in the table's order.
+ */
+export function shortcutGroups(): { label: TextKey; keys: string[] }[] {
+  const groups = new Map<TextKey, string[]>();
+  for (const { keys, label } of Object.values(SHORTCUTS)) {
+    groups.set(label, [...(groups.get(label) ?? []), keys]);
+  }
+  return [...groups].map(([label, keys]) => ({ label, keys }));
+}
+
 type NavigatorWithData = Navigator & { userAgentData?: { platform?: string } };
 
 export function isMac(): boolean {

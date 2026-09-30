@@ -67,6 +67,7 @@ export const ru: Dictionary = {
   "shortcut.editorMode": "Переключить текстовый редактор и Markdown",
   "shortcut.help": "Показать эти сочетания клавиш",
   "shortcuts.title": "Сочетания клавиш",
+  "shortcuts.or": "или",
 
   "note.untitled": "Без названия",
   "note.unreadable": "Нечитаемый конспект",

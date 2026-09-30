@@ -1,15 +1,21 @@
-import { useEffect, useRef } from "react";
-import { formatKeys, SHORTCUTS } from "../app/shortcuts";
+import { Fragment, useEffect, useRef } from "react";
+import { formatKeys, shortcutGroups } from "../app/shortcuts";
 import { t } from "../i18n/i18n";
+import { CloseIcon } from "./icons";
 
-/** The shortcut registry as a definition list (the dialog and Settings). */
+/** The shortcut registry as a definition list, one row per action (the dialog and Settings). */
 export function ShortcutList() {
   return (
     <dl className="shortcuts">
-      {Object.values(SHORTCUTS).map(({ keys, label }) => (
-        <div key={keys}>
+      {shortcutGroups().map(({ keys, label }) => (
+        <div key={label}>
           <dt>
-            <kbd>{formatKeys(keys)}</kbd>
+            {keys.map((key, index) => (
+              <Fragment key={key}>
+                {index > 0 && <span className="shortcut-or">{t("shortcuts.or")}</span>}
+                <kbd>{formatKeys(key)}</kbd>
+              </Fragment>
+            ))}
           </dt>
           <dd>{t(label)}</dd>
         </div>
@@ -42,11 +48,20 @@ export function ShortcutsDialog({ onClose }: { onClose: () => void }) {
           event.stopPropagation();
         }}
       >
-        <h2 id="shortcuts-title">{t("shortcuts.title")}</h2>
+        <div className="dialog-header">
+          <h2 id="shortcuts-title">{t("shortcuts.title")}</h2>
+          <button
+            ref={close}
+            type="button"
+            className="icon-button"
+            aria-label={t("app.close")}
+            title={t("app.close")}
+            onClick={onClose}
+          >
+            <CloseIcon />
+          </button>
+        </div>
         <ShortcutList />
-        <button ref={close} type="button" className="button" onClick={onClose}>
-          {t("app.close")}
-        </button>
       </div>
     </div>
   );

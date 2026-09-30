@@ -1,4 +1,4 @@
-import { formatKeys, matchesShortcut } from "./shortcuts";
+import { formatKeys, matchesShortcut, shortcutGroups } from "./shortcuts";
 
 const key = (init: KeyboardEventInit) => new KeyboardEvent("keydown", init);
 
@@ -65,5 +65,17 @@ describe("formatKeys", () => {
     expect(formatKeys("Mod+,", false)).toBe("Ctrl+,");
     expect(formatKeys("?", true)).toBe("?");
     expect(formatKeys("Escape", true)).toBe("Esc");
+  });
+});
+
+describe("shortcutGroups", () => {
+  it("lists each action once, with every key that does it", () => {
+    const groups = shortcutGroups();
+    expect(groups.find((group) => group.label === "shortcut.search")?.keys).toEqual(["Mod+P", "/"]);
+    expect(groups.find((group) => group.label === "shortcut.newNote")?.keys).toEqual([
+      "Mod+N",
+      "n",
+    ]);
+    expect(new Set(groups.map((group) => group.label)).size).toBe(groups.length);
   });
 });
