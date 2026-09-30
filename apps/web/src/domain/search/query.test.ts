@@ -1,5 +1,4 @@
 import { joinQuery, queryParts, takeTags, isEmptyQuery, parseQuery, withoutTag } from "./query";
-import { parseTagName, type Tag } from "../tag/tags";
 
 const tagNames = (input: string) => parseQuery(input).tags.map((tag) => tag.name);
 
@@ -11,11 +10,8 @@ describe("parseQuery", () => {
     expect(query.tags.map((tag) => tag.name)).toEqual(["java"]);
   });
 
-  it("reads hierarchical tags with or without a leading hash", () => {
-    expect(tagNames("#java#collections java#streams")).toEqual([
-      "java#collections",
-      "java#streams",
-    ]);
+  it("reads a chain as a filter per tag, with or without a leading hash", () => {
+    expect(tagNames("#java#collections java#streams")).toEqual(["java", "collections", "streams"]);
   });
 
   it("treats a plain word as a word, even if a tag has that name", () => {
@@ -39,8 +35,11 @@ describe("parseQuery", () => {
 
 describe("withoutTag", () => {
   it("removes the tokens that select a tag and keeps the rest", () => {
-    const java = parseTagName("java") as Tag;
-    expect(withoutTag("hashmap #Java  #go java", java)).toBe("hashmap #go java");
+    expect(withoutTag("hashmap #Java  #go java", { name: "java" })).toBe("hashmap #go java");
+  });
+
+  it("keeps the other tags of a chain that selects it", () => {
+    expect(withoutTag("#java#collections#maps x", { name: "collections" })).toBe("#java #maps x");
   });
 });
 
@@ -52,7 +51,7 @@ describe("query parts", () => {
 
   it("splits a query into its tag filters and the other words", () => {
     expect(names(queryParts("hash #java  maps #java#collections"))).toEqual([
-      ["java", "java#collections"],
+      ["java", "collections"],
       "hash maps",
     ]);
   });

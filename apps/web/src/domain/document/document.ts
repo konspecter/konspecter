@@ -119,16 +119,18 @@ function parseFrontmatter(yaml: string): Document {
   const document = parseYaml(yaml);
   const [error] = document.errors;
   if (error) {
-    throw new InvalidDocumentError(`Frontmatter is not valid YAML: ${firstLine(error.message)}`);
+    // The parser's own wording is not shown; the line says where to look.
+    const line = error.linePos?.[0].line;
+    throw new InvalidDocumentError(
+      line === undefined
+        ? "Frontmatter is not valid YAML"
+        : `Frontmatter line ${String(line)} is not valid YAML`,
+    );
   }
   if (document.contents !== null && !isMap(document.contents)) {
     throw new InvalidDocumentError("Frontmatter must be a set of key: value pairs");
   }
   return document;
-}
-
-function firstLine(text: string): string {
-  return text.split("\n", 1)[0] ?? text;
 }
 
 function readMetadata(frontmatter: Document): Metadata {

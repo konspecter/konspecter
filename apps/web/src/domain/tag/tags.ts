@@ -2,14 +2,22 @@ import MarkdownIt from "markdown-it";
 import type Token from "markdown-it/lib/token.mjs";
 
 /**
- * A tag is a path of one or more segments: `#java` is ["java"], and
- * `#java#collections` is ["java", "collections"], a child of `java`.
- * Tags are case-insensitive and stored in lowercase.
- * See docs/architecture/tags.md for the full rules.
+ * A tag is one name: `#java` is the tag java. Tags are case-insensitive and
+ * stored in lowercase. See docs/architecture/tags.md for the full rules.
  */
 export type Tag = {
-  readonly path: readonly string[];
-  /** The canonical form, segments joined by "#": "java#collections". */
+  readonly name: string;
+};
+
+/**
+ * Tags written as a chain: `#java#collections` is the tags java and
+ * collections, and says that collections has the parent java. Each tag of a
+ * chain is the parent of the next.
+ */
+export type TagChain = {
+  /** Outermost first: java, collections. */
+  readonly tags: readonly Tag[];
+  /** The canonical form, names joined by "#": "java#collections". */
   readonly name: string;
 };
 
@@ -20,57 +28,71 @@ tokenizer.disable("text_join");
 
 /**
  * `#` starts a tag unless it follows a letter, digit, `_` or another `#`
- * (so `C#`, `foo#bar` and `##` are not tags). Segments are letters, digits,
- * `_` and `-`; further `#segment`s make the tag hierarchical.
+ * (so `C#`, `foo#bar` and `##` are not tags). Names are letters, digits,
+ * `_` and `-`; further `#name`s make a chain.
  */
 const TAG = /(?<![\p{L}\p{N}_#])#([\p{L}\p{N}_-]+(?:#[\p{L}\p{N}_-]+)*)/gu;
 const ALL_DIGITS = /^\p{N}+$/u;
 
-/** All tags in a Markdown body, deduplicated, in order of first appearance. */
+/** All tags in a Markdown body, each once, in order of first appearance. */
 export function parseTags(markdown: string): Tag[] {
-  return tagsAsWritten(markdown).map(([tag]) => tag);
+  return writtenTagList(writtenTags(markdown)).map(({ tag }) => tag);
 }
 
 /**
- * The tags of a Markdown body as first written there, case kept and without
- * the leading "#" ("Java#Linked_List"), in the order of `parseTags`.
+ * The tag chains of a Markdown body as first written there, case kept and
+ * without the leading "#" ("Java#Linked_List"), each once, in order.
  */
 export function writtenTags(markdown: string): string[] {
-  return tagsAsWritten(markdown).map(([, written]) => written);
-}
-
-function tagsAsWritten(markdown: string): [Tag, string][] {
-  const seen = new Map<string, [Tag, string]>();
+  const seen = new Map<string, string>();
   for (const text of taggableText(tokenizer.parse(markdown, {}))) {
     for (const match of text.matchAll(TAG)) {
       const written = match[1] ?? "";
-      const tag = toTag(written);
-      if (tag && !seen.has(tag.name)) seen.set(tag.name, [tag, written]);
+      const chain = toChain(written);
+      if (chain && !seen.has(chain.name)) seen.set(chain.name, written);
     }
   }
   return [...seen.values()];
 }
 
 /**
+ * The tags of chains as written, each once with its first spelling, in order:
+ * ["Java#Collections", "java#streams"] → Java, Collections, streams. What a
+ * note shows as its list of tags. Entries that are not chains are skipped.
+ */
+export function writtenTagList(chains: readonly string[]): { tag: Tag; written: string }[] {
+  const seen = new Map<string, { tag: Tag; written: string }>();
+  for (const chain of chains) {
+    const parsed = parseTagChain(chain);
+    if (!parsed) continue;
+    const spellings = chain.trim().replace(/^#/, "").split("#");
+    parsed.tags.forEach((tag, index) => {
+      if (!seen.has(tag.name)) seen.set(tag.name, { tag, written: spellings[index] ?? tag.name });
+    });
+  }
+  return [...seen.values()];
+}
+
+/**
  * Where tags are in a piece of plain text (no Markdown syntax), as ranges that
- * include the "#". For marking tags in editors, which already know which text
- * is code; the same rules as `parseTags` otherwise.
+ * include the "#", a chain as one range. For marking tags in editors, which
+ * already know which text is code; the same rules as `parseTags` otherwise.
  */
 export function tagRanges(text: string): { from: number; to: number }[] {
   const ranges: { from: number; to: number }[] = [];
   for (const match of text.matchAll(TAG)) {
-    if (toTag(match[1] ?? ""))
+    if (toChain(match[1] ?? ""))
       ranges.push({ from: match.index, to: match.index + match[0].length });
   }
   return ranges;
 }
 
-function toTag(raw: string): Tag | null {
-  const path = raw.toLowerCase().split("#");
-  const [first] = path;
+function toChain(raw: string): TagChain | null {
+  const names = raw.toLowerCase().split("#");
+  const [first] = names;
   // "#123" is more likely an issue number than a tag.
   if (first === undefined || ALL_DIGITS.test(first)) return null;
-  return { path, name: path.join("#") };
+  return { tags: names.map((name) => ({ name })), name: names.join("#") };
 }
 
 /** Plain text content, excluding code, HTML, images and URLs shown as link text. */
@@ -93,98 +115,122 @@ function* taggableText(tokens: readonly Token[]): Generator<string> {
   }
 }
 
-export function parseTagName(name: string): Tag | null {
-  const trimmed = name.trim().replace(/^#/, "");
+/** A tag or chain typed by the user, with or without the leading "#". */
+export function parseTagChain(written: string): TagChain | null {
+  const trimmed = written.trim().replace(/^#/, "");
   const match = /^[\p{L}\p{N}_-]+(?:#[\p{L}\p{N}_-]+)*$/u.exec(trimmed);
-  return match ? toTag(trimmed) : null;
+  return match ? toChain(trimmed) : null;
 }
 
-/** The tag and each of its ancestors, outermost first: java, java#collections. */
-export function tagWithAncestors(tag: Tag): Tag[] {
-  return tag.path.map((_, index) => {
-    const path = tag.path.slice(0, index + 1);
-    return { path, name: path.join("#") };
+/** The parent links a chain makes, as [parent, child] names; none to itself. */
+export function chainLinks(chain: TagChain): [string, string][] {
+  const links: [string, string][] = [];
+  chain.tags.forEach((tag, index) => {
+    const parent = chain.tags[index - 1];
+    if (parent && parent.name !== tag.name) links.push([parent.name, tag.name]);
   });
-}
-
-/** True if `tag` is `ancestor` or nested somewhere below it. */
-export function isWithin(tag: Tag, ancestor: Tag): boolean {
-  return (
-    ancestor.path.length <= tag.path.length &&
-    ancestor.path.every((segment, index) => tag.path[index] === segment)
-  );
+  return links;
 }
 
 export type TagNode = {
   readonly tag: Tag;
   /** What the tree shows: see `tagLabel`. */
   readonly label: string;
-  /** Notes tagged with this tag or any tag below it. */
+  /** Notes tagged with this tag. */
   readonly count: number;
   readonly children: readonly TagNode[];
 };
 
 /**
- * Arranges tag counts into a tree, siblings sorted by name. A tag whose parent
- * is missing from the input becomes a root. `spelling` is the tag as written
- * (see `tagSpellings`); without it the tag shows in lowercase. `capitalize`
- * starts every label with a capital letter.
+ * Arranges tags into a tree, siblings sorted by name. `parents` are the tags
+ * a chain writes right before this one, in any note; a tag shows under each
+ * of them, and only a tag without a parent is a root. Tags reachable only
+ * through a cycle (`#a#b` and `#b#a`) get a root too: the first by name. A
+ * branch stops before a tag already above it. `spelling` is the tag as
+ * written (see `tagSpellings`); without it the tag shows in lowercase.
+ * `capitalize` starts every label with a capital letter.
  */
 export function tagTree(
-  counts: readonly { tag: Tag; count: number; spelling?: string }[],
+  counts: readonly { tag: Tag; count: number; spelling?: string; parents?: readonly string[] }[],
   { capitalize = false }: { capitalize?: boolean } = {},
 ): TagNode[] {
-  type Mutable = { tag: Tag; label: string; count: number; children: Mutable[] };
-  const byName = new Map<string, Mutable>();
-  for (const { tag, count, spelling } of counts) {
-    const label = tagLabel(spelling ?? tag.name, capitalize);
-    byName.set(tag.name, { tag, label, count, children: [] });
-  }
-  const roots: Mutable[] = [];
-  for (const node of byName.values()) {
-    const parent = byName.get(node.tag.path.slice(0, -1).join("#"));
-    if (node.tag.path.length > 1 && parent) {
-      parent.children.push(node);
-    } else {
-      roots.push(node);
+  const byName = new Map(counts.map((entry) => [entry.tag.name, entry]));
+  const names = [...byName.keys()].sort(byCodePoint);
+  const children = new Map<string, string[]>();
+  const hasParent = new Set<string>();
+  for (const name of names) {
+    for (const parent of new Set(byName.get(name)?.parents)) {
+      if (parent === name || !byName.has(parent)) continue;
+      children.set(parent, [...(children.get(parent) ?? []), name]);
+      hasParent.add(name);
     }
   }
-  const sort = (nodes: Mutable[]): Mutable[] =>
-    nodes
-      .sort((a, b) => (a.tag.name < b.tag.name ? -1 : a.tag.name > b.tag.name ? 1 : 0))
-      .map((node) => ({ ...node, children: sort(node.children) }));
-  return sort(roots);
+
+  const roots = names.filter((name) => !hasParent.has(name));
+  const reached = new Set<string>();
+  const reach = (start: string) => {
+    const pending = [start];
+    for (let name = pending.pop(); name !== undefined; name = pending.pop()) {
+      if (reached.has(name)) continue;
+      reached.add(name);
+      pending.push(...(children.get(name) ?? []));
+    }
+  };
+  roots.forEach(reach);
+  for (const name of names) {
+    if (!reached.has(name)) {
+      roots.push(name);
+      reach(name);
+    }
+  }
+
+  const node = (name: string, above: ReadonlySet<string>): TagNode => {
+    const entry = byName.get(name);
+    const path = new Set(above).add(name);
+    return {
+      tag: entry?.tag ?? { name },
+      label: tagLabel(entry?.spelling ?? name, capitalize),
+      count: entry?.count ?? 0,
+      children: (children.get(name) ?? [])
+        .filter((child) => !path.has(child))
+        .map((child) => node(child, path)),
+    };
+  };
+  return roots.sort(byCodePoint).map((name) => node(name, new Set()));
+}
+
+function byCodePoint(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/** True if the tag named `name` is somewhere below `node`. */
+export function tagTreeContains(node: TagNode, name: string): boolean {
+  return node.children.some((child) => child.tag.name === name || tagTreeContains(child, name));
 }
 
 /**
- * How a tag is shown inside the tree: the last segment of its spelling, case
- * kept, with "_" shown as a space ("Java#Linked_List" → "Linked List"), and
- * with a capital first letter if `capitalize` ("новые_технологии" → "Новые технологии").
+ * How a tag is shown inside the tree: its spelling, case kept, with "_" shown
+ * as a space ("Linked_List" → "Linked List"), and with a capital first letter
+ * if `capitalize` ("новые_технологии" → "Новые технологии").
  */
 export function tagLabel(spelling: string, capitalize = false): string {
-  const label = (spelling.split("#").at(-1) ?? spelling).replaceAll("_", " ");
+  const label = spelling.replaceAll("_", " ");
   if (!capitalize) return label;
   const [first = "", ...rest] = label;
   return first.toLocaleUpperCase() + rest.join("");
 }
 
 /**
- * One spelling per tag name, for display, from each note's tags as written
- * (`writtenTags`). An ancestor is spelled as written before its child
- * ("Java" from "Java#Streams"). When notes differ ("#Java", "#java"), the
- * spelling in most notes wins; a tie goes to the first in code point order,
- * so capitals win.
+ * One spelling per tag name, for display, from each note's tag chains as
+ * written (`writtenTags`): "Java#Streams" spells java "Java". When notes
+ * differ ("#Java", "#java"), the spelling in most notes wins; a tie goes to
+ * the first in code point order, so capitals win.
  */
 export function tagSpellings(notes: Iterable<readonly string[]>): Map<string, string> {
   const votes = new Map<string, Map<string, number>>();
   for (const written of notes) {
     // Each note votes once per spelling.
-    const spelled = new Set(
-      written.flatMap((tag) => {
-        const segments = tag.split("#");
-        return segments.map((_, index) => segments.slice(0, index + 1).join("#"));
-      }),
-    );
+    const spelled = new Set(written.flatMap((chain) => chain.split("#")));
     for (const spelling of spelled) {
       const name = spelling.toLowerCase();
       const counts = votes.get(name) ?? new Map<string, number>();

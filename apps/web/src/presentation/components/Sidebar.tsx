@@ -4,20 +4,21 @@ import {
   useEffect,
   useState,
   useSyncExternalStore,
+  type KeyboardEvent,
   type MouseEvent,
   type Ref,
 } from "react";
 import { Link } from "react-router";
 import { tagTree, type Tag, type TagNode } from "../../domain/tag/tags";
 import {
-  notesTaggedExactly,
+  notesInTag,
   type NoteCatalog,
   type NoteSummary,
 } from "../../application/notes/note-catalog";
 import type { NoteRepository } from "../../application/notes/note-repository";
 import type { TagNames } from "../../domain/settings/settings";
 import { formatKeys, SHORTCUTS } from "../app/shortcuts";
-import { GearIcon, ListIcon, NewNoteIcon, SidebarIcon } from "./icons";
+import { GearIcon, NewNoteIcon, SidebarIcon } from "./icons";
 import { summaryTitle } from "./note-title";
 import { TagTreeView } from "./TagTreeView";
 import { t } from "../i18n/i18n";
@@ -39,6 +40,30 @@ type SidebarProps = {
   /** Receives the footer element where the open page shows its details. */
   detailsRef?: Ref<HTMLDivElement>;
 };
+
+/** The rows ↑/↓ move between: the tag folders and notes of the tree, then the recent notes. */
+export const SIDEBAR_ROWS = "a.tree-label, a.tree-document, a.recent-link";
+
+/** The row an element belongs to (a folder's toggle belongs to its name). */
+function rowOf(element: Element): HTMLElement | null {
+  const row = element.closest<HTMLElement>(".tree-document, .recent-link, .tree-row");
+  return row?.matches(".tree-document, .recent-link")
+    ? row
+    : (row?.querySelector<HTMLElement>("a.tree-label") ?? null);
+}
+
+/** ↑/↓: the previous or next visible row, the tree and the recent list as one flat list. */
+function moveBetweenRows(event: KeyboardEvent<HTMLElement>): void {
+  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+  if (!(event.target instanceof Element)) return;
+  const row = rowOf(event.target);
+  if (row === null) return;
+  const rows = [...event.currentTarget.querySelectorAll<HTMLElement>(SIDEBAR_ROWS)];
+  const next = rows[rows.indexOf(row) + (event.key === "ArrowDown" ? 1 : -1)];
+  event.preventDefault();
+  next?.focus();
+}
 
 /** Tooltip text with the shortcut, e.g. "Settings (⌘,)". */
 export function withShortcut(label: string, keys: string): string {
@@ -99,14 +124,6 @@ export const Sidebar = memo(function Sidebar({
           <GearIcon />
         </Link>
         <Link
-          to="/"
-          className="icon-button"
-          aria-label={t("sidebar.allNotes")}
-          title={withShortcut(t("sidebar.allNotes"), SHORTCUTS.allNotes.keys)}
-        >
-          <ListIcon />
-        </Link>
-        <Link
           to="/notes/new"
           className="icon-button"
           aria-label={t("sidebar.newNote")}
@@ -115,7 +132,7 @@ export const Sidebar = memo(function Sidebar({
           <NewNoteIcon />
         </Link>
       </div>
-      <div className="sidebar-scroll">
+      <div className="sidebar-scroll" onKeyDown={moveBetweenRows}>
         <SidebarTags
           store={store}
           library={library}
@@ -175,7 +192,7 @@ function SidebarTags({ store, library, activeTag, currentNoteId, tagNames }: Sid
   const [tree, setTree] = useState<readonly TagNode[] | null>(null);
   // A new loader for every change, so open folders read their notes again.
   const loadNotes = useCallback(
-    (tag: Tag) => notesTaggedExactly(store, tag),
+    (tag: Tag) => notesInTag(store, tag),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- library marks the change
     [store, library],
   );

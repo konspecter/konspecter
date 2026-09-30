@@ -23,7 +23,8 @@ export type SyncStatus = {
   readonly pending: number;
   /** Notes held back: changes the server refused. */
   readonly blocked: number;
-  readonly error: string | null;
+  /** Why the last cycle failed (not set when offline); the interface words it. */
+  readonly error: Error | null;
 };
 
 type StoredConfig = ServerConfig & { readonly account: Account };
@@ -345,7 +346,7 @@ export class SyncEngine {
       const offline = error instanceof NetworkError;
       await this.#refreshCounts({
         state: offline ? "offline" : "error",
-        error: offline ? null : describe(error),
+        error: offline ? null : error instanceof Error ? error : new Error(String(error)),
       });
       this.#schedule(this.#retryDelay());
     }
@@ -468,11 +469,4 @@ function parseStoredConfig(
   if (typeof serverUrl !== "string") return null;
   if (typeof id !== "string" || typeof email !== "string") return null;
   return { serverUrl, token: typeof token === "string" ? token : null, account: { id, email } };
-}
-
-function describe(error: unknown): string {
-  if (error instanceof ApiError && error.status === 401) {
-    return "The server did not accept the token. Connect again with a valid token.";
-  }
-  return error instanceof Error ? error.message : String(error);
 }

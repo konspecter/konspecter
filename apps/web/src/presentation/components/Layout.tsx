@@ -13,9 +13,10 @@ import { useShortcuts } from "../hooks/use-shortcuts";
 import { Antenna } from "./Antenna";
 import { DetailsSlot } from "./details-slot";
 import { ListIcon, NewNoteIcon, SidebarIcon } from "./icons";
+import { NO_FIND, NoteFindContext, type NoteFind, type NoteFindChannel } from "./note-find";
 import { SearchBox } from "./SearchBox";
 import { ShortcutsDialog } from "./ShortcutsDialog";
-import { Sidebar, withShortcut } from "./Sidebar";
+import { Sidebar, SIDEBAR_ROWS, withShortcut } from "./Sidebar";
 import { SyncIndicator } from "./SyncIndicator";
 import { ModeToggle, ThemeToggle, useDarkTheme } from "./TopBarControls";
 import { UpdateBanner } from "./UpdateBanner";
@@ -61,6 +62,17 @@ function rememberSidebar(open: boolean): void {
   }
 }
 
+/** Where Mod+\ enters the sidebar: the open note, else what is current there, else the first row. */
+function sidebarEntry(): HTMLElement | null {
+  const sidebar = document.getElementById("sidebar");
+  return (
+    sidebar?.querySelector<HTMLElement>(".recent-link[aria-current]") ??
+    sidebar?.querySelector<HTMLElement>(".sidebar-scroll [aria-current]") ??
+    sidebar?.querySelector<HTMLElement>(SIDEBAR_ROWS) ??
+    null
+  );
+}
+
 /**
  * The whole window: the sidebar on the left, and on the right a top bar
  * (search, theme, editor mode, activity) over the page content.
@@ -83,6 +95,7 @@ export function Layout({
   const noteMatch = useMatch("/notes/:id");
   const matchedId = noteMatch?.params.id;
   const currentNoteId = matchedId === undefined || matchedId === "new" ? null : matchedId;
+  const onNote = noteMatch !== null;
   const [sidebarOpen, setSidebarOpen] = useState(initialSidebarOpen);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [detailsSlot, setDetailsSlot] = useState<HTMLDivElement | null>(null);
@@ -90,6 +103,21 @@ export function Layout({
   const sidebarToggleRef = useRef<HTMLButtonElement>(null);
   const barToggleRef = useRef<HTMLButtonElement>(null);
   const dark = useDarkTheme(theme);
+  // On the note page the search box searches the note, unless it was opened
+  // for the library (Mod+P); that lasts until the box loses the focus.
+  const [find, setFind] = useState<NoteFind>(NO_FIND);
+  const [findCount, setFindCount] = useState(0);
+  const [libraryScope, setLibraryScope] = useState(false);
+  const selected = findCount === 0 ? 0 : Math.min(find.selected, findCount - 1);
+  const shownFind = useMemo(() => ({ ...find, selected }), [find, selected]);
+  const closeFind = useCallback(() => {
+    setFind(NO_FIND);
+    setFindCount(0);
+  }, []);
+  const findChannel = useMemo<NoteFindChannel>(
+    () => ({ find: shownFind, onCount: setFindCount, onClose: closeFind }),
+    [shownFind, closeFind],
+  );
   useScrollbarGutter();
   // The app opens where it was last time.
   useEffect(() => {
@@ -123,6 +151,29 @@ export function Layout({
       )?.focus();
     });
   }, []);
+  // Mod+\ that shows the sidebar also goes into it, to the open note; hiding
+  // it from there gives the focus back to where it was (the editor's caret).
+  const returnFocus = useRef<HTMLElement | null>(null);
+  const [sidebarEntered, setSidebarEntered] = useState(0);
+  useEffect(() => {
+    if (sidebarEntered > 0) sidebarEntry()?.focus();
+  }, [sidebarEntered]);
+  const toggleSidebarByKey = () => {
+    if (!sidebarOpen) {
+      const active = document.activeElement;
+      returnFocus.current =
+        active instanceof HTMLElement && active !== document.body ? active : null;
+      toggleSidebar();
+      setSidebarEntered((count) => count + 1);
+      return;
+    }
+    const back = returnFocus.current;
+    returnFocus.current = null;
+    if (back?.isConnected && document.activeElement?.closest("#sidebar")) {
+      back.focus({ preventScroll: true });
+    }
+    toggleSidebar();
+  };
   const closeSidebarOnNarrow = useCallback(() => {
     if (isNarrow()) setSidebarOpen(false);
   }, []);
@@ -132,7 +183,13 @@ export function Layout({
 
   const openSearch = () => {
     // An open note stays until something is typed.
-    if (location.pathname !== "/" && noteMatch === null) void navigate("/");
+    if (location.pathname !== "/" && !onNote) void navigate("/");
+    setLibraryScope(onNote);
+    searchRef.current?.focus();
+    searchRef.current?.select();
+  };
+  const openFind = () => {
+    setLibraryScope(false);
     searchRef.current?.focus();
     searchRef.current?.select();
   };
@@ -140,11 +197,13 @@ export function Layout({
   useShortcuts({
     search: openSearch,
     quickSearch: openSearch,
+    // Elsewhere Mod+F stays the browser's.
+    ...(onNote ? { find: openFind } : {}),
     allNotes: () => void navigate("/"),
     newNote,
     quickNewNote: newNote,
     settings: () => void navigate("/settings"),
-    toggleSidebar,
+    toggleSidebar: toggleSidebarByKey,
     editorMode: () => {
       onModeChange(mode === "markdown" ? "text" : "markdown");
     },
@@ -191,14 +250,6 @@ export function Layout({
                   <SidebarIcon />
                 </button>
                 <Link
-                  to="/"
-                  className="icon-button"
-                  aria-label={t("sidebar.allNotes")}
-                  title={withShortcut(t("sidebar.allNotes"), SHORTCUTS.allNotes.keys)}
-                >
-                  <ListIcon />
-                </Link>
-                <Link
                   to="/notes/new"
                   className="icon-button"
                   aria-label={t("sidebar.newNote")}
@@ -208,8 +259,42 @@ export function Layout({
                 </Link>
               </>
             )}
+            {/* Always here, right before the search: the list is what the search filters. */}
+            <Link
+              to="/"
+              className="icon-button topbar-list"
+              aria-label={t("sidebar.allNotes")}
+              title={withShortcut(t("sidebar.allNotes"), SHORTCUTS.allNotes.keys)}
+            >
+              <ListIcon />
+            </Link>
           </div>
-          <SearchBox inputRef={searchRef} />
+          <SearchBox
+            inputRef={searchRef}
+            find={
+              onNote && !libraryScope
+                ? {
+                    query: find.query,
+                    count: findCount,
+                    selected,
+                    onQuery: (query) => {
+                      setFind((current) => ({ query, selected: 0, reveal: current.reveal + 1 }));
+                    },
+                    onStep: (step) => {
+                      if (findCount === 0) return;
+                      setFind((current) => ({
+                        query: current.query,
+                        selected: (selected + step + findCount) % findCount,
+                        reveal: current.reveal + 1,
+                      }));
+                    },
+                  }
+                : null
+            }
+            onLeave={() => {
+              setLibraryScope(false);
+            }}
+          />
           <div className="topbar-end" data-tauri-drag-region="">
             <ThemeToggle
               dark={dark}
@@ -226,7 +311,9 @@ export function Layout({
         {updates && <UpdateBanner updates={updates} />}
         <main id="content" className="content" tabIndex={-1}>
           <DetailsSlot value={detailsSlot}>
-            <Outlet />
+            <NoteFindContext value={findChannel}>
+              <Outlet />
+            </NoteFindContext>
           </DetailsSlot>
         </main>
       </div>

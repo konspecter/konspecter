@@ -112,7 +112,7 @@ export class ApiClient {
         signal,
       });
     } catch (error) {
-      throw new NetworkError(`Could not reach the server: ${String(error)}`);
+      throw new NetworkError("Could not reach the server", { cause: error });
     }
     if (!response.ok) await failure(response);
     if (!response.body) throw invalid("event stream");
@@ -131,7 +131,7 @@ export class ApiClient {
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
     } catch (error) {
-      throw new NetworkError(`Could not reach the server: ${String(error)}`);
+      throw new NetworkError("Could not reach the server", { cause: error });
     }
     if (response.status === 204) return null;
     if (!response.ok) return failure(response);

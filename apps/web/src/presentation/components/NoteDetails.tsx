@@ -11,10 +11,10 @@ import {
   readNote,
   type Note,
 } from "../../domain/note/note";
-import { parseTagName } from "../../domain/tag/tags";
+import { writtenTagList } from "../../domain/tag/tags";
 import { exportToFolder, isDesktop } from "../../infrastructure/desktop/desktop";
 import { downloadFile } from "../../infrastructure/files/files";
-import { errorMessage } from "./ErrorState";
+import { useErrorMessage } from "../hooks/use-error-message";
 import { DownloadIcon, ExternalIcon, RevealIcon, TitleCoverIcon, TrashIcon } from "./icons";
 import { NoteDate } from "./NoteDate";
 import { displayTitle } from "./note-title";
@@ -50,7 +50,11 @@ export function NoteDetails({
   const headingId = useId();
   const [deleting, setDeleting] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [failure, setFailure] = useState<unknown>(null);
+  const [failure, setFailure] = useState<{ error: unknown; deleting: boolean } | null>(null);
+  const failureText = useErrorMessage(failure?.error ?? null);
+  const fail = (error: unknown) => {
+    setFailure({ error, deleting: false });
+  };
   const read = note ? readNote(note) : null;
 
   async function handleDelete() {
@@ -60,7 +64,7 @@ export function NoteDetails({
     try {
       await onDelete();
     } catch (error) {
-      setFailure(new Error(t("details.deleteFailed", { error: errorMessage(error) })));
+      setFailure({ error, deleting: true });
       setDeleting(false);
     }
   }
@@ -87,20 +91,18 @@ export function NoteDetails({
               t("details.readingTime", { minutes: stats.readingMinutes }),
             ].join(" · "),
       ]);
-      const tags = noteWrittenTags(read);
+      const tags = writtenTagList(noteWrittenTags(read));
       const removable = new Set(listedOnlyTags(read));
       if (tags.length > 0) {
         rows.push([
           t("details.tags"),
           <span className="details-tags">
-            {tags.map((written) => {
-              const tag = parseTagName(written);
-              if (!tag) return null;
+            {tags.map(({ tag, written }) => {
               const label = t("details.removeTag", { tag: `#${written}` });
               return (
                 <span key={tag.name} className="details-tag">
                   <Link to={`/?q=${encodeURIComponent(`#${tag.name}`)}`}>#{written}</Link>
-                  {onRemoveTag && removable.has(written) && (
+                  {onRemoveTag && removable.has(tag.name) && (
                     <button
                       type="button"
                       className="details-tag-remove"
@@ -164,7 +166,7 @@ export function NoteDetails({
               const [file] = exportFiles([note]);
               if (!file) return;
               if (isDesktop()) {
-                void exportToFolder([file]).catch(setFailure);
+                void exportToFolder([file]).catch(fail);
               } else {
                 downloadFile(file.name, new Blob([file.contents], { type: "text/markdown" }));
               }
@@ -179,7 +181,7 @@ export function NoteDetails({
             className="icon-button"
             aria-label={t("details.openExternally")}
             title={t("details.openExternally")}
-            onClick={() => void store.openExternally?.(note.id).catch(setFailure)}
+            onClick={() => void store.openExternally?.(note.id).catch(fail)}
           >
             <ExternalIcon />
           </button>
@@ -190,7 +192,7 @@ export function NoteDetails({
             className="icon-button"
             aria-label={t("details.reveal")}
             title={t("details.reveal")}
-            onClick={() => void store.reveal?.(note.id).catch(setFailure)}
+            onClick={() => void store.reveal?.(note.id).catch(fail)}
           >
             <RevealIcon />
           </button>
@@ -210,9 +212,9 @@ export function NoteDetails({
           </button>
         )}
       </div>
-      {failure !== null && (
+      {failure !== null && failureText !== null && (
         <p role="alert" className="inline-error">
-          {errorMessage(failure)}
+          {failure.deleting ? t("details.deleteFailed", { error: failureText }) : failureText}
         </p>
       )}
       {confirming && read && (

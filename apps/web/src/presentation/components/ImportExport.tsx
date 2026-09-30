@@ -4,7 +4,8 @@ import { importMarkdown, type ImportReport } from "../../application/library/imp
 import type { NoteRepository } from "../../application/notes/note-repository";
 import { exportToFolder, isDesktop } from "../../infrastructure/desktop/desktop";
 import { downloadFile, readMarkdownFiles, zipFiles } from "../../infrastructure/files/files";
-import { errorMessage } from "./ErrorState";
+import { errorMessage, reportError } from "../app/errors";
+import { useErrorMessage } from "../hooks/use-error-message";
 import { t, tn } from "../i18n/i18n";
 import { rich } from "../i18n/rich";
 
@@ -16,7 +17,13 @@ function describeImport(
 ) {
   const parts = [tn("transfer.imported", report.imported)];
   if (report.duplicates > 0) parts.push(tn("transfer.duplicates", report.duplicates));
-  const problems = [...unreadable, ...report.rejected];
+  const problems = [
+    ...unreadable,
+    ...report.rejected.map(({ name, error }) => {
+      reportError(error);
+      return { name, reason: errorMessage(error) };
+    }),
+  ];
   if (problems.length > 0) parts.push(tn("transfer.rejected", problems.length));
   return { text: `${parts.join(", ")}.`, details: problems.map((p) => `${p.name}: ${p.reason}`) };
 }
@@ -28,6 +35,7 @@ export function ImportExport({ store }: { store: NoteRepository }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [failure, setFailure] = useState<unknown>(null);
+  const failureText = useErrorMessage(failure);
 
   function run(action: () => Promise<Result | null>) {
     setBusy(true);
@@ -122,9 +130,9 @@ export function ImportExport({ store }: { store: NoteRepository }) {
           )}
         </div>
       )}
-      {failure !== null && (
+      {failureText !== null && (
         <p role="alert" className="inline-error">
-          {errorMessage(failure)}
+          {failureText}
         </p>
       )}
     </section>

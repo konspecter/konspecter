@@ -3,9 +3,30 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { yamlFrontmatter } from "@codemirror/lang-yaml";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
-import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
-import { Annotation, EditorSelection, EditorState, Prec, Transaction } from "@codemirror/state";
-import { EditorView, drawSelection, keymap, placeholder, type Command } from "@codemirror/view";
+import {
+  gotoLine,
+  highlightSelectionMatches,
+  selectNextOccurrence,
+  selectSelectionMatches,
+} from "@codemirror/search";
+import {
+  Annotation,
+  EditorSelection,
+  EditorState,
+  Prec,
+  StateEffect,
+  StateField,
+  Transaction,
+} from "@codemirror/state";
+import {
+  Decoration,
+  EditorView,
+  drawSelection,
+  keymap,
+  placeholder,
+  type Command,
+  type DecorationSet,
+} from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 import { memo, useEffect, useRef } from "react";
 import { textChanges } from "./diff";
@@ -13,6 +34,8 @@ import { sourceEditorMarks } from "./source-marks";
 import { t } from "../i18n/i18n";
 import { TITLE_MAX_LENGTH } from "./text-editor-setup";
 import { withSavedDates, type Note } from "../../domain/note/note";
+import { findMatches, type Match } from "../../domain/search/find";
+import { NO_FIND, type NoteFind } from "../components/note-find";
 
 type MarkdownSourceEditorProps = {
   /** Read once, when the editor mounts. */
@@ -33,6 +56,9 @@ type MarkdownSourceEditorProps = {
    * each time).
    */
   replacement?: { readonly markdown: string } | null;
+  /** What to find in the text (see `NoteEditor`). */
+  find?: NoteFind;
+  onFindCount?: (count: number) => void;
 };
 
 /** A caret in characters of the text, and whether the editor has the focus. */
@@ -83,6 +109,41 @@ const highlightStyle = HighlightStyle.define([
   { tag: [tags.tagName, tags.angleBracket], color: "var(--code-meta)" },
 ]);
 
+/** A search in the text (the top bar's, see `NoteFind`): its matches and the selected one. */
+type SourceFind = {
+  readonly query: string;
+  readonly selected: number;
+  readonly matches: readonly Match[];
+  readonly decorations: DecorationSet;
+};
+
+const askFind = StateEffect.define<{ query: string; selected: number }>();
+const matchMark = Decoration.mark({ class: "find-match" });
+const currentMark = Decoration.mark({ class: "find-match find-current" });
+
+/** Marks the matches of a search; the text is searched again as it changes. */
+const findField = StateField.define<SourceFind>({
+  create: () => ({ query: "", selected: 0, matches: [], decorations: Decoration.none }),
+  update(previous, transaction) {
+    let { query, selected } = previous;
+    for (const effect of transaction.effects) {
+      if (effect.is(askFind)) ({ query, selected } = effect.value);
+    }
+    if (query === "" && previous.query === "") return previous;
+    const same = query === previous.query && !transaction.docChanged;
+    if (same && selected === previous.selected) return previous;
+    const matches = same ? previous.matches : findMatches(transaction.newDoc.toString(), query);
+    const current = Math.min(selected, matches.length - 1);
+    const decorations = Decoration.set(
+      matches.map(({ from, to }, index) =>
+        (index === current ? currentMark : matchMark).range(from, to),
+      ),
+    );
+    return { query, selected, matches, decorations };
+  },
+  provide: (field) => EditorView.decorations.from(field, (value) => value.decorations),
+});
+
 /**
  * In a new note, Enter at the end of the first line makes it the title
  * (`# line`) if it is short and not already Markdown syntax. Only while the
@@ -118,15 +179,28 @@ export function createSourceExtensions(
   {
     titleFromFirstLine = false,
     onSelectionChange,
-  }: { titleFromFirstLine?: boolean; onSelectionChange?: (caret: Caret) => void } = {},
+    onFindCount,
+  }: {
+    titleFromFirstLine?: boolean;
+    onSelectionChange?: (caret: Caret) => void;
+    onFindCount?: (count: number) => void;
+  } = {},
 ) {
   return [
     ...(titleFromFirstLine ? [Prec.high(keymap.of([{ key: "Enter", run: firstLineTitle }]))] : []),
     history(),
     drawSelection(),
-    search({ top: true }),
     highlightSelectionMatches(),
-    keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
+    // Searching is the top bar's (Mod+F); CodeMirror keeps its selection commands.
+    keymap.of([
+      ...defaultKeymap,
+      ...historyKeymap,
+      { key: "Mod-d", run: selectNextOccurrence, preventDefault: true },
+      { key: "Mod-Shift-l", run: selectSelectionMatches },
+      { key: "Mod-Alt-g", run: gotoLine },
+      indentWithTab,
+    ]),
+    findField,
     // Markdown with GFM, fenced code highlighted in its own language (grammars
     // load on demand), and a YAML frontmatter block.
     yamlFrontmatter({ content: markdown({ base: markdownLanguage, codeLanguages: languages }) }),
@@ -145,6 +219,8 @@ export function createSourceExtensions(
         const { anchor, head } = update.state.selection.main;
         onSelectionChange?.({ anchor, head, focused: update.view.hasFocus });
       }
+      const found = update.state.field(findField);
+      if (found !== update.startState.field(findField)) onFindCount?.(found.matches.length);
       if (!update.docChanged) return;
       if (update.transactions.some((transaction) => transaction.annotation(fromElsewhere))) return;
       onChange(update.state.doc.toString());
@@ -162,11 +238,14 @@ export const MarkdownSourceEditor = memo(function MarkdownSourceEditor({
   replacement = null,
   initialSelection = null,
   onSelectionChange,
+  find = NO_FIND,
+  onFindCount,
 }: MarkdownSourceEditorProps) {
   const viewRef = useRef<EditorView | null>(null);
   const mountRef = useRef<HTMLDivElement>(null);
   const onChangeRef = useRef(onChange);
   const onSelectionRef = useRef(onSelectionChange);
+  const onFindCountRef = useRef(onFindCount);
   const initialValueRef = useRef(initialValue);
   const initialSelectionRef = useRef(initialSelection);
   const autoFocusRef = useRef(autoFocus || initialSelection?.focused === true);
@@ -175,7 +254,8 @@ export const MarkdownSourceEditor = memo(function MarkdownSourceEditor({
   useEffect(() => {
     onChangeRef.current = onChange;
     onSelectionRef.current = onSelectionChange;
-  }, [onChange, onSelectionChange]);
+    onFindCountRef.current = onFindCount;
+  }, [onChange, onSelectionChange, onFindCount]);
 
   useEffect(() => {
     const parent = mountRef.current;
@@ -195,6 +275,7 @@ export const MarkdownSourceEditor = memo(function MarkdownSourceEditor({
           {
             titleFromFirstLine: titleFromFirstLineRef.current,
             onSelectionChange: (next) => onSelectionRef.current?.(next),
+            onFindCount: (count) => onFindCountRef.current?.(count),
           },
         ),
       }),
@@ -213,6 +294,22 @@ export const MarkdownSourceEditor = memo(function MarkdownSourceEditor({
     const view = viewRef.current;
     if (view && replacement) replaceInPlace(view, replacement.markdown, true);
   }, [replacement]);
+
+  // The search marks its matches; asked anew, it scrolls to the selected one
+  // (not when the editor opens with a search under way). CodeMirror draws
+  // only the lines in view, so it does the scrolling itself.
+  const revealed = useRef<number | null>(null);
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({ effects: askFind.of({ query: find.query, selected: find.selected }) });
+    const { matches, selected } = view.state.field(findField);
+    const current = matches[Math.min(selected, matches.length - 1)];
+    if (current && revealed.current !== null && revealed.current !== find.reveal) {
+      view.dispatch({ effects: EditorView.scrollIntoView(current.from, { y: "center" }) });
+    }
+    revealed.current = find.reveal;
+  }, [find]);
 
   // After each save, the frontmatter's dates follow the stored version.
   useEffect(() => {

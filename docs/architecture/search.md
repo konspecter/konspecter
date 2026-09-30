@@ -34,19 +34,20 @@ and rendered with `<mark>` from text parts. The snippet is never built as an HTM
 The query is parsed by `parseQuery` (`domain/search/query.ts`), a pure and deterministic
 function:
 
-| Query                    | Meaning                                                      |
-| ------------------------ | ------------------------------------------------------------ |
-| `hashmap`                | notes whose title, text **or tag names** match `hashmap`     |
-| `#java` / `java#streams` | tag filter: only notes within that tag (child tags included) |
-| `hashmap #java`          | both: text matches _and_ the note is within `#java`          |
-| `#java #go`              | within **every** tag filter                                  |
+| Query           | Meaning                                                         |
+| --------------- | --------------------------------------------------------------- |
+| `hashmap`       | notes whose title, text **or tag names** match `hashmap`        |
+| `#java`         | tag filter: only notes carrying that tag (chains give each tag) |
+| `#java#streams` | a chain: the filters `#java` and `#streams`                     |
+| `hashmap #java` | both: text matches _and_ the note carries `#java`               |
+| `#java #go`     | carrying **every** tag filter                                   |
 
-- A token that starts with or contains `#` and is a valid tag is a filter. Anything else is a
-  word. A plain `java` is a word, and it also matches notes tagged `java` through the
+- A token that starts with or contains `#` and is a valid tag or chain is a filter per tag.
+  Anything else is a word. A plain `java` is a word, and it also matches notes tagged `java` through the
   indexed tag names (boosted 2×). A lone `#` or `#123` is searched as text.
-- With filters but no words, all notes within the tags are listed, newest first.
-- Active filters appear as chips on the search page. Removing a chip removes its tokens from
-  the query (`withoutTag`).
+- With filters but no words, all notes carrying the tags are listed, newest first.
+- Active filters appear as chips on the search page, one per tag. Removing a chip removes its
+  tag from the query (`withoutTag`); a chain keeps its other tags.
 - Ordering is the same as for text search: score, then `updated`, then id.
 
 ### The index lives in memory

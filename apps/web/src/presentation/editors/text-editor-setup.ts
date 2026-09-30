@@ -20,11 +20,13 @@ import { liftListItem, sinkListItem, splitListItem, wrapInList } from "prosemirr
 import {
   EditorState,
   Plugin,
+  PluginKey,
   TextSelection,
   type Command,
   type Transaction,
 } from "prosemirror-state";
 import { Decoration, DecorationSet } from "prosemirror-view";
+import { findMatches, type Match } from "../../domain/search/find";
 import { tagRanges } from "../../domain/tag/tags";
 import { diffSequences, offsets } from "./diff";
 import { t, type TextKey } from "../i18n/i18n";
@@ -136,6 +138,87 @@ const tags: Plugin<DecorationSet> = new Plugin<DecorationSet>({
     },
   },
 });
+
+/** A search in the text (the top bar's, see `NoteFind`): its matches and the selected one. */
+type FindState = {
+  readonly query: string;
+  readonly selected: number;
+  readonly matches: readonly Match[];
+  readonly decorations: DecorationSet;
+};
+
+const findKey = new PluginKey<FindState>("find");
+
+const NOTHING_FOUND: FindState = {
+  query: "",
+  selected: 0,
+  matches: [],
+  decorations: DecorationSet.empty,
+};
+
+/** Every match of `query` in the text blocks of `doc`, in document positions. */
+export function findInDocument(doc: Node, query: string): Match[] {
+  const matches: Match[] = [];
+  if (query.trim() === "") return matches;
+  doc.descendants((node, pos) => {
+    if (!node.isTextblock) return true;
+    // One character per position: inline leaves (breaks, images) are one
+    // character that nothing typed matches. Matches stay within the block.
+    const text = node.textBetween(0, node.content.size, undefined, "\ufffc");
+    for (const { from, to } of findMatches(text, query)) {
+      matches.push({ from: pos + 1 + from, to: pos + 1 + to });
+    }
+    return false;
+  });
+  return matches;
+}
+
+function foundIn(doc: Node, query: string, selected: number, matches: readonly Match[]) {
+  const current = Math.min(selected, matches.length - 1);
+  const decorations = matches.map(({ from, to }, index) =>
+    Decoration.inline(from, to, {
+      class: index === current ? "find-match find-current" : "find-match",
+    }),
+  );
+  return { query, selected, matches, decorations: DecorationSet.create(doc, decorations) };
+}
+
+/** Marks the matches of a search; the text is searched again as it changes. */
+const find: Plugin<FindState> = new Plugin<FindState>({
+  key: findKey,
+  state: {
+    init: () => NOTHING_FOUND,
+    apply(tr, previous) {
+      const asked = tr.getMeta(findKey) as { query: string; selected: number } | undefined;
+      const query = asked?.query ?? previous.query;
+      const selected = asked?.selected ?? previous.selected;
+      if (query === "" && previous.query === "") return previous;
+      const same = query === previous.query && !tr.docChanged;
+      if (same && selected === previous.selected) return previous;
+      return foundIn(
+        tr.doc,
+        query,
+        selected,
+        same ? previous.matches : findInDocument(tr.doc, query),
+      );
+    },
+  },
+  props: {
+    decorations(state) {
+      return this.getState(state)?.decorations ?? null;
+    },
+  },
+});
+
+/** Searches the text for `query`, with the match at `selected` (from 0) as the selected one. */
+export function findTransaction(state: EditorState, query: string, selected: number): Transaction {
+  return state.tr.setMeta(findKey, { query, selected });
+}
+
+/** The matches of the search in `state`. */
+export function foundMatches(state: EditorState): readonly Match[] {
+  return findKey.getState(state)?.matches ?? [];
+}
 
 const SMART_QUOTES: Record<string, RegExp> = { '"': /[«»“”„‟]/g, "'": /[‘’‚‛]/g };
 
@@ -300,6 +383,7 @@ export function createTextEditorState(
       keymap(baseKeymap),
       placeholder(t("editor.placeholder")),
       tags,
+      find,
       straightQuotesInCode(),
     ],
   });

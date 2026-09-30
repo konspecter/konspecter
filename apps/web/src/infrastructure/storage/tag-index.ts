@@ -1,55 +1,62 @@
 import type { IDBPDatabase, IDBPTransaction } from "idb";
-import { noteWrittenTags, parseNote, readNote, type Note } from "../../domain/note/note";
-import { parseTagName, tagSpellings, tagWithAncestors, type Tag } from "../../domain/tag/tags";
+import { noteTags, noteWrittenTags, parseNote, readNote, type Note } from "../../domain/note/note";
+import { chainLinks, parseTagChain, tagSpellings, type Tag } from "../../domain/tag/tags";
 import type { KonspecterDb } from "./schema";
 
 /**
  * Bump when the tag rules or the entry shape change. Stores built by another
  * version are rebuilt from the notes when the database is opened.
  */
-export const TAG_INDEX_VERSION = 3;
+export const TAG_INDEX_VERSION = 4;
 
 /** Derived data: which tags a note has. Always rebuildable from the notes. */
 export type TagEntry = {
   readonly noteId: string;
-  /** Tags written in the note. */
-  readonly tags: readonly string[];
-  /** The same tags as written, case kept, for display ("Java#Streams"). */
+  /** The tag chains written in the note, case kept ("Java#Streams"): spellings and parents. */
   readonly written: readonly string[];
-  /** The tags plus all their ancestors; indexed (multiEntry) for tag → notes. */
+  /** The note's tags ("java", "streams"); indexed (multiEntry) for tag → notes. */
   readonly memberOf: readonly string[];
 };
 
 export type TagCount = {
   readonly tag: Tag;
-  /** Notes tagged with this tag or any tag below it. */
+  /** Notes tagged with this tag. */
   readonly count: number;
   /** How the notes write it (`tagSpellings`). */
   readonly spelling: string;
+  /** The tags written right before it in a chain, in any note, by name. */
+  readonly parents: readonly string[];
 };
 
 type WriteTransaction = IDBPTransaction<KonspecterDb, ("notes" | "tags" | "meta")[], "readwrite">;
 
 export function tagEntry(note: Note): TagEntry {
-  const written = noteWrittenTags(readNote(note));
-  const tags = written.flatMap((tag) => parseTagName(tag) ?? []);
-  const memberOf = new Set(tags.flatMap((tag) => tagWithAncestors(tag).map((t) => t.name)));
-  return { noteId: note.id, tags: tags.map((tag) => tag.name), written, memberOf: [...memberOf] };
+  const read = readNote(note);
+  const memberOf = noteTags(read).map((tag) => tag.name);
+  return { noteId: note.id, written: noteWrittenTags(read), memberOf };
 }
 
-/** Every tag in the entries, each counting the notes within it, sorted by name. */
+/** Every tag in the entries, with the notes tagged with it and its parents, sorted by name. */
 export function countTags(entries: Iterable<TagEntry>): TagCount[] {
   const list = [...entries];
   const counts = new Map<string, number>();
+  const parents = new Map<string, Set<string>>();
   for (const entry of list) {
     for (const name of entry.memberOf) counts.set(name, (counts.get(name) ?? 0) + 1);
+    for (const written of entry.written) {
+      const chain = parseTagChain(written);
+      for (const [parent, child] of chain ? chainLinks(chain) : []) {
+        parents.set(child, (parents.get(child) ?? new Set()).add(parent));
+      }
+    }
   }
   const spellings = tagSpellings(list.map((entry) => entry.written));
   return [...counts]
     .map(([name, count]) => ({
-      tag: { path: name.split("#"), name },
+      tag: { name },
       count,
       spelling: spellings.get(name) ?? name,
+      parents: [...(parents.get(name) ?? [])].sort(),
     }))
     .sort((a, b) => (a.tag.name < b.tag.name ? -1 : a.tag.name > b.tag.name ? 1 : 0));
 }
@@ -96,13 +103,8 @@ async function indexMatchesNotes(db: IDBPDatabase<KonspecterDb>): Promise<boolea
   const noted = new Set(noteKeys.map(String));
   const indexed = new Set<string>();
   for (const entry of entries as unknown[]) {
-    const { noteId, tags, written, memberOf } = (entry ?? {}) as Record<string, unknown>;
-    if (
-      typeof noteId !== "string" ||
-      !Array.isArray(tags) ||
-      !Array.isArray(written) ||
-      !Array.isArray(memberOf)
-    )
+    const { noteId, written, memberOf } = (entry ?? {}) as Record<string, unknown>;
+    if (typeof noteId !== "string" || !Array.isArray(written) || !Array.isArray(memberOf))
       return false;
     indexed.add(noteId);
   }
@@ -110,12 +112,12 @@ async function indexMatchesNotes(db: IDBPDatabase<KonspecterDb>): Promise<boolea
   return [...indexed].every((id) => noted.has(id)) && indexed.size <= noted.size;
 }
 
-/** Every tag in use, each counting the notes within it, sorted by name. */
+/** Every tag in use, with the notes tagged with it and its parents, sorted by name. */
 export async function allTags(db: IDBPDatabase<KonspecterDb>): Promise<TagCount[]> {
   return countTags(await db.getAll("tags"));
 }
 
-/** Ids of the notes tagged with `tag` or any tag below it. */
+/** Ids of the notes tagged with `tag`. */
 export async function noteIdsWithTag(db: IDBPDatabase<KonspecterDb>, tag: Tag): Promise<string[]> {
   const keys = await db.getAllKeysFromIndex("tags", "memberOf", tag.name);
   return keys.filter((key): key is string => typeof key === "string");

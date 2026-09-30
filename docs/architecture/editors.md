@@ -85,8 +85,9 @@ CodeMirror 6 over the whole document, frontmatter included (`MarkdownSourceEdito
 - **Quotes:** in code blocks, inline code and the frontmatter a typed `"` or `'` stays
   straight even when the system substitutes a typographic quote (see Text mode); `autocorrect`
   and `autocapitalize` are off.
-- **Editing:** undo and redo, search and replace (`Mod-F`), Tab indents, and long lines
-  wrap.
+- **Editing:** undo and redo, Tab indents, and long lines wrap. Searching is the top bar's
+  (`Mod+F`, [ui](ui.md)), in every mode; CodeMirror keeps its selection commands (`Mod-D`,
+  `Mod-Shift-L`) and go to line (`Mod-Alt-G`), but not its search and replace panel.
 - **No autocompletion**, by design, and no bracket closing, so what you type is what is
   saved.
 

@@ -149,12 +149,12 @@ describe("reading notes", () => {
 });
 
 describe("noteTags", () => {
-  it("takes the frontmatter's tags first, then the body's, each once", () => {
+  it("takes the frontmatter's tags first, then the body's, each tag of a chain once", () => {
     const read = readNote({
       id: "n",
       markdown: "---\ntags:\n  - parent_1#child\n  - Java\n---\nText #java and #go, not `#code`.",
     });
-    expect(noteTags(read).map((tag) => tag.name)).toEqual(["parent_1#child", "java", "go"]);
+    expect(noteTags(read).map((tag) => tag.name)).toEqual(["parent_1", "child", "java", "go"]);
     expect(noteWrittenTags(read)).toEqual(["parent_1#child", "Java", "go"]);
   });
 
@@ -200,7 +200,9 @@ describe("removing a listed tag", () => {
   const markdown = "---\ntitle: T\ntags: [Java, go, extra]\n---\n\nT #go";
 
   it("offers only the tags the frontmatter lists and the body does not write", () => {
-    expect(listedOnlyTags(readNote({ id: "n", markdown }))).toEqual(["Java", "extra"]);
+    expect(listedOnlyTags(readNote({ id: "n", markdown }))).toEqual(["java", "extra"]);
+    const chained = "---\ntags: [java#collections]\n---\n\n#collections";
+    expect(listedOnlyTags(readNote({ id: "n", markdown: chained }))).toEqual(["java"]);
     expect(listedOnlyTags(readNote({ id: "n", markdown: "---\ntags: [\n---\n" }))).toEqual([]);
   });
 
@@ -208,6 +210,14 @@ describe("removing a listed tag", () => {
     expect(withoutTag(markdown, "java")).toBe("---\ntitle: T\ntags: [go, extra]\n---\n\nT #go");
     expect(withoutTag("---\ntags:\n- a\n---\n", "a")).toBe("---\n---\n");
     expect(withoutTag(markdown, "missing")).toBe(markdown);
+  });
+
+  it("splits a chain around the tag, so no new parent is made", () => {
+    const listed = (tags: string) => `---\ntags: [${tags}]\n---\n`;
+    expect(withoutTag(listed("Java#Collections"), "collections")).toBe(listed("Java"));
+    expect(withoutTag(listed("Java#Collections"), "java")).toBe(listed("Collections"));
+    expect(withoutTag(listed("a#b#c, c"), "b")).toBe(listed("a, c"));
+    expect(withoutTag(listed("java#8"), "java")).toBe("---\n---\n");
   });
 });
 

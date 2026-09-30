@@ -27,7 +27,7 @@ Database `konspecter`, version 5:
 | Object store | Key       | Value                                                                     |
 | ------------ | --------- | ------------------------------------------------------------------------- |
 | `notes`      | note `id` | `{ id, markdown }` (see [domain model](domain-model.md))                  |
-| `tags`       | `noteId`  | `{ noteId, tags, written, memberOf }`, derived, `memberOf` multiEntry idx |
+| `tags`       | `noteId`  | `{ noteId, written, memberOf }`, derived, `memberOf` multiEntry idx       |
 | `meta`       | name      | `tagIndexVersion`                                                         |
 | `reading`    | note id   | `{ noteId, position, updatedAt }`, user state (see [reading](reading.md)) |
 | `sync`       | note id   | sync bookkeeping (see [sync](sync.md))                                    |
@@ -59,11 +59,12 @@ upgrades never wait forever. The old tab then shows storage errors until it is r
 
 ## Tag index
 
-`tags` is **derived data**: one entry per note, with the tags written in it (`tags`), the
-same tags as written, case kept, for display (`written`, e.g. `Java#Linked_List`), and
-those tags plus all their ancestors (`memberOf`, e.g. `java`, `java#collections`). The
-`memberOf` multiEntry index answers "which notes are in `java`?" directly, including notes
-tagged only with `java#collections` (`infrastructure/storage/tag-index.ts`).
+`tags` is **derived data**: one entry per note, with the tag chains written in it, case kept
+(`written`, e.g. `Java#Linked_List`: spellings and parent links), and the note's tags
+(`memberOf`, e.g. `java`, `linked_list`; see [tags](tags.md)). The `memberOf` multiEntry
+index answers "which notes carry `java`?" directly, including notes written
+`#java#collections`. The tag list with counts and parents (`countTags`) is computed from the
+entries (`infrastructure/storage/tag-index.ts`).
 
 - **Always in step:** `put` and `delete` write the note and its entry in one transaction.
 - **Rebuildable:** `rebuildIndexes()` clears the store and recomputes it from the notes. On open,

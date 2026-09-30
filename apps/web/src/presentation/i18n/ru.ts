@@ -11,6 +11,7 @@ export const ru: Dictionary = {
   "app.tryAgain": "Повторить",
   "app.close": "Закрыть",
   "app.cancel": "Отмена",
+  "app.somethingWrong": "Упс, что-то пошло не так.",
 
   "sidebar.label": "Боковая панель",
   "sidebar.show": "Показать боковую панель",
@@ -33,6 +34,11 @@ export const ru: Dictionary = {
 
   "topbar.search": "Поиск по конспектам",
   "topbar.searchPlaceholder": "Поиск",
+  "topbar.find": "Поиск в этом конспекте",
+  "topbar.findPlaceholder": "Поиск в конспекте",
+  "topbar.findCount": "Совпадение {current} из {count}",
+  "topbar.findPrevious": "Предыдущее совпадение",
+  "topbar.findNext": "Следующее совпадение",
   "topbar.darkTheme": "Тёмная тема",
   "topbar.toLight": "Включить светлую тему",
   "topbar.toDark": "Включить тёмную тему",
@@ -52,6 +58,7 @@ export const ru: Dictionary = {
   "syncHint.label": "Синхронизация: {text}",
 
   "shortcut.search": "Поиск",
+  "shortcut.find": "Поиск в открытом конспекте",
   "shortcut.allNotes": "Все конспекты",
   "shortcut.newNote": "Новый конспект",
   "shortcut.settings": "Настройки",
@@ -80,7 +87,7 @@ export const ru: Dictionary = {
   "note.notSavedInvalid":
     "Не сохранено: {reason}. Исправьте frontmatter, и сохранение продолжится.",
   "note.saveFailed":
-    "Не удалось сохранить конспект: {error}. Текст не потерян; при следующем изменении будет новая попытка.",
+    "Не удалось сохранить конспект: {error} Текст не потерян; при следующем изменении будет новая попытка.",
 
   "details.title": "Сведения",
   "details.status": "Состояние",
@@ -165,7 +172,7 @@ Map<String, Integer> counts = new HashMap<>();
   "editor.loadFailed": "Не удалось загрузить редактор",
   "editor.readerLoadFailed": "Не удалось загрузить просмотр конспекта",
   "editor.textUnavailable":
-    "Текстовое редактирование недоступно: {reason}. Исправьте это в Markdown ниже.",
+    "Текстовое редактирование недоступно: {reason} Исправьте это в Markdown ниже.",
   "editor.markdownOnly": "{reason}, поэтому его можно редактировать только в режиме Markdown.",
   "editor.uses": "В этом конспекте есть {features}",
   "editor.wouldChange": "В этом конспекте есть Markdown, который текстовый редактор изменил бы",
@@ -233,7 +240,7 @@ Map<String, Integer> counts = new HashMap<>();
   "settings.reading.restore": "Продолжать с того места, где остановился",
   "settings.reading.ask": "Спрашивать перед переходом",
   "settings.reading.off": "Всегда начинать сначала",
-  "settings.saveFailed": "Не удалось сохранить настройки: {error}. Они действуют до перезагрузки.",
+  "settings.saveFailed": "Не удалось сохранить настройки: {error} Они действуют до перезагрузки.",
   "settings.shortcuts": "Сочетания клавиш",
   "settings.storage": "Хранение без сети",
   "settings.storage.persistent":
@@ -355,5 +362,6 @@ Map<String, Integer> counts = new HashMap<>();
   "sync.serverUrl": "Адрес сервера",
   "sync.token": "Токен доступа",
   "sync.connectFailed": "Не удалось подключиться: {error}",
+  "sync.tokenRejected": "Сервер не принял токен. Подключитесь снова с действительным токеном.",
   "sync.connect": "Подключиться",
 };

@@ -1,7 +1,14 @@
 import { defaultMarkdownParser, schema } from "prosemirror-markdown";
 import { TextSelection, type EditorState } from "prosemirror-state";
 import { DecorationSet, EditorView } from "prosemirror-view";
-import { createTextEditorState, tagDecorations, toolbarActions } from "./text-editor-setup";
+import {
+  createTextEditorState,
+  findInDocument,
+  findTransaction,
+  foundMatches,
+  tagDecorations,
+  toolbarActions,
+} from "./text-editor-setup";
 import { toolbarTopFor } from "./TextEditor";
 
 function editorWith(markdown: string) {
@@ -130,5 +137,34 @@ describe("toolbar placement", () => {
 
   it("keeps growing down when there is even less room above", () => {
     expect(toolbarTopFor(rect(120, 150), rect(100, 900), 900, area)).toBe(20);
+  });
+});
+
+describe("text editor search", () => {
+  const found = (markdown: string, query: string) => {
+    const doc = defaultMarkdownParser.parse(markdown);
+    return findInDocument(doc, query).map(({ from, to }) => doc.textBetween(from, to));
+  };
+
+  it("finds across marks and after line breaks, at the right positions", () => {
+    expect(found("A **Hash**Map and a  \nhashmap", "hashmap")).toEqual(["HashMap", "hashmap"]);
+  });
+
+  it("never matches from one block into the next", () => {
+    expect(found("ends with hash\n\nmap starts this", "hash map")).toEqual([]);
+    expect(found("- hash\n- map", "hashmap")).toEqual([]);
+  });
+
+  it("marks the selected match and searches again as the text changes", () => {
+    const { view } = editorWith("map, map");
+    view.dispatch(findTransaction(view.state, "map", 1));
+    const classes = () =>
+      [...view.dom.querySelectorAll(".find-match")].map((match) => match.className);
+    expect(classes()).toEqual(["find-match", "find-match find-current"]);
+
+    view.dispatch(view.state.tr.insertText(" map", view.state.doc.content.size - 1));
+    expect(foundMatches(view.state)).toHaveLength(3);
+    view.dispatch(findTransaction(view.state, "", 0));
+    expect(classes()).toEqual([]);
   });
 });

@@ -100,8 +100,12 @@ describe("parseDocument", () => {
   });
 
   it.each([
-    ["invalid YAML", "---\ntitle: Java: Collections\n---\n", /not valid YAML/],
-    ["duplicate keys", "---\ntitle: A\ntitle: B\n---\n", /not valid YAML/],
+    [
+      "invalid YAML",
+      "---\ntitle: Java: Collections\n---\n",
+      "Frontmatter line 1 is not valid YAML",
+    ],
+    ["duplicate keys", "---\ntitle: A\ntitle: B\n---\n", "Frontmatter line 2 is not valid YAML"],
     ["a list instead of a mapping", "---\n- a\n---\n", /key: value pairs/],
     ["a scalar instead of a mapping", "---\njust text\n---\n", /key: value pairs/],
     ["a non-text title", "---\ntitle: 2024\n---\n", /"title" must be text/],

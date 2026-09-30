@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import type { NoteRepository } from "../../application/notes/note-repository";
 import { downloadFile } from "../../infrastructure/files/files";
 import { useAsync } from "../hooks/use-async";
-import { errorMessage } from "./ErrorState";
+import { useErrorMessage } from "../hooks/use-error-message";
 import { t, tn } from "../i18n/i18n";
 
 /**
@@ -18,6 +18,7 @@ export function BackupRecovery({ store }: { store: NoteRepository }) {
   const [message, setMessage] = useState<string | null>(null);
   const [failure, setFailure] = useState<unknown>(null);
   const [saved, setSaved] = useState(false);
+  const failureText = useErrorMessage(failure);
 
   function run(action: () => Promise<string>) {
     setMessage(null);
@@ -96,9 +97,9 @@ export function BackupRecovery({ store }: { store: NoteRepository }) {
           {message}
         </p>
       )}
-      {failure !== null && (
+      {failureText !== null && (
         <p role="alert" className="inline-error">
-          {errorMessage(failure)}
+          {failureText}
         </p>
       )}
     </section>

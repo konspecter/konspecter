@@ -3,13 +3,12 @@ import { documentTitle } from "../../domain/document/document";
 import { plainText } from "../../domain/document/plain-text";
 import { noteTags, noteUpdated, readNote, type Note } from "../../domain/note/note";
 import { isEmptyQuery, type SearchQuery } from "../../domain/search/query";
-import { tagWithAncestors } from "../../domain/tag/tags";
 
 type IndexedNote = {
   readonly id: string;
   readonly title: string;
   readonly text: string;
-  /** Tag names and their ancestors, space-separated: "java java#collections". */
+  /** The note's tag names, space-separated: "java collections". */
   readonly tags: string;
   readonly updated: string;
 };
@@ -30,14 +29,13 @@ function toIndexed(note: Note): IndexedNote {
     // Still findable: index the raw text.
     return { id: note.id, title: "", text: note.markdown, tags: "", updated: "" };
   }
-  const memberOf = new Set(
-    noteTags(read).flatMap((tag) => tagWithAncestors(tag).map((ancestor) => ancestor.name)),
-  );
   return {
     id: note.id,
     title: documentTitle(read.document),
     text: plainText(read.document.body),
-    tags: [...memberOf].join(" "),
+    tags: noteTags(read)
+      .map((tag) => tag.name)
+      .join(" "),
     updated: noteUpdated(read) ?? "",
   };
 }

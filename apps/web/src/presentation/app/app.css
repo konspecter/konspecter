@@ -22,9 +22,14 @@
   --color-danger: #a8322a;
   --color-tree-folder: #4f86bd;
   --color-tree-guide: #d6d8d4;
+  /* The keyboard focus on a sidebar row (tree, recent notes): quieter than the accent. */
+  --color-focus-row: #a4a6a7;
   /* A highlighter pen on paper. */
   --color-mark: #f7e3a1;
   --color-mark-fg: #2b2410;
+  /* The selected match of a search in the note: the pen pressed harder. */
+  --color-mark-current: #eeb54f;
+  --color-mark-current-fg: #2b2410;
   --color-antenna-idle: #c2c3c0;
   --color-antenna-active: #55585d;
   --color-antenna-offline: #c9742c;
@@ -64,8 +69,11 @@
     --color-danger: #eeb0aa;
     --color-tree-folder: #7ea9d4;
     --color-tree-guide: #3a3d41;
+    --color-focus-row: #525458;
     --color-mark: #5b4d1f;
     --color-mark-fg: #f6ecc9;
+    --color-mark-current: #d6a547;
+    --color-mark-current-fg: #1d1708;
     --color-antenna-idle: #474a4f;
     --color-antenna-active: #b8bcc1;
     --color-antenna-offline: #e39a5b;
@@ -94,8 +102,11 @@
   --color-danger: #eeb0aa;
   --color-tree-folder: #7ea9d4;
   --color-tree-guide: #3a3d41;
+  --color-focus-row: #525458;
   --color-mark: #5b4d1f;
   --color-mark-fg: #f6ecc9;
+  --color-mark-current: #d6a547;
+  --color-mark-current-fg: #1d1708;
   --color-antenna-idle: #474a4f;
   --color-antenna-active: #b8bcc1;
   --color-antenna-offline: #e39a5b;
@@ -198,6 +209,31 @@ mark {
   background: var(--color-mark);
   color: var(--color-mark-fg);
   box-decoration-break: clone;
+}
+
+/*
+ * A search in the open note: every match marked, the selected one stronger.
+ * The editors mark with elements, the rendered view with highlight ranges.
+ */
+.find-match {
+  border-radius: 2px;
+  background: var(--color-mark);
+  color: var(--color-mark-fg);
+}
+
+.find-match.find-current {
+  background: var(--color-mark-current);
+  color: var(--color-mark-current-fg);
+}
+
+::highlight(find-match) {
+  background-color: var(--color-mark);
+  color: var(--color-mark-fg);
+}
+
+::highlight(find-current) {
+  background-color: var(--color-mark-current);
+  color: var(--color-mark-current-fg);
 }
 
 .visually-hidden {
@@ -339,6 +375,15 @@ mark {
 }
 
 /*
+ * Inside the row, as in the tree (the item's containment clips anything
+ * outside it), with the row's own rounding, like the active note.
+ */
+.recent-link:focus-visible {
+  outline: 1px solid var(--color-focus-row);
+  outline-offset: -1px;
+}
+
+/*
  * The sidebar's footer: the open note's details, rendered there by the note
  * page. Empty (and hidden) everywhere else. Smaller and quieter than the rest.
  */
@@ -390,6 +435,7 @@ mark {
 }
 
 .details-tags a {
+  min-width: 0;
   color: inherit;
   text-decoration: none;
 }
@@ -399,9 +445,14 @@ mark {
   text-decoration: underline;
 }
 
-/* A tag and, when only the frontmatter lists it, the button that removes it. */
+/*
+ * A tag and, when only the frontmatter lists it, the button that removes it.
+ * WebKit sizes flex items by their longest word even with `overflow-wrap:
+ * anywhere`; without `min-width: 0` a long tag scrolls the details sideways.
+ */
 .details-tag {
   display: inline-flex;
+  min-width: 0;
   align-items: baseline;
   gap: 1px;
 }
@@ -523,10 +574,14 @@ mark {
   gap: 6px;
 }
 
+/* All notes keeps to the search's left, as the theme and mode buttons keep to its right. */
+.topbar-list {
+  margin-left: auto;
+}
+
 /*
  * Medium screens: the search fills the row between the controls, with the
- * same gap on each side. The gap is a margin on the controls, so an empty
- * side (sidebar open) adds none.
+ * same gap on each side (a margin on the controls).
  */
 @media (max-width: 1024px) {
   .topbar {
@@ -534,7 +589,7 @@ mark {
     gap: 0;
   }
 
-  .topbar-start:not(:empty) {
+  .topbar-start {
     margin-right: 12px;
   }
 
@@ -683,6 +738,56 @@ mark {
 
 .search-input:focus + .search-kbd {
   display: none;
+}
+
+/* Searching the open note: "2/5", then ↑ and ↓. */
+.search-count {
+  flex-shrink: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.search-step {
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.search-count + .search-step {
+  margin-left: 2px;
+}
+
+.search-step:hover:not(:disabled) {
+  background: var(--color-hover);
+  color: var(--color-fg);
+}
+
+.search-step:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.search-step .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.search-step-up .icon {
+  transform: rotate(-90deg);
+}
+
+.search-step-down .icon {
+  transform: rotate(90deg);
 }
 
 .antenna {
@@ -879,7 +984,8 @@ kbd {
 
 .tree-row:has(:focus-visible),
 .tree-document:focus-visible {
-  outline: 1px solid var(--color-accent);
+  border-radius: 3px;
+  outline: 1px solid var(--color-focus-row);
   outline-offset: -1px;
 }
 

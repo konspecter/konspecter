@@ -11,7 +11,7 @@ import {
   type MarkdownDocument,
 } from "../document/document";
 import { plainText } from "../document/plain-text";
-import { parseTagName, writtenTags, type Tag } from "../tag/tags";
+import { parseTagChain, writtenTagList, writtenTags, type Tag } from "../tag/tags";
 
 /**
  * A stored note: an id plus its Markdown document. Everything else (title,
@@ -146,14 +146,19 @@ function updatedTime(read: ReadNote): number | null {
 }
 
 /**
- * The note's tags: those listed in the frontmatter's `tags` field, then those
- * written in the body, each once (by name). None if its document is invalid.
+ * The note's tags: those of the chains listed in the frontmatter's `tags`
+ * field, then those written in the body, each once (by name), so
+ * `#java#collections` gives java and collections. None if its document is
+ * invalid.
  */
 export function noteTags(read: ReadNote): Tag[] {
-  return noteWrittenTags(read).flatMap((written) => parseTagName(written) ?? []);
+  return writtenTagList(noteWrittenTags(read)).map(({ tag }) => tag);
 }
 
-/** The note's tags as written, case kept, in the order of `noteTags`. */
+/**
+ * The note's tag chains as written, case kept: the frontmatter's, then the
+ * body's, each once (by name). How the Markdown defines the tags.
+ */
 export function noteWrittenTags(read: ReadNote): string[] {
   if (!read.valid) return [];
   const seen = new Map<string, string>();
@@ -161,36 +166,60 @@ export function noteWrittenTags(read: ReadNote): string[] {
     ...frontmatterTags(read.note.markdown),
     ...writtenTags(read.document.body),
   ]) {
-    const tag = parseTagName(written);
-    if (tag && !seen.has(tag.name)) seen.set(tag.name, written);
+    const chain = parseTagChain(written);
+    if (chain && !seen.has(chain.name)) seen.set(chain.name, written);
   }
   return [...seen.values()];
 }
 
 /**
- * The note's tags as written (`noteWrittenTags`) that only its frontmatter's
- * `tags` field lists: those can be removed from the list (`withoutTag`). A tag
- * also written in the body is part of the text and is removed there.
+ * The names of the note's tags (`noteTags`) that only its frontmatter's
+ * `tags` field lists: those can be removed from the list (`withoutTag`). A
+ * tag also written in the body is part of the text and is removed there.
  */
 export function listedOnlyTags(read: ReadNote): string[] {
   if (!read.valid) return [];
   const inBody = new Set(
-    writtenTags(read.document.body).map((written) => parseTagName(written)?.name),
+    writtenTagList(writtenTags(read.document.body)).map(({ tag }) => tag.name),
   );
-  return noteWrittenTags(read).filter((written) => !inBody.has(parseTagName(written)?.name));
+  return noteTags(read)
+    .map((tag) => tag.name)
+    .filter((name) => !inBody.has(name));
 }
 
 /**
  * `markdown` without the tag `written` (by name, any spelling) in its
- * frontmatter's `tags` field; everything else stays as written. Returns
- * `markdown` itself when the field does not list it. Throws
- * InvalidDocumentError for invalid frontmatter.
+ * frontmatter's `tags` field. A chain is split around it, so no new parent is
+ * made: without `b`, `a#b#c` becomes `a` and `c` (a part already listed, or
+ * that is not a tag, is dropped). Everything else stays as written. Returns `markdown` itself
+ * when the field does not list it. Throws InvalidDocumentError for invalid
+ * frontmatter.
  */
 export function withoutTag(markdown: string, written: string): string {
-  const name = parseTagName(written)?.name;
+  const [removed, ...more] = parseTagChain(written)?.tags ?? [];
   const listed = frontmatterTags(markdown);
-  const kept = listed.filter((entry) => parseTagName(entry)?.name !== name);
-  return kept.length === listed.length ? markdown : setFrontmatterTags(markdown, kept);
+  if (!removed || more.length > 0) return markdown;
+  const kept = new Map<string, string>();
+  let changed = false;
+  for (const entry of listed) {
+    const chain = parseTagChain(entry);
+    if (!chain?.tags.some((tag) => tag.name === removed.name)) {
+      kept.set(chain?.name ?? entry, entry);
+      continue;
+    }
+    changed = true;
+    const spellings = entry.trim().replace(/^#/, "").split("#");
+    const parts: string[][] = [[]];
+    spellings.forEach((spelling, index) => {
+      if (chain.tags[index]?.name === removed.name) parts.push([]);
+      else parts.at(-1)?.push(spelling);
+    });
+    for (const part of parts) {
+      const name = parseTagChain(part.join("#"))?.name;
+      if (name !== undefined && !kept.has(name)) kept.set(name, part.join("#"));
+    }
+  }
+  return changed ? setFrontmatterTags(markdown, [...kept.values()]) : markdown;
 }
 
 /**
@@ -233,7 +262,7 @@ export function withBody(markdown: string, body: string): string {
     result = updateMetadata(result, { title: next === "" ? null : next });
   }
 
-  const tagName = (written: string) => parseTagName(written)?.name;
+  const tagName = (written: string) => parseTagChain(written)?.name;
   const before = new Set(writtenTags(previous.body).map(tagName));
   const written = writtenTags(body);
   const now = new Set(written.map(tagName));

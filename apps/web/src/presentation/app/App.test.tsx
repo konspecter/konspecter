@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { openDB } from "idb";
 import { MemoryRouter } from "react-router";
@@ -47,6 +47,8 @@ const sidebar = () => screen.getByRole("complementary", { name: "Sidebar" });
 const topBar = () => screen.getByRole("banner");
 const topBarButton = (name: string) => within(topBar()).getByRole("button", { name });
 const searchBox = () => screen.getByRole("searchbox", { name: "Search conspects" });
+/** The same box on the note page, where it searches the note. */
+const findBox = () => screen.getByRole("searchbox", { name: "Search in this conspect" });
 const noteList = () => screen.findByRole("list", { name: "Conspects" });
 const recentNav = () => within(sidebar()).getByRole("navigation", { name: "Recent" });
 const recentTitles = () =>
@@ -112,9 +114,6 @@ describe("layout", () => {
     expect(localStorage.getItem("konspecter.sidebar")).toBe("closed");
     // Its controls move to the top bar meanwhile.
     expect(within(topBar()).getByRole("link", { name: "New conspect" })).toBeInTheDocument();
-    const allNotes = within(topBar()).getByRole("link", { name: "All conspects" });
-    expect(allNotes).toHaveAttribute("href", "/");
-    expect(allNotes).toHaveAttribute("title", "All conspects (Esc)");
 
     await userEvent.click(topBarButton("Show sidebar"));
     expect(sidebar()).toBeInTheDocument();
@@ -129,21 +128,33 @@ describe("layout", () => {
     expect(topBarButton("Show sidebar")).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("opens settings, every note and a new note from the sidebar", async () => {
-    const store = await newStore();
-    await store.put(javaNote);
-    renderApp(store);
+  it("opens settings and a new note from the sidebar", async () => {
+    renderApp(await newStore());
 
     await userEvent.click(within(sidebar()).getByRole("link", { name: "Settings" }));
     expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument();
 
-    const allNotes = within(sidebar()).getByRole("link", { name: "All conspects" });
+    await userEvent.click(within(sidebar()).getByRole("link", { name: "New conspect" }));
+    expect(await textEditor()).toHaveFocus();
+  });
+
+  it("opens every note from the top bar, right before the search, whether or not the sidebar is shown", async () => {
+    const store = await newStore();
+    await store.put(javaNote);
+    renderApp(store, "/settings");
+
+    expect(
+      within(sidebar()).queryByRole("link", { name: "All conspects" }),
+    ).not.toBeInTheDocument();
+    const allNotes = within(topBar()).getByRole("link", { name: "All conspects" });
+    expect(allNotes).toHaveAttribute("href", "/");
     expect(allNotes).toHaveAttribute("title", "All conspects (Esc)");
+    expect(allNotes.parentElement?.nextElementSibling).toBe(within(topBar()).getByRole("search"));
     await userEvent.click(allNotes);
     expect(await listTitles()).toEqual(["Java Collections"]);
 
-    await userEvent.click(within(sidebar()).getByRole("link", { name: "New conspect" }));
-    expect(await textEditor()).toHaveFocus();
+    await userEvent.click(within(sidebar()).getByRole("button", { name: "Hide sidebar" }));
+    expect(within(topBar()).getByRole("link", { name: "All conspects" })).toBeInTheDocument();
   });
 
   it("shows not found for an unknown route", async () => {
@@ -174,12 +185,17 @@ describe("the note list", () => {
   it("shows an error when notes cannot be loaded, and retries", async () => {
     const store = await newStore();
     await store.put(javaNote);
-    vi.spyOn(store, "list").mockRejectedValueOnce(new Error("Disk on fire"));
+    const failure = new Error("Disk on fire");
+    vi.spyOn(store, "list").mockRejectedValueOnce(failure);
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
     renderApp(store);
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Could not load conspects");
-    expect(alert).toHaveTextContent("Disk on fire");
+    // A library's message is not shown; it goes to the log.
+    expect(alert).toHaveTextContent("Oops, something went wrong.");
+    expect(alert).not.toHaveTextContent("Disk on fire");
+    expect(log).toHaveBeenCalledWith(failure);
 
     await userEvent.click(within(alert).getByRole("button", { name: "Try again" }));
 
@@ -263,12 +279,15 @@ describe("creating a note", () => {
   it("keeps the text and tries again when saving fails", async () => {
     const store = await newStore();
     vi.spyOn(store, "put").mockRejectedValueOnce(new Error("Quota exceeded"));
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
     renderApp(store, "/notes/new");
 
     const editor = await textEditor();
     await userEvent.type(editor, "Important{Enter}text");
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Quota exceeded");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Could not save the conspect: Oops, something went wrong. Your text is kept",
+    );
     expect(editor).toHaveTextContent("Important");
     await userEvent.type(editor, "Still here");
     await waitFor(async () => {
@@ -478,9 +497,10 @@ describe("tags", () => {
     expect(within(tree).queryByRole("link", { name: "Collections" })).not.toBeInTheDocument();
 
     await userEvent.click(within(tree).getByRole("button", { name: "Expand #java" }));
+    // A folder is its tag: its link filters by that tag alone.
     expect(within(tree).getByRole("link", { name: "Collections" })).toHaveAttribute(
       "href",
-      "/?q=%23java%23collections",
+      "/?q=%23collections",
     );
     expect(within(tree).getByRole("button", { name: "Collapse #java" })).toHaveAttribute(
       "aria-expanded",
@@ -489,7 +509,7 @@ describe("tags", () => {
     // #java has only child tags; its notes sit inside them.
     expect(within(javaRow).queryByRole("link", { name: "Lists" })).not.toBeInTheDocument();
 
-    await userEvent.click(within(tree).getByRole("button", { name: "Expand #java#collections" }));
+    await userEvent.click(within(tree).getByRole("button", { name: "Expand #collections" }));
     expect(await within(tree).findByRole("link", { name: "Lists" })).toHaveAttribute(
       "href",
       "/notes/lists",
@@ -501,9 +521,52 @@ describe("tags", () => {
         within(tree)
           .getAllByRole("link", { name: "Streams" })
           .map((link) => link.getAttribute("href")),
-      ).toEqual(["/notes/streams", "/?q=%23java%23streams"]);
+      ).toEqual(["/notes/streams", "/?q=%23streams"]);
     });
     expect(within(tree).queryByRole("link", { name: "Untagged" })).not.toBeInTheDocument();
+  });
+
+  it("walks the tree with the arrow keys: ↑/↓ row by row, → into a folder, ← out of it", async () => {
+    renderApp(await storeWithTaggedNotes());
+    const tree = await tagTree();
+    const java = within(tree).getByRole("link", { name: "Java" });
+    act(() => {
+      java.focus();
+    });
+
+    await userEvent.keyboard("{ArrowRight}");
+    expect(within(tree).getByRole("button", { name: "Collapse #java" })).toBeInTheDocument();
+    expect(java).toHaveFocus();
+    await userEvent.keyboard("{ArrowRight}");
+    expect(within(tree).getByRole("link", { name: "Collections" })).toHaveFocus();
+    await userEvent.keyboard("{ArrowDown}");
+    const streams = within(tree)
+      .getAllByRole("link", { name: "Streams" })
+      .find((link) => link.getAttribute("href") === "/?q=%23streams");
+    expect(streams).toHaveFocus();
+    await userEvent.keyboard("{ArrowRight}");
+    const note = await waitFor(() => {
+      const link = within(tree)
+        .getAllByRole("link", { name: "Streams" })
+        .find((each) => each.getAttribute("href") === "/notes/streams");
+      expect(link).toBeDefined();
+      return link;
+    });
+    await userEvent.keyboard("{ArrowRight}");
+    expect(note).toHaveFocus();
+
+    await userEvent.keyboard("{ArrowLeft}");
+    expect(streams).toHaveFocus();
+    await userEvent.keyboard("{ArrowLeft}");
+    expect(within(tree).getByRole("button", { name: "Expand #streams" })).toBeInTheDocument();
+    await userEvent.keyboard("{ArrowLeft}");
+    expect(java).toHaveFocus();
+    await userEvent.keyboard("{ArrowUp}");
+    expect(within(tree).getByRole("link", { name: "Fp" })).toHaveFocus();
+
+    // Past the tree, the recent notes: one list.
+    await userEvent.keyboard("{ArrowDown}{ArrowLeft}{ArrowDown}");
+    expect(within(recentNav()).getByRole("link", { name: "Lists" })).toHaveFocus();
   });
 
   it("shows tags as the notes write them, with underscores as spaces", async () => {
@@ -516,7 +579,7 @@ describe("tags", () => {
     expect(within(tree).getByRole("link", { name: "Java" })).toHaveAttribute("href", "/?q=%23java");
     expect(within(tree).getByRole("link", { name: "Linked List" })).toHaveAttribute(
       "href",
-      "/?q=%23java%23linked_list",
+      "/?q=%23linked_list",
     );
   });
 
@@ -530,12 +593,43 @@ describe("tags", () => {
     const tree = await tagTree();
     expect(await within(tree).findByRole("link", { name: "Parent 1" })).toBeInTheDocument();
     expect(within(tree).getByRole("link", { name: "Parent 2" })).toBeInTheDocument();
+    // A tag with a parent is never a root.
+    expect(within(tree).queryByRole("link", { name: "Child" })).not.toBeInTheDocument();
     await userEvent.click(within(tree).getByRole("button", { name: "Expand #parent_1" }));
-    await userEvent.click(within(tree).getByRole("button", { name: "Expand #parent_1#child" }));
+    await userEvent.click(within(tree).getByRole("button", { name: "Expand #child" }));
     expect(await within(tree).findByRole("link", { name: "Meta" })).toHaveAttribute(
       "href",
       "/notes/m",
     );
+  });
+
+  it("shows a tag under each of its parents, holding every note it ends a chain of", async () => {
+    const store = await newStore();
+    await store.put(createNote("# Lists\n\n#java#collections", new Date(), "lists"));
+    await store.put(createNote("# Py\n\n#python#collections", new Date(), "py"));
+    await store.put(createNote("# Bare\n\n#collections", new Date(), "bare"));
+    renderApp(store, "/?q=%23collections");
+
+    const tree = await tagTree();
+    const roots = await within(tree).findAllByRole("link", { name: /^(Java|Python|Collections)$/ });
+    // The active tag's folders start open, under both parents.
+    expect(roots.map((link) => link.textContent)).toEqual([
+      "Java",
+      "Collections",
+      "Python",
+      "Collections",
+    ]);
+    for (const link of within(tree).getAllByRole("link", { name: "Collections" })) {
+      expect(link).toHaveAttribute("aria-current", "page");
+    }
+    // The same notes in both: the folder is the tag, whatever its parent.
+    await waitFor(() => {
+      expect(
+        within(tree)
+          .getAllByRole("link", { name: /^(Bare|Lists|Py)$/ })
+          .map((link) => link.textContent),
+      ).toEqual(["Bare", "Lists", "Py", "Bare", "Lists", "Py"]);
+    });
   });
 
   it("opens a note from the tag tree and marks it there", async () => {
@@ -581,7 +675,7 @@ describe("tags", () => {
     expect(await listTitles()).toEqual(["Lists", "Streams", "Untagged"]);
   });
 
-  it("narrows to a child tag", async () => {
+  it("narrows to every tag of a chain", async () => {
     renderApp(await storeWithTaggedNotes(), "/?q=%23java%23streams");
 
     await waitFor(async () => {
@@ -647,7 +741,7 @@ describe("search", () => {
     renderApp(await storeWithNotes(), "/notes/new");
     await textEditor();
 
-    await userEvent.click(searchBox());
+    await userEvent.click(findBox());
 
     expect(await textEditor()).toBeInTheDocument();
     expect(screen.queryByRole("list", { name: "Conspects" })).not.toBeInTheDocument();
@@ -767,11 +861,11 @@ describe("search", () => {
     });
   });
 
-  it("searches from a note and opens results", async () => {
+  it("searches the library from a note with Ctrl+P and opens results", async () => {
     renderApp(await storeWithNotes(), "/notes/maps");
     await textEditor();
 
-    await userEvent.click(searchBox());
+    await userEvent.keyboard("{Control>}p{/Control}");
     await userEvent.keyboard("tcp");
     await waitFor(async () => {
       expect(await listTitles()).toEqual(["Networking"]);
@@ -799,6 +893,180 @@ describe("search", () => {
 
     await userEvent.keyboard("{ArrowDown}{ArrowDown}{Enter}");
     expect(await textEditor()).toHaveTextContent("TCP handshakes.");
+  });
+});
+
+describe("search in the note", () => {
+  const maps = createNote(
+    "# Hash maps\n\nA HashMap maps keys.\n\nTreeMap keeps them sorted.",
+    new Date("2020-01-01"),
+    "maps",
+  );
+  let scrollTo: ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    scrollTo = vi.fn();
+    window.scrollTo = scrollTo as unknown as typeof window.scrollTo;
+  });
+
+  async function openMaps(settings?: Settings) {
+    const store = await newStore();
+    await store.put(maps);
+    renderApp(store, "/notes/maps", settings);
+    return store;
+  }
+
+  const count = () => within(topBar()).getByRole("status");
+  const marked = (root: ParentNode = document) =>
+    [...root.querySelectorAll(".find-match")].map((match) => match.textContent);
+  const current = () => document.querySelector(".find-current")?.textContent;
+
+  it("marks the matches in the note and scrolls to the first", async () => {
+    await openMaps();
+    const editor = await textEditor();
+    await userEvent.click(findBox());
+    scrollTo.mockClear();
+
+    await userEvent.keyboard("map");
+
+    expect(marked(editor)).toEqual(["map", "Map", "map", "Map"]);
+    expect(current()).toBe("map");
+    expect(count()).toHaveTextContent("Match 1 of 4");
+    expect(scrollTo).toHaveBeenCalled();
+    // The note stays; the library is not searched.
+    expect(screen.queryByRole("list", { name: "Conspects" })).not.toBeInTheDocument();
+    expect(editor).toHaveTextContent("A HashMap maps keys.");
+  });
+
+  it("moves between the matches with ↓, ↑, Enter and the buttons, around the ends", async () => {
+    await openMaps();
+    const editor = await textEditor();
+    await userEvent.click(findBox());
+    await userEvent.keyboard("map");
+    const selected = () =>
+      [...editor.querySelectorAll(".find-match")].findIndex((match) =>
+        match.classList.contains("find-current"),
+      );
+
+    await userEvent.keyboard("{ArrowDown}");
+    expect(selected()).toBe(1);
+    expect(findBox()).toHaveFocus();
+    await userEvent.keyboard("{Enter}");
+    expect(selected()).toBe(2);
+    await userEvent.click(within(topBar()).getByRole("button", { name: "Next match" }));
+    expect(selected()).toBe(3);
+    expect(count()).toHaveTextContent("Match 4 of 4");
+    await userEvent.keyboard("{ArrowDown}");
+    expect(selected()).toBe(0);
+    await userEvent.keyboard("{ArrowUp}");
+    expect(selected()).toBe(3);
+    await userEvent.keyboard("{Shift>}{Enter}{/Shift}");
+    expect(selected()).toBe(2);
+    await userEvent.click(within(topBar()).getByRole("button", { name: "Previous match" }));
+    expect(selected()).toBe(1);
+    expect(findBox()).toHaveFocus();
+  });
+
+  it("lets Tab leave the box, with or without matches", async () => {
+    await openMaps();
+    const editor = await textEditor();
+    await userEvent.click(findBox());
+    await userEvent.keyboard("queue");
+
+    expect(marked(editor)).toEqual([]);
+    expect(count()).toHaveTextContent("Match 0 of 0");
+    expect(within(topBar()).getByRole("button", { name: "Next match" })).toBeDisabled();
+    await userEvent.keyboard("{Tab}");
+    expect(findBox()).not.toHaveFocus();
+
+    await userEvent.click(findBox());
+    await userEvent.clear(findBox());
+    await userEvent.keyboard("map");
+    expect(count()).toHaveTextContent("Match 1 of 4");
+    await userEvent.keyboard("{Tab}");
+    expect(findBox()).not.toHaveFocus();
+    expect(count()).toHaveTextContent("Match 1 of 4");
+  });
+
+  it("opens with Ctrl+F from the editor; Ctrl+P searches the library instead", async () => {
+    await openMaps();
+    await userEvent.click(await textEditor());
+
+    await userEvent.keyboard("{Control>}f{/Control}");
+    expect(findBox()).toHaveFocus();
+    await userEvent.keyboard("sorted");
+    expect(current()).toBe("sorted");
+
+    await userEvent.keyboard("{Control>}p{/Control}");
+    expect(searchBox()).toHaveFocus();
+    expect(searchBox()).toHaveValue("");
+    // Leaving the box brings the note's search back.
+    await userEvent.click(await textEditor());
+    expect(findBox()).toHaveValue("sorted");
+    expect(current()).toBe("sorted");
+  });
+
+  it("ends with the note: the list's search box is empty and nothing stays marked", async () => {
+    await openMaps();
+    await textEditor();
+    await userEvent.click(findBox());
+    await userEvent.keyboard("map");
+
+    await userEvent.click(within(topBar()).getByRole("link", { name: "All conspects" }));
+    expect(await listTitles()).toEqual(["Hash maps"]);
+    expect(searchBox()).toHaveValue("");
+
+    await userEvent.click(within(await noteList()).getByRole("link", { name: "Hash maps" }));
+    expect(await textEditor()).toHaveTextContent("A HashMap maps keys.");
+    expect(findBox()).toHaveValue("");
+    expect(marked()).toEqual([]);
+  });
+
+  it("searches the Markdown source in Markdown mode, frontmatter and marks included", async () => {
+    await openMaps({ ...DEFAULT_SETTINGS, defaultEditor: "markdown" });
+    const source = await screen.findByRole("textbox", { name: "Markdown" });
+
+    await userEvent.click(findBox());
+    await userEvent.keyboard("# hash");
+
+    expect(marked(source)).toEqual(["# Hash"]);
+    expect(count()).toHaveTextContent("Match 1 of 1");
+  });
+
+  it("follows the note as it changes, and keeps the matches when the mode is switched", async () => {
+    await openMaps();
+    const editor = await textEditor();
+    await userEvent.click(findBox());
+    await userEvent.keyboard("keys");
+    expect(count()).toHaveTextContent("Match 1 of 1");
+
+    await userEvent.click(editor);
+    caretAtEnd(editor);
+    await userEvent.keyboard(" More keys.");
+    expect(marked(editor)).toEqual(["keys", "keys"]);
+
+    await userEvent.keyboard("{Control>}/{/Control}");
+    const source = await screen.findByRole("textbox", { name: "Markdown" });
+    expect(marked(source)).toEqual(["keys", "keys"]);
+    expect(count()).toHaveTextContent("Match 1 of 2");
+  });
+
+  it("counts the matches in a note shown rendered", async () => {
+    const store = await newStore();
+    await store.put(
+      createNote(
+        "# Maps\n\n| Map | Order |\n| --- | --- |\n| TreeMap | sorted |",
+        new Date("2020-01-01"),
+        "table",
+      ),
+    );
+    renderApp(store, "/notes/table");
+    await screen.findByRole("table");
+
+    await userEvent.click(findBox());
+    await userEvent.keyboard("map");
+
+    // "Maps" is the page's title, not repeated in the text: the table's two.
+    expect(count()).toHaveTextContent("Match 1 of 2");
   });
 });
 
@@ -961,12 +1229,13 @@ describe("settings and the top bar", () => {
   it("shows an error but keeps the change when saving fails", async () => {
     const store = await newStore();
     vi.spyOn(store, "saveSettings").mockRejectedValueOnce(new Error("Read-only"));
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
     renderWithSettings(store, "/settings");
 
     await userEvent.click(screen.getByRole("radio", { name: "Light" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Could not save settings: Read-only",
+      "Could not save settings: Oops, something went wrong. They apply until you reload.",
     );
     expect(document.documentElement.dataset.theme).toBe("light");
   });
@@ -1050,9 +1319,14 @@ describe("note details", () => {
     const region = await within(sidebar()).findByRole("region", { name: "Details" });
     expect(region).toHaveTextContent("Created");
     expect(region).toHaveTextContent("7 words");
-    expect(within(region).getByRole("link", { name: "#java#collections" })).toHaveAttribute(
+    // A chain is listed as its separate tags.
+    expect(within(region).getByRole("link", { name: "#java" })).toHaveAttribute(
       "href",
-      "/?q=%23java%23collections",
+      "/?q=%23java",
+    );
+    expect(within(region).getByRole("link", { name: "#collections" })).toHaveAttribute(
+      "href",
+      "/?q=%23collections",
     );
     expect(region).toHaveTextContent("AuthorAnn");
     const actions = within(region).getByRole("group", { name: "Conspect actions" });
@@ -1486,7 +1760,7 @@ describe("keyboard shortcuts", () => {
     expect(await textEditor()).toHaveTextContent("");
   });
 
-  it("toggles the sidebar with Ctrl+\\ and keeps the caret in the editor", async () => {
+  it("toggles the sidebar with Ctrl+\\: in to the open note when shown, back to the editor", async () => {
     const store = await newStore();
     await store.put(javaNote);
     renderApp(store, "/notes/java");
@@ -1497,6 +1771,9 @@ describe("keyboard shortcuts", () => {
     expect(await textEditor()).toHaveFocus();
     await userEvent.keyboard("{Control>}\\{/Control}");
     expect(sidebar()).toBeVisible();
+    expect(within(recentNav()).getByRole("link", { name: "Java Collections" })).toHaveFocus();
+    await userEvent.keyboard("{Control>}\\{/Control}");
+    expect(screen.queryByRole("complementary", { name: "Sidebar" })).not.toBeInTheDocument();
     expect(await textEditor()).toHaveFocus();
   });
 
@@ -1543,7 +1820,7 @@ describe("keyboard shortcuts", () => {
     await userEvent.keyboard("n/");
     expect(await textEditor()).toBe(editor);
     expect(editor).toHaveTextContent("dynamic array.n/");
-    expect(searchBox()).not.toHaveFocus();
+    expect(findBox()).not.toHaveFocus();
 
     await userEvent.click(within(sidebar()).getByRole("link", { name: "Settings" }));
     await userEvent.keyboard("/");
@@ -1562,7 +1839,7 @@ describe("keyboard shortcuts", () => {
     expect(screen.queryByRole("textbox", { name: "Conspect text" })).not.toBeInTheDocument();
   });
 
-  it("leaves Escape to dialogs, the search box and CodeMirror's search panel", async () => {
+  it("leaves Escape to dialogs and the search box", async () => {
     const store = await newStore();
     await store.put(javaNote);
     renderApp(store, "/notes/java", { ...DEFAULT_SETTINGS, defaultEditor: "markdown" });
@@ -1572,17 +1849,17 @@ describe("keyboard shortcuts", () => {
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
 
-    await userEvent.click(searchBox());
+    await userEvent.click(findBox());
     await userEvent.keyboard("{Escape}");
-    expect(searchBox()).not.toHaveFocus();
+    expect(findBox()).not.toHaveFocus();
 
+    // Ctrl+F is the top bar's search, not CodeMirror's panel.
     await userEvent.click(source);
     await userEvent.keyboard("{Control>}f{/Control}");
-    // CodeMirror's search panel: Escape closes it and stays in the note.
-    const panel = () => document.querySelector(".cm-search");
-    expect(panel()).not.toBeNull();
+    expect(findBox()).toHaveFocus();
+    expect(document.querySelector(".cm-search")).toBeNull();
     await userEvent.keyboard("{Escape}");
-    expect(panel()).toBeNull();
+    expect(findBox()).not.toHaveFocus();
 
     expect(screen.getByRole("textbox", { name: "Markdown" })).toBeInTheDocument();
     expect(await store.get("java")).toEqual(javaNote);

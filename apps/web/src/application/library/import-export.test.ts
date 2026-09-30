@@ -56,7 +56,8 @@ describe("importMarkdown", () => {
 
   it("reports files the library cannot store", async () => {
     const store = await library();
-    vi.spyOn(store, "create").mockRejectedValueOnce(new Error("Quota exceeded"));
+    const quota = new Error("Quota exceeded");
+    vi.spyOn(store, "create").mockRejectedValueOnce(quota);
 
     const report = await importMarkdown(
       [
@@ -70,7 +71,7 @@ describe("importMarkdown", () => {
     expect(report).toEqual({
       imported: 1,
       duplicates: 0,
-      rejected: [{ name: "a.md", reason: "Quota exceeded" }],
+      rejected: [{ name: "a.md", error: quota }],
     });
   });
 });

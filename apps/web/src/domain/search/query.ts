@@ -1,4 +1,4 @@
-import { parseTagName, type Tag } from "../tag/tags";
+import { parseTagChain, type Tag } from "../tag/tags";
 
 /**
  * A parsed search query. Words are matched against note text, titles and tag
@@ -11,16 +11,17 @@ export type SearchQuery = {
 
 /**
  * Splits a query on whitespace. A token that starts with or contains `#` and
- * is a valid tag (`#java`, `java#collections`) becomes a tag filter; any other
- * token is a word (a lone `#` or `#123` is searched as text).
+ * is a valid tag or chain (`#java`, `java#collections`) becomes a tag filter
+ * per tag; any other token is a word (a lone `#` or `#123` is searched as
+ * text).
  */
 export function parseQuery(input: string): SearchQuery {
   const words: string[] = [];
   const tags = new Map<string, Tag>();
   for (const token of input.split(/\s+/).filter((t) => t !== "")) {
-    const tag = token.includes("#") ? parseTagName(token) : null;
-    if (tag) {
-      tags.set(tag.name, tag);
+    const tokenTags = tagsOf(token);
+    if (tokenTags) {
+      for (const tag of tokenTags) tags.set(tag.name, tag);
     } else {
       const word = token.replace(/^#+/, "");
       if (word !== "") words.push(word);
@@ -33,9 +34,12 @@ export function isEmptyQuery(query: SearchQuery): boolean {
   return query.words.length === 0 && query.tags.length === 0;
 }
 
-/** A token that is a tag filter (`#java`, `java#collections`), as `parseQuery` reads it. */
-function tokenTag(token: string): Tag | null {
-  return token.includes("#") ? parseTagName(token) : null;
+/**
+ * The tag filters of a token (`#java`; `java#collections` is two), as
+ * `parseQuery` reads it; null for a word.
+ */
+function tagsOf(token: string): readonly Tag[] | null {
+  return token.includes("#") ? (parseTagChain(token)?.tags ?? null) : null;
 }
 
 /** A query as the search box shows it: its tag filters, and the rest of the text. */
@@ -46,8 +50,8 @@ export function queryParts(input: string): QueryParts {
   const tags = new Map<string, Tag>();
   const words: string[] = [];
   for (const token of input.split(/\s+/).filter((t) => t !== "")) {
-    const tag = tokenTag(token);
-    if (tag) tags.set(tag.name, tag);
+    const tokenTags = tagsOf(token);
+    if (tokenTags) for (const tag of tokenTags) tags.set(tag.name, tag);
     else words.push(token);
   }
   return { tags: [...tags.values()], text: words.join(" ") };
@@ -63,8 +67,8 @@ export function takeTags(text: string): QueryParts {
   const kept: string[] = [];
   tokens.forEach((token, index) => {
     const complete = index + 1 < tokens.length; // a separator follows
-    const tag = complete ? tokenTag(token) : null;
-    if (tag) tags.set(tag.name, tag);
+    const tokenTags = complete ? tagsOf(token) : null;
+    if (tokenTags) for (const tag of tokenTags) tags.set(tag.name, tag);
     else if (!/^\s+$/.test(token) && token !== "") kept.push(token);
   });
   const rest = kept.join(" ");
@@ -77,12 +81,18 @@ export function joinQuery(tags: readonly Tag[], text: string): string {
   return [...tags.map((tag) => `#${tag.name}`), text].filter((part) => part !== "").join(" ");
 }
 
-/** The query text without the tokens that select `tag`. */
+/**
+ * The query text without the filter `tag`. A chain that selects it keeps its
+ * other tags, as separate filters.
+ */
 export function withoutTag(input: string, tag: Tag): string {
   return input
     .split(/\s+/)
-    .filter(
-      (token) => token !== "" && !(token.includes("#") && parseTagName(token)?.name === tag.name),
-    )
+    .filter((token) => token !== "")
+    .flatMap((token) => {
+      const tokenTags = tagsOf(token);
+      if (!tokenTags?.some((other) => other.name === tag.name)) return [token];
+      return tokenTags.filter((other) => other.name !== tag.name).map((other) => `#${other.name}`);
+    })
     .join(" ");
 }

@@ -7,8 +7,8 @@ interface speaks English and Russian ([i18n](i18n.md)).
 ## Layout
 
 ```text
-┌─ Sidebar ─────────────┬─ Top bar: [ search ]  (theme) (mode)               (antenna) ─┐
-│ ☰         ⚙  ≡  ✎     ├────────────────────────────────────────────────────────────────┤
+┌─ Sidebar ─────────────┬─ Top bar: ≡ [ search ]  (theme) (mode)             (antenna) ─┐
+│ ☰         ⚙  ✎        ├────────────────────────────────────────────────────────────────┤
 │ Tags (tree)           │                                                                │
 │ Recent (by last edit) │   Main content: note list · editor · settings                  │
 │ ───────────────────── │                                                                │
@@ -19,10 +19,10 @@ interface speaks English and Russian ([i18n](i18n.md)).
 - Two panels over the whole window (`components/Layout.tsx`): the sidebar is sticky at full
   height and scrolls on its own; the page scrolls under a sticky top bar (so the reading
   position keeps using the window's scroll). No app header, brand or menu.
-- **Sidebar** (`Sidebar.tsx`): toggle, Settings, All notes (`/`), New note; the tag tree (tags as folders,
+- **Sidebar** (`Sidebar.tsx`): toggle, Settings, New note; the tag tree (tags as folders,
   notes as documents inside them; a tag's name opens `/?q=#tag`, see [tags](tags.md)); recent notes, most recently edited first, with the open
-  one marked. Hidden or shown per device (`localStorage`); while it is hidden, its toggle, All notes and New note sit at the start of the top bar; on narrow screens it starts hidden
-  and slides over the content. While it is hidden, its toggle and New note sit in the top bar.
+  one marked. Hidden or shown per device (`localStorage`); while it is hidden, its toggle and New note sit at the start of the top bar; on narrow screens it starts hidden
+  and slides over the content.
 - **Details** (`NoteDetails.tsx`, the sidebar's footer): on the note page only (new or
   existing), the note page renders its details into the sidebar through a portal
   (`details-slot.tsx`: the layout provides the element, `<Details>` renders into it). What the
@@ -35,7 +35,8 @@ interface speaks English and Russian ([i18n](i18n.md)).
   (`ConfirmDialog.tsx`: Cancel focused, Escape cancels), since the browser's `confirm()` is
   not shown by every web view. Smaller (12px) and quieter (`--color-faint`, still WCAG AA)
   than the rest of the app.
-- **Top bar:** the search box (centre), the theme toggle and the editor mode button to its
+- **Top bar:** All notes (`/`) right before the search box, always (the list is what the search
+  filters); the search box (centre), the theme toggle and the editor mode button to its
   right, a sync hint when sync needs attention, and the antenna at the far right. The
   controls are never hidden. Wide windows (over 1024px): the search is centred, up to 30rem,
   both sides at least as wide as the controls on the right (plus the macOS window buttons).
@@ -69,6 +70,20 @@ interface speaks English and Russian ([i18n](i18n.md)).
   results stay while the next search runs, so typing never blanks the list. ↓ moves into the
   results, ↑ and ↓ move between them (↑ on the first returns to the box), Enter opens the
   first. Neither the list nor the results have a visible heading.
+- **Search in the note** (`note-find.ts`, [plan](../../.claude/plans/note-find.md)): on the
+  note page (new or existing) the box searches the open note instead, unless it was opened
+  with `Mod+P` or `/` (the library, as above, until the box loses the focus). Every match is
+  marked like the list's, the selected one stronger (`--color-mark-current`), and the first
+  is scrolled to the middle of the page below the top bar. The box ends in `2/5` and ↑/↓;
+  the ↓ and ↑ keys (or Enter and Shift+Enter) go to the next and the previous match, around
+  the ends; Tab leaves the box as usual. The caret stays where it was. Matching is
+  `findMatches` (`domain/search/find.ts`): the whole query as one phrase, anywhere in a word,
+  any case, never across blocks. The layout owns the query and the selected match and hands
+  them to the note page through a context; the open view marks and counts: the text editor
+  with ProseMirror decorations, the Markdown editor with CodeMirror decorations (it scrolls
+  itself, since it draws only the lines in view, and searches the source, frontmatter and
+  marks included), the rendered view with the CSS Custom Highlight API (without it, matches
+  are counted and scrolled to but not marked). The search ends with the note.
 - **Tag chips:** the query's tag filters are chips inside the search box, before the text
   (`queryParts`, `takeTags`, `joinQuery` in `domain/search/query.ts`). A typed tag becomes a
   chip when a space follows it (or the field is left), a tag chosen in the sidebar arrives as
@@ -102,30 +117,48 @@ out with an orange X while sync is set up but there is no connection (notes keep
 device and sync when it is back). That is the only sign of it: the top bar shows text only when
 sync fails or holds notes back.
 
+## Errors
+
+The interface shows an error's message only when Konspecter wrote it: the app's own error
+classes (invalid document or note, cover image, server answers, "could not reach the
+server", folder errors other than `io` and `credentials`). Anything from a library, the
+browser or the operating system reads "Oops, something went wrong." (`app.somethingWrong`),
+and the real error is logged: `console.error` (the browser console; logcat on Android), and
+on the desktop also its log file ([clients](clients.md)). One place decides:
+`presentation/app/errors.ts` (`errorMessage`, `reportError`); components use
+`useErrorMessage(error)`, which logs in an effect, never during render. Own messages must
+not quote a library either: invalid YAML names the frontmatter line, a network failure keeps
+the fetch error as its `cause`.
+
 ## Keyboard
 
 One registry, `presentation/app/shortcuts.ts`, used by the handlers and by the lists in the
 `?` dialog and in Settings. `Mod` is ⌘ on macOS and Ctrl elsewhere; the physical key is also
 matched, so the shortcuts work on Cyrillic layouts.
 
-| Keys    | Action                          | Where                       |
-| ------- | ------------------------------- | --------------------------- |
-| `Mod+P` | Search                          | everywhere, also in editors |
-| `Esc`   | All notes (the list, `/`)       | everywhere, also in editors |
-| `Mod+N` | New note                        | everywhere, also in editors |
-| `Mod+,` | Settings                        | everywhere, also in editors |
-| `Mod+\` | Show or hide the sidebar        | everywhere, also in editors |
-| `Mod+/` | Switch text editor and Markdown | everywhere, also in editors |
-| `Mod+S` | Save now                        | the editor                  |
-| `/` `n` | Search, new note                | outside text fields         |
-| `?`     | Show the shortcuts              | outside text fields         |
+| Keys    | Action                          | Where                          |
+| ------- | ------------------------------- | ------------------------------ |
+| `Mod+P` | Search                          | everywhere, also in editors    |
+| `Mod+F` | Search in the open note         | the note page, also in editors |
+| `Esc`   | All notes (the list, `/`)       | everywhere, also in editors    |
+| `Mod+N` | New note                        | everywhere, also in editors    |
+| `Mod+,` | Settings                        | everywhere, also in editors    |
+| `Mod+\` | Show or hide the sidebar        | everywhere, also in editors    |
+| `Mod+/` | Switch text editor and Markdown | everywhere, also in editors    |
+| `Mod+S` | Save now                        | the editor                     |
+| `/` `n` | Search, new note                | outside text fields            |
+| `?`     | Show the shortcuts              | outside text fields            |
 
 Modifier shortcuts are caught in the capture phase, before editors and the browser (no print
 dialog on `Mod+P`), and go no further (CodeMirror's own `Mod-/` does not comment the line).
 `Esc` leaves the editor for the list, but gives way where Escape already means something: an
-open dialog closes, the search box and other form fields let go of the focus, and CodeMirror's
-search panel closes. `Mod+\` and `Mod+/` leave the caret where it is: in the editor after hiding the sidebar, and in
-the other editor after switching. On a Russian layout they are the keys that type `ё`/`\` and
+open dialog closes, the search box and other form fields (CodeMirror's go-to-line field) let
+go of the focus. CodeMirror has no search panel of its own: `Mod+F` is the top bar's. `Mod+\` that shows the sidebar moves the focus into it, to the open note (else to what is
+current there, else to the first row); `Mod+\` from there hides it and gives the focus back to
+where it was, so the caret is in the editor again. Hiding it from the editor leaves the caret
+where it is, and `Mod+/` puts it in the other editor. In the sidebar `↑`/`↓` go row by row
+through the tag tree and the recent notes as one flat list; `→` opens a tag folder, then goes
+to its first entry, and `←` closes it, then goes to the folder above. On a Russian layout they are the keys that type `ё`/`\` and
 `.`: the physical key (`Backslash`, `Slash`) is what counts. Browsers keep `Ctrl+N` for themselves in ordinary tabs; it works in the
 desktop app and in the installed PWA, and `n` works everywhere.
 

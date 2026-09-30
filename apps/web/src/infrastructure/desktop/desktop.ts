@@ -192,6 +192,11 @@ export async function exportToFolder(
   return { folder, written };
 }
 
+/** Appends an entry to the desktop app's log file (native command `log_error`). */
+export async function writeLog(entry: string): Promise<void> {
+  await invoke("log_error", { entry });
+}
+
 /** The sync token in the operating system's keychain (native commands credential_*). */
 export const keychainCredentials = {
   async load(): Promise<string | null> {

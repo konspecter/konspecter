@@ -16,7 +16,7 @@ import {
 } from "../../infrastructure/storage/persistence";
 import { appInfo, isDesktop } from "../../infrastructure/desktop/desktop";
 import type { SyncEngine } from "../../infrastructure/sync/sync-engine";
-import { errorMessage } from "../components/ErrorState";
+import { useErrorMessage } from "../hooks/use-error-message";
 import { SyncSettings } from "../components/SyncSettings";
 import { ImportExport } from "../components/ImportExport";
 import { BackupRecovery } from "../components/BackupRecovery";
@@ -84,6 +84,7 @@ function options() {
 /** Changes apply and are saved immediately. */
 export function SettingsPage({ settings, onChange, sync, library, store }: SettingsPageProps) {
   const [saveError, setSaveError] = useState<unknown>(null);
+  const saveErrorText = useErrorMessage(saveError);
   const choices = options();
 
   function update<K extends keyof Settings>(key: K, value: Settings[K]) {
@@ -174,9 +175,9 @@ export function SettingsPage({ settings, onChange, sync, library, store }: Setti
         </h2>
         <ShortcutList />
       </section>
-      {saveError !== null && (
+      {saveErrorText !== null && (
         <p role="alert" className="inline-error">
-          {t("settings.saveFailed", { error: errorMessage(saveError) })}
+          {t("settings.saveFailed", { error: saveErrorText })}
         </p>
       )}
     </>
@@ -282,6 +283,7 @@ function LibrarySettings({ library }: { library: LibraryControls }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [failure, setFailure] = useState<unknown>(null);
+  const failureText = useErrorMessage(failure);
 
   function run(action: () => Promise<string | null>) {
     setBusy(true);
@@ -364,9 +366,9 @@ function LibrarySettings({ library }: { library: LibraryControls }) {
           {message}
         </p>
       )}
-      {failure !== null && (
+      {failureText !== null && (
         <p role="alert" className="inline-error">
-          {errorMessage(failure)}
+          {failureText}
         </p>
       )}
     </section>

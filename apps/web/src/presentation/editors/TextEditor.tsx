@@ -13,8 +13,11 @@ import {
   type ReactNode,
 } from "react";
 import { ChevronIcon } from "../components/icons";
+import { NO_FIND, revealMatch, type NoteFind } from "../components/note-find";
 import {
   createTextEditorState,
+  findTransaction,
+  foundMatches,
   FROM_ELSEWHERE,
   isLinkActive,
   linkCommand,
@@ -41,6 +44,9 @@ type TextEditorProps = {
   autoFocus?: boolean;
   /** A new note: a short first line becomes the title when Enter ends it. */
   titleFromFirstLine?: boolean;
+  /** What to find in the text (see `NoteEditor`). */
+  find?: NoteFind;
+  onFindCount?: (count: number) => void;
 };
 
 /** A caret in ProseMirror positions, and whether the editor has the focus. */
@@ -165,6 +171,8 @@ export const TextEditor = memo(function TextEditor({
   onSelectionChange,
   autoFocus = false,
   titleFromFirstLine = false,
+  find = NO_FIND,
+  onFindCount,
 }: TextEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -253,6 +261,24 @@ export const TextEditor = memo(function TextEditor({
     const transaction = replaceDocument(view.state, replacement.doc);
     if (transaction) view.dispatch(transaction);
   }, [replacement]);
+
+  // The search marks its matches; asked anew, it scrolls to the selected one
+  // (not when the editor opens with a search under way).
+  const revealed = useRef<number | null>(null);
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch(findTransaction(view.state, find.query, find.selected));
+    if (revealed.current !== null && revealed.current !== find.reveal) {
+      const current = view.dom.querySelector(".find-current");
+      if (current) revealMatch(current.getBoundingClientRect());
+    }
+    revealed.current = find.reveal;
+  }, [find]);
+  const findCount = foundMatches(editorState).length;
+  useEffect(() => {
+    onFindCount?.(findCount);
+  }, [findCount, onFindCount]);
 
   // Place the toolbar after every render that can move the caret's block or
   // change the toolbar's height (folding), and again once it shows, when its

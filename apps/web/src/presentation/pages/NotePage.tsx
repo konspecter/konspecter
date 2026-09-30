@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { InvalidDocumentError } from "../../domain/document/document";
 import { readNote, withoutTag, type Note } from "../../domain/note/note";
@@ -10,14 +10,16 @@ import { requestPersistence } from "../../infrastructure/storage/persistence";
 import { saveBeforeClosing } from "../app/closing";
 import type { Activity } from "../app/activity";
 import { CoverImage } from "../components/CoverImage";
-import { ErrorState, errorMessage } from "../components/ErrorState";
+import { ErrorState } from "../components/ErrorState";
 import { Details } from "../components/details-slot";
 import { NoteDetails } from "../components/NoteDetails";
 import { NoteNotFound } from "../components/NoteNotFound";
+import { NoteFindContext } from "../components/note-find";
 import { displayTitle } from "../components/note-title";
 import { LazyNoteEditor, preloadEditor } from "../editors/LazyNoteEditor";
 import type { DocumentEdit } from "../editors/NoteEditor";
 import { useAsync } from "../hooks/use-async";
+import { useErrorMessage } from "../hooks/use-error-message";
 import { useReadingPosition } from "../hooks/use-reading-position";
 import { useShortcuts } from "../hooks/use-shortcuts";
 import { t } from "../i18n/i18n";
@@ -133,6 +135,7 @@ function NoteSession({
   // The latest stored version: title, dates and cover come from it.
   const [saved, setSaved] = useState(initial);
   const [problem, setProblem] = useState<unknown>(null);
+  const problemText = useErrorMessage(problem);
   const [deletedElsewhere, setDeletedElsewhere] = useState(false);
   const [ready, setReady] = useState(false);
   const [showMetadata, setShowMetadata] = useState(false);
@@ -208,6 +211,11 @@ function NoteSession({
 
   useShortcuts({ save: () => void autosave.flush() });
 
+  // The top bar's search searches this note; it ends with the session.
+  const finding = use(NoteFindContext);
+  const closeFind = finding?.onClose;
+  useEffect(() => closeFind, [closeFind]);
+
   const handleChange = useCallback(
     (read: () => string) => {
       autosave.change(read);
@@ -274,12 +282,13 @@ function NoteSession({
         showMetadata={showMetadata}
         initialSelection={initialSelection}
         onSelectionChange={reading.rememberSelection}
+        {...(finding ? { find: finding.find, onFindCount: finding.onCount } : {})}
       />
-      {problem !== null && (
+      {problemText !== null && (
         <p role="alert" className="inline-error">
           {problem instanceof InvalidDocumentError
             ? t("note.notSavedInvalid", { reason: problem.message })
-            : t("note.saveFailed", { error: errorMessage(problem) })}
+            : t("note.saveFailed", { error: problemText })}
         </p>
       )}
       <Details>

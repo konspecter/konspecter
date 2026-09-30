@@ -1,6 +1,5 @@
 import { openDB } from "idb";
 import { createNote, updateNote, type Note } from "../../domain/note/note";
-import { parseTagName, type Tag } from "../../domain/tag/tags";
 import { openNoteStore } from "./note-store";
 import { TAG_INDEX_VERSION } from "./tag-index";
 
@@ -11,32 +10,36 @@ function uniqueName() {
 }
 
 const now = new Date("2026-09-28T10:00:00Z");
-const tag = (name: string) => parseTagName(name) as Tag;
+const tag = (name: string) => ({ name });
 const note = (id: string, markdown: string): Note => createNote(markdown, now, id);
 const ids = (notes: readonly Note[]) => notes.map((n) => n.id).sort();
 
 describe("tag index", () => {
-  it("indexes tags when a note is saved", async () => {
+  it("indexes each tag of a chain when a note is saved", async () => {
     const store = await openNoteStore(uniqueName());
     await store.put(note("a", "Intro #java#collections and #tips"));
     await store.put(note("b", "#java"));
 
     expect(ids(await store.notesWithTag(tag("java")))).toEqual(["a", "b"]);
-    expect(ids(await store.notesWithTag(tag("java#collections")))).toEqual(["a"]);
+    expect(ids(await store.notesWithTag(tag("collections")))).toEqual(["a"]);
     expect(ids(await store.notesWithTag(tag("tips")))).toEqual(["a"]);
     expect(await store.notesWithTag(tag("missing"))).toEqual([]);
   });
 
-  it("counts notes per tag, including notes in child tags", async () => {
+  it("counts notes per tag, with the parents chains give it in any note", async () => {
     const store = await openNoteStore(uniqueName());
     await store.put(note("a", "#java#collections #java#streams"));
-    await store.put(note("b", "#java #go"));
+    await store.put(note("b", "#java #go #python#collections"));
+    await store.put(note("c", "#collections"));
 
-    expect((await store.tags()).map(({ tag, count }) => [tag.name, count])).toEqual([
-      ["go", 1],
-      ["java", 2],
-      ["java#collections", 1],
-      ["java#streams", 1],
+    expect(
+      (await store.tags()).map(({ tag, count, parents }) => [tag.name, count, parents]),
+    ).toEqual([
+      ["collections", 3, ["java", "python"]],
+      ["go", 1, []],
+      ["java", 2, []],
+      ["python", 1, []],
+      ["streams", 1, ["java"]],
     ]);
   });
 
@@ -45,8 +48,8 @@ describe("tag index", () => {
     await store.put(note("a", "---\ntags:\n  - parent_1#child\n  - parent_2\n---\nBody"));
 
     expect((await store.tags()).map(({ tag, count }) => [tag.name, count])).toEqual([
+      ["child", 1],
       ["parent_1", 1],
-      ["parent_1#child", 1],
       ["parent_2", 1],
     ]);
     expect(ids(await store.notesWithTag(tag("parent_1")))).toEqual(["a"]);
@@ -60,7 +63,7 @@ describe("tag index", () => {
     expect((await store.tags()).map(({ tag, spelling }) => [tag.name, spelling])).toEqual([
       ["go", "go"],
       ["java", "Java"],
-      ["java#linked_list", "Java#Linked_List"],
+      ["linked_list", "Linked_List"],
     ]);
   });
 
@@ -136,7 +139,7 @@ describe("tag index recovery", () => {
     await store.put(note("b", "#go"));
     const raw = await openDB(name);
     await raw.delete("tags", "a"); // An entry lost…
-    await raw.put("tags", { noteId: "ghost", tags: ["x"], memberOf: ["x"] }); // …and one without a note.
+    await raw.put("tags", { noteId: "ghost", written: ["x"], memberOf: ["x"] }); // …and one without a note.
     raw.close();
 
     const reopened = await openNoteStore(name);
@@ -148,7 +151,7 @@ describe("tag index recovery", () => {
     const name = uniqueName();
     await (await openNoteStore(name)).put(note("a", "#java"));
     const raw = await openDB(name);
-    await raw.put("tags", { noteId: "a", tags: "not a list" });
+    await raw.put("tags", { noteId: "a", written: "not a list" });
     raw.close();
 
     const reopened = await openNoteStore(name);

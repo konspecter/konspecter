@@ -450,12 +450,12 @@ export class NoteStore implements NoteRepository {
     await this.#db.put("meta", parseSettings(settings), "settings");
   }
 
-  /** Every tag in use, with the number of notes within it, sorted by name. */
+  /** Every tag in use, with the notes tagged with it and its parents, sorted by name. */
   tags(): Promise<TagCount[]> {
     return allTags(this.#db);
   }
 
-  /** Notes tagged with `tag` or any tag below it. */
+  /** Notes tagged with `tag`. */
   async notesWithTag(tag: Tag): Promise<Note[]> {
     const ids = await noteIdsWithTag(this.#db, tag);
     const notes = await Promise.all(ids.map((id) => this.get(id)));

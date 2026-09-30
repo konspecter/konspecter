@@ -13,6 +13,7 @@ export const en = {
   "app.tryAgain": "Try again",
   "app.close": "Close",
   "app.cancel": "Cancel",
+  "app.somethingWrong": "Oops, something went wrong.",
 
   "sidebar.label": "Sidebar",
   "sidebar.show": "Show sidebar",
@@ -30,6 +31,11 @@ export const en = {
 
   "topbar.search": "Search conspects",
   "topbar.searchPlaceholder": "Search",
+  "topbar.find": "Search in this conspect",
+  "topbar.findPlaceholder": "Search in conspect",
+  "topbar.findCount": "Match {current} of {count}",
+  "topbar.findPrevious": "Previous match",
+  "topbar.findNext": "Next match",
   "topbar.darkTheme": "Dark theme",
   "topbar.toLight": "Switch to the light theme",
   "topbar.toDark": "Switch to the dark theme",
@@ -44,6 +50,7 @@ export const en = {
   "syncHint.label": "Sync: {text}",
 
   "shortcut.search": "Search",
+  "shortcut.find": "Search in the open conspect",
   "shortcut.allNotes": "All conspects",
   "shortcut.newNote": "New conspect",
   "shortcut.settings": "Settings",
@@ -70,7 +77,7 @@ export const en = {
   "note.startFromTop": "Start from the top",
   "note.notSavedInvalid": "Not saved: {reason}. Fix the frontmatter and it saves again.",
   "note.saveFailed":
-    "Could not save the conspect: {error}. Your text is kept; the next change tries again.",
+    "Could not save the conspect: {error} Your text is kept; the next change tries again.",
 
   "details.title": "Details",
   "details.status": "Status",
@@ -143,7 +150,7 @@ source, or delete this conspect when you are done.
 
   "editor.loadFailed": "Could not load the editor",
   "editor.readerLoadFailed": "Could not load the conspect reader",
-  "editor.textUnavailable": "Text editing is unavailable: {reason}. Fix it in the Markdown below.",
+  "editor.textUnavailable": "Text editing is unavailable: {reason} Fix it in the Markdown below.",
   "editor.markdownOnly": "{reason}, so it can only be edited in Markdown mode.",
   "editor.uses": "This conspect uses {features}",
   "editor.wouldChange": "This conspect uses Markdown the text editor would change",
@@ -210,7 +217,7 @@ source, or delete this conspect when you are done.
   "settings.reading.restore": "Continue where I left off",
   "settings.reading.ask": "Ask before jumping",
   "settings.reading.off": "Always start at the top",
-  "settings.saveFailed": "Could not save settings: {error}. They apply until you reload.",
+  "settings.saveFailed": "Could not save settings: {error} They apply until you reload.",
   "settings.shortcuts": "Keyboard shortcuts",
   "settings.storage": "Offline storage",
   "settings.storage.persistent":
@@ -300,5 +307,6 @@ source, or delete this conspect when you are done.
   "sync.serverUrl": "Server URL",
   "sync.token": "Access token",
   "sync.connectFailed": "Could not connect: {error}",
+  "sync.tokenRejected": "The server did not accept the token. Connect again with a valid token.",
   "sync.connect": "Connect",
 };

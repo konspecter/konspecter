@@ -1,14 +1,15 @@
 import {
-  isWithin,
-  parseTagName,
+  chainLinks,
+  parseTagChain,
   parseTags,
   tagLabel,
   tagRanges,
   tagSpellings,
   tagTree,
-  tagWithAncestors,
+  tagTreeContains,
+  writtenTagList,
   writtenTags,
-  type Tag,
+  type TagChain,
   type TagNode,
 } from "./tags";
 
@@ -16,12 +17,13 @@ const names = (markdown: string) => parseTags(markdown).map((tag) => tag.name);
 
 describe("parseTags", () => {
   it("reads a single tag", () => {
-    expect(parseTags("#java")).toEqual([{ path: ["java"], name: "java" }]);
+    expect(parseTags("#java")).toEqual([{ name: "java" }]);
   });
 
-  it("reads a hierarchical tag as one path", () => {
+  it("reads a chain as its separate tags", () => {
     expect(parseTags("#java#getting-started")).toEqual([
-      { path: ["java", "getting-started"], name: "java#getting-started" },
+      { name: "java" },
+      { name: "getting-started" },
     ]);
   });
 
@@ -47,14 +49,7 @@ describe("parseTags", () => {
       "#java again",
     ].join("\n");
 
-    expect(names(markdown)).toEqual([
-      "java",
-      "java#collections",
-      "tips",
-      "lists",
-      "quote",
-      "in-table",
-    ]);
+    expect(names(markdown)).toEqual(["java", "collections", "tips", "lists", "quote", "in-table"]);
   });
 
   it("does not treat Markdown headings as tags", () => {
@@ -108,7 +103,7 @@ describe("parseTags", () => {
   });
 
   it("allows digits after the first segment", () => {
-    expect(names("#java#8 #web3")).toEqual(["java#8", "web3"]);
+    expect(names("#java#8 #web3")).toEqual(["java", "8", "web3"]);
   });
 
   it("is deterministic", () => {
@@ -117,50 +112,57 @@ describe("parseTags", () => {
   });
 });
 
-describe("tag helpers", () => {
-  const tag = (name: string) => parseTagName(name) as Tag;
+describe("tag chains", () => {
+  const chain = (written: string) => parseTagChain(written) as TagChain;
 
-  it("parses tag names typed with or without the hash", () => {
-    expect(parseTagName("#Java#Collections")).toEqual({
-      path: ["java", "collections"],
+  it("parses chains typed with or without the hash", () => {
+    expect(parseTagChain("#Java#Collections")).toEqual({
+      tags: [{ name: "java" }, { name: "collections" }],
       name: "java#collections",
     });
-    expect(parseTagName("java")).toEqual({ path: ["java"], name: "java" });
-    expect(parseTagName("not a tag")).toBeNull();
-    expect(parseTagName("123")).toBeNull();
-    expect(parseTagName("")).toBeNull();
+    expect(parseTagChain("java")).toEqual({ tags: [{ name: "java" }], name: "java" });
+    expect(parseTagChain("not a tag")).toBeNull();
+    expect(parseTagChain("123")).toBeNull();
+    expect(parseTagChain("")).toBeNull();
   });
 
-  it("expands a tag into itself and its ancestors", () => {
-    expect(tagWithAncestors(tag("java#collections#maps")).map((t) => t.name)).toEqual([
-      "java",
-      "java#collections",
-      "java#collections#maps",
+  it("links each tag of a chain to the next, never to itself", () => {
+    expect(chainLinks(chain("java#collections#maps"))).toEqual([
+      ["java", "collections"],
+      ["collections", "maps"],
     ]);
+    expect(chainLinks(chain("java"))).toEqual([]);
+    expect(chainLinks(chain("a#a#b"))).toEqual([["a", "b"]]);
   });
 
-  it("checks whether a tag is within another", () => {
-    expect(isWithin(tag("java#collections"), tag("java"))).toBe(true);
-    expect(isWithin(tag("java"), tag("java"))).toBe(true);
-    expect(isWithin(tag("java"), tag("java#collections"))).toBe(false);
-    expect(isWithin(tag("javascript"), tag("java"))).toBe(false);
+  it("lists the tags of chains once, with their first spelling", () => {
+    expect(writtenTagList(["Java#Collections", "java#Streams", "go", "2024"])).toEqual([
+      { tag: { name: "java" }, written: "Java" },
+      { tag: { name: "collections" }, written: "Collections" },
+      { tag: { name: "streams" }, written: "Streams" },
+      { tag: { name: "go" }, written: "go" },
+    ]);
   });
 });
 
 describe("tagTree", () => {
-  const count = (name: string, n: number) => ({ tag: parseTagName(name) as Tag, count: n });
+  const count = (name: string, n: number, parents: string[] = []) => ({
+    tag: { name },
+    count: n,
+    parents,
+  });
+  const shape = (nodes: readonly TagNode[]): unknown[] =>
+    nodes.map((node) => [node.label, node.count, shape(node.children)]);
 
   it("nests tags under their parents, sorted by name", () => {
     const tree = tagTree([
-      count("java#streams", 1),
+      count("streams", 1, ["java"]),
       count("go", 2),
       count("java", 3),
-      count("java#collections", 2),
-      count("java#collections#maps", 1),
+      count("collections", 2, ["java"]),
+      count("maps", 1, ["collections"]),
     ]);
 
-    const shape = (nodes: readonly TagNode[]): unknown[] =>
-      nodes.map((node) => [node.label, node.count, shape(node.children)]);
     expect(shape(tree)).toEqual([
       ["go", 2, []],
       [
@@ -174,10 +176,34 @@ describe("tagTree", () => {
     ]);
   });
 
-  it("labels each tag with its spelling's last segment", () => {
+  it("shows a tag under each of its parents, never as a root", () => {
+    const tree = tagTree([
+      count("java", 2),
+      count("python", 1),
+      count("collections", 3, ["java", "python"]),
+    ]);
+    expect(shape(tree)).toEqual([
+      ["java", 2, [["collections", 3, []]]],
+      ["python", 1, [["collections", 3, []]]],
+    ]);
+  });
+
+  it("gives a cycle one root, the first by name, and stops before repeating a tag", () => {
+    const tree = tagTree([count("b", 1, ["a"]), count("a", 1, ["b"]), count("c", 1, ["c"])]);
+    expect(shape(tree)).toEqual([
+      ["a", 1, [["b", 1, []]]],
+      ["c", 1, []],
+    ]);
+  });
+
+  it("ignores parents that are not tags", () => {
+    expect(shape(tagTree([count("b", 1, ["a"])]))).toEqual([["b", 1, []]]);
+  });
+
+  it("labels each tag with its spelling", () => {
     const tree = tagTree([
       { ...count("java", 2), spelling: "Java" },
-      { ...count("java#linked_list", 1), spelling: "Java#Linked_List" },
+      { ...count("linked_list", 1, ["java"]), spelling: "Linked_List" },
       count("go", 1),
     ]);
     expect(tree.map((node) => node.label)).toEqual(["go", "Java"]);
@@ -185,13 +211,21 @@ describe("tagTree", () => {
   });
 
   it("capitalizes every label on request", () => {
-    const tree = tagTree([count("java", 1), count("java#streams", 1)], { capitalize: true });
+    const tree = tagTree([count("java", 1), count("streams", 1, ["java"])], {
+      capitalize: true,
+    });
     expect(tree.map((node) => node.label)).toEqual(["Java"]);
     expect(tree[0]?.children.map((node) => node.label)).toEqual(["Streams"]);
   });
 
-  it("makes a tag without a known parent a root", () => {
-    expect(tagTree([count("a#b", 1)]).map((node) => node.tag.name)).toEqual(["a#b"]);
+  it("finds a tag anywhere below a node", () => {
+    const [java] = tagTree([
+      count("java", 1),
+      count("collections", 1, ["java"]),
+      count("maps", 1, ["collections"]),
+    ]);
+    expect(java && tagTreeContains(java, "maps")).toBe(true);
+    expect(java && tagTreeContains(java, "java")).toBe(false);
   });
 
   it("is empty for no tags", () => {
@@ -200,33 +234,34 @@ describe("tagTree", () => {
 });
 
 describe("writtenTags", () => {
-  it("keeps the case of each tag's first spelling, in the order of parseTags", () => {
+  it("keeps the case of each chain's first spelling, each chain once", () => {
     expect(writtenTags("#Java#Linked_List and #java#linked_list, #GO")).toEqual([
       "Java#Linked_List",
       "GO",
     ]);
     expect(names("#Java#Linked_List and #java#linked_list, #GO")).toEqual([
-      "java#linked_list",
+      "java",
+      "linked_list",
       "go",
     ]);
   });
 });
 
 describe("tagLabel", () => {
-  it("shows the last segment, case kept, with underscores as spaces", () => {
-    expect(tagLabel("Java#Linked_List")).toBe("Linked List");
+  it("keeps the case, with underscores as spaces", () => {
+    expect(tagLabel("Linked_List")).toBe("Linked List");
     expect(tagLabel("getting-started")).toBe("getting-started");
     expect(tagLabel("новые_технологии", true)).toBe("Новые технологии");
-    expect(tagLabel("Java#iOS", true)).toBe("IOS");
+    expect(tagLabel("iOS", true)).toBe("IOS");
   });
 });
 
 describe("tagSpellings", () => {
-  it("spells each tag and its ancestors as the notes write them", () => {
+  it("spells each tag of a chain as the notes write it", () => {
     const spellings = tagSpellings([["Java#Streams"], ["Go"]]);
     expect(Object.fromEntries(spellings)).toEqual({
       java: "Java",
-      "java#streams": "Java#Streams",
+      streams: "Streams",
       go: "Go",
     });
   });

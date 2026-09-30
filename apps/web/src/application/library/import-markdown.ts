@@ -8,7 +8,8 @@ export type ImportReport = {
   readonly imported: number;
   /** Files whose content the library already has. */
   readonly duplicates: number;
-  readonly rejected: readonly { readonly name: string; readonly reason: string }[];
+  /** Files the library refused, with the error (the interface words it). */
+  readonly rejected: readonly { readonly name: string; readonly error: unknown }[];
 };
 
 /** Compares notes by content, ignoring frontmatter and the escape added below. */
@@ -36,7 +37,7 @@ export async function importMarkdown(
   const existing = new Set((await library.list()).map((note) => bodyOf(note.markdown)));
   let imported = 0;
   let duplicates = 0;
-  const rejected: { name: string; reason: string }[] = [];
+  const rejected: { name: string; error: unknown }[] = [];
   for (const { name, text } of sources) {
     const body = bodyOf(text);
     if (existing.has(body)) {
@@ -53,7 +54,7 @@ export async function importMarkdown(
       existing.add(body);
       imported += 1;
     } catch (error) {
-      rejected.push({ name, reason: error instanceof Error ? error.message : String(error) });
+      rejected.push({ name, error });
     }
   }
   return { imported, duplicates, rejected };

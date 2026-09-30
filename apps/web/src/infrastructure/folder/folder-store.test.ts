@@ -2,7 +2,6 @@ import { importFolder } from "../../application/library/import-folder";
 import { parseDocument } from "../../domain/document/document";
 import { readNotes, updateNote } from "../../domain/note/note";
 import { parseQuery } from "../../domain/search/query";
-import { parseTagName, type Tag } from "../../domain/tag/tags";
 import { openNoteStore } from "../storage/note-store";
 import { mustGet } from "../storage/test-utils";
 import { FakeFolder } from "./fake-folder";
@@ -91,14 +90,13 @@ describe("FolderStore", () => {
     const { folder, store } = await setup();
     folder.edit("a.md", "# Maps\n\nhashmap #java#collections");
     folder.edit("b.md", "# Go\n\nhashmap #go");
-    const tag = (name: string) => parseTagName(name) as Tag;
 
     expect((await store.tags()).map(({ tag: t, count }) => [t.name, count])).toEqual([
+      ["collections", 1],
       ["go", 1],
       ["java", 1],
-      ["java#collections", 1],
     ]);
-    expect((await store.notesWithTag(tag("java"))).map((n) => n.id)).toEqual(["a.md"]);
+    expect((await store.notesWithTag({ name: "java" })).map((n) => n.id)).toEqual(["a.md"]);
     expect((await store.search(parseQuery("hashmap #go"))).map((hit) => hit.id)).toEqual(["b.md"]);
 
     await store.create("# New\n\nhashmap #go", now);

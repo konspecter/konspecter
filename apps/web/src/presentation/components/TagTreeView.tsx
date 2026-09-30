@@ -1,32 +1,40 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type RefObject,
+} from "react";
 import { Link } from "react-router";
 import type { NoteSummary } from "../../application/notes/note-catalog";
-import type { Tag, TagNode } from "../../domain/tag/tags";
+import { tagTreeContains, type Tag, type TagNode } from "../../domain/tag/tags";
 import { ChevronIcon, DocumentIcon, FolderIcon, FolderOpenIcon } from "./icons";
 import { summaryTitle } from "./note-title";
 import { t, tn } from "../i18n/i18n";
 
 type TagTreeViewProps = {
   nodes: readonly TagNode[];
-  /** The tag the note list is filtered by; its folder and the ones above it start open. */
+  /** The tag the note list is filtered by; its folders and the ones above them start open. */
   activeTag?: string | null;
   /** The note open in the main area; marked where it appears. */
   currentNoteId?: string | null;
   /**
-   * The notes inside a tag (tagged with it exactly). A new function means the
-   * notes changed: open folders read them again.
+   * The notes inside a tag (a chain of theirs ends in it). A new function
+   * means the notes changed: open folders read them again.
    */
   loadNotes: (tag: Tag) => Promise<readonly NoteSummary[]>;
 };
 
-/** The note list filtered to the tag and the tags below it (a search for `#tag`). */
+/** The note list filtered to the tag (a search for `#tag`). */
 function tagPath(tag: Tag): string {
   return `/?q=${encodeURIComponent(`#${tag.name}`)}`;
 }
 
 /**
  * The tags as a project tree: each tag is a folder holding its child tags,
- * then the notes tagged with it. A folder's name opens its filtered note list.
+ * then its notes; a tag with several parents is a folder under each. A
+ * folder's name opens its filtered note list.
  */
 export function TagTreeView({
   nodes,
@@ -53,20 +61,31 @@ export function TagTreeView({
 type TagFolderProps = {
   node: TagNode;
   depth: number;
+  /** The name of the folder this one is in; ← goes there. */
+  parent?: RefObject<HTMLAnchorElement | null>;
   activeTag: string | null;
   currentNoteId: string | null;
   loadNotes: TagTreeViewProps["loadNotes"];
 };
+
+/** The arrow key pressed alone, if it is ← or →. */
+function sideways(event: KeyboardEvent): "left" | "right" | null {
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return null;
+  if (event.key === "ArrowLeft") return "left";
+  return event.key === "ArrowRight" ? "right" : null;
+}
 
 /** The row's indentation level, read by the stylesheet. */
 function indent(depth: number): CSSProperties {
   return { "--depth": depth } as CSSProperties;
 }
 
-function TagFolder({ node, depth, activeTag, currentNoteId, loadNotes }: TagFolderProps) {
+function TagFolder({ node, depth, parent, activeTag, currentNoteId, loadNotes }: TagFolderProps) {
   const { tag } = node;
+  const label = useRef<HTMLAnchorElement>(null);
+  const group = useRef<HTMLUListElement>(null);
   const [expanded, setExpanded] = useState(
-    activeTag !== null && (activeTag === tag.name || activeTag.startsWith(`${tag.name}#`)),
+    activeTag !== null && (activeTag === tag.name || tagTreeContains(node, activeTag)),
   );
   const [notes, setNotes] = useState<readonly NoteSummary[]>([]);
 
@@ -85,9 +104,30 @@ function TagFolder({ node, depth, activeTag, currentNoteId, loadNotes }: TagFold
     };
   }, [expanded, loadNotes, tag]);
 
+  // → opens the folder, then goes to its first entry; ← closes it, then goes up.
+  const onRowKey = (event: KeyboardEvent) => {
+    const key = sideways(event);
+    if (key === null) return;
+    event.preventDefault();
+    if (key === "right") {
+      if (expanded) group.current?.querySelector<HTMLElement>("a")?.focus();
+      else setExpanded(true);
+    } else if (expanded) {
+      setExpanded(false);
+      label.current?.focus();
+    } else {
+      parent?.current?.focus();
+    }
+  };
+  const onNoteKey = (event: KeyboardEvent) => {
+    if (sideways(event) !== "left") return;
+    event.preventDefault();
+    label.current?.focus();
+  };
+
   return (
     <li>
-      <div className="tree-row" style={indent(depth)}>
+      <div className="tree-row" style={indent(depth)} onKeyDown={onRowKey}>
         <button
           type="button"
           className="tree-toggle"
@@ -101,6 +141,7 @@ function TagFolder({ node, depth, activeTag, currentNoteId, loadNotes }: TagFold
           {expanded ? <FolderOpenIcon /> : <FolderIcon />}
         </button>
         <Link
+          ref={label}
           to={tagPath(tag)}
           className="tree-label"
           {...(activeTag === tag.name ? { "aria-current": "page" } : {})}
@@ -115,12 +156,13 @@ function TagFolder({ node, depth, activeTag, currentNoteId, loadNotes }: TagFold
         </span>
       </div>
       {expanded && (
-        <ul className="tree-group" style={indent(depth + 1)}>
+        <ul ref={group} className="tree-group" style={indent(depth + 1)}>
           {node.children.map((child) => (
             <TagFolder
               key={child.tag.name}
               node={child}
               depth={depth + 1}
+              parent={label}
               activeTag={activeTag}
               currentNoteId={currentNoteId}
               loadNotes={loadNotes}
@@ -133,6 +175,7 @@ function TagFolder({ node, depth, activeTag, currentNoteId, loadNotes }: TagFold
                 className="tree-row tree-document"
                 style={indent(depth + 1)}
                 {...(note.id === currentNoteId ? { "aria-current": "page" } : {})}
+                onKeyDown={onNoteKey}
               >
                 <DocumentIcon />
                 <span className="tree-label">{summaryTitle(note)}</span>

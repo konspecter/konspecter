@@ -11,6 +11,7 @@ import type { TextKey } from "../i18n/i18n";
  */
 export const SHORTCUTS = {
   search: { keys: "Mod+P", label: "shortcut.search" },
+  find: { keys: "Mod+F", label: "shortcut.find" },
   allNotes: { keys: "Escape", label: "shortcut.allNotes" },
   newNote: { keys: "Mod+N", label: "shortcut.newNote" },
   settings: { keys: "Mod+,", label: "shortcut.settings" },

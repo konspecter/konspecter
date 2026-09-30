@@ -3,6 +3,7 @@
 //! its desktop bridge (`apps/web/src/infrastructure/desktop/`).
 
 mod folder;
+mod log;
 
 use folder::{Changed, FileContents, FileEntry, Folder, FolderError};
 use notify_debouncer_mini::notify::{RecommendedWatcher, RecursiveMode};
@@ -338,6 +339,20 @@ fn credential_delete() -> Result<(), CommandError> {
     }
 }
 
+/// Appends an entry to `konspecter.log` in the platform's log directory
+/// (macOS: `~/Library/Logs/<identifier>/`, shown by Console.app).
+#[tauri::command]
+fn log_error(app: AppHandle, entry: String) -> Result<(), CommandError> {
+    let dir = app.path().app_log_dir().map_err(|error| CommandError {
+        code: "io",
+        message: error.to_string(),
+    })?;
+    log::append(&dir, &entry).map_err(|error| CommandError {
+        code: "io",
+        message: error.to_string(),
+    })
+}
+
 #[tauri::command]
 fn folder_trash(state: State<'_, FolderState>, path: String) -> Result<(), CommandError> {
     state.with(|f| f.trash(&path))
@@ -371,6 +386,7 @@ pub fn run() {
             credential_get,
             credential_set,
             credential_delete,
+            log_error,
         ])
         .run(tauri::generate_context!())
         .expect("error while running the Konspecter desktop app");

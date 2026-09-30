@@ -60,6 +60,11 @@ apps/desktop/
   the shell, and typed wrappers call Rust commands with validated results. Today there is one
   command, `app_info`, which Settings → About shows. File Mode adds folder access and the
   file watcher here.
+- **Log file:** `log_error` (`src-tauri/src/log.rs`) appends the errors the interface hides
+  ([UI: errors](ui.md#errors)) to `konspecter.log` in the platform's log directory (macOS:
+  `~/Library/Logs/app.konspecter.desktop/`, shown by Console.app). Not next to the binary:
+  on macOS that is inside the signed app bundle. At 1 MB the file becomes `konspecter.log.old`;
+  an entry is cut at 16 KB.
 - **Differences from the PWA:** no service worker or update banner (the bundle contains the
   files). Settings shows _About_ instead of the storage-persistence section.
 - **Requirements:** Rust (rustup) and Xcode Command Line Tools on macOS. WebKitGTK and friends

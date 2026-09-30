@@ -1,6 +1,6 @@
 import type { Node } from "prosemirror-model";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { InvalidDocumentError, documentTitle, parseDocument } from "../../domain/document/document";
+import { documentTitle, parseDocument } from "../../domain/document/document";
 import type { EditorSelection } from "../../domain/reading/reading";
 import type { EditorMode } from "../../domain/settings/settings";
 import { LazyMarkdownView } from "../markdown/LazyMarkdownView";
@@ -9,8 +9,10 @@ import { MarkdownSourceEditor } from "./MarkdownSourceEditor";
 import { MetadataFields } from "./MetadataFields";
 import { TextEditor } from "./TextEditor";
 import "./editors.css";
+import { errorMessage } from "../app/errors";
 import { t } from "../i18n/i18n";
 import { withBody, withSavedDates, type Note } from "../../domain/note/note";
+import { NO_FIND, type NoteFind } from "../components/note-find";
 
 export type { EditorMode };
 
@@ -58,6 +60,10 @@ export type NoteEditorProps = {
   initialSelection?: EditorSelection | null;
   /** The caret moved, or the editor gained or lost the focus. */
   onSelectionChange?: (selection: EditorSelection) => void;
+  /** What to find in the note: the matches are marked, the selected one scrolled to. */
+  find?: NoteFind;
+  /** How many matches the open view has, whenever that changes. */
+  onFindCount?: (count: number) => void;
 };
 
 /** Turns the whole document into its edited version. */
@@ -86,11 +92,10 @@ function viewFor(mode: EditorMode, markdown: string, key: number): View {
   try {
     document = parseDocument(markdown);
   } catch (error) {
-    const reason = error instanceof InvalidDocumentError ? error.message : String(error);
     return {
       kind: "source",
       key,
-      notice: t("editor.textUnavailable", { reason }),
+      notice: t("editor.textUnavailable", { reason: errorMessage(error) }),
     };
   }
   const content = markdownToTextDoc(document.body);
@@ -124,6 +129,8 @@ export const NoteEditor = memo(function NoteEditor({
   showMetadata = false,
   initialSelection = null,
   onSelectionChange,
+  find = NO_FIND,
+  onFindCount,
 }: NoteEditorProps) {
   // The document as of the last metadata or source edit. In text mode its
   // body is replaced by `doc` (the rich text) once that has been edited.
@@ -314,6 +321,8 @@ export const NoteEditor = memo(function NoteEditor({
           onSelectionChange={handleTextSelection}
           autoFocus={autoFocus || focusWithin}
           titleFromFirstLine={titleFromFirstLine}
+          find={find}
+          {...(onFindCount ? { onFindCount } : {})}
         />
       )}
       {view.kind === "source" && (
@@ -327,6 +336,8 @@ export const NoteEditor = memo(function NoteEditor({
           autoFocus={autoFocus || focusWithin}
           titleFromFirstLine={titleFromFirstLine}
           saved={saved}
+          find={find}
+          {...(onFindCount ? { onFindCount } : {})}
         />
       )}
       {view.kind === "rendered" && (
@@ -335,6 +346,8 @@ export const NoteEditor = memo(function NoteEditor({
           title={view.title}
           titleDerived={view.titleDerived}
           {...(onReady ? { onRendered: onReady } : {})}
+          find={find}
+          {...(onFindCount ? { onFindCount } : {})}
         />
       )}
     </div>

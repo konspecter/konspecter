@@ -1,6 +1,7 @@
 import { useId, useState, useSyncExternalStore, type SubmitEvent } from "react";
+import { ApiError } from "../../infrastructure/http/api-client";
 import type { SyncEngine, SyncStatus } from "../../infrastructure/sync/sync-engine";
-import { errorMessage } from "./ErrorState";
+import { useErrorMessage } from "../hooks/use-error-message";
 import { NoteDate } from "./NoteDate";
 import { t, tn } from "../i18n/i18n";
 import { rich } from "../i18n/rich";
@@ -29,6 +30,8 @@ export function SyncSettings({ sync }: { sync: SyncEngine }) {
 }
 
 function SyncState({ sync, status }: { sync: SyncEngine; status: SyncStatus }) {
+  const errorText = useErrorMessage(status.error);
+  const tokenRejected = status.error instanceof ApiError && status.error.status === 401;
   return (
     <>
       <p className="setting-hint">
@@ -46,7 +49,9 @@ function SyncState({ sync, status }: { sync: SyncEngine; status: SyncStatus }) {
           </>
         )}
       </p>
-      {status.error && <p className="inline-error">{status.error}</p>}
+      {errorText !== null && (
+        <p className="inline-error">{tokenRejected ? t("sync.tokenRejected") : errorText}</p>
+      )}
       {status.blocked > 0 && <p className="setting-hint">{t("sync.heldBack")}</p>}
       <div className="actions">
         <button type="button" className="button" onClick={() => void sync.syncNow()}>
@@ -67,6 +72,7 @@ function ConnectForm({ sync }: { sync: SyncEngine }) {
   const [token, setToken] = useState("");
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  const errorText = useErrorMessage(error);
 
   async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -106,9 +112,9 @@ function ConnectForm({ sync }: { sync: SyncEngine }) {
           setToken(event.target.value);
         }}
       />
-      {error !== null && (
+      {errorText !== null && (
         <p role="alert" className="inline-error">
-          {t("sync.connectFailed", { error: errorMessage(error) })}
+          {t("sync.connectFailed", { error: errorText })}
         </p>
       )}
       <div className="actions">
