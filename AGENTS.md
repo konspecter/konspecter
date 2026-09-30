@@ -50,19 +50,20 @@ Konspecter is a local-first personal knowledge base for technical notes.
 
 All planned phases are done. New work needs a new plan in `.claude/plans/`.
 
-| Package   | Scope                                                                       | Status |
-| --------- | --------------------------------------------------------------------------- | ------ |
-| Updates 1 | Two-panel UI, editor-first notes with autosave, search UX, shortcuts, font  | Done   |
-| Updates 2 | Owl icon, English/Russian UI, sidebar details, toolbar, tags, highlighting  | Done   |
-| Markdown  | Single source of truth audit: author, frontmatter tags in UI, date aliases  | Done   |
-| LWW sync  | Last write wins (no conflict copies), live open notes, server change events | Done   |
-| Tag chain | `#parent#child` is two tags and a parent link; global tag graph in the tree | Done   |
-| Note find | Search box searches the open note (`Mod+F`), marks, ↑/↓ between matches     | Done   |
-| Errors    | Library errors read "Oops, something went wrong."; the real one is logged   | Done   |
-| Slug file | File Mode names files by title slug; optional rename when the title changes | Done   |
+| Package    | Scope                                                                       | Status |
+| ---------- | --------------------------------------------------------------------------- | ------ |
+| Updates 1  | Two-panel UI, editor-first notes with autosave, search UX, shortcuts, font  | Done   |
+| Updates 2  | Owl icon, English/Russian UI, sidebar details, toolbar, tags, highlighting  | Done   |
+| Markdown   | Single source of truth audit: author, frontmatter tags in UI, date aliases  | Done   |
+| LWW sync   | Last write wins (no conflict copies), live open notes, server change events | Done   |
+| Tag chain  | `#parent#child` is two tags and a parent link; global tag graph in the tree | Done   |
+| Note find  | Search box searches the open note (`Mod+F`), marks, ↑/↓ between matches     | Done   |
+| Errors     | Library errors read "Oops, something went wrong."; the real one is logged   | Done   |
+| Slug file  | File Mode names files by title slug; optional rename when the title changes | Done   |
+| Mode place | Switching modes keeps the caret and the text on screen where they were      | Done   |
 
 Specs and notes: `.claude/plans/updates-1.md` (+ `updates-1-implementation.md`), `updates-2.md`
-(+ `updates-2-implementation.md`), `markdown-single-source.md`, `last-write-wins.md`, `tag-chains.md` (item 1 of `updates-3.md`), `note-find.md` (item 3), `friendly-errors.md` (item 5), `slug-file-names.md` (item 8). UI architecture: `docs/architecture/ui.md`; languages:
+(+ `updates-2-implementation.md`), `markdown-single-source.md`, `last-write-wins.md`, `tag-chains.md` (item 1 of `updates-3.md`), `note-find.md` (item 3), `friendly-errors.md` (item 5), `slug-file-names.md` (item 8), `mode-switch-place.md` (item 14). UI architecture: `docs/architecture/ui.md`; languages:
 `docs/architecture/i18n.md`.
 
 ## Working rules

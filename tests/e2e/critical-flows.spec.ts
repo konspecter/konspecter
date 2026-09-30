@@ -194,3 +194,53 @@ test("typing in Markdown mode through several saves keeps every character", asyn
   // The frontmatter shows the dates the last save wrote.
   await expect(source).toContainText(/updated: \d{4}-\d{2}-\d{2}T/);
 });
+
+test("switching modes keeps the caret and the text on screen in a long note", async ({ page }) => {
+  await page.goto("/notes/new");
+  await page.getByRole("banner").getByRole("button", { name: "Markdown" }).click();
+  const source = page.getByRole("textbox", { name: "Markdown" });
+  await source.click();
+  const paragraphs = Array.from(
+    { length: 80 },
+    (_, index) => `Paragraph ${String(index)} has **some** words.`,
+  );
+  await page.keyboard.insertText(`# Long\n\n${paragraphs.join("\n\n")}\n`);
+  await saved(page);
+
+  const modifier = await mod(page);
+  // Half way down, the paragraph in the middle of the window (CodeMirror draws only those in view).
+  await page.evaluate(() => {
+    window.scrollTo(0, document.documentElement.scrollHeight / 2);
+  });
+  const middleLine = () =>
+    page.evaluate(() => {
+      const lines = [...document.querySelectorAll(".cm-line")].filter((element) => {
+        const { top, bottom } = element.getBoundingClientRect();
+        return top < window.innerHeight / 2 && bottom > window.innerHeight / 3;
+      });
+      const texts = lines.map((element) => /Paragraph \d+ has/.exec(element.textContent)?.[0]);
+      return texts.find((text) => text !== undefined) ?? "";
+    });
+  await expect.poll(middleLine).not.toBe("");
+  const middle = await middleLine();
+  const line = (box: typeof source) => box.getByText(middle, { exact: false });
+  await line(source).click();
+  await page.keyboard.press("End");
+  const before = await line(source).boundingBox();
+
+  await page.keyboard.press(`${modifier}+/`);
+  const text = page.getByRole("textbox", { name: "Conspect text" });
+  await expect(text).toBeFocused();
+  const after = await line(text).boundingBox();
+  // The paragraph stays where it was on screen, and typing goes on at the caret.
+  expect(Math.abs((after?.y ?? 0) - (before?.y ?? 0))).toBeLessThan(12);
+  await page.keyboard.type("!");
+  await expect(text).toContainText(`${middle} some words.!`);
+
+  await page.keyboard.press(`${modifier}+/`);
+  await expect(source).toBeFocused();
+  const back = await line(source).boundingBox();
+  expect(Math.abs((back?.y ?? 0) - (before?.y ?? 0))).toBeLessThan(12);
+  await page.keyboard.type("?");
+  await expect(source).toContainText(`${middle} **some** words.!?`);
+});

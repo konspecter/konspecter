@@ -28,7 +28,7 @@ import {
   type DecorationSet,
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
-import { memo, useEffect, useRef } from "react";
+import { memo, useEffect, useLayoutEffect, useRef } from "react";
 import { textChanges } from "./diff";
 import { sourceEditorMarks } from "./source-marks";
 import { t } from "../i18n/i18n";
@@ -36,6 +36,7 @@ import { TITLE_MAX_LENGTH } from "./text-editor-setup";
 import { withSavedDates, type Note } from "../../domain/note/note";
 import { findMatches, type Match } from "../../domain/search/find";
 import { NO_FIND, type NoteFind } from "../components/note-find";
+import { visibleArea, type Place } from "./place";
 
 type MarkdownSourceEditorProps = {
   /** Read once, when the editor mounts. */
@@ -59,6 +60,14 @@ type MarkdownSourceEditorProps = {
   /** What to find in the text (see `NoteEditor`). */
   find?: NoteFind;
   onFindCount?: (count: number) => void;
+  /** Where the reader was when the editor closes (switching modes). */
+  onLeave?: (place: Place) => void;
+  /**
+   * Asked once the editor has opened: where to put the caret, and which text
+   * to bring back to its height in the window (switching modes). Instead of
+   * `initialSelection`.
+   */
+  arrival?: () => Place | null;
 };
 
 /** A caret in characters of the text, and whether the editor has the focus. */
@@ -228,6 +237,24 @@ export function createSourceExtensions(
   ];
 }
 
+/**
+ * Where the reader is: the selection, and the caret's line if it can be seen,
+ * else the line in the middle of what can be seen of the text.
+ */
+function placeOf(view: EditorView): Place {
+  const { anchor, head } = view.state.selection.main;
+  const area = visibleArea();
+  const caret = view.coordsAtPos(head);
+  if (caret && caret.top >= area.top && caret.bottom <= area.bottom) {
+    return { anchor, head, shown: { at: head, top: caret.top } };
+  }
+  const text = view.contentDOM.getBoundingClientRect();
+  const top = Math.min(Math.max((area.top + area.bottom) / 2, text.top), text.bottom);
+  if (top < area.top || top > area.bottom) return { anchor, head, shown: null };
+  const at = view.posAtCoords({ x: text.left + text.width / 2, y: top }, false);
+  return { anchor, head, shown: { at, top: view.coordsAtPos(at)?.top ?? top } };
+}
+
 /** CodeMirror 6 editing the whole document as Markdown source. No autocompletion. */
 export const MarkdownSourceEditor = memo(function MarkdownSourceEditor({
   initialValue,
@@ -240,12 +267,16 @@ export const MarkdownSourceEditor = memo(function MarkdownSourceEditor({
   onSelectionChange,
   find = NO_FIND,
   onFindCount,
+  onLeave,
+  arrival,
 }: MarkdownSourceEditorProps) {
   const viewRef = useRef<EditorView | null>(null);
   const mountRef = useRef<HTMLDivElement>(null);
   const onChangeRef = useRef(onChange);
   const onSelectionRef = useRef(onSelectionChange);
   const onFindCountRef = useRef(onFindCount);
+  const onLeaveRef = useRef(onLeave);
+  const arrivalRef = useRef(arrival);
   const initialValueRef = useRef(initialValue);
   const initialSelectionRef = useRef(initialSelection);
   const autoFocusRef = useRef(autoFocus || initialSelection?.focused === true);
@@ -255,13 +286,15 @@ export const MarkdownSourceEditor = memo(function MarkdownSourceEditor({
     onChangeRef.current = onChange;
     onSelectionRef.current = onSelectionChange;
     onFindCountRef.current = onFindCount;
-  }, [onChange, onSelectionChange, onFindCount]);
+    onLeaveRef.current = onLeave;
+  }, [onChange, onSelectionChange, onFindCount, onLeave]);
 
   useEffect(() => {
     const parent = mountRef.current;
     if (!parent) return;
     const doc = initialValueRef.current;
-    const caret = initialSelectionRef.current;
+    const arrive = arrivalRef.current;
+    const caret = arrive ? null : initialSelectionRef.current;
     const at = (position: number) => Math.min(position, doc.length);
     const view = new EditorView({
       parent,
@@ -281,12 +314,32 @@ export const MarkdownSourceEditor = memo(function MarkdownSourceEditor({
       }),
     });
     viewRef.current = view;
+    const place = arrive?.() ?? null;
+    if (place)
+      view.dispatch({ selection: EditorSelection.single(at(place.anchor), at(place.head)) });
     if (autoFocusRef.current) view.focus();
+    // CodeMirror scrolls once it has measured the lines: the held text's line
+    // goes back to its height in the window.
+    if (place?.shown) {
+      const { at: shown, top } = place.shown;
+      view.dispatch({
+        effects: EditorView.scrollIntoView(at(shown), { y: "start", yMargin: top }),
+      });
+    }
     return () => {
       view.destroy();
       viewRef.current = null;
     };
   }, []);
+
+  // While the text is still laid out: the effect above ends after it is gone.
+  useLayoutEffect(
+    () => () => {
+      const view = viewRef.current;
+      if (view) onLeaveRef.current?.(placeOf(view));
+    },
+    [],
+  );
 
   // A version from elsewhere first: the stored version that comes with it
   // then has the same dates, so the effect below changes nothing.

@@ -13,6 +13,7 @@ import { errorMessage } from "../app/errors";
 import { t } from "../i18n/i18n";
 import { withBody, withSavedDates, type Note } from "../../domain/note/note";
 import { NO_FIND, type NoteFind } from "../components/note-find";
+import { mapPlace, positionMap, type Place } from "./place";
 
 export type { EditorMode };
 
@@ -110,6 +111,39 @@ function viewFor(mode: EditorMode, markdown: string, key: number): View {
   };
 }
 
+/** Positions of one editor → the same places in another. */
+type Carry = (position: number) => number;
+
+/** The text editor's document and the Markdown source `markdown`, whose body it shows. */
+function bodyPositions(doc: Node, markdown: string) {
+  const { body } = parseDocument(markdown);
+  return { map: positionMap(doc, body), start: markdown.length - body.length };
+}
+
+/**
+ * How the positions of the view being left (`from`, showing `doc` when it is
+ * the text editor) become the next one's, for a mode switch between the two
+ * editors: made when the new editor asks. Null with the rendered view, which
+ * has no caret. `markdown` is the document as it is carried over.
+ */
+function carrying(from: View, doc: Node | null, markdown: string, to: View): (() => Carry) | null {
+  if (from.kind === "text" && to.kind === "source") {
+    const shown = doc ?? from.doc;
+    return () => {
+      const { map, start } = bodyPositions(shown, markdown);
+      return (position) => start + map.toSource(position);
+    };
+  }
+  if (from.kind === "source" && to.kind === "text") {
+    return () => {
+      // A caret in the frontmatter goes to the start of the body.
+      const { map, start } = bodyPositions(to.doc, markdown);
+      return (offset) => map.toText(Math.max(0, offset - start));
+    };
+  }
+  return null;
+}
+
 /**
  * Edits a whole note document. Text mode edits the body as rich text, and the
  * frontmatter's title and tags follow what the body says (`withBody`);
@@ -140,7 +174,12 @@ export const NoteEditor = memo(function NoteEditor({
   // frontmatter as last edited, and the rich text of the current text session.
   const markdownRef = useRef(initialMarkdown);
   const docRef = useRef<{ readonly session: number; readonly doc: Node } | null>(null);
-  const [shown, setShown] = useState(() => ({ mode, view: viewFor(mode, initialMarkdown, 0) }));
+  const [shown, setShown] = useState<{
+    readonly mode: EditorMode;
+    readonly view: View;
+    /** The view was opened by a mode switch: how to carry the place over. */
+    readonly carry?: (() => Carry) | null;
+  }>(() => ({ mode, view: viewFor(mode, initialMarkdown, 0) }));
   // The dates each save writes join the document at once: the frontmatter
   // held here (text mode), and the text read when saving.
   const [syncedWith, setSyncedWith] = useState(saved);
@@ -166,11 +205,13 @@ export const NoteEditor = memo(function NoteEditor({
   if (mode !== shown.mode) {
     // Switching modes carries the edits over, serialized once.
     const current = doc ? withBody(markdown, textDocToMarkdown(doc)) : markdown;
+    const closing = view;
     view = viewFor(mode, current, view.key + 1);
+    const carry = carrying(closing, doc, current, view);
     setMarkdown(current);
     setDoc(null);
     setIncoming(null); // The new editor opens with the current text.
-    setShown({ mode, view });
+    setShown({ mode, view, carry });
   }
 
   // A version from elsewhere: into the open editor in place when it can show
@@ -285,6 +326,23 @@ export const NoteEditor = memo(function NoteEditor({
     [onSelectionChange],
   );
 
+  // The place the closing editor left, carried into the one a mode switch opens.
+  const left = useRef<Place | null>(null);
+  const handleLeave = useCallback((place: Place) => {
+    left.current = place;
+  }, []);
+  const carry = shown.carry ?? null;
+  const arrived = useRef<{ readonly session: number; readonly place: Place | null } | null>(null);
+  const arrival = useCallback(() => {
+    // Asked again (a development double mount), it answers the same.
+    if (arrived.current?.session !== session) {
+      const place = left.current;
+      arrived.current = { session, place: carry && place ? mapPlace(place, carry()) : null };
+    }
+    return arrived.current.place;
+  }, [session, carry]);
+  const arriving = carry ? { arrival } : {};
+
   // The title field's placeholder follows the body's first line as it is typed.
   const firstLine = doc?.firstChild?.textContent.trim();
 
@@ -323,6 +381,8 @@ export const NoteEditor = memo(function NoteEditor({
           titleFromFirstLine={titleFromFirstLine}
           find={find}
           {...(onFindCount ? { onFindCount } : {})}
+          onLeave={handleLeave}
+          {...arriving}
         />
       )}
       {view.kind === "source" && (
@@ -338,6 +398,8 @@ export const NoteEditor = memo(function NoteEditor({
           saved={saved}
           find={find}
           {...(onFindCount ? { onFindCount } : {})}
+          onLeave={handleLeave}
+          {...arriving}
         />
       )}
       {view.kind === "rendered" && (

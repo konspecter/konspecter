@@ -5,6 +5,7 @@ import { NoteEditor, type EditorMode } from "./NoteEditor";
 import { undo } from "@codemirror/commands";
 import { setSourceValue, sourceValue, sourceView, typeSubstituted } from "./test-helpers";
 import { coverDataUrl, CoverImageError } from "../../infrastructure/files/cover-image";
+import type { EditorSelection } from "../../domain/reading/reading";
 
 // jsdom cannot decode images; the conversion itself is tested on its own.
 vi.mock("../../infrastructure/files/cover-image", async (importOriginal) => ({
@@ -18,11 +19,13 @@ function Harness({
   initialMode,
   onChange,
   showMetadata,
+  onSelectionChange,
 }: {
   initialMarkdown: string;
   initialMode: EditorMode;
   onChange: (read: () => string) => void;
   showMetadata: boolean;
+  onSelectionChange: (selection: EditorSelection) => void;
 }) {
   const [mode, setMode] = useState(initialMode);
   return (
@@ -44,6 +47,7 @@ function Harness({
         mode={mode}
         onChange={onChange}
         showMetadata={showMetadata}
+        onSelectionChange={onSelectionChange}
       />
     </>
   );
@@ -58,17 +62,23 @@ function renderEditor(
   const onChange = vi.fn((read: () => string) => {
     latest = read;
   });
+  let caret: EditorSelection | null = null;
   render(
     <Harness
       initialMarkdown={initialMarkdown}
       initialMode={initialMode}
       onChange={onChange}
       showMetadata={showMetadata}
+      onSelectionChange={(selection) => {
+        caret = selection;
+      }}
     />,
   );
   /** What a save would write now: the latest reported text, or the untouched original. */
   const save = () => (latest ? latest() : initialMarkdown);
-  return { save, onChange };
+  /** Where the caret was last reported, in which editor. */
+  const selection = () => caret;
+  return { save, onChange, selection };
 }
 
 const textBox = () => screen.getByRole("textbox", { name: "Conspect text" });
@@ -310,6 +320,51 @@ describe("switching modes", () => {
     expect(textBox()).toHaveTextContent("One two three");
 
     expect(save()).toBe("---\ntitle: T\n---\n\nOne two three");
+  });
+
+  describe("keeps the caret at the same place in the text", () => {
+    const note = "---\ntitle: T\n---\n\n# Head\n\nSome **bold** word";
+    // In the text editor: the heading's text is 1–5, then the paragraph's from 7.
+    const bold = 12;
+    const word = 17;
+
+    it("from text to Markdown", async () => {
+      renderEditor(note);
+      await userEvent.click(textBox());
+      const texts = within(textBox()).getByText("bold").firstChild as Text;
+      document.getSelection()?.setBaseAndExtent(texts, 1, texts, 3);
+      document.dispatchEvent(new Event("selectionchange"));
+
+      await userEvent.click(screen.getByRole("button", { name: "Markdown" }));
+
+      const { anchor, head } = sourceView(sourceBox()).state.selection.main;
+      expect(note.slice(anchor, head)).toBe("ol");
+      expect(anchor).toBe(note.indexOf("bold") + 1);
+    });
+
+    it("from Markdown to text, and back", async () => {
+      const { selection } = renderEditor(note, "markdown");
+      const view = sourceView(sourceBox());
+      view.dispatch({ selection: { anchor: note.indexOf("word"), head: note.indexOf("bold") } });
+
+      await userEvent.click(screen.getByRole("button", { name: "Text" }));
+      expect(selection()).toMatchObject({ editor: "text", anchor: word, head: bold });
+
+      await userEvent.click(screen.getByRole("button", { name: "Markdown" }));
+      expect(selection()).toMatchObject({
+        editor: "markdown",
+        anchor: note.indexOf("word"),
+        head: note.indexOf("bold"),
+      });
+    });
+
+    it("from the frontmatter to the start of the body", async () => {
+      const { selection } = renderEditor(note, "markdown");
+      sourceView(sourceBox()).dispatch({ selection: { anchor: 5 } });
+
+      await userEvent.click(screen.getByRole("button", { name: "Text" }));
+      expect(selection()).toMatchObject({ editor: "text", anchor: 1, head: 1 });
+    });
   });
 
   it("can start in Markdown mode", () => {

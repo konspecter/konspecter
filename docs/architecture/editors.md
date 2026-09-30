@@ -11,7 +11,21 @@ themselves ([Autosave](#autosave), [ADR-010](decisions/ADR-010-autosave-editor-f
 
 The mode switch is one icon button in the top bar (pressed while the Markdown source shows;
 its icon, a T or the Markdown mark, is the mode it switches to); the choice is remembered (the
-`defaultEditor` setting). Edits carry over when switching modes.
+`defaultEditor` setting). Edits carry over when switching modes, and so does the place:
+
+- **The caret** stays at the same character of the text (`place.ts`). The text editor's text
+  blocks are paired, in order, with the block tokens of markdown-it (the parser the text
+  editor reads with; an empty paragraph, written as nothing, is left out), and within a block
+  its characters are aligned with the token's source lines by `diffSequences`, whitespace
+  matching whitespace; the markup (`**`, `#`, a link's address) is what the diff steps over.
+  A caret before a character goes before it, after any markup in front of it; one in the
+  frontmatter goes to the start of the body.
+- **What is on screen** stays at its height in the window: the caret's line if it can be
+  seen, else the line in the middle of what can be seen of the note (below the top bar).
+  The closing editor reports this place (`onLeave`, from a layout-effect cleanup, while its
+  text is still laid out); `NoteEditor` maps it, and the new editor sets the selection and
+  scrolls (`arrival`). The rendered view has no caret: switching to or from it starts the
+  other view as before.
 
 ## Text mode
 

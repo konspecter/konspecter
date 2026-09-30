@@ -26,6 +26,7 @@ import {
   toolbarActions,
 } from "./text-editor-setup";
 import { t, type TextKey } from "../i18n/i18n";
+import { visibleArea, type Place } from "./place";
 
 type TextEditorProps = {
   /** Read once, when the editor mounts. */
@@ -47,6 +48,14 @@ type TextEditorProps = {
   /** What to find in the text (see `NoteEditor`). */
   find?: NoteFind;
   onFindCount?: (count: number) => void;
+  /** Where the reader was when the editor closes (switching modes). */
+  onLeave?: (place: Place) => void;
+  /**
+   * Asked once the editor has opened: where to put the caret, and which text
+   * to bring back to its height in the window (switching modes). Instead of
+   * `initialSelection`.
+   */
+  arrival?: () => Place | null;
 };
 
 /** A caret in ProseMirror positions, and whether the editor has the focus. */
@@ -121,6 +130,11 @@ function LinkIcon() {
   );
 }
 
+/** `position`, if it is in `doc`, else its end. */
+function clamp(doc: Node, position: number): number {
+  return Math.min(position, doc.content.size);
+}
+
 /** The text block holding the caret, or null when the selection is not in one. */
 function activeBlock(view: EditorView): HTMLElement | null {
   const { $from } = view.state.selection;
@@ -130,12 +144,24 @@ function activeBlock(view: EditorView): HTMLElement | null {
 }
 
 /**
- * The part of the window where the toolbar can be seen: below the page's
- * sticky top bar (when there is one) and above the window's bottom edge.
+ * Where the reader is: the selection, and the caret's line if it can be seen,
+ * else the line in the middle of what can be seen of the text.
  */
-function visibleArea(): { top: number; bottom: number } {
-  const topBar = document.querySelector(".topbar");
-  return { top: topBar?.getBoundingClientRect().bottom ?? 0, bottom: window.innerHeight };
+function placeOf(view: EditorView): Place {
+  const { anchor, head } = view.state.selection;
+  const area = visibleArea();
+  const caret = view.coordsAtPos(head);
+  if (caret.top >= area.top && caret.bottom <= area.bottom) {
+    return { anchor, head, shown: { at: head, top: caret.top } };
+  }
+  const text = view.dom.getBoundingClientRect();
+  const top = Math.min(Math.max((area.top + area.bottom) / 2, text.top), text.bottom);
+  const middle =
+    top >= area.top && top <= area.bottom
+      ? view.posAtCoords({ left: text.left + text.width / 2, top })
+      : null;
+  const shown = middle && { at: middle.pos, top: view.coordsAtPos(middle.pos).top };
+  return { anchor, head, shown };
 }
 
 /**
@@ -173,6 +199,8 @@ export const TextEditor = memo(function TextEditor({
   titleFromFirstLine = false,
   find = NO_FIND,
   onFindCount,
+  onLeave,
+  arrival,
 }: TextEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -180,11 +208,12 @@ export const TextEditor = memo(function TextEditor({
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
   const onSelectionRef = useRef(onSelectionChange);
+  const onLeaveRef = useRef(onLeave);
+  const [arrive] = useState(() => arrival);
   const [editorState, setEditorState] = useState(() => {
     const state = createTextEditorState(initialDoc, { titleFromFirstLine });
-    if (!initialSelection) return state;
-    const size = state.doc.content.size;
-    const at = (position: number) => state.doc.resolve(Math.min(position, size));
+    if (!initialSelection || arrival) return state;
+    const at = (position: number) => state.doc.resolve(clamp(state.doc, position));
     const selection = TextSelection.between(at(initialSelection.anchor), at(initialSelection.head));
     return state.apply(state.tr.setSelection(selection));
   });
@@ -203,7 +232,8 @@ export const TextEditor = memo(function TextEditor({
   useEffect(() => {
     onChangeRef.current = onChange;
     onSelectionRef.current = onSelectionChange;
-  }, [onChange, onSelectionChange]);
+    onLeaveRef.current = onLeave;
+  }, [onChange, onSelectionChange, onLeave]);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -248,12 +278,31 @@ export const TextEditor = memo(function TextEditor({
       onSelectionRef.current?.({ anchor, head, focused });
     }
     viewRef.current = view;
+    const place = arrive?.() ?? null;
+    const at = (position: number) => view.state.doc.resolve(clamp(view.state.doc, position));
+    if (place) {
+      const selection = TextSelection.between(at(place.anchor), at(place.head));
+      view.dispatch(view.state.tr.setSelection(selection));
+    }
     if (initialFocus) view.focus();
+    if (place?.shown) {
+      const moved = view.coordsAtPos(at(place.shown.at).pos).top - place.shown.top;
+      if (moved !== 0) window.scrollBy({ top: moved });
+    }
     return () => {
       view.destroy();
       viewRef.current = null;
     };
-  }, [initialState, initialFocus, noteToolUsed]);
+  }, [initialState, initialFocus, noteToolUsed, arrive]);
+
+  // While the text is still laid out: the effect above ends after it is gone.
+  useLayoutEffect(
+    () => () => {
+      const view = viewRef.current;
+      if (view) onLeaveRef.current?.(placeOf(view));
+    },
+    [],
+  );
 
   useEffect(() => {
     const view = viewRef.current;
