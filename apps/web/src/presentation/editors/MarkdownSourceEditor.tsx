@@ -36,7 +36,7 @@ import { TITLE_MAX_LENGTH } from "./text-editor-setup";
 import { withSavedDates, type Note } from "../../domain/note/note";
 import { findMatches, type Match } from "../../domain/search/find";
 import { NO_FIND, type NoteFind } from "../components/note-find";
-import { visibleArea, type Place } from "./place";
+import { coveredBelow, visibleArea, type Place } from "./place";
 
 type MarkdownSourceEditorProps = {
   /** Read once, when the editor mounts. */
@@ -210,6 +210,8 @@ export function createSourceExtensions(
       indentWithTab,
     ]),
     findField,
+    // The caret is scrolled into view above the island (small screens).
+    EditorView.scrollMargins.of(() => ({ bottom: coveredBelow() })),
     // Markdown with GFM, fenced code highlighted in its own language (grammars
     // load on demand), and a YAML frontmatter block.
     yamlFrontmatter({ content: markdown({ base: markdownLanguage, codeLanguages: languages }) }),

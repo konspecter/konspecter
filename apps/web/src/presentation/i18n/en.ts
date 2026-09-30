@@ -36,6 +36,8 @@ export const en = {
   "topbar.findCount": "Match {current} of {count}",
   "topbar.findPrevious": "Previous match",
   "topbar.findNext": "Next match",
+  "topbar.closeSearch": "Close search",
+  "topbar.actions": "Main actions",
   "topbar.darkTheme": "Dark theme",
   "topbar.toLight": "Switch to the light theme",
   "topbar.toDark": "Switch to the dark theme",

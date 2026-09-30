@@ -21,8 +21,8 @@ interface speaks English and Russian ([i18n](i18n.md)).
   position keeps using the window's scroll). No app header, brand or menu.
 - **Sidebar** (`Sidebar.tsx`): toggle, Settings, New note; the tag tree (tags as folders,
   notes as documents inside them; a tag's name opens `/?q=#tag`, see [tags](tags.md)); recent notes, most recently edited first, with the open
-  one marked. Hidden or shown per device (`localStorage`); while it is hidden, its toggle and New note sit at the start of the top bar; on narrow screens it starts hidden
-  and slides over the content.
+  one marked. Hidden or shown per device (`localStorage`); while it is hidden, its toggle and New note sit at the start of the top bar; on small screens it starts hidden
+  and covers the whole screen when opened (see [Small screens](#small-screens)).
 - **Details** (`NoteDetails.tsx`, the sidebar's footer): on the note page only (new or
   existing), the note page renders its details into the sidebar through a portal
   (`details-slot.tsx`: the layout provides the element, `<Details>` renders into it). What the
@@ -41,16 +41,58 @@ interface speaks English and Russian ([i18n](i18n.md)).
   controls are never hidden. Wide windows (over 1024px): the search is centred, up to 30rem,
   both sides at least as wide as the controls on the right (plus the macOS window buttons).
   Medium (761–1024px): the search fills the row between the controls, with the same gap on
-  each side. Small (≤760px): the controls keep the first row and the search takes a second
-  row across the whole width (`--topbar-search-row`).
+  each side. Small (≤760px): the top bar keeps theme, mode, sync and the antenna; the list,
+  the search and the sidebar's controls are in the island.
 - **Desktop (macOS):** the title bar is an overlay; the window buttons sit in the sidebar's
   top bar and both bars are drag regions (`data-tauri-drag-region`). The web inspector is off
   (`devtools: false`).
 - **Stable page:** the page scroller keeps the scrollbar's room (`scrollbar-gutter: stable`),
   so content never shifts sideways when a note grows long enough to scroll. The layout
   measures that room (`use-scrollbar-gutter.ts`, `--scrollbar-gutter`) and keeps the same on
-  the main column's left, so its margins are equal on both sides at every width; on small
-  screens the note's margins match the search bar's.
+  the main column's left, so its margins are equal on both sides at every width.
+
+## Small screens
+
+Phones and windows up to 760px wide (`hooks/use-narrow.ts`: `NARROW`, `useNarrow()`; the same
+breakpoint in the CSS), in the browser, the PWA and the Android app alike
+([plan](../../.claude/plans/mobile-view.md)).
+
+```text
+┌──────────────────────── (theme) (mode) (antenna) ─┐
+│ Title                                             │
+│ Text across the width: 8px room, 4px inside       │
+│                                                   │
+│      ( ▯  ☰  ⌕  B  ✎   ⚙ )                        │   the island
+└───────────────────────────────────────────────────┘
+```
+
+- **The island** (`Layout.tsx`): a rounded block fixed at the bottom centre with round 44px
+  buttons: sidebar, all notes, search, the text editor's tools (on the note page), new note
+  and, a little apart, settings. It stays above
+  the open sidebar, whose menu it completes; its links close the sidebar. Search turns it into
+  the search box (the same `SearchBox`, the library or the open note) with a close button at
+  its end (`onClose`), which empties the query. The box also shows while the list has a query
+  (a tag chosen in the sidebar), and goes when a note opens while it does not have the focus
+  (a result tapped). It is always on screen, also while a note is edited: both editors scroll
+  the caret into view above it (`coveredBelow` in `editors/place.ts`, as ProseMirror's
+  `scrollMargin` and CodeMirror's `scrollMargins`). The viewport meta has
+  `interactive-widget=resizes-content`, so the island rides above the soft keyboard.
+- **Sidebar:** a full-screen menu, without its own bar (the island holds those buttons), in
+  bigger text (16px, the tree 15px, the details 14px). The note's details wait behind a
+  "Details" button at its foot (`aria-expanded`).
+- **Editors:** the editor takes nearly the whole screen, with 8px of room around it (top and
+  sides, instead of the page's inset), and its text 4px inside it on every side (CodeMirror's own
+  line padding is dropped). The Markdown source is 13px, at a line height of 1.45.
+- **Top bar:** a thin strip: 12px from the screen's top edge to its 16px icons, 2px below them.
+- **Editor tools** (`TextEditor.tsx`, `IslandTools`): there is no toolbar beside the text; the
+  text editor renders its tools into the island through a portal (`island-slot.tsx`: the
+  layout provides the element, `<InIsland>` renders into it). The island's button shows the
+  tool a folded toolbar would show (the one in effect at the caret, else the last one used,
+  as on wider screens); pressing it opens every tool in a column above it, a vertical
+  island of its own (rounded, round buttons; it scrolls when the window is short), and using
+  one, or tapping elsewhere, closes them. The Markdown source has no tools.
+- **Sizes:** text is 16px instead of 17px (times the text size setting); icon buttons 40px,
+  toolbar buttons 36px, sidebar rows taller.
 
 ## Main content
 
@@ -96,8 +138,8 @@ interface speaks English and Russian ([i18n](i18n.md)).
   one, and × or Backspace at the start of the field removes one. The URL (`?q=#java hash`)
   stays the truth; the box re-splits it when it changes from elsewhere.
 - **Editing** ([editors](editors.md)): there is no permanent toolbar. The formatting toolbar
-  is a vertical strip beside the text block holding the caret, shown only while the text has
-  focus, absolutely positioned (no layout space, no shift); flat and pale until pointed at,
+  is a vertical strip beside the text block holding the caret (in the island on small
+  screens), shown only while the text has focus, absolutely positioned (no layout space, no shift); flat and pale until pointed at,
   and folded to one tool by default. The editing area is a slightly darker panel with room at
   the sides (setting "Editing area"). Changes save themselves
   ([ADR-010](decisions/ADR-010-autosave-editor-first.md)).

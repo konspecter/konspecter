@@ -66,11 +66,40 @@ test("no screen overflows sideways on a phone", async ({ browser }) => {
     await page.waitForLoadState("networkidle");
     expect(await overflow(), path).toBeLessThanOrEqual(0);
   }
-  // The sidebar starts closed on a phone and slides over the page when opened.
-  await expect(page.getByRole("complementary", { name: "Sidebar" })).toBeHidden();
-  await page.getByRole("button", { name: "Show sidebar" }).click();
-  await expect(page.getByRole("complementary", { name: "Sidebar" })).toBeVisible();
+  // The sidebar starts closed on a phone and covers the screen when opened from the island.
+  const sidebar = page.getByRole("complementary", { name: "Sidebar" });
+  const island = page.getByRole("navigation", { name: "Main actions" });
+  await expect(sidebar).toBeHidden();
+  await island.getByRole("button", { name: "Show sidebar" }).click();
+  await expect(sidebar).toBeVisible();
+  expect((await sidebar.boundingBox())?.width).toBeCloseTo(360, 0);
+  await expect(island).toBeVisible();
   expect(await overflow(), "open sidebar").toBeLessThanOrEqual(0);
+  // The note's details wait behind their button.
+  const details = sidebar.getByRole("button", { name: "Details" });
+  await expect(sidebar.getByText("Created")).toBeHidden();
+  await details.click();
+  await expect(sidebar.getByText("Created")).toBeVisible();
+  expect(await audit(page), "open sidebar with details").toEqual([]);
+  // The search fills the island, with its close button at the end.
+  await island.getByRole("button", { name: "Hide sidebar" }).click();
+  await island.getByRole("button", { name: "Search in this conspect" }).click();
+  await expect(island.getByRole("searchbox")).toBeFocused();
+  expect(await overflow(), "island search").toBeLessThanOrEqual(0);
+  expect(await audit(page), "island search").toEqual([]);
+  await island.getByRole("button", { name: "Close search" }).click();
+  await expect(island.getByRole("searchbox")).toBeHidden();
+  // The island stays while the text is edited, and holds the editor's tools.
+  await page.getByRole("textbox", { name: "Conspect text" }).click();
+  await expect(island).toBeVisible();
+  const toolbar = page.getByRole("toolbar", { name: "Formatting" });
+  await expect(toolbar).toBeHidden();
+  await island.getByRole("button", { name: "Formatting" }).click();
+  await expect(toolbar).toBeVisible();
+  expect(await overflow(), "island tools").toBeLessThanOrEqual(0);
+  expect(await audit(page), "island tools").toEqual([]);
+  await toolbar.getByRole("button", { name: "Bold" }).click();
+  await expect(toolbar).toBeHidden();
   await context.close();
 });
 

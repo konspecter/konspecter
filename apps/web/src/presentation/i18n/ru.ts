@@ -39,6 +39,8 @@ export const ru: Dictionary = {
   "topbar.findCount": "Совпадение {current} из {count}",
   "topbar.findPrevious": "Предыдущее совпадение",
   "topbar.findNext": "Следующее совпадение",
+  "topbar.closeSearch": "Закрыть поиск",
+  "topbar.actions": "Основные действия",
   "topbar.darkTheme": "Тёмная тема",
   "topbar.toLight": "Включить светлую тему",
   "topbar.toDark": "Включить тёмную тему",

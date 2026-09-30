@@ -330,3 +330,46 @@
 .markdown-source .cm-code-first.cm-code-last {
   border-radius: 6px;
 }
+
+/*
+ * Small screens: the editor takes nearly the whole screen: 8px of room around
+ * it (at the top and the sides, instead of the page's inset), its text 4px
+ * inside it on every side. The toolbar is in the island (`app.css`). The
+ * Markdown source is set tighter.
+ */
+@media (max-width: 760px) {
+  .note-editor {
+    --editor-gap: 4px;
+    --editor-side-gap: 4px;
+    --editor-room: 8px;
+
+    margin-top: calc(var(--editor-room) - var(--content-top));
+    margin-inline: calc(var(--editor-room) - var(--content-inset));
+    padding-inline: var(--editor-side-gap);
+  }
+
+  :root[data-editing-area="highlighted"] .note-editor {
+    border-radius: 10px;
+  }
+
+  .title-field {
+    font-size: calc(28px * var(--font-scale));
+  }
+
+  .markdown-source .cm-editor {
+    font-size: calc(13px * var(--font-scale));
+  }
+
+  .markdown-source .cm-scroller {
+    line-height: 1.45;
+  }
+
+  /* CodeMirror's own line padding would add to the editor's gap. */
+  .markdown-source .cm-content .cm-line:not(.cm-code-line) {
+    padding-inline: 0;
+  }
+
+  .markdown-source .cm-code-line {
+    padding-inline: 8px;
+  }
+}

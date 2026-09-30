@@ -48,8 +48,6 @@
   --column-width: 720px;
   --sidebar-width: 272px;
   --topbar-height: 52px;
-  /* The search's own row under the top bar on small screens. */
-  --topbar-search-row: 0px;
   /* Set from the "Text size" setting; scales reading and editing text. */
   --font-scale: 1;
   --gutter: 16px;
@@ -412,6 +410,15 @@ mark {
   display: none;
 }
 
+/* Wide screens show the details as they are; small ones behind their button. */
+.sidebar-footer {
+  display: contents;
+}
+
+.sidebar-details-toggle {
+  display: none;
+}
+
 .note-details .sidebar-heading {
   margin-top: 0;
 }
@@ -519,10 +526,6 @@ mark {
   font-size: 12px;
 }
 
-.sidebar-backdrop {
-  display: none;
-}
-
 /*
  * The page keeps room for its scrollbar on the right (scrollbar-gutter). The
  * same room on the left (--scrollbar-gutter, measured by the layout) keeps the
@@ -557,7 +560,7 @@ mark {
     minmax(var(--topbar-side), 1fr);
   align-items: center;
   gap: 12px;
-  height: calc(var(--topbar-height) + var(--topbar-search-row) + env(safe-area-inset-top));
+  height: calc(var(--topbar-height) + env(safe-area-inset-top));
   padding: env(safe-area-inset-top) max(12px, env(safe-area-inset-right)) 0 12px;
   background: var(--color-bg);
   font-family: var(--font-ui);
@@ -800,6 +803,27 @@ mark {
 
 .search-step-down .icon {
   transform: rotate(90deg);
+}
+
+/* The island's search ends in its close button. */
+.search-close {
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin-right: -4px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.search-close:hover {
+  background: var(--color-hover);
+  color: var(--color-fg);
 }
 
 .antenna {
@@ -1298,7 +1322,7 @@ kbd {
 
 .resume-reading {
   position: sticky;
-  top: calc(var(--topbar-height) + var(--topbar-search-row) + 0.5rem);
+  top: calc(var(--topbar-height) + 0.5rem);
   z-index: 2;
   display: flex;
   flex-wrap: wrap;
@@ -1500,41 +1524,295 @@ kbd {
 
 /* --- Narrow windows and phones ------------------------------------------- */
 
+/*
+ * The island: a rounded block fixed at the bottom of a small screen, with big
+ * round buttons (sidebar, list, search, new note, then settings), or the
+ * search box with its close button. It keeps above the full-screen sidebar.
+ */
+.island {
+  position: fixed;
+  bottom: calc(var(--island-margin) + env(safe-area-inset-bottom));
+  left: 50%;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100% - 2 * var(--gutter));
+  height: var(--island-height);
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-bg);
+  box-shadow:
+    0 0 0 1px var(--color-border),
+    0 6px 24px var(--color-shadow);
+  font-family: var(--font-ui);
+  transform: translateX(-50%);
+}
+
+/* Searching, it spans the screen with the field. */
+.island:has(.search-box) {
+  width: calc(100% - 2 * var(--gutter));
+}
+
+.island .search-box {
+  flex: 1;
+  height: 44px;
+  padding: 0 6px 0 14px;
+  border-radius: 999px;
+  font-size: 16px;
+}
+
+.island-button {
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.island-button[aria-expanded="true"] {
+  background: var(--color-hover);
+  color: var(--color-fg);
+}
+
+/* Only a real pointer hovers: a tap would leave the button lit. */
+@media (hover: hover) {
+  .island-button:hover {
+    background: var(--color-hover);
+    color: var(--color-fg);
+  }
+}
+
+.island-button .icon {
+  width: 22px;
+  height: 22px;
+}
+
+/*
+ * The open editor's tools: its button, and above it every tool in a column,
+ * a vertical island of its own. It scrolls when the window is too short
+ * (the soft keyboard is up).
+ */
+.island-slot {
+  display: contents;
+}
+
+.island-tools {
+  position: relative;
+  display: inline-grid;
+  flex-shrink: 0;
+}
+
+.island-tool {
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.island-tool[data-pressed="true"] {
+  color: var(--color-fg);
+}
+
+.island-toolbar {
+  position: absolute;
+  /* Clear of the island: its padding around the button, and a gap. */
+  bottom: calc(100% + (var(--island-height) - 44px) / 2 + 8px);
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: calc(100dvh - var(--island-space) - var(--topbar-height) - 16px);
+  padding: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: 28px;
+  background: var(--color-bg);
+  box-shadow:
+    0 0 0 1px var(--color-border),
+    0 6px 24px var(--color-shadow);
+  transform: translateX(-50%);
+}
+
+.island-toolbar .toolbar-button {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--color-fg);
+  font-size: 14px;
+}
+
+/* Settings stands a little apart from the rest. */
+.island-settings {
+  margin-left: 10px;
+}
+
 @media (max-width: 760px) {
+  :root {
+    /* The top bar: 12px from the screen's top edge to its icons, 2px below them. */
+    --topbar-icon: 16px;
+    --topbar-top: 12px;
+    --topbar-height: calc(var(--topbar-top) + var(--topbar-icon) + 2px);
+    --island-height: 56px;
+    --island-margin: 12px;
+    /* What the island covers at the bottom of the page. */
+    --island-space: calc(var(--island-height) + 2 * var(--island-margin));
+  }
+
+  body {
+    font-size: calc(16px * var(--font-scale));
+  }
+
   .app,
   .app[data-sidebar="closed"] {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  /* The sidebar slides over the content instead of taking a column. */
+  /* The sidebar is a full-screen menu; the island holds its bar's buttons. */
   .sidebar {
     position: fixed;
-    inset: 0 auto 0 0;
-    z-index: 20;
-    width: min(85vw, var(--sidebar-width));
-    box-shadow: 0 0 40px var(--color-shadow);
-  }
-
-  .sidebar-backdrop {
-    position: fixed;
     inset: 0;
-    z-index: 15;
-    display: block;
-    background: color-mix(in srgb, var(--color-fg) 20%, transparent);
+    z-index: 20;
+    width: 100%;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right)
+      calc(var(--island-space) + env(safe-area-inset-bottom)) env(safe-area-inset-left);
+    border-right: 0;
   }
 
-  :root {
-    --topbar-search-row: 42px;
+  .sidebar-bar {
+    display: none;
   }
 
-  /* The controls in the first row, the search across the whole second one. */
+  /* Bigger text in the menu: it is read and tapped at arm's length. */
+  .sidebar {
+    font-size: 16px;
+  }
+
+  .sidebar .tree {
+    font-size: 15px;
+  }
+
+  .sidebar-heading,
+  .tree-count {
+    font-size: 13px;
+  }
+
+  .sidebar-hint {
+    font-size: 14px;
+  }
+
+  .sidebar-scroll {
+    padding: 12px 8px 12px;
+  }
+
+  .recent-link {
+    padding: 9px 8px;
+  }
+
+  /* The note's details: a button, and above the island what it shows. */
+  .sidebar-footer {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    max-height: 60%;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .sidebar-footer:has(> .sidebar-details:empty) {
+    display: none;
+  }
+
+  .sidebar-details-toggle {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 16px;
+    border: 0;
+    background: none;
+    color: var(--color-muted);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .sidebar-details-toggle .icon {
+    width: 18px;
+    height: 18px;
+    transform: rotate(90deg);
+    transition: transform 120ms ease;
+  }
+
+  .sidebar-details-toggle[aria-expanded="true"] .icon {
+    transform: rotate(-90deg);
+  }
+
+  .sidebar-details {
+    max-height: none;
+    min-height: 0;
+    padding: 0 8px 10px;
+    border-top: 0;
+    font-size: 14px;
+  }
+
+  .sidebar-footer[data-details="hidden"] .sidebar-details {
+    display: none;
+  }
+
+  /* The button names the details already. */
+  .sidebar-details .note-details > .sidebar-heading {
+    display: none;
+  }
+
+  .details-actions .icon-button {
+    width: 40px;
+    height: 40px;
+  }
+
+  /* Bigger controls for fingers. */
+  .icon-button {
+    width: 40px;
+    height: 40px;
+  }
+
+  .search-step {
+    width: 32px;
+    height: 32px;
+  }
+
+  .search-chips button {
+    width: 28px;
+    height: 28px;
+  }
+
+  /*
+   * The top bar keeps theme, mode and activity; the search is in the island.
+   * A thin strip: its buttons are small, the island's are the big ones.
+   */
   .topbar {
-    grid-template-areas:
-      "start . end"
-      "search search search";
-    grid-template-rows: var(--topbar-height) 34px;
+    grid-template-areas: "start . end";
     grid-template-columns: auto minmax(0, 1fr) auto;
-    padding-bottom: 8px;
+    padding-top: calc(env(safe-area-inset-top) + var(--topbar-top));
+    padding-bottom: 2px;
+  }
+
+  .topbar .icon-button {
+    width: 28px;
+    height: var(--topbar-icon);
+    border-radius: 4px;
+  }
+
+  .topbar .icon,
+  .topbar .antenna {
+    width: var(--topbar-icon);
+    height: var(--topbar-icon);
   }
 
   .topbar-start {
@@ -1545,14 +1823,11 @@ kbd {
     grid-area: end;
   }
 
-  .search-box {
-    grid-area: search;
-  }
-
-  /* The same margins as the search bar above. */
   .content {
     --content-inset: 12px;
-    padding-top: 12px;
+    --content-top: 12px;
+    padding-top: var(--content-top);
+    padding-bottom: calc(var(--island-space) + 16px + env(safe-area-inset-bottom));
   }
 
   .search-kbd {
@@ -1562,5 +1837,11 @@ kbd {
   .note-result {
     --list-cover-size: 72px;
     gap: 12px;
+  }
+}
+
+@media (max-width: 760px) and (prefers-reduced-motion: reduce) {
+  .sidebar-details-toggle .icon {
+    transition: none;
   }
 }

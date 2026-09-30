@@ -1980,3 +1980,162 @@ describe("keyboard shortcuts", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });
+
+describe("small screens", () => {
+  beforeEach(() => {
+    vi.stubGlobal("matchMedia", (query: string): Partial<MediaQueryList> => ({
+      matches: query === "(max-width: 760px)",
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+    vi.stubGlobal("scrollTo", vi.fn());
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const island = () => screen.getByRole("navigation", { name: "Main actions" });
+  const islandButton = (name: string) => within(island()).getByRole("button", { name });
+  const islandLink = (name: string) => within(island()).getByRole("link", { name });
+
+  async function storeWithNotes() {
+    const store = await newStore();
+    await store.put(createNote("# Hash maps\n\nBuckets. #java", new Date("2020-01-01"), "maps"));
+    await store.put(createNote("# Networking\n\nTCP handshakes.", new Date("2020-02-01"), "net"));
+    return store;
+  }
+
+  it("gathers the sidebar, the list, search, new note and settings in the island", async () => {
+    renderApp(await storeWithNotes());
+    expect(await listTitles()).toEqual(["Networking", "Hash maps"]);
+
+    expect(
+      [...island().querySelectorAll("button, a")].map((control) =>
+        control.getAttribute("aria-label"),
+      ),
+    ).toEqual(["Show sidebar", "All conspects", "Search conspects", "New conspect", "Settings"]);
+    // The top bar keeps theme, mode and activity; the search is in the island.
+    expect(within(topBar()).queryByRole("search")).not.toBeInTheDocument();
+    expect(within(topBar()).queryByRole("link")).not.toBeInTheDocument();
+    expect(topBarButton("Dark theme")).toBeInTheDocument();
+
+    // The sidebar starts hidden; the island opens and closes it.
+    expect(screen.queryByRole("complementary", { name: "Sidebar" })).not.toBeInTheDocument();
+    await userEvent.click(islandButton("Show sidebar"));
+    expect(sidebar()).toBeInTheDocument();
+    expect(islandButton("Hide sidebar")).toHaveAttribute("aria-expanded", "true");
+    await userEvent.click(islandButton("Hide sidebar"));
+    expect(screen.queryByRole("complementary", { name: "Sidebar" })).not.toBeInTheDocument();
+
+    // A link in the island closes the sidebar it covers.
+    await userEvent.click(islandButton("Show sidebar"));
+    await userEvent.click(islandLink("Settings"));
+    expect(await screen.findByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument();
+    expect(screen.queryByRole("complementary", { name: "Sidebar" })).not.toBeInTheDocument();
+    await userEvent.click(islandLink("New conspect"));
+    expect(await textEditor()).toHaveFocus();
+  });
+
+  it("turns the island into the search box with a close button, and back", async () => {
+    renderApp(await storeWithNotes());
+    await noteList();
+
+    await userEvent.click(islandButton("Search conspects"));
+    expect(searchBox()).toHaveFocus();
+    expect(within(island()).queryByRole("link")).not.toBeInTheDocument();
+    await userEvent.keyboard("tcp");
+    await waitFor(async () => {
+      expect(await listTitles()).toEqual(["Networking"]);
+    });
+
+    await userEvent.click(islandButton("Close search"));
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    await waitFor(async () => {
+      expect(await listTitles()).toEqual(["Networking", "Hash maps"]);
+    });
+    expect(islandButton("Search conspects")).toBeInTheDocument();
+  });
+
+  it("shows the search while a tag filters the list, and ends it when a result opens", async () => {
+    renderApp(await storeWithNotes(), "/?q=%23java");
+    expect(await listTitles()).toEqual(["Hash maps"]);
+    expect(within(island()).getByRole("list", { name: "Tag filters" })).toHaveTextContent("#java");
+
+    await userEvent.click(screen.getByRole("link", { name: "Hash maps" }));
+    expect(await textEditor()).toHaveTextContent("Buckets.");
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+  });
+
+  it("searches the open note from the island", async () => {
+    renderApp(await storeWithNotes(), "/notes/maps");
+    const editor = await textEditor();
+
+    await userEvent.click(islandButton("Search in this conspect"));
+    expect(findBox()).toHaveFocus();
+    await userEvent.keyboard("buck");
+    expect(editor.querySelector(".find-match")).toHaveTextContent("Buck");
+
+    await userEvent.click(islandButton("Close search"));
+    expect(editor.querySelector(".find-match")).toBeNull();
+  });
+
+  it("keeps the note's details behind a button in the sidebar", async () => {
+    renderApp(await storeWithNotes(), "/notes/maps");
+    await textEditor();
+    await userEvent.click(islandButton("Show sidebar"));
+
+    const toggle = within(sidebar()).getByRole("button", { name: "Details" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    const details = document.getElementById(toggle.getAttribute("aria-controls") ?? "");
+    expect(details).toHaveTextContent("Created");
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("holds the text editor's tools: the one in effect, and every tool until one is used", async () => {
+    renderApp(await storeWithNotes(), "/notes/maps");
+    const editor = await textEditor();
+    expect(
+      [...island().querySelectorAll("button, a")].map((control) =>
+        control.getAttribute("aria-label"),
+      ),
+    ).toEqual([
+      "Show sidebar",
+      "All conspects",
+      "Search in this conspect",
+      "Formatting",
+      "New conspect",
+      "Settings",
+    ]);
+    // No toolbar beside the text; the island's button shows the folded toolbar's tool.
+    const tools = islandButton("Formatting");
+    expect(tools).toHaveTextContent("B");
+    expect(screen.queryByRole("toolbar")).not.toBeInTheDocument();
+
+    await userEvent.click(editor);
+    caretAtEnd(editor);
+    await userEvent.click(tools);
+    expect(tools).toHaveAttribute("aria-expanded", "true");
+    const toolbar = within(island()).getByRole("toolbar", { name: "Formatting" });
+    await userEvent.click(within(toolbar).getByRole("button", { name: "Heading" }));
+
+    expect(editor.querySelector("h2")).toHaveTextContent("Buckets.");
+    expect(screen.queryByRole("toolbar")).not.toBeInTheDocument();
+    expect(tools).toHaveAttribute("aria-expanded", "false");
+    // The caret is in the heading now: that is the tool in effect.
+    expect(tools).toHaveTextContent("H2");
+
+    // Tapping elsewhere closes the tools unused.
+    await userEvent.click(tools);
+    await userEvent.click(editor);
+    expect(screen.queryByRole("toolbar")).not.toBeInTheDocument();
+  });
+
+  it("has no editor tools in the Markdown source", async () => {
+    renderApp(await storeWithNotes(), "/notes/maps");
+    await textEditor();
+    await markdownEditor();
+    expect(within(island()).queryByRole("button", { name: "Formatting" })).not.toBeInTheDocument();
+  });
+});

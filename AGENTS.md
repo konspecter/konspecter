@@ -61,9 +61,10 @@ All planned phases are done. New work needs a new plan in `.claude/plans/`.
 | Errors     | Library errors read "Oops, something went wrong."; the real one is logged   | Done   |
 | Slug file  | File Mode names files by title slug; optional rename when the title changes | Done   |
 | Mode place | Switching modes keeps the caret and the text on screen where they were      | Done   |
+| Mobile     | Island buttons, full-screen sidebar, details button, top toolbar, sizes     | Done   |
 
 Specs and notes: `.claude/plans/updates-1.md` (+ `updates-1-implementation.md`), `updates-2.md`
-(+ `updates-2-implementation.md`), `markdown-single-source.md`, `last-write-wins.md`, `tag-chains.md` (item 1 of `updates-3.md`), `note-find.md` (item 3), `friendly-errors.md` (item 5), `slug-file-names.md` (item 8), `mode-switch-place.md` (item 14). UI architecture: `docs/architecture/ui.md`; languages:
+(+ `updates-2-implementation.md`), `markdown-single-source.md`, `last-write-wins.md`, `tag-chains.md` (item 1 of `updates-3.md`), `note-find.md` (item 3), `friendly-errors.md` (item 5), `slug-file-names.md` (item 8), `mode-switch-place.md` (item 14), `mobile-view.md` (mobile view updates). UI architecture: `docs/architecture/ui.md`; languages:
 `docs/architecture/i18n.md`.
 
 ## Working rules

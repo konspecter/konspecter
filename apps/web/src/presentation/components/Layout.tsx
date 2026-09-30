@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useMatch, useNavigate, useSearchParams } from "react-router";
 import { parseQuery } from "../../domain/search/query";
 import type { EditorMode, TagNames, Theme } from "../../domain/settings/settings";
@@ -12,7 +12,8 @@ import type { UpdateSource } from "../app/updates";
 import { useShortcuts } from "../hooks/use-shortcuts";
 import { Antenna } from "./Antenna";
 import { DetailsSlot } from "./details-slot";
-import { ListIcon, NewNoteIcon, SidebarIcon } from "./icons";
+import { IslandSlot } from "./island-slot";
+import { GearIcon, ListIcon, NewNoteIcon, SearchIcon, SidebarIcon } from "./icons";
 import { NO_FIND, NoteFindContext, type NoteFind, type NoteFindChannel } from "./note-find";
 import { SearchBox } from "./SearchBox";
 import { ShortcutsDialog } from "./ShortcutsDialog";
@@ -21,6 +22,7 @@ import { SyncIndicator } from "./SyncIndicator";
 import { ModeToggle, ThemeToggle, useDarkTheme } from "./TopBarControls";
 import { UpdateBanner } from "./UpdateBanner";
 import { t } from "../i18n/i18n";
+import { isNarrow, useNarrow } from "../hooks/use-narrow";
 import { useScrollbarGutter } from "../hooks/use-scrollbar-gutter";
 
 type LayoutProps = {
@@ -36,12 +38,7 @@ type LayoutProps = {
   sync?: SyncEngine | undefined;
 };
 
-const NARROW = "(max-width: 760px)";
 const SIDEBAR_KEY = "konspecter.sidebar";
-
-function isNarrow(): boolean {
-  return typeof window.matchMedia === "function" && window.matchMedia(NARROW).matches;
-}
 
 /** Narrow screens start with the sidebar closed; wide ones remember the choice. */
 function initialSidebarOpen(): boolean {
@@ -75,7 +72,9 @@ function sidebarEntry(): HTMLElement | null {
 
 /**
  * The whole window: the sidebar on the left, and on the right a top bar
- * (search, theme, editor mode, activity) over the page content.
+ * (search, theme, editor mode, activity) over the page content. On small
+ * screens the sidebar covers the screen, and the island at the bottom holds
+ * the sidebar, the list, the search, the editor's tools, new note and settings.
  */
 export function Layout({
   store,
@@ -99,10 +98,14 @@ export function Layout({
   const [sidebarOpen, setSidebarOpen] = useState(initialSidebarOpen);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [detailsSlot, setDetailsSlot] = useState<HTMLDivElement | null>(null);
+  const [islandSlot, setIslandSlot] = useState<HTMLSpanElement | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const sidebarToggleRef = useRef<HTMLButtonElement>(null);
   const barToggleRef = useRef<HTMLButtonElement>(null);
   const dark = useDarkTheme(theme);
+  const narrow = useNarrow();
+  // The island's search: opened by its button, shown too while the list has a query.
+  const [islandSearch, setIslandSearch] = useState(false);
   // On the note page the search box searches the note, unless it was opened
   // for the library (Mod+P); that lasts until the box loses the focus.
   const [find, setFind] = useState<NoteFind>(NO_FIND);
@@ -125,6 +128,15 @@ export function Layout({
   }, [location.pathname, location.search]);
 
   const query = location.pathname === "/" ? (searchParams.get("q") ?? "") : "";
+  const islandSearchShown = islandSearch || query !== "";
+  // Opened, the island's field takes the focus (and brings up the keyboard).
+  useLayoutEffect(() => {
+    if (islandSearch) searchRef.current?.focus();
+  }, [islandSearch]);
+  // A note opened from the results (the field let go of the focus) ends the search.
+  useEffect(() => {
+    if (onNote && document.activeElement !== searchRef.current) setIslandSearch(false);
+  }, [onNote, location.pathname]);
   const activeTag = useMemo(() => {
     const parsed = parseQuery(query);
     return parsed.words.length === 0 && parsed.tags.length === 1
@@ -181,17 +193,20 @@ export function Layout({
     setShowShortcuts(false);
   }, []);
 
+  const focusSearch = () => {
+    if (isNarrow()) setIslandSearch(true);
+    searchRef.current?.focus();
+    searchRef.current?.select();
+  };
   const openSearch = () => {
     // An open note stays until something is typed.
     if (location.pathname !== "/" && !onNote) void navigate("/");
     setLibraryScope(onNote);
-    searchRef.current?.focus();
-    searchRef.current?.select();
+    focusSearch();
   };
   const openFind = () => {
     setLibraryScope(false);
-    searchRef.current?.focus();
-    searchRef.current?.select();
+    focusSearch();
   };
   const newNote = () => void navigate("/notes/new");
   useShortcuts({
@@ -212,6 +227,36 @@ export function Layout({
     },
   });
 
+  const searchBox = (onClose?: () => void) => (
+    <SearchBox
+      inputRef={searchRef}
+      find={
+        onNote && !libraryScope
+          ? {
+              query: find.query,
+              count: findCount,
+              selected,
+              onQuery: (query) => {
+                setFind((current) => ({ query, selected: 0, reveal: current.reveal + 1 }));
+              },
+              onStep: (step) => {
+                if (findCount === 0) return;
+                setFind((current) => ({
+                  query: current.query,
+                  selected: (selected + step + findCount) % findCount,
+                  reveal: current.reveal + 1,
+                }));
+              },
+            }
+          : null
+      }
+      onLeave={() => {
+        setLibraryScope(false);
+      }}
+      {...(onClose ? { onClose } : {})}
+    />
+  );
+
   return (
     <div className="app" data-sidebar={sidebarOpen ? "open" : "closed"}>
       <a className="skip-link" href="#content">
@@ -229,13 +274,10 @@ export function Layout({
         toggleRef={sidebarToggleRef}
         detailsRef={setDetailsSlot}
       />
-      {sidebarOpen && (
-        <div className="sidebar-backdrop" aria-hidden="true" onClick={closeSidebarOnNarrow} />
-      )}
       <div className="main">
         <header className="topbar" data-tauri-drag-region="">
           <div className="topbar-start" data-tauri-drag-region="">
-            {!sidebarOpen && (
+            {!narrow && !sidebarOpen && (
               <>
                 <button
                   ref={barToggleRef}
@@ -260,41 +302,18 @@ export function Layout({
               </>
             )}
             {/* Always here, right before the search: the list is what the search filters. */}
-            <Link
-              to="/"
-              className="icon-button topbar-list"
-              aria-label={t("sidebar.allNotes")}
-              title={withShortcut(t("sidebar.allNotes"), SHORTCUTS.allNotes.keys)}
-            >
-              <ListIcon />
-            </Link>
+            {!narrow && (
+              <Link
+                to="/"
+                className="icon-button topbar-list"
+                aria-label={t("sidebar.allNotes")}
+                title={withShortcut(t("sidebar.allNotes"), SHORTCUTS.allNotes.keys)}
+              >
+                <ListIcon />
+              </Link>
+            )}
           </div>
-          <SearchBox
-            inputRef={searchRef}
-            find={
-              onNote && !libraryScope
-                ? {
-                    query: find.query,
-                    count: findCount,
-                    selected,
-                    onQuery: (query) => {
-                      setFind((current) => ({ query, selected: 0, reveal: current.reveal + 1 }));
-                    },
-                    onStep: (step) => {
-                      if (findCount === 0) return;
-                      setFind((current) => ({
-                        query: current.query,
-                        selected: (selected + step + findCount) % findCount,
-                        reveal: current.reveal + 1,
-                      }));
-                    },
-                  }
-                : null
-            }
-            onLeave={() => {
-              setLibraryScope(false);
-            }}
-          />
+          {!narrow && searchBox()}
           <div className="topbar-end" data-tauri-drag-region="">
             <ThemeToggle
               dark={dark}
@@ -311,12 +330,74 @@ export function Layout({
         {updates && <UpdateBanner updates={updates} />}
         <main id="content" className="content" tabIndex={-1}>
           <DetailsSlot value={detailsSlot}>
-            <NoteFindContext value={findChannel}>
-              <Outlet />
-            </NoteFindContext>
+            <IslandSlot value={islandSlot}>
+              <NoteFindContext value={findChannel}>
+                <Outlet />
+              </NoteFindContext>
+            </IslandSlot>
           </DetailsSlot>
         </main>
       </div>
+      {narrow && (
+        <nav className="island" aria-label={t("topbar.actions")}>
+          {islandSearchShown ? (
+            searchBox(() => {
+              setIslandSearch(false);
+            })
+          ) : (
+            <>
+              <button
+                type="button"
+                className="island-button"
+                aria-label={sidebarOpen ? t("sidebar.hide") : t("sidebar.show")}
+                aria-expanded={sidebarOpen}
+                aria-controls="sidebar"
+                onClick={toggleSidebar}
+              >
+                <SidebarIcon />
+              </button>
+              <Link
+                to="/"
+                className="island-button"
+                aria-label={t("sidebar.allNotes")}
+                onClick={closeSidebarOnNarrow}
+              >
+                <ListIcon />
+              </Link>
+              <button
+                type="button"
+                className="island-button"
+                aria-label={onNote ? t("topbar.find") : t("topbar.search")}
+                onClick={() => {
+                  closeSidebarOnNarrow();
+                  setLibraryScope(false);
+                  setIslandSearch(true);
+                }}
+              >
+                <SearchIcon />
+              </button>
+              {/* The open editor's tools, when it has any. */}
+              <span ref={setIslandSlot} className="island-slot" />
+              <Link
+                to="/notes/new"
+                className="island-button"
+                aria-label={t("sidebar.newNote")}
+                onClick={closeSidebarOnNarrow}
+              >
+                <NewNoteIcon />
+              </Link>
+              <Link
+                to="/settings"
+                className="island-button island-settings"
+                aria-label={t("sidebar.settings")}
+                onClick={closeSidebarOnNarrow}
+              >
+                <GearIcon />
+              </Link>
+            </>
+          )}
+        </nav>
+      )}
       {showShortcuts && <ShortcutsDialog onClose={closeShortcuts} />}
     </div>
   );

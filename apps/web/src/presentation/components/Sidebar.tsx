@@ -2,6 +2,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useId,
   useState,
   useSyncExternalStore,
   type KeyboardEvent,
@@ -18,7 +19,7 @@ import {
 import type { NoteRepository } from "../../application/notes/note-repository";
 import type { TagNames } from "../../domain/settings/settings";
 import { formatKeys, SHORTCUTS } from "../app/shortcuts";
-import { GearIcon, NewNoteIcon, SidebarIcon } from "./icons";
+import { ChevronIcon, GearIcon, NewNoteIcon, SidebarIcon } from "./icons";
 import { summaryTitle } from "./note-title";
 import { TagTreeView } from "./TagTreeView";
 import { t } from "../i18n/i18n";
@@ -73,6 +74,7 @@ export function withShortcut(label: string, keys: string): string {
 /**
  * The left panel: controls, the tag tree and the recently edited notes, and
  * at the bottom the open note's details (rendered there by the note page).
+ * Small screens show the details only after their button is pressed.
  */
 export const Sidebar = memo(function Sidebar({
   store,
@@ -88,6 +90,8 @@ export const Sidebar = memo(function Sidebar({
 }: SidebarProps) {
   const library = useSyncExternalStore(catalog.subscribe, catalog.getSnapshot);
   const notes = library.status === "ready" ? library.notes : null;
+  const detailsId = useId();
+  const [detailsShown, setDetailsShown] = useState(false);
 
   const handleClick = (event: MouseEvent<HTMLElement>) => {
     if (event.target instanceof Element && event.target.closest("a")) onNavigate();
@@ -154,7 +158,21 @@ export const Sidebar = memo(function Sidebar({
           )}
         </nav>
       </div>
-      <div ref={detailsRef} className="sidebar-details" />
+      <div className="sidebar-footer" data-details={detailsShown ? "shown" : "hidden"}>
+        <button
+          type="button"
+          className="sidebar-details-toggle"
+          aria-expanded={detailsShown}
+          aria-controls={detailsId}
+          onClick={() => {
+            setDetailsShown(!detailsShown);
+          }}
+        >
+          {t("details.title")}
+          <ChevronIcon />
+        </button>
+        <div ref={detailsRef} id={detailsId} className="sidebar-details" />
+      </div>
     </aside>
   );
 });

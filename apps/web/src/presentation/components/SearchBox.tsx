@@ -3,7 +3,7 @@ import { useLocation, useMatch, useNavigate, useSearchParams } from "react-route
 import { joinQuery, queryParts, takeTags, type QueryParts } from "../../domain/search/query";
 import type { Tag } from "../../domain/tag/tags";
 import { formatKeys, SHORTCUTS } from "../app/shortcuts";
-import { ChevronIcon, SearchIcon } from "./icons";
+import { ChevronIcon, CloseIcon, SearchIcon } from "./icons";
 import { t } from "../i18n/i18n";
 
 type Shown = QueryParts & {
@@ -43,6 +43,8 @@ type SearchBoxProps = {
   find?: FindBox | null;
   /** The field lost the focus. */
   onLeave?: () => void;
+  /** Ends the search: a close button at the end empties the query, then calls it (the island). */
+  onClose?: () => void;
 };
 
 /**
@@ -58,8 +60,10 @@ type SearchBoxProps = {
  * With `find`, it searches the open note instead: no chips, no list; the
  * count and ↑/↓ at its end; the ↓ and ↑ keys (or Enter and Shift+Enter)
  * move between the matches.
+ *
+ * With `onClose` it ends in a close button, as the mobile island shows it.
  */
-export function SearchBox({ inputRef, find = null, onLeave }: SearchBoxProps) {
+export function SearchBox({ inputRef, find = null, onLeave, onClose }: SearchBoxProps) {
   const id = useId();
   const location = useLocation();
   const navigate = useNavigate();
@@ -199,6 +203,21 @@ export function SearchBox({ inputRef, find = null, onLeave }: SearchBoxProps) {
         </kbd>
       )}
       {find && find.query !== "" && <FindControls find={find} />}
+      {onClose && (
+        <button
+          type="button"
+          className="search-close"
+          aria-label={t("topbar.closeSearch")}
+          title={t("topbar.closeSearch")}
+          onClick={() => {
+            if (find) find.onQuery("");
+            else if (tags.length > 0 || text !== "") change([], "");
+            onClose();
+          }}
+        >
+          <CloseIcon />
+        </button>
+      )}
     </form>
   );
 }

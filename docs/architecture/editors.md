@@ -36,8 +36,9 @@ with a contextual formatting toolbar and Markdown-style shortcuts.
   margin, starting at the top of the block that holds the caret, and it follows the caret
   from block to block. It is absolutely positioned, so it takes no space and never shifts the
   text. Tab moves from the text into it; it hides when focus leaves both. It is always on the
-  left: in the column's margin, and on small screens in the editor's left gap (a compact
-  toolbar). It stays visible: it grows down from the block's top, and when it does not fit
+  left, in the column's margin. Small screens have no margin: there the tools are in the
+  island at the bottom of the screen, its button showing the tool a folded toolbar would show
+  and opening every tool ([UI](ui.md#small-screens)). It stays visible: it grows down from the block's top, and when it does not fit
   below within the window (under the top bar) and there is more room above, it ends at the
   block's bottom and grows up (`toolbarTopFor`); scrolling and resizing place it again. At
   rest it is flat and pale (no frame, muted buttons); pointing at it or moving the focus into
@@ -136,8 +137,9 @@ uploaded: the image is stored in the frontmatter as a base64 `data:` URL
 ## Editing area
 
 With the setting "Editing area" on (the default), the editor is a panel a shade darker than
-the page (`--color-editor`) with the same gap on every side (`--editor-gap`: 28px, 36px on
-small screens, where the gap holds the toolbar) and as tall as the note: no empty space is
+the page (`--color-editor`) with a gap at the top and bottom (`--editor-gap`, 28px) and a
+narrower one at the sides (`--editor-side-gap`, 16px); on small screens it has 8px of room around
+it and the text 4px inside it on every side. It is as tall as the note: no empty space is
 forced below the text, and the text adds no margin at its top or bottom. Off, the editor sits
 on the page as before (`data-editing-area` on `<html>`).
 

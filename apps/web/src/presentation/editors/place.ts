@@ -23,13 +23,23 @@ export function mapPlace(place: Place, map: (position: number) => number): Place
   };
 }
 
+/** How far up from the window's bottom edge the island covers the page (small screens), else 0. */
+export function coveredBelow(): number {
+  const island = document.querySelector(".island");
+  return island ? Math.max(0, window.innerHeight - island.getBoundingClientRect().top) : 0;
+}
+
 /**
  * The part of the window where the note can be seen: below the page's sticky
- * top bar (when there is one) and above the window's bottom edge.
+ * top bar (when there is one) and above the island (when there is one) or the
+ * window's bottom edge.
  */
 export function visibleArea(): { top: number; bottom: number } {
   const topBar = document.querySelector(".topbar");
-  return { top: topBar?.getBoundingClientRect().bottom ?? 0, bottom: window.innerHeight };
+  return {
+    top: topBar?.getBoundingClientRect().bottom ?? 0,
+    bottom: window.innerHeight - coveredBelow(),
+  };
 }
 
 /**

@@ -6,6 +6,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -13,6 +14,7 @@ import {
   type ReactNode,
 } from "react";
 import { ChevronIcon } from "../components/icons";
+import { InIsland } from "../components/island-slot";
 import { NO_FIND, revealMatch, type NoteFind } from "../components/note-find";
 import {
   createTextEditorState,
@@ -27,7 +29,8 @@ import {
   toolsInEffect,
 } from "./text-editor-setup";
 import { t, type TextKey } from "../i18n/i18n";
-import { visibleArea, type Place } from "./place";
+import { useNarrow } from "../hooks/use-narrow";
+import { coveredBelow, visibleArea, type Place } from "./place";
 
 type TextEditorProps = {
   /** Read once, when the editor mounts. */
@@ -188,7 +191,9 @@ export function toolbarTopFor(
  * Markdown. The formatting toolbar is contextual: a vertical strip beside
  * the block being edited, shown only while the editor has focus. It is
  * positioned absolutely, so it never takes space or shifts the text, and it
- * folds to a single tool and its toggle.
+ * folds to a single tool and its toggle. Small screens have no margin for it:
+ * there the island holds the tool a folded toolbar would show, and pressing
+ * it opens every tool (`IslandTools`).
  */
 export const TextEditor = memo(function TextEditor({
   initialDoc,
@@ -221,6 +226,7 @@ export const TextEditor = memo(function TextEditor({
   const [initialState] = useState(editorState);
   const [initialFocus] = useState(autoFocus || initialSelection?.focused === true);
   const [focused, setFocused] = useState(false);
+  const narrow = useNarrow();
   const [toolbarTop, setToolbarTop] = useState<number | null>(null);
   const [folded, setFolded] = useState(initialFolded);
   const [lastUsed, setLastUsed] = useState(initialLastUsed);
@@ -247,6 +253,15 @@ export const TextEditor = memo(function TextEditor({
         role: "textbox",
         "aria-multiline": "true",
         "aria-label": t("editor.text"),
+      },
+      // The caret is scrolled into view above the island, measured each time.
+      scrollMargin: {
+        top: 5,
+        left: 5,
+        right: 5,
+        get bottom() {
+          return coveredBelow() + 5;
+        },
       },
       dispatchTransaction(transaction) {
         const next = view.state.apply(transaction);
@@ -352,18 +367,18 @@ export const TextEditor = memo(function TextEditor({
   }, []);
   const placed = toolbarTop !== null;
   useLayoutEffect(() => {
-    if (focused) place();
-  }, [focused, folded, editorState, placed, place]);
+    if (focused && !narrow) place();
+  }, [focused, narrow, folded, editorState, placed, place]);
   // Scrolling or resizing moves the text under a toolbar that should stay visible.
   useEffect(() => {
-    if (!focused) return;
+    if (!focused || narrow) return;
     window.addEventListener("scroll", place, { passive: true });
     window.addEventListener("resize", place);
     return () => {
       window.removeEventListener("scroll", place);
       window.removeEventListener("resize", place);
     };
-  }, [focused, place]);
+  }, [focused, narrow, place]);
 
   function handleFocus() {
     setFocused(true);
@@ -386,6 +401,12 @@ export const TextEditor = memo(function TextEditor({
     if (!view) return;
     const href = isLinkActive(view.state) ? null : window.prompt(t("editor.linkAddress"));
     run(linkCommand(href?.trim() ?? null));
+  }
+
+  function applyTool(tool: Tool) {
+    noteToolUsed(tool.id);
+    if (tool.command) run(tool.command);
+    else handleLink();
   }
 
   const toolbarVisible = focused && toolbarTop !== null;
@@ -421,55 +442,139 @@ export const TextEditor = memo(function TextEditor({
   return (
     <div ref={containerRef} className="text-editor" onFocus={handleFocus} onBlur={handleBlur}>
       <div ref={mountRef} />
-      <div
-        ref={toolbarRef}
-        role="toolbar"
-        aria-label={t("editor.formatting")}
-        aria-orientation="vertical"
-        className="text-editor-toolbar"
-        data-folded={folded}
-        hidden={!toolbarVisible}
-        style={toolbarTop === null ? undefined : { top: toolbarTop }}
-      >
-        {shown.map((tool) => (
+      {narrow ? (
+        <InIsland>
+          <IslandTools tools={tools} pinned={pinned} onUse={applyTool} />
+        </InIsland>
+      ) : (
+        <div
+          ref={toolbarRef}
+          role="toolbar"
+          aria-label={t("editor.formatting")}
+          aria-orientation="vertical"
+          className="text-editor-toolbar"
+          data-folded={folded}
+          hidden={!toolbarVisible}
+          style={toolbarTop === null ? undefined : { top: toolbarTop }}
+        >
+          {shown.map((tool) => (
+            <ToolButton
+              key={tool.id}
+              tool={tool}
+              onUse={() => {
+                applyTool(tool);
+              }}
+            />
+          ))}
           <button
-            key={tool.id}
             type="button"
-            className="toolbar-button"
-            aria-label={tool.label}
-            title={tool.title}
-            {...(tool.pressed === undefined ? {} : { "aria-pressed": tool.pressed })}
-            disabled={tool.disabled}
-            // Keep the editor's selection when the toolbar is clicked.
+            className="toolbar-button toolbar-fold"
+            aria-label={t("editor.allTools")}
+            title={folded ? t("editor.showTools") : t("editor.foldTools")}
+            aria-expanded={!folded}
             onMouseDown={(event) => {
               event.preventDefault();
             }}
             onClick={() => {
-              noteToolUsed(tool.id);
-              if (tool.command) run(tool.command);
-              else handleLink();
+              setFolded(!folded);
+              rememberFolded(!folded);
             }}
           >
-            {tool.content}
+            <ChevronIcon />
           </button>
-        ))}
-        <button
-          type="button"
-          className="toolbar-button toolbar-fold"
-          aria-label={t("editor.allTools")}
-          title={folded ? t("editor.showTools") : t("editor.foldTools")}
-          aria-expanded={!folded}
-          onMouseDown={(event) => {
-            event.preventDefault();
-          }}
-          onClick={() => {
-            setFolded(!folded);
-            rememberFolded(!folded);
-          }}
-        >
-          <ChevronIcon />
-        </button>
-      </div>
+        </div>
+      )}
     </div>
   );
 });
+
+function ToolButton({ tool, onUse }: { tool: Tool; onUse: () => void }) {
+  return (
+    <button
+      type="button"
+      className="toolbar-button"
+      aria-label={tool.label}
+      title={tool.title}
+      {...(tool.pressed === undefined ? {} : { "aria-pressed": tool.pressed })}
+      disabled={tool.disabled}
+      // Keep the editor's selection when the toolbar is clicked.
+      onMouseDown={(event) => {
+        event.preventDefault();
+      }}
+      onClick={onUse}
+    >
+      {tool.content}
+    </button>
+  );
+}
+
+/**
+ * The toolbar in the island (small screens): one button showing the tool a
+ * folded toolbar would show; pressing it opens every tool in a column above it,
+ * and using one, or tapping elsewhere, closes them again.
+ */
+function IslandTools({
+  tools,
+  pinned,
+  onUse,
+}: {
+  tools: readonly Tool[];
+  pinned: Tool | undefined;
+  onUse: (tool: Tool) => void;
+}) {
+  const id = useId();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: PointerEvent) => {
+      if (!(event.target instanceof Element && ref.current?.contains(event.target))) setOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+    };
+  }, [open]);
+  return (
+    <span ref={ref} className="island-tools">
+      <button
+        type="button"
+        className="island-button island-tool"
+        aria-label={t("editor.formatting")}
+        title={t("editor.showTools")}
+        aria-expanded={open}
+        aria-controls={id}
+        data-pressed={pinned?.pressed === true}
+        // Keep the editor's selection when the island is tapped.
+        onMouseDown={(event) => {
+          event.preventDefault();
+        }}
+        onClick={() => {
+          setOpen(!open);
+        }}
+      >
+        {pinned?.content}
+      </button>
+      {open && (
+        <div
+          id={id}
+          role="toolbar"
+          aria-label={t("editor.formatting")}
+          aria-orientation="vertical"
+          className="island-toolbar"
+        >
+          {tools.map((tool) => (
+            <ToolButton
+              key={tool.id}
+              tool={tool}
+              onUse={() => {
+                setOpen(false);
+                onUse(tool);
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </span>
+  );
+}
