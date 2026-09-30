@@ -217,6 +217,11 @@ source, or delete this conspect when you are done.
   "settings.reading.restore": "Continue where I left off",
   "settings.reading.ask": "Ask before jumping",
   "settings.reading.off": "Always start at the top",
+  "settings.fileNames": "File names",
+  "settings.fileNames.hint":
+    "New conspects get files named after their titles, like hello-mir.md for “Hello мир!”.",
+  "settings.fileNames.kept": "Keep the name when the title changes",
+  "settings.fileNames.title": "Rename the file after the title",
   "settings.saveFailed": "Could not save settings: {error} They apply until you reload.",
   "settings.shortcuts": "Keyboard shortcuts",
   "settings.storage": "Offline storage",

@@ -124,7 +124,7 @@ export class NoteStore implements NoteRepository {
    * Creates or replaces the note (a local edit): updates its index entry and
    * queues it for sync, all in one transaction.
    */
-  async put(note: Note): Promise<void> {
+  async put(note: Note): Promise<Note> {
     const tx = this.#db.transaction(["notes", "tags", "sync"], "readwrite");
     const sync = tx.objectStore("sync");
     const entry = await readEntry(sync.get(note.id));
@@ -145,6 +145,7 @@ export class NoteStore implements NoteRepository {
     ]);
     (await this.#search)?.upsert(note);
     this.#emit({ noteId: note.id, source: "local" });
+    return note;
   }
 
   /**

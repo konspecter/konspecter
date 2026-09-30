@@ -59,7 +59,7 @@ export type FileEntry = {
 };
 export type FileContents = { readonly entry: FileEntry; readonly text: string };
 
-/** A native folder operation failed; `code` is e.g. "not_found", "too_large". */
+/** A native folder operation failed; `code` is e.g. "not_found", "exists", "too_large". */
 export class FolderError extends Error {
   override readonly name = "FolderError";
   constructor(
@@ -76,7 +76,10 @@ export type FolderBridge = {
   read(path: string): Promise<FileContents>;
   /** Writes the file atomically, over whatever is there (the last write wins). */
   write(path: string, contents: string): Promise<FileEntry>;
-  create(title: string, contents: string): Promise<FileEntry>;
+  /** Creates a file at exactly this path; fails with "exists" if it is taken. */
+  createAt(path: string, contents: string): Promise<FileEntry>;
+  /** Renames a file, never over another one (fails with "exists"). */
+  rename(from: string, to: string): Promise<FileEntry>;
   trash(path: string): Promise<void>;
   openExternally(path: string): Promise<void>;
   reveal(path: string): Promise<void>;
@@ -138,8 +141,11 @@ export const folderBridge: FolderBridge = {
   async write(path, contents) {
     return parseEntry(await folderCommand("folder_write", { path, contents }));
   },
-  async create(title, contents) {
-    return parseEntry(await folderCommand("folder_create", { title, contents }));
+  async createAt(path, contents) {
+    return parseEntry(await folderCommand("folder_create_at", { path, contents }));
+  },
+  async rename(from, to) {
+    return parseEntry(await folderCommand("folder_rename", { from, to }));
   },
   async trash(path) {
     await folderCommand("folder_trash", { path });

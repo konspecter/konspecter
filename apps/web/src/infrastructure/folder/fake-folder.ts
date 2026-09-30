@@ -7,7 +7,8 @@ import {
 
 /**
  * Test double for the native folder (src-tauri/src/folder.rs): the same
- * create/write/trash rules over an in-memory map. Used only by tests.
+ * create/rename/write/trash rules over an in-memory map, with file names
+ * that ignore case. Used only by tests.
  */
 export class FakeFolder implements FolderBridge {
   readonly files = new Map<string, { text: string; modifiedMs: number }>();
@@ -73,16 +74,29 @@ export class FakeFolder implements FolderBridge {
     return Promise.resolve(this.#entry(path));
   }
 
-  create(title: string, contents: string) {
-    const stem =
-      title
-        .replace(/[^\p{L}\p{N} _-]+/gu, " ")
-        .replace(/\s+/g, " ")
-        .trim() || "Untitled";
-    let name = `${stem}.md`;
-    for (let n = 2; this.files.has(name); n += 1) name = `${stem} ${String(n)}.md`;
-    this.edit(name, contents);
-    return Promise.resolve(this.#entry(name));
+  /** Whether a file has this name, ignoring case (as macOS and Windows do). */
+  #taken(path: string): string | undefined {
+    return [...this.files.keys()].find((name) => name.toLowerCase() === path.toLowerCase());
+  }
+
+  createAt(path: string, contents: string) {
+    if (this.#taken(path) !== undefined) {
+      return Promise.reject(new FolderError("exists", `${path} already exists`));
+    }
+    this.edit(path, contents);
+    return Promise.resolve(this.#entry(path));
+  }
+
+  rename(from: string, to: string) {
+    const file = this.files.get(from);
+    if (!file) return Promise.reject(new FolderError("not_found", `${from} does not exist`));
+    const taken = this.#taken(to);
+    if (taken !== undefined && taken !== from) {
+      return Promise.reject(new FolderError("exists", `${to} already exists`));
+    }
+    this.files.delete(from);
+    this.files.set(to, file);
+    return Promise.resolve(this.#entry(to));
   }
 
   trash(path: string) {

@@ -4,6 +4,7 @@ import {
   FONT_SCALES,
   type EditingArea,
   type EditorMode,
+  type FileNames,
   type Language,
   type Settings,
   type TagNames,
@@ -73,6 +74,10 @@ function options() {
       { value: "highlighted", label: t("settings.editingArea.highlighted") },
       { value: "plain", label: t("settings.editingArea.plain") },
     ] satisfies Option<EditingArea>[],
+    fileNames: [
+      { value: "kept", label: t("settings.fileNames.kept") },
+      { value: "title", label: t("settings.fileNames.title") },
+    ] satisfies Option<FileNames>[],
     reading: [
       { value: "restore", label: t("settings.reading.restore") },
       { value: "ask", label: t("settings.reading.ask") },
@@ -163,6 +168,17 @@ export function SettingsPage({ settings, onChange, sync, library, store }: Setti
             update("readingPosition", value);
           }}
         />
+        {library?.folder != null && (
+          <Choice
+            legend={t("settings.fileNames")}
+            hint={t("settings.fileNames.hint")}
+            options={choices.fileNames}
+            value={settings.fileNames}
+            onChange={(value) => {
+              update("fileNames", value);
+            }}
+          />
+        )}
       </form>
       {isDesktop() ? <DesktopAbout /> : <OfflineStorage />}
       {library && <LibrarySettings library={library} />}

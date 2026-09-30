@@ -149,6 +149,8 @@ function NoteSession({
         setDeletedElsewhere(false); // Saving brought it back.
       },
       onProblem: setProblem,
+      // The file was renamed after the title: the editing continues under the new id.
+      onRenamed: onAdopt,
       onCreated: (note) => {
         onAdopt(note);
         // Now there is something worth keeping: ask the browser not to evict it.

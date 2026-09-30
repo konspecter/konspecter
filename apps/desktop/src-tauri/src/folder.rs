@@ -38,6 +38,7 @@ pub struct FileContents {
 pub enum FolderError {
     InvalidPath(String),
     NotFound(String),
+    Exists(String),
     TooLarge(String),
     Io(String),
 }
@@ -47,6 +48,7 @@ impl FolderError {
         match self {
             FolderError::InvalidPath(_) => "invalid_path",
             FolderError::NotFound(_) => "not_found",
+            FolderError::Exists(_) => "exists",
             FolderError::TooLarge(_) => "too_large",
             FolderError::Io(_) => "io",
         }
@@ -58,6 +60,7 @@ impl fmt::Display for FolderError {
         match self {
             FolderError::InvalidPath(p) => write!(f, "invalid path {p:?}"),
             FolderError::NotFound(p) => write!(f, "{p} does not exist"),
+            FolderError::Exists(p) => write!(f, "{p} already exists"),
             FolderError::TooLarge(p) => write!(f, "{p} is larger than 5 MB"),
             FolderError::Io(message) => write!(f, "{message}"),
         }
@@ -224,7 +227,8 @@ impl Folder {
     }
 
     /// Creates a new file in the folder's top level named after `title`,
-    /// adding " 2", " 3" … if the name is taken. Never overwrites.
+    /// adding " 2", " 3" … if the name is taken. Never overwrites. Used by
+    /// the folder export; File Mode names its files itself (`create_at`).
     pub fn create(&self, title: &str, contents: &str) -> Result<FileEntry, FolderError> {
         let stem = file_stem_for(title);
         for n in 1..10_000 {
@@ -233,24 +237,63 @@ impl Folder {
             } else {
                 format!("{stem} {n}.md")
             };
-            let path = self.resolve(&name)?;
-            match fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&path)
-            {
-                Ok(mut file) => {
-                    file.write_all(contents.as_bytes())
-                        .map_err(|e| io("create file", e))?;
-                    file.sync_all().map_err(|e| io("create file", e))?;
-                    let meta = fs::metadata(&path).map_err(|e| io("create file", e))?;
-                    return self.entry(&path, &meta);
-                }
-                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
-                Err(e) => return Err(io("create file", e)),
+            match self.create_at(&name, contents) {
+                Err(FolderError::Exists(_)) => continue,
+                result => return result,
             }
         }
         Err(FolderError::Io("could not find a free file name".into()))
+    }
+
+    /// Creates a new file at exactly this path; `Exists` if it is taken.
+    pub fn create_at(&self, relative: &str, contents: &str) -> Result<FileEntry, FolderError> {
+        let path = self.resolve(relative)?;
+        if contents.len() as u64 > MAX_FILE_BYTES {
+            return Err(FolderError::TooLarge(relative.to_string()));
+        }
+        let mut file = match fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+        {
+            Ok(file) => file,
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                return Err(FolderError::Exists(relative.to_string()));
+            }
+            Err(e) => return Err(io("create file", e)),
+        };
+        file.write_all(contents.as_bytes())
+            .map_err(|e| io("create file", e))?;
+        file.sync_all().map_err(|e| io("create file", e))?;
+        let meta = fs::metadata(&path).map_err(|e| io("create file", e))?;
+        self.entry(&path, &meta)
+    }
+
+    /// Renames a file, never over another one (`Exists`). A change of case
+    /// only (`Test.md` → `test.md`) works on case-insensitive disks too.
+    pub fn rename(&self, from: &str, to: &str) -> Result<FileEntry, FolderError> {
+        let source = self.existing(from)?;
+        let target = self.resolve(to)?;
+        // A hard link cannot replace an existing file, so taking the new name
+        // this way is atomic; then the old name goes.
+        match fs::hard_link(&source, &target) {
+            Ok(()) => fs::remove_file(&source).map_err(|e| io("rename file", e))?,
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                if !same_file(&source, &target) {
+                    return Err(FolderError::Exists(to.to_string()));
+                }
+                fs::rename(&source, &target).map_err(|e| io("rename file", e))?;
+            }
+            // Disks without hard links (e.g. FAT): check, then rename.
+            Err(_) => {
+                if target.exists() && !same_file(&source, &target) {
+                    return Err(FolderError::Exists(to.to_string()));
+                }
+                fs::rename(&source, &target).map_err(|e| io("rename file", e))?;
+            }
+        }
+        let meta = fs::metadata(&target).map_err(|e| io("rename file", e))?;
+        self.entry(&target, &meta)
     }
 
     /// Opens the file in the system's default app for Markdown.
@@ -350,6 +393,28 @@ fn modified_ms(meta: &fs::Metadata) -> u64 {
         .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0)
+}
+
+/// Whether two paths name the same file (e.g. differing only in case on a
+/// case-insensitive disk).
+fn same_file(a: &Path, b: &Path) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        match (fs::metadata(a), fs::metadata(b)) {
+            (Ok(a), Ok(b)) => a.dev() == b.dev() && a.ino() == b.ino(),
+            _ => false,
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        match (fs::canonicalize(a), fs::canonicalize(b)) {
+            (Ok(a), Ok(b)) => {
+                a.to_string_lossy().to_lowercase() == b.to_string_lossy().to_lowercase()
+            }
+            _ => false,
+        }
+    }
 }
 
 /// A readable, portable file name for a note title.
@@ -470,6 +535,54 @@ mod tests {
         assert_eq!(b.path, "Java Collections Maps 2.md");
         assert_eq!(untitled.path, "Untitled.md");
         assert_eq!(folder.read(&a.path).unwrap().text, "a");
+    }
+
+    #[test]
+    fn creates_files_at_exact_paths_only_when_free() {
+        let (_dir, folder) = folder();
+        fs::create_dir(folder.root().join("sub")).unwrap();
+        let entry = folder.create_at("sub/hello-mir.md", "a").unwrap();
+        assert_eq!(entry.path, "sub/hello-mir.md");
+        assert_eq!(
+            folder.create_at("sub/hello-mir.md", "b"),
+            Err(FolderError::Exists("sub/hello-mir.md".into()))
+        );
+        assert_eq!(folder.read("sub/hello-mir.md").unwrap().text, "a");
+    }
+
+    #[test]
+    fn renames_without_overwriting() {
+        let (_dir, folder) = folder();
+        folder.write("test.md", "mine").unwrap();
+        folder.write("taken.md", "other").unwrap();
+
+        assert_eq!(
+            folder.rename("test.md", "taken.md"),
+            Err(FolderError::Exists("taken.md".into()))
+        );
+        assert_eq!(folder.read("taken.md").unwrap().text, "other");
+
+        let moved = folder.rename("test.md", "hello-mir.md").unwrap();
+        assert_eq!(moved.path, "hello-mir.md");
+        assert_eq!(folder.read("hello-mir.md").unwrap().text, "mine");
+        assert!(matches!(
+            folder.read("test.md"),
+            Err(FolderError::NotFound(_))
+        ));
+        assert!(matches!(
+            folder.rename("missing.md", "x.md"),
+            Err(FolderError::NotFound(_))
+        ));
+    }
+
+    #[test]
+    fn renames_a_change_of_case() {
+        let (_dir, folder) = folder();
+        folder.write("Test.md", "mine").unwrap();
+        let moved = folder.rename("Test.md", "test.md").unwrap();
+        assert_eq!(moved.path, "test.md");
+        let names: Vec<String> = folder.list().unwrap().into_iter().map(|e| e.path).collect();
+        assert_eq!(names, ["test.md"]);
     }
 
     #[test]

@@ -8,11 +8,15 @@ import { FakeFolder } from "./fake-folder";
 import { FolderStore } from "./folder-store";
 
 let databaseCount = 0;
-async function setup() {
+async function setup({ followTitles = false } = {}) {
   databaseCount += 1;
   const library = await openNoteStore(`folder-test-${String(databaseCount)}`);
   const folder = new FakeFolder();
-  return { folder, library, store: new FolderStore(folder, library, { graceMs: 5 }) };
+  return {
+    folder,
+    library,
+    store: new FolderStore(folder, library, { graceMs: 5, followTitles }),
+  };
 }
 
 const now = new Date("2026-09-28T10:00:00Z");
@@ -44,16 +48,34 @@ describe("FolderStore", () => {
     ]);
   });
 
-  it("creates files named after the title", async () => {
+  it("creates files named after the title's slug", async () => {
     const { folder, store } = await setup();
+    folder.edit("Hello-Mir-2.md", "someone else's");
 
-    const first = await store.create("# Hash maps\n\nBuckets.", now);
-    const second = await store.create("# Hash maps\n\nAgain.", now);
+    const first = await store.create("# Hello мир!\n\nBuckets.", now);
+    const second = await store.create("# Hello мир!\n\nAgain.", now);
+    const untitled = await store.create("\n\n", now);
 
-    expect([first.id, second.id]).toEqual(["Hash maps.md", "Hash maps 2.md"]);
-    expect(parseDocument(folder.files.get("Hash maps.md")?.text ?? "").body).toBe(
-      "# Hash maps\n\nBuckets.",
+    // "Hello-Mir-2.md" takes "hello-mir-2.md" too: file names ignore case.
+    expect([first.id, second.id, untitled.id]).toEqual([
+      "hello-mir.md",
+      "hello-mir-3.md",
+      "untitled.md",
+    ]);
+    expect(parseDocument(folder.files.get("hello-mir.md")?.text ?? "").body).toBe(
+      "# Hello мир!\n\nBuckets.",
     );
+  });
+
+  it("does not create over a file it has not seen yet", async () => {
+    const { folder, store } = await setup();
+    await store.list();
+    folder.edit("maps.md", "written by another program, not reported yet");
+
+    const note = await store.create("# Maps", now);
+
+    expect(note.id).toBe("maps-2.md");
+    expect(folder.files.get("maps.md")?.text).toBe("written by another program, not reported yet");
   });
 
   it("writes edits back to the file", async () => {
@@ -101,9 +123,94 @@ describe("FolderStore", () => {
 
     await store.create("# New\n\nhashmap #go", now);
     expect((await store.search(parseQuery("hashmap #go"))).map((hit) => hit.id).sort()).toEqual([
-      "New.md",
       "b.md",
+      "new.md",
     ]);
+  });
+
+  describe("with files following their titles", () => {
+    it("renames a file whose title changed, in its folder", async () => {
+      const { folder, store } = await setup({ followTitles: true });
+      folder.edit("sub/test.md", "# Test");
+      const changes: string[] = [];
+      store.onChange((change) => {
+        changes.push(`${change.previousId ?? ""}→${change.noteId}`);
+      });
+      await store.saveReadingPosition("sub/test.md", 0.3);
+
+      const saved = await store.put(
+        updateNote(await mustGet(store, "sub/test.md"), "# Hello мир!", now),
+      );
+
+      expect(saved.id).toBe("sub/hello-mir.md");
+      expect([...folder.files.keys()]).toEqual(["sub/hello-mir.md"]);
+      expect(folder.files.get("sub/hello-mir.md")?.text).toContain("# Hello мир!");
+      expect((await store.list()).map((note) => note.id)).toEqual(["sub/hello-mir.md"]);
+      expect((await store.search(parseQuery("мир"))).map((hit) => hit.id)).toEqual([
+        "sub/hello-mir.md",
+      ]);
+      expect((await store.readingState("sub/hello-mir.md"))?.position).toBe(0.3);
+      expect(changes).toEqual(["sub/test.md→sub/hello-mir.md"]);
+    });
+
+    it("keeps names that fit the title, and only changes case when that is all", async () => {
+      const { folder, store } = await setup({ followTitles: true });
+      folder.edit("hello-mir-2.md", "# Hello мир!");
+      folder.edit("Maps.md", "# Maps");
+
+      const kept = await store.put(
+        updateNote(await mustGet(store, "hello-mir-2.md"), "# Hello мир!\n\nMore", now),
+      );
+      const cased = await store.put(
+        updateNote(await mustGet(store, "Maps.md"), "# Maps\n\nMore", now),
+      );
+
+      expect([kept.id, cased.id]).toEqual(["hello-mir-2.md", "maps.md"]);
+      expect([...folder.files.keys()].sort()).toEqual(["hello-mir-2.md", "maps.md"]);
+    });
+
+    it("never renames over another file", async () => {
+      const { folder, store } = await setup({ followTitles: true });
+      folder.edit("go.md", "# Go");
+      folder.edit("draft.md", "# Draft");
+      await store.list();
+      folder.edit("go-2.md", "not reported yet");
+
+      const saved = await store.put(updateNote(await mustGet(store, "draft.md"), "# Go", now));
+
+      expect(saved.id).toBe("go-3.md");
+      expect(folder.files.get("go.md")?.text).toBe("# Go");
+      expect(folder.files.get("go-2.md")?.text).toBe("not reported yet");
+    });
+
+    it("keeps names when the setting is off", async () => {
+      const { folder, store } = await setup();
+      folder.edit("test.md", "# Test");
+
+      const saved = await store.put(updateNote(await mustGet(store, "test.md"), "# Hello", now));
+      expect(saved.id).toBe("test.md");
+
+      store.followTitles(true);
+      const renamed = await store.put(updateNote(saved, "# Hello\n\nagain", now));
+      expect(renamed.id).toBe("hello.md");
+      expect([...folder.files.keys()]).toEqual(["hello.md"]);
+    });
+
+    it("ignores its own rename coming back from the watcher", async () => {
+      const { folder, store } = await setup({ followTitles: true });
+      folder.edit("test.md", "# Test");
+      await store.watch();
+      const changes: string[] = [];
+      store.onChange((change) => {
+        changes.push(`${change.source}:${change.noteId}`);
+      });
+
+      await store.put(updateNote(await mustGet(store, "test.md"), "# Renamed", now));
+      folder.notify({ paths: ["test.md", "renamed.md"], rescan: false });
+      await new Promise((resolve) => setTimeout(resolve, 25));
+
+      expect(changes).toEqual(["local:renamed.md"]);
+    });
   });
 
   it("keeps reading positions in the app database, not the files", async () => {

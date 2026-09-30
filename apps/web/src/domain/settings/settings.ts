@@ -6,6 +6,12 @@ export type EditorMode = "text" | "markdown";
 export type TagNames = "capitalized" | "as-written";
 /** Whether the editing area has its own surface (a slightly darker panel). */
 export type EditingArea = "highlighted" | "plain";
+/**
+ * File Mode: whether a file is renamed when its note's title changes ("title":
+ * "test.md" titled "Hello мир!" becomes "hello-mir.md") or keeps its name.
+ * New files are named after their titles either way.
+ */
+export type FileNames = "kept" | "title";
 /** The interface language: the system's (the default) or a chosen one. */
 export type Language = "system" | "en" | "ru";
 
@@ -18,6 +24,7 @@ export type Settings = {
   readonly tagNames: TagNames;
   readonly editingArea: EditingArea;
   readonly language: Language;
+  readonly fileNames: FileNames;
 };
 
 export const FONT_SCALES = [0.9, 1, 1.15, 1.3] as const;
@@ -30,6 +37,7 @@ export const DEFAULT_SETTINGS: Settings = {
   tagNames: "capitalized",
   editingArea: "highlighted",
   language: "system",
+  fileNames: "kept",
 };
 
 function oneOf<T extends string | number>(value: unknown, options: readonly T[], fallback: T): T {
@@ -59,5 +67,6 @@ export function parseSettings(value: unknown): Settings {
     tagNames: oneOf(record.tagNames, ["capitalized", "as-written"], DEFAULT_SETTINGS.tagNames),
     editingArea: oneOf(record.editingArea, ["highlighted", "plain"], DEFAULT_SETTINGS.editingArea),
     language: oneOf(record.language, ["system", "en", "ru"], DEFAULT_SETTINGS.language),
+    fileNames: oneOf(record.fileNames, ["kept", "title"], DEFAULT_SETTINGS.fileNames),
   };
 }

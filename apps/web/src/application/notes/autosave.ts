@@ -6,6 +6,8 @@ export type AutosaveEvents = {
   /** A new note's first save stored it: the editing continues under its id. */
   onCreated?: (note: Note) => void;
   onSaved?: (note: Note) => void;
+  /** A save gave the note a new id (File Mode: the file was renamed after its title). */
+  onRenamed?: (note: Note) => void;
   /** A save failed or the text is not a valid document; `null` once a save succeeds. */
   onProblem?: (problem: unknown) => void;
   /** True from the first unsaved change until it is written. */
@@ -160,7 +162,7 @@ export class Autosave {
 
   /**
    * The editor is gone (the user moved on): pending text is still saved, but
-   * onCreated, onSaved and onProblem are no longer called. `attach` undoes it.
+   * onCreated, onRenamed, onSaved and onProblem are no longer called. `attach` undoes it.
    */
   detach(): void {
     this.#attached = false;
@@ -223,9 +225,9 @@ export class Autosave {
       if (this.#attached) this.#events.onCreated?.(note);
       return;
     }
-    const next = updateNote(base, markdown, now);
-    await this.#store.put(next);
-    this.#adopt(next, markdown);
+    const stored = await this.#store.put(updateNote(base, markdown, now));
+    this.#adopt(stored, markdown);
+    if (stored.id !== base.id && this.#attached) this.#events.onRenamed?.(stored);
   }
 
   #adopt(note: Note, markdown: string): void {

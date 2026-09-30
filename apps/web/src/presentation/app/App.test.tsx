@@ -1468,9 +1468,9 @@ describe("sync", () => {
 });
 
 describe("file mode", () => {
-  async function folderApp(path = "/") {
+  async function folderApp(path = "/", { followTitles = false } = {}) {
     const folder = new FakeFolder();
-    const store = new FolderStore(folder, await newStore(), { graceMs: 5 });
+    const store = new FolderStore(folder, await newStore(), { graceMs: 5, followTitles });
     return {
       folder,
       store,
@@ -1502,7 +1502,7 @@ describe("file mode", () => {
 
     await userEvent.type(await textEditor(), "# Fresh idea{Enter}Body");
     await waitFor(() => {
-      expect(folder.files.has("Fresh idea.md")).toBe(true);
+      expect(folder.files.has("fresh-idea.md")).toBe(true);
     });
 
     await userEvent.click(await screen.findByRole("button", { name: "Delete" }));
@@ -1512,7 +1512,7 @@ describe("file mode", () => {
     expect(
       await screen.findByRole("heading", { name: "Welcome to Konspecter" }),
     ).toBeInTheDocument();
-    expect(folder.trashed).toEqual(["Fresh idea.md"]);
+    expect(folder.trashed).toEqual(["fresh-idea.md"]);
   });
 
   it("updates the list and the open note when files change on disk", async () => {
@@ -1546,6 +1546,43 @@ describe("file mode", () => {
       expect(link).toHaveAttribute("aria-current", "page");
     });
     expect(await textEditor()).toHaveTextContent("Moving");
+  });
+
+  it("renames the open note's file after its title, and the editing goes on", async () => {
+    const { folder, render: show } = await folderApp("/notes/test.md", { followTitles: true });
+    folder.edit("test.md", "# Test\n\nBody");
+    show();
+
+    const editor = await markdownEditor();
+    setSourceValue(editor, "# Hello мир!\n\nBody");
+    await waitFor(() => {
+      expect([...folder.files.keys()]).toEqual(["hello-mir.md"]);
+    });
+    await waitFor(() => {
+      const link = within(recentNav()).getByRole("link", { name: "Hello мир!" });
+      expect(link).toHaveAttribute("href", "/notes/hello-mir.md");
+      expect(link).toHaveAttribute("aria-current", "page");
+    });
+
+    // The same editor keeps saving, now to the renamed file.
+    expect(editor).toBeInTheDocument();
+    setSourceValue(editor, "# Hello мир!\n\nMore");
+    await waitFor(() => {
+      expect(folder.files.get("hello-mir.md")?.text).toContain("More");
+    });
+    expect([...folder.files.keys()]).toEqual(["hello-mir.md"]);
+  });
+
+  it("keeps file names when titles change, unless the setting says otherwise", async () => {
+    const { folder, render: show } = await folderApp("/notes/test.md");
+    folder.edit("test.md", "# Test");
+    show();
+
+    setSourceValue(await markdownEditor(), "# Hello мир!");
+    await waitFor(() => {
+      expect(folder.files.get("test.md")?.text).toContain("Hello мир!");
+    });
+    expect([...folder.files.keys()]).toEqual(["test.md"]);
   });
 
   it("opens a note in the external editor", async () => {
@@ -1621,6 +1658,16 @@ describe("file mode", () => {
     );
 
     expect(screen.getByText("/Users/ada/Notes")).toBeInTheDocument();
+    const fileNames = screen.getByRole("group", { name: "File names" });
+    expect(
+      within(fileNames).getByRole("radio", { name: "Keep the name when the title changes" }),
+    ).toBeChecked();
+    await userEvent.click(
+      within(fileNames).getByRole("radio", { name: "Rename the file after the title" }),
+    );
+    expect(
+      within(fileNames).getByRole("radio", { name: "Rename the file after the title" }),
+    ).toBeChecked();
     expect(screen.getByText(/Sync applies to the app library/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Import into the app library" }));
     expect(

@@ -72,6 +72,30 @@ file saved in Vim ─→ Rust watcher (notify, 300 ms debounce) ─→ event "fo
   follows it to the new id.
 - **Write-back:** saving writes the file atomically. If the file changed on disk since it was
   read, the write is refused rather than overwriting the other program's version.
+- **Own renames:** paths the app is renaming are left out of watcher batches while the
+  rename runs, and afterwards the cache already has the new path, so the app's own renames
+  emit nothing extra.
+
+## File names
+
+A file's name is the **slug** of its note's title (`domain/note/file-name.ts`, `slugFor`):
+lower case, Cyrillic transliterated, accents dropped from Latin letters, everything that
+is not a letter or digit collapsed into `-`, at most 80 characters, `untitled` when nothing
+is left. "Hello мир!" is `hello-mir.md`. Letters of other scripts are kept as they are.
+
+- **New notes** always get the slug name, in the folder's top level. A taken name gets a
+  number: `hello-mir-2.md`, `hello-mir-3.md` … Names compare ignoring case, as on macOS and
+  Windows disks.
+- **Title changes** (Settings → **File names**, File Mode only; off by default): when on, a
+  save whose title no longer fits the file name renames the file, in its own folder.
+  `test.md` titled "Hello мир!" becomes `hello-mir.md`. A name that fits already is kept,
+  numbered ones too (`hello-mir-2.md`), and `Maps.md` becomes `maps.md` by a change of case
+  only. Files that are never saved from the app keep whatever names they have.
+- A rename never replaces another file: `folder_rename` fails with `exists` for a name taken
+  by a file the app has not seen yet, and the next number is tried. `put` returns the note
+  under its new id and emits a change with `previousId`. The open note's autosave
+  (`onRenamed`) moves the editing session to the new id with the caret and the undo history
+  intact, and the reading position moves with it.
 - **Live pages:** the note list, the sidebar (recent notes, tags), search results and the
   open note follow changes, keeping the current content visible meanwhile. The same mechanism
   shows notes that arrive by sync. The editor reloads a changed note only while nothing is
@@ -114,7 +138,8 @@ Konspecter  ⇄  ~/Notes/java.md  ⇄  VS Code / Vim / Neovim / …
 | `folder_list`                    | every `.md` file, recursively, sorted by path                                                                         |
 | `folder_read`                    | a file's text and entry (path, modification time, size)                                                               |
 | `folder_write`                   | atomic write (temporary file + rename); refuses with `changed_on_disk` if the file changed since `expectedModifiedMs` |
-| `folder_create`                  | a new top-level file named after the title (`Title.md`, `Title 2.md` …), never overwriting                            |
+| `folder_create_at`               | a new file at exactly the given path; `exists` if it is taken (never overwrites)                                      |
+| `folder_rename`                  | renames a file, never over another one (`exists`); a change of case only works on case-insensitive disks too          |
 | `folder_trash`                   | moves the file to the system trash                                                                                    |
 
 ### Safety
@@ -132,8 +157,11 @@ Konspecter  ⇄  ~/Notes/java.md  ⇄  VS Code / Vim / Neovim / …
 ## Tests
 
 - Rust unit tests (`folder.rs`) on temporary folders: path validation, symlink escape,
-  recursive listing, atomic write, the changed-on-disk refusal, unique names, invalid
+  recursive listing, atomic write, the changed-on-disk refusal, unique names, exact-path
+  creation and renames that never overwrite (a change of case included), invalid
   UTF-8, size limits, watcher path classification, and a real watcher seeing an external write.
 - `FakeFolder` (TypeScript) mirrors those rules for `FolderStore`, import, and app-level tests:
   listing, editing, creating, trashing, tags, search, reading positions, external edits,
-  deletions, renames, rescans, ignoring its own writes, and live pages.
+  deletions, renames, rescans, ignoring its own writes, and live pages. File names ignore
+  case there, as on macOS. Slug names and renames after the title are covered in
+  `folder-store.test.ts` and in the app tests (the open note keeps its editor).

@@ -1,5 +1,6 @@
 import type { NoteChange, NoteRepository } from "../../application/notes/note-repository";
 import { documentTitle, parseDocument } from "../../domain/document/document";
+import { slugFileNames, slugFor, stemFitsSlug } from "../../domain/note/file-name";
 import { createNote, type Note } from "../../domain/note/note";
 import type { EditorSelection, ReadingState } from "../../domain/reading/reading";
 import type { SearchQuery } from "../../domain/search/query";
@@ -40,17 +41,36 @@ export class FolderStore implements NoteRepository {
   #loaded: Promise<void> | null = null;
   #search: SearchIndex | null = null;
   readonly #listeners = new Set<(change: NoteChange) => void>();
+  /** Paths being renamed by this app: the watcher's reports of them are its own. */
+  readonly #moving = new Set<string>();
 
   readonly #graceMs: number;
+  #followTitles: boolean;
 
   /**
    * @param graceMs how long a vanished file gets to reappear before it counts
    *   as deleted (editors that save by deleting and recreating the file)
+   * @param followTitles whether a save renames the file after the note's
+   *   title (see `followTitles`)
    */
-  constructor(folder: FolderBridge, reading: ReadingStateStore, { graceMs = 150 } = {}) {
+  constructor(
+    folder: FolderBridge,
+    reading: ReadingStateStore,
+    { graceMs = 150, followTitles = false } = {},
+  ) {
     this.#folder = folder;
     this.#reading = reading;
     this.#graceMs = graceMs;
+    this.#followTitles = followTitles;
+  }
+
+  /**
+   * The "file names" setting: when on, saving a note whose title no longer
+   * matches its file name renames the file ("test.md" titled "Hello мир!"
+   * becomes "hello-mir.md"). New files are named after their titles either way.
+   */
+  followTitles(follow: boolean): void {
+    this.#followTitles = follow;
   }
 
   /** Reads every file again and reports what changed. */
@@ -86,8 +106,9 @@ export class FolderStore implements NoteRepository {
    * disappeared while one with the same content appeared is a rename: its
    * reading position moves and listeners learn the previous id.
    */
-  async #apply(paths: readonly string[]): Promise<void> {
+  async #apply(reported: readonly string[]): Promise<void> {
     await this.#ensureLoaded();
+    const paths = reported.filter((path) => !this.#moving.has(path));
     const reads = await Promise.all(paths.map((path) => this.#readIfPresent(path)));
     const removed: string[] = [];
     const added: FileContents[] = [];
@@ -121,14 +142,7 @@ export class FolderStore implements NoteRepository {
       this.#search?.remove(path);
     }
     for (const file of [...added, ...changed]) this.#remember(file.entry, file.text);
-    for (const [newPath, oldPath] of renames) {
-      const state = await this.#reading.readingState(readingKey(oldPath));
-      if (!state) continue;
-      await this.#reading.saveReadingPosition(readingKey(newPath), state.position);
-      if (state.selection) {
-        await this.#reading.saveEditorSelection(readingKey(newPath), state.selection);
-      }
-    }
+    for (const [newPath, oldPath] of renames) await this.#moveReadingState(oldPath, newPath);
 
     const renamedFrom = new Set(renames.values());
     for (const path of removed) {
@@ -141,6 +155,15 @@ export class FolderStore implements NoteRepository {
         source: "remote",
         ...(previousId === undefined ? {} : { previousId }),
       });
+    }
+  }
+
+  async #moveReadingState(oldPath: string, newPath: string): Promise<void> {
+    const state = await this.#reading.readingState(readingKey(oldPath));
+    if (!state) return;
+    await this.#reading.saveReadingPosition(readingKey(newPath), state.position);
+    if (state.selection) {
+      await this.#reading.saveEditorSelection(readingKey(newPath), state.selection);
     }
   }
 
@@ -208,26 +231,91 @@ export class FolderStore implements NoteRepository {
     return file && toNote(id, file.markdown, file.modifiedMs);
   }
 
-  /** Creates a new file named after the note's title. */
+  /** Creates a new file in the folder's top level, named after the note's title. */
   async create(markdown: string, now: Date): Promise<Note> {
     await this.#ensureLoaded();
     const note = createNote(markdown, now);
-    const title = documentTitle(parseDocument(note.markdown));
-    const entry = await this.#folder.create(title, note.markdown);
+    const entry = await this.#claimName("", slugFor(titleOf(note.markdown)), null, (path) =>
+      this.#folder.createAt(path, note.markdown),
+    );
     const created = this.#remember(entry, note.markdown);
+    this.#moving.delete(entry.path);
     this.#emit({ noteId: entry.path, source: "local" });
     return created;
   }
 
   /**
    * Writes the file, over whatever another program wrote meanwhile: the last
-   * write wins. A file deleted meanwhile is written again.
+   * write wins. A file deleted meanwhile is written again. When files follow
+   * their titles, a file whose name no longer fits the title is then renamed:
+   * the note returned has the new id.
    */
-  async put(note: Note): Promise<void> {
+  async put(note: Note): Promise<Note> {
     await this.#ensureLoaded();
     const entry = await this.#folder.write(note.id, note.markdown);
-    this.#remember(entry, note.markdown);
-    this.#emit({ noteId: note.id, source: "local" });
+    const written = this.#remember(entry, note.markdown);
+    const renamed = this.#followTitles ? await this.#renameAfterTitle(note.id) : null;
+    this.#emit({
+      noteId: renamed?.id ?? note.id,
+      source: "local",
+      ...(renamed ? { previousId: note.id } : {}),
+    });
+    return renamed ?? written;
+  }
+
+  /** Renames the file to its title's slug, in its folder, unless its name fits already. */
+  async #renameAfterTitle(path: string): Promise<Note | null> {
+    const file = this.#files.get(path);
+    if (!file) return null;
+    const slug = slugFor(titleOf(file.markdown));
+    const slash = path.lastIndexOf("/") + 1;
+    if (stemFitsSlug(path.slice(slash).replace(/\.md$/i, ""), slug)) return null;
+    this.#moving.add(path);
+    try {
+      const entry = await this.#claimName(path.slice(0, slash), slug, path, (target) =>
+        this.#folder.rename(path, target),
+      );
+      this.#files.delete(path);
+      this.#search?.remove(path);
+      const renamed = this.#remember(entry, file.markdown);
+      this.#moving.delete(entry.path);
+      await this.#moveReadingState(path, entry.path);
+      return renamed;
+    } finally {
+      this.#moving.delete(path);
+    }
+  }
+
+  /**
+   * Takes the first free name for a slug in `dir` ("slug.md", "slug-2.md" …):
+   * names of known files are skipped (ignoring case, as macOS and Windows
+   * do, except the file's own name: `current`), and `take` fails with
+   * "exists" for a file this store does not know yet. The name taken stays
+   * in `#moving` until the caller has remembered the file.
+   */
+  async #claimName(
+    dir: string,
+    slug: string,
+    current: string | null,
+    take: (path: string) => Promise<FileEntry>,
+  ): Promise<FileEntry> {
+    const own = current?.toLowerCase();
+    const known = new Set([...this.#files.keys()].map((path) => path.toLowerCase()));
+    let tries = 0;
+    for (const name of slugFileNames(dir, slug)) {
+      const lower = name.toLowerCase();
+      if (known.has(lower) && lower !== own) continue;
+      this.#moving.add(name);
+      try {
+        return await take(name);
+      } catch (error) {
+        this.#moving.delete(name);
+        if (!(error instanceof FolderError && error.code === "exists") || (tries += 1) > 100) {
+          throw error;
+        }
+      }
+    }
+    throw new FolderError("exists", `No free file name for ${slug}`);
   }
 
   /** Moves the file to the system trash. */
@@ -271,6 +359,10 @@ export class FolderStore implements NoteRepository {
     this.#listeners.add(listener);
     return () => this.#listeners.delete(listener);
   }
+}
+
+function titleOf(markdown: string): string {
+  return documentTitle(parseDocument(markdown));
 }
 
 function toNote(path: string, markdown: string, modifiedMs: number): Note {

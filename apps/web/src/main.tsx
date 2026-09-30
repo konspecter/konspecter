@@ -74,7 +74,9 @@ try {
   // On the desktop the library can be a folder of Markdown files (File Mode),
   // a separate backend; the app library (IndexedDB, synced) is the default.
   const folder = isDesktop() ? await currentFolder() : null;
-  const folderStore = folder ? new FolderStore(folderBridge, store) : null;
+  const folderStore = folder
+    ? new FolderStore(folderBridge, store, { followTitles: settings.fileNames === "title" })
+    : null;
   const repository: NoteRepository = folderStore ?? store;
   // Follow changes other programs make to the files.
   void folderStore?.watch();
@@ -108,7 +110,10 @@ try {
         <App
           store={repository}
           initialSettings={settings}
-          saveSettings={(next) => store.saveSettings(next)}
+          saveSettings={(next) => {
+            folderStore?.followTitles(next.fileNames === "title");
+            return store.saveSettings(next);
+          }}
           library={library}
           updates={updates}
           sync={folder ? undefined : sync}

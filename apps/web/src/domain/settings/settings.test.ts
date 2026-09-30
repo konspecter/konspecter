@@ -10,12 +10,18 @@ describe("parseSettings", () => {
       tagNames: "as-written",
       editingArea: "plain",
       language: "ru",
+      fileNames: "title",
     };
     expect(parseSettings(settings)).toEqual(settings);
   });
 
   it("names tags with a capital letter and highlights the editing area by default", () => {
     expect(DEFAULT_SETTINGS).toMatchObject({ tagNames: "capitalized", editingArea: "highlighted" });
+  });
+
+  it("keeps file names when titles change by default", () => {
+    expect(DEFAULT_SETTINGS.fileNames).toBe("kept");
+    expect(parseSettings({ fileNames: "slug" }).fileNames).toBe("kept");
   });
 
   it("follows the system's language by default, and ignores languages it does not speak", () => {

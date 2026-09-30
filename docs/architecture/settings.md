@@ -12,6 +12,7 @@ apply and are saved immediately.
 | Reading position | restore, ask, off (see [reading](reading.md))       | restore              |
 | Editing area     | Highlighted, Plain (see [editors](editors.md))      | Highlighted          |
 | Tag names        | Capital first letter, As written in notes           | Capital first letter |
+| File names       | Keep when the title changes, Rename after the title | Keep                 |
 
 ## Storage
 
@@ -41,5 +42,9 @@ are not synced. A separate strategy can be added with sync if needed.
   for "System", else the chosen one. `main.tsx` applies the saved choice before the first
   render; a change applies at once, without a reload (`App` renders its routes again, keyed
   by the language). Language names are shown in their own language.
+
+- **File names** (shown only while a Markdown folder is open): `main.tsx` passes it to
+  `FolderStore.followTitles`, at start and on every change. See
+  [File Mode](filesystem-mode.md#file-names).
 
 If saving fails, the change still applies for the session and the page says so.

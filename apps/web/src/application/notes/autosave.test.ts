@@ -145,7 +145,7 @@ describe("savesSettled", () => {
       await new Promise<void>((resolve) => {
         release = resolve;
       });
-      await put(next);
+      return put(next);
     });
     const autosave = new Autosave(store, note, events());
 

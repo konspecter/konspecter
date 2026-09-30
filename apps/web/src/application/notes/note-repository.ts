@@ -34,8 +34,11 @@ export interface NoteRepository {
   get(id: string): Promise<Note | undefined>;
   /** Stores a new note; the backend chooses its id (a UUID, or a file name). */
   create(markdown: string, now: Date): Promise<Note>;
-  /** Saves an existing note. */
-  put(note: Note): Promise<void>;
+  /**
+   * Saves an existing note and returns it as stored. Its id can change: in
+   * File Mode a file that follows its title is renamed.
+   */
+  put(note: Note): Promise<Note>;
   delete(id: string): Promise<void>;
   tags(): Promise<TagCount[]>;
   notesWithTag(tag: Tag): Promise<Note[]>;

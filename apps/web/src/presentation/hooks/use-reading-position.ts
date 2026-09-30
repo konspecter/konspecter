@@ -36,13 +36,18 @@ type Options = {
  */
 export function useReadingPosition({ store, noteId, mode, ready, saveDelay = 400 }: Options) {
   const [offer, setOffer] = useState<{ noteId: string; position: number } | null>(null);
+  // Once per editing session: a note that gets a new id while open (its file
+  // renamed after the title) stays where it is.
+  const restored = useRef(false);
 
   useEffect(() => {
-    if (!ready || mode === "off") return;
+    if (!ready || mode === "off" || restored.current) return;
     let current = true;
     store.readingState(noteId).then(
       (state) => {
-        if (!current || !state || state.position === 0) return;
+        if (!current) return;
+        restored.current = true;
+        if (!state || state.position === 0) return;
         if (mode === "restore") {
           scrollTo(state.position);
         } else {

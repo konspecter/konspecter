@@ -240,6 +240,11 @@ Map<String, Integer> counts = new HashMap<>();
   "settings.reading.restore": "Продолжать с того места, где остановился",
   "settings.reading.ask": "Спрашивать перед переходом",
   "settings.reading.off": "Всегда начинать сначала",
+  "settings.fileNames": "Имена файлов",
+  "settings.fileNames.hint":
+    "Файлы новых конспектов называются по заголовку, например hello-mir.md для «Hello мир!».",
+  "settings.fileNames.kept": "Оставлять имя при смене заголовка",
+  "settings.fileNames.title": "Переименовывать файл по заголовку",
   "settings.saveFailed": "Не удалось сохранить настройки: {error} Они действуют до перезагрузки.",
   "settings.shortcuts": "Сочетания клавиш",
   "settings.storage": "Хранение без сети",

@@ -239,12 +239,21 @@ fn folder_write(
 }
 
 #[tauri::command]
-fn folder_create(
+fn folder_create_at(
     state: State<'_, FolderState>,
-    title: String,
+    path: String,
     contents: String,
 ) -> Result<FileEntry, CommandError> {
-    state.with(|f| f.create(&title, &contents))
+    state.with(|f| f.create_at(&path, &contents))
+}
+
+#[tauri::command]
+fn folder_rename(
+    state: State<'_, FolderState>,
+    from: String,
+    to: String,
+) -> Result<FileEntry, CommandError> {
+    state.with(|f| f.rename(&from, &to))
 }
 
 #[tauri::command]
@@ -378,7 +387,8 @@ pub fn run() {
             folder_list,
             folder_read,
             folder_write,
-            folder_create,
+            folder_create_at,
+            folder_rename,
             folder_trash,
             folder_open_external,
             folder_reveal,
