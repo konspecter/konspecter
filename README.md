@@ -62,6 +62,28 @@ pnpm --filter @konspecter/desktop dev       # desktop app
 pnpm --filter @konspecter/mobile android:debug
 ```
 
+### Debugging on Android
+
+Needs JDK 21 (`brew install openjdk@21`), the Android SDK (`ANDROID_HOME`, `adb` on the
+`PATH`), and a phone with USB debugging on (Settings → Developer options) or an emulator.
+
+```sh
+adb devices                                     # the phone or emulator must be listed
+pnpm --filter @konspecter/mobile android:debug  # build the web app, sync it, build the debug APK
+adb install -r apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+adb shell am start -n app.konspecter.mobile/.MainActivity
+```
+
+- **Inspect the web view:** open `chrome://inspect` in desktop Chrome, find Konspecter under
+  the device and press _inspect_: DevTools with the console, elements and network. Debug builds
+  allow it; release builds do not.
+- **Logs:** `adb logcat -s Capacitor/Console` shows the app's console, including the real
+  errors behind "Oops, something went wrong."
+- **Android Studio:** `pnpm --filter @konspecter/mobile android:open` opens the project there,
+  to run it on a device and debug the native side.
+- After changing the web app, run `android:debug` and install again: the APK carries its own
+  copy of the web build.
+
 ## Documentation
 
 - [Architecture overview](docs/architecture/overview.md) and [decisions](docs/architecture/decisions/)
