@@ -43,6 +43,51 @@ describe("text editor quotes", () => {
   });
 });
 
+describe("paired characters in the text editor", () => {
+  /** Selects [from, to] and types `key`, the system inserting `inserted`. */
+  const typeOver = (markdown: string, from: number, to: number, key: string, inserted = key) => {
+    const { view } = editorWith(markdown);
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, from, to)));
+    view.someProp("handleKeyDown", (handle) => handle(view, new KeyboardEvent("keydown", { key })));
+    const handled = view.someProp("handleTextInput", (handle) =>
+      handle(view, from, to, inserted, () => view.state.tr.insertText(inserted, from, to)),
+    );
+    const { selection, doc } = view.state;
+    return {
+      handled: handled ?? false,
+      markdown: textDocToMarkdown(doc),
+      selected: doc.textBetween(selection.from, selection.to),
+    };
+  };
+
+  it.each([
+    ["(", "(", "a (word) here"],
+    ['"', '"', 'a "word" here'],
+    ["'", "'", "a 'word' here"],
+    ['"', "«", "a «word» here"],
+    ['"', "“", "a “word” here"],
+  ])(
+    "wraps the selection in %s (the system typing %s), keeping it selected",
+    (key, inserted, markdown) => {
+      expect(typeOver("a word here", 3, 7, key, inserted)).toEqual({
+        handled: true,
+        markdown,
+        selected: "word",
+      });
+    },
+  );
+
+  it("wraps in straight quotes in code", () => {
+    expect(typeOver("`word`", 1, 5, '"', "«").markdown).toBe('`"word"`');
+  });
+
+  it("replaces the selection with other characters, and closes nothing without one", () => {
+    expect(typeOver("a word here", 3, 7, "*").handled).toBe(false);
+    expect(typeOver("a word here", 3, 7, "[").handled).toBe(false);
+    expect(typeOver("a word here", 3, 3, "(").handled).toBe(false);
+  });
+});
+
 describe("tag highlighting", () => {
   const ranges = (set: DecorationSet) => set.find().map(({ from, to }) => [from, to]);
   const shown = (state: EditorState) =>

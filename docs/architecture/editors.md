@@ -48,6 +48,11 @@ with a contextual formatting toolbar and Markdown-style shortcuts.
 - **Quotes in code:** a typographic quote the system puts in for a typed `"` or `'` (macOS
   smart quotes, «» in Russian) is replaced by the straight quote in code blocks and inline
   code; text keeps the system's choice.
+- **Paired characters:** typing `(` or a quote (`"`, `'`, or the system's `«»`, `“”`, `‘’`)
+  over a selection wraps it instead of replacing it, and the text stays selected. Other
+  characters replace the selection as usual; Markdown mode wraps in more pairs. The
+  selection is read from the page at the key press, since a selection just made with the
+  keyboard can reach ProseMirror only after the typed text.
 - **Markdown generation:** the ProseMirror document uses `prosemirror-markdown`'s CommonMark
   schema, so every editor state maps to Markdown and back. The serializer writes the body,
   except that `_` between letters or digits of any script is written as it is (the library
@@ -88,8 +93,13 @@ CodeMirror 6 over the whole document, frontmatter included (`MarkdownSourceEdito
 - **Editing:** undo and redo, Tab indents, and long lines wrap. Searching is the top bar's
   (`Mod+F`, [ui](ui.md)), in every mode; CodeMirror keeps its selection commands (`Mod-D`,
   `Mod-Shift-L`) and go to line (`Mod-Alt-G`), but not its search and replace panel.
-- **No autocompletion**, by design, and no bracket closing, so what you type is what is
-  saved.
+- **Paired characters:** typing an opening character over a selection wraps it instead of
+  replacing it, and the text stays selected (`*` twice makes `**bold**`): `()`, `[]`, `{}`,
+  `<>`, `""`, `''`, backticks, `**`, `__`, `~~` and the typographic `«»`, `“”`, `‘’` (the
+  system's substitution for a typed quote; in code the quotes stay straight). Every
+  selection of a multiple selection is wrapped (`source-marks.ts`).
+- **No autocompletion**, by design, and no bracket closing without a selection, so what you
+  type is what is saved.
 
 Markdown mode is always available. It is the way to edit whatever Text mode would change.
 Text mode is the default for new and existing notes.

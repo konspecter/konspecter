@@ -1,5 +1,5 @@
 import { syntaxTree } from "@codemirror/language";
-import type { EditorState, Extension, Range } from "@codemirror/state";
+import { EditorSelection, type EditorState, type Extension, type Range } from "@codemirror/state";
 import {
   Decoration,
   EditorView,
@@ -111,11 +111,59 @@ const SMART_DOUBLE = /[«»“”„‟]/g;
 const SMART_SINGLE = /[‘’‚‛]/g;
 
 /**
- * Straight quotes in code stay straight. When the system replaces a typed `"`
- * or `'` with a typographic quote (macOS smart quotes, «» in Russian), the
- * replacement is undone inside code and the frontmatter; prose keeps it.
+ * Typing an opening character over a selection wraps it in the pair instead of
+ * replacing it; the text stays selected, so `*` twice makes `**bold**`. With
+ * no selection a typed character is only itself: nothing is closed for you.
  */
-function straightQuotesInCode(): Extension {
+const PAIRS: ReadonlyMap<string, string> = new Map([
+  ["(", ")"],
+  ["[", "]"],
+  ["{", "}"],
+  ["<", ">"],
+  ['"', '"'],
+  ["'", "'"],
+  ["`", "`"],
+  ["*", "*"],
+  ["_", "_"],
+  ["~", "~"],
+  ["«", "»"],
+  ["“", "”"],
+  ["‘", "’"],
+]);
+
+function wrapSelection(view: EditorView, open: string): boolean {
+  const close = PAIRS.get(open);
+  const { state } = view;
+  if (close === undefined || state.selection.ranges.every((range) => range.empty)) return false;
+  view.dispatch(
+    state.changeByRange((range) => {
+      if (range.empty) {
+        return {
+          changes: { from: range.from, insert: open },
+          range: EditorSelection.cursor(range.from + open.length),
+        };
+      }
+      return {
+        changes: [
+          { from: range.from, insert: open },
+          { from: range.to, insert: close },
+        ],
+        range: EditorSelection.range(range.anchor + open.length, range.head + open.length),
+      };
+    }),
+    { scrollIntoView: true, userEvent: "input.type" },
+  );
+  return true;
+}
+
+/**
+ * The typed text, with two rules: an opening character over a selection
+ * wraps it (`PAIRS`), and straight quotes in code stay straight. When the
+ * system replaces a typed `"` or `'` with a typographic quote (macOS smart
+ * quotes, «» in Russian), the replacement is undone inside code and the
+ * frontmatter; prose keeps it.
+ */
+function typing(): Extension {
   let typed: string | null = null;
   return [
     EditorView.domEventHandlers({
@@ -127,12 +175,17 @@ function straightQuotesInCode(): Extension {
     EditorView.inputHandler.of((view, from, to, text) => {
       const quote = typed;
       typed = null;
-      if (quote === null || !within(view.state, from, CODE)) return false;
-      const straight = text.replace(quote === '"' ? SMART_DOUBLE : SMART_SINGLE, quote);
-      if (straight === text) return false;
+      if (view.composing) return false;
+      const insert =
+        quote !== null && within(view.state, from, CODE)
+          ? text.replace(quote === '"' ? SMART_DOUBLE : SMART_SINGLE, quote)
+          : text;
+      const { main } = view.state.selection;
+      if (from === main.from && to === main.to && wrapSelection(view, insert)) return true;
+      if (insert === text) return false;
       view.dispatch({
-        changes: { from, to, insert: straight },
-        selection: { anchor: from + straight.length },
+        changes: { from, to, insert },
+        selection: { anchor: from + insert.length },
         userEvent: "input.type",
       });
       return true;
@@ -141,5 +194,5 @@ function straightQuotesInCode(): Extension {
 }
 
 export function sourceEditorMarks(): Extension {
-  return [sourceMarks, straightQuotesInCode()];
+  return [sourceMarks, typing()];
 }

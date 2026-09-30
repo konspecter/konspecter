@@ -25,7 +25,7 @@ import {
   type Command,
   type Transaction,
 } from "prosemirror-state";
-import { Decoration, DecorationSet } from "prosemirror-view";
+import { Decoration, DecorationSet, type EditorView } from "prosemirror-view";
 import { findMatches, type Match } from "../../domain/search/find";
 import { tagRanges } from "../../domain/tag/tags";
 import { diffSequences, offsets } from "./diff";
@@ -222,32 +222,79 @@ export function foundMatches(state: EditorState): readonly Match[] {
 
 const SMART_QUOTES: Record<string, RegExp> = { '"': /[«»“”„‟]/g, "'": /[‘’‚‛]/g };
 
+/** What typing an opening character over a selection wraps it in. */
+const PAIRS: ReadonlyMap<string, string> = new Map([
+  ["(", ")"],
+  ['"', '"'],
+  ["'", "'"],
+  ["«", "»"],
+  ["“", "”"],
+  ["‘", "’"],
+]);
+
 /**
- * Straight quotes in code stay straight: when the system replaces a typed `"`
- * or `'` with a typographic quote (macOS smart quotes, «» in Russian), the
- * replacement is undone in code blocks and inline code. Text keeps it.
+ * The selection as the page shows it: when a typed key replaces it, the
+ * editor has not always taken in a selection just made with the keyboard.
  */
-function straightQuotesInCode(): Plugin {
+function shownSelection(view: EditorView): { anchor: number; head: number } | null {
+  const shown = view.dom.ownerDocument.getSelection();
+  if (shown?.anchorNode && shown.focusNode && view.dom.contains(shown.anchorNode)) {
+    const anchor = view.posAtDOM(shown.anchorNode, shown.anchorOffset);
+    const head = view.posAtDOM(shown.focusNode, shown.focusOffset);
+    if (anchor !== head) return { anchor, head };
+  }
+  const { selection } = view.state;
+  return selection instanceof TextSelection && !selection.empty ? selection : null;
+}
+
+/**
+ * The typed text, with two rules. Typing `(` or a quote over a selection wraps
+ * it instead of replacing it, and the text stays selected; with no selection
+ * nothing is closed for you. Straight quotes in code stay straight: when the
+ * system replaces a typed `"` or `'` with a typographic quote (macOS smart
+ * quotes, «» in Russian), the replacement is undone in code blocks and inline
+ * code. Text keeps it.
+ */
+function typing(): Plugin {
   let typed: string | null = null;
+  let selected: { anchor: number; head: number } | null = null;
   return new Plugin({
     props: {
-      handleKeyDown(_, event) {
+      handleKeyDown(view, event) {
         typed = event.key in SMART_QUOTES ? event.key : null;
+        selected = shownSelection(view);
         return false;
       },
       handleTextInput(view, from, to, text) {
         const quote = typed;
+        const range = selected;
         typed = null;
-        const smart = quote === null ? undefined : SMART_QUOTES[quote];
-        if (quote === null || !smart) return false;
+        selected = null;
         const { state } = view;
+        const smart = quote === null ? undefined : SMART_QUOTES[quote];
         const $from = state.doc.resolve(from);
         const inCode =
           $from.parent.type === nodes.code_block ||
           Boolean(marks.code.isInSet(state.storedMarks ?? $from.marks()));
-        const straight = text.replace(smart, quote);
-        if (!inCode || straight === text) return false;
-        view.dispatch(state.tr.insertText(straight, from, to));
+        const insert = quote !== null && smart && inCode ? text.replace(smart, quote) : text;
+        const close = PAIRS.get(insert);
+        if (
+          close !== undefined &&
+          range !== null &&
+          Math.min(range.anchor, range.head) === from &&
+          Math.max(range.anchor, range.head) === to
+        ) {
+          const tr = state.tr.insertText(close, to).insertText(insert, from);
+          const shift = insert.length;
+          view.dispatch(
+            tr
+              .setSelection(TextSelection.create(tr.doc, range.anchor + shift, range.head + shift))
+              .scrollIntoView(),
+          );
+          return true;
+        }
+        if (insert === text) return false;
+        view.dispatch(state.tr.insertText(insert, from, to));
         return true;
       },
     },
@@ -384,7 +431,7 @@ export function createTextEditorState(
       placeholder(t("editor.placeholder")),
       tags,
       find,
-      straightQuotesInCode(),
+      typing(),
     ],
   });
 }

@@ -21,21 +21,23 @@ export function setSourceValue(element: HTMLElement, text: string): void {
 }
 
 /**
- * Types `key` at `pos` the way a system text substitution does: the key goes
- * down, then the input handlers see `inserted` (e.g. « for a typed ").
- * Returns false when no handler took the input (the default would insert it).
+ * Types `key` at `at` (a position, or a selected [from, to]) the way a system
+ * text substitution does: the key goes down, then the input handlers see
+ * `inserted` (e.g. « for a typed "). Returns false when no handler took the
+ * input (the default would insert it).
  */
 export function typeSubstituted(
   element: HTMLElement,
-  pos: number,
+  at: number | readonly [number, number],
   key: string,
   inserted: string,
 ): boolean {
   const view = sourceView(element);
-  view.dispatch({ selection: { anchor: pos } });
+  const [from, to] = typeof at === "number" ? [at, at] : at;
+  view.dispatch({ selection: { anchor: from, head: to } });
   view.contentDOM.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
-  const insert = () => view.state.update({ changes: { from: pos, insert: inserted } });
+  const insert = () => view.state.update({ changes: { from, to, insert: inserted } });
   return view.state
     .facet(EditorView.inputHandler)
-    .some((handler) => handler(view, pos, pos, inserted, insert));
+    .some((handler) => handler(view, from, to, inserted, insert));
 }

@@ -550,6 +550,56 @@ describe("tags and code in the editors", () => {
   });
 });
 
+describe("paired characters in the Markdown editor", () => {
+  const selected = (element: HTMLElement) => {
+    const { from, to } = sourceView(element).state.selection.main;
+    return sourceValue(element).slice(from, to);
+  };
+
+  it("wraps the selection instead of replacing it, keeping it selected", () => {
+    renderEditor("a word here", "markdown");
+    const box = sourceBox();
+
+    expect(typeSubstituted(box, [2, 6], "*", "*")).toBe(true);
+    expect(typeSubstituted(box, [3, 7], "*", "*")).toBe(true);
+    expect(sourceValue(box)).toBe("a **word** here");
+    expect(selected(box)).toBe("word");
+    expect(typeSubstituted(box, [4, 8], "(", "(")).toBe(true);
+    expect(sourceValue(box)).toBe("a **(word)** here");
+  });
+
+  it.each([
+    ["_", "_", "_x_"],
+    ["[", "[", "[x]"],
+    ["`", "`", "`x`"],
+    ["~", "~", "~x~"],
+    ['"', "“", "“x”"],
+    ['"', "«", "«x»"],
+  ])("wraps with %s (the system typing %s)", (key, inserted, wrapped) => {
+    renderEditor("x", "markdown");
+    const box = sourceBox();
+
+    expect(typeSubstituted(box, [0, 1], key, inserted)).toBe(true);
+    expect(sourceValue(box)).toBe(wrapped);
+  });
+
+  it("wraps in straight quotes in code", () => {
+    renderEditor("`x`", "markdown");
+    const box = sourceBox();
+
+    expect(typeSubstituted(box, [1, 2], '"', "«")).toBe(true);
+    expect(sourceValue(box)).toBe('`"x"`');
+  });
+
+  it("types a single character where nothing is selected, and replaces with others", () => {
+    renderEditor("x", "markdown");
+    const box = sourceBox();
+
+    expect(typeSubstituted(box, 1, "(", "(")).toBe(false);
+    expect(typeSubstituted(box, [0, 1], "a", "a")).toBe(false);
+  });
+});
+
 describe("a version from elsewhere", () => {
   // Changed before the caret (the date, the heading) and after it.
   const first =
