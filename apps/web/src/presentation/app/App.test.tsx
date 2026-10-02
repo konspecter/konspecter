@@ -178,13 +178,13 @@ describe("the note list", () => {
       "href",
       "/notes/java",
     );
-    // A row is the cover, title, date and tags: not the start of the text.
-    expect(within(list).queryByText("ArrayList — dynamic array.")).not.toBeInTheDocument();
+    // A row is the cover, title, date and tags, and the start of the text.
+    expect(within(list).getByText(/ArrayList — dynamic array\./)).toBeInTheDocument();
     expect(list.querySelector("time")).toHaveAttribute("datetime", "2020-09-28T10:15:00Z");
     expect(recentTitles()).toEqual(["Java Collections", "Untitled", "Unreadable conspect"]);
   });
 
-  it("shows each note's cover and tags, and a letter where there is no cover", async () => {
+  it("shows each note's cover, tags and text, and a letter where there is no cover", async () => {
     const store = await newStore();
     const date = new Date("2020-01-01");
     await store.put(
@@ -204,7 +204,7 @@ describe("the note list", () => {
     expect(maps).toHaveTextContent("#java #maps #algorithms");
     expect(hedgehog?.querySelector("img")).toBeNull();
     expect(hedgehog?.querySelector(".note-result-letter")).toHaveTextContent("Ё");
-    expect(hedgehog).not.toHaveTextContent("Text.");
+    expect(hedgehog?.querySelector(".search-snippet")).toHaveTextContent(/^Text\.$/);
   });
 
   it("shows an error when notes cannot be loaded, and retries", async () => {

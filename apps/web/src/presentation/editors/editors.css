@@ -334,13 +334,13 @@
 /*
  * Small screens: the editor takes nearly the whole screen: 8px of room around
  * it (at the top and the sides, instead of the page's inset), its text 4px
- * inside it on every side. The toolbar is in the island (`app.css`). The
- * Markdown source is set tighter.
+ * inside it at the top and bottom and 8px at the sides. The toolbar is in the
+ * island (`app.css`). The Markdown source is set tighter.
  */
 @media (max-width: 760px) {
   .note-editor {
     --editor-gap: 4px;
-    --editor-side-gap: 4px;
+    --editor-side-gap: 8px;
     --editor-room: 8px;
 
     margin-top: calc(var(--editor-room) - var(--content-top));

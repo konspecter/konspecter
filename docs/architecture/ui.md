@@ -105,8 +105,9 @@ breakpoint in the CSS), in the browser, the PWA and the Android app alike
 
 - **The list** (`pages/NotesPage.tsx`): two columns where they fit (at least 320px each), one
   on small screens or beside a sidebar on a medium one; the arrow keys move through the grid
-  (↑/↓ a row, ←/→ a column). Each item is the cover beside the title (two lines at
-  most), the last-edit date and the tags (two lines at most); not the note's text. A note
+  (↑/↓ a row, ←/→ a column). Each item, the same in search results, is the cover beside four
+  lines of text, each a quarter of the cover's height: the title, the last-edit date with the
+  tags, and two lines of the note's text (in search results, where it matched). A note
   without a displayable cover gets its title's first letter on a pastel colour, its hue
   hashed from the note's id so it stays the same (`--cover-*` tokens per theme).
 - **Search** (`pages/NotesPage.tsx`, `SearchBox.tsx`): focusing the search box shows the list,
@@ -146,7 +147,7 @@ breakpoint in the CSS), in the browser, the PWA and the Android app alike
 
 ## Shared state
 
-- `application/notes/note-catalog.ts`: summaries of every note (title, date, cover, tags),
+- `application/notes/note-catalog.ts`: summaries of every note (title, date, cover, tags, excerpt),
   loaded once and updated one note at a time from repository change events. The sidebar and
   the list read it with `useSyncExternalStore`, so a save reorders Recent at once without
   re-reading the library.

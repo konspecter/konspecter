@@ -1121,8 +1121,10 @@ kbd {
   list-style: none;
 }
 
+/* Beside the cover, four lines of text: the title, the date and tags, two of text. */
 .note-result {
   --list-cover-size: 96px;
+  --list-line: calc(var(--list-cover-size) / 4);
   position: relative;
   display: grid;
   grid-template-columns: var(--list-cover-size) minmax(0, 1fr);
@@ -1147,20 +1149,16 @@ kbd {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 2px;
 }
 
 .note-result-title {
-  display: -webkit-box;
   overflow: hidden;
   color: var(--color-fg);
   font-weight: 600;
-  line-height: 1.35;
+  line-height: var(--list-line);
   text-decoration: none;
-  overflow-wrap: anywhere;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .note-result-cover {
@@ -1182,18 +1180,25 @@ kbd {
   user-select: none;
 }
 
-.note-result-tags {
-  display: -webkit-box;
-  margin: 2px 0 0;
-  overflow: hidden;
+.note-result-meta {
+  display: flex;
+  gap: 8px;
+  margin: 0;
   color: var(--color-muted);
   font-family: var(--font-ui);
   font-size: 13px;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  line-height: var(--list-line);
+  white-space: nowrap;
+}
+
+.note-result-meta time {
+  flex: none;
+}
+
+.note-result-tags {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* The whole row opens the note. */
@@ -1207,19 +1212,14 @@ kbd {
   outline: none;
 }
 
-.note-result time {
-  color: var(--color-muted);
-  font-family: var(--font-ui);
-  font-size: 13px;
-}
-
 .search-snippet {
   display: -webkit-box;
-  margin: 2px 0 0;
+  margin: 0;
   overflow: hidden;
   color: var(--color-muted);
   font-size: 15px;
-  line-height: 1.5;
+  line-height: var(--list-line);
+  overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   line-clamp: 2;
@@ -1835,8 +1835,12 @@ kbd {
   }
 
   .note-result {
-    --list-cover-size: 72px;
+    --list-cover-size: 84px;
     gap: 12px;
+  }
+
+  .search-snippet {
+    font-size: 14px;
   }
 }
 

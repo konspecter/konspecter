@@ -1,3 +1,4 @@
+import { plainText } from "../../domain/document/plain-text";
 import {
   noteTitle,
   noteUpdated,
@@ -18,6 +19,8 @@ export type NoteSummary = {
   readonly cover: string | null;
   /** The note's tags as written, a chain as its tags (`#java#maps` → java, maps). */
   readonly tags: readonly string[];
+  /** The start of the note's readable text, without the heading that is its title. */
+  readonly excerpt: string;
   /** False when the frontmatter cannot be read. */
   readonly valid: boolean;
 };
@@ -27,14 +30,24 @@ export type CatalogState =
   | { readonly status: "error"; readonly error: unknown }
   | { readonly status: "ready"; readonly notes: readonly NoteSummary[] };
 
+const EXCERPT_SOURCE = 800;
+const EXCERPT_LENGTH = 200;
+
 export function summarize(note: Note): NoteSummary {
   const read = readNote(note);
+  const title = noteTitle(read);
+  const blocks = (
+    read.valid ? plainText(read.document.body.slice(0, EXCERPT_SOURCE)) : note.markdown
+  ).split("\n");
+  // Lists show the title already; do not repeat a leading heading.
+  if (title !== "" && blocks[0]?.trim() === title) blocks.shift();
   return {
     id: note.id,
-    title: noteTitle(read),
+    title,
     updated: noteUpdated(read),
     cover: read.valid ? read.document.metadata.cover : null,
     tags: writtenTagList(noteWrittenTags(read)).map(({ written }) => written),
+    excerpt: blocks.join(" ").replace(/\s+/g, " ").trim().slice(0, EXCERPT_LENGTH),
     valid: read.valid,
   };
 }

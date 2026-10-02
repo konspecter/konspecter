@@ -35,7 +35,7 @@ type Row = {
   readonly updated: string | null;
   readonly cover: string | null;
   readonly tags: readonly string[];
-  /** Where a search matched the text; empty outside a search. */
+  /** The start of the text, or where a search matched it. */
   readonly text: readonly SnippetPart[];
 };
 
@@ -50,7 +50,7 @@ function summaryRow(note: NoteSummary): Row {
     updated: note.updated,
     cover: note.cover,
     tags: note.tags,
-    text: [],
+    text: note.excerpt === "" ? [] : [{ text: note.excerpt, match: false }],
   };
 }
 
@@ -214,8 +214,9 @@ const ResultList = memo(function ResultList({ rows }: { rows: readonly Row[] }) 
 });
 
 /**
- * A conspect: its cover beside the title, the date it was last edited and its
- * tags. While searching, also where the text matched.
+ * A conspect, the same in the list and in search results: its cover beside
+ * four lines of text, about as tall as the cover: the title; the date it was
+ * last edited and its tags; two of the text (where a search matched it).
  */
 const ResultRow = memo(function ResultRow({ row }: { row: Row }) {
   return (
@@ -227,9 +228,13 @@ const ResultRow = memo(function ResultRow({ row }: { row: Row }) {
             part.match ? <mark key={index}>{part.text}</mark> : part.text,
           )}
         </Link>
-        {row.updated !== null && <NoteDate value={row.updated} />}
-        {row.tags.length > 0 && (
-          <p className="note-result-tags">{row.tags.map((tag) => `#${tag}`).join(" ")}</p>
+        {(row.updated !== null || row.tags.length > 0) && (
+          <p className="note-result-meta">
+            {row.updated !== null && <NoteDate value={row.updated} />}
+            {row.tags.length > 0 && (
+              <span className="note-result-tags">{row.tags.map((tag) => `#${tag}`).join(" ")}</span>
+            )}
+          </p>
         )}
         {row.text.length > 0 && <Snippet parts={row.text} />}
       </div>

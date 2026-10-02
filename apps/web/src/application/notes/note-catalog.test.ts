@@ -19,7 +19,7 @@ async function ready(
 }
 
 describe("summarize", () => {
-  it("keeps the title, date, cover and tags", () => {
+  it("keeps the title, date, cover, tags and the start of the readable text", () => {
     const note = createNote(
       "---\ncover: https://example.com/maps.png\ntags: [Java#Collections]\n---\n# Hash maps\n\nBuckets #java #algorithms.",
       new Date("2024-01-02"),
@@ -31,6 +31,7 @@ describe("summarize", () => {
       updated: "2024-01-02T00:00:00Z",
       cover: "https://example.com/maps.png",
       tags: ["Java", "Collections", "algorithms"],
+      excerpt: "Buckets #java #algorithms.",
       valid: true,
     });
   });
