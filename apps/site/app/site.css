@@ -100,8 +100,14 @@ main {
   overflow: hidden;
   max-width: 16rem;
   color: var(--color-muted);
+  text-decoration: none;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.site-account-email:hover {
+  color: var(--color-fg);
+  text-decoration: underline;
 }
 
 .site-preferences {
@@ -522,6 +528,163 @@ main {
 
 /* --- Small screens ------------------------------------------------------- */
 
+/* --- Settings ----------------------------------------------------------- */
+
+/* One column of sections split by hairlines, as the platform list; no cards. */
+.settings-page {
+  max-width: calc(40rem + 2 * var(--site-gutter));
+  padding-block: clamp(2.5rem, 7vw, 5rem) 1rem;
+}
+
+.settings-page h1 {
+  margin: 0;
+  font-size: 1.9rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.settings-lead {
+  margin: 0.7rem 0 0;
+  color: var(--color-muted);
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.settings-section {
+  margin-top: 2.25rem;
+  padding-top: 1.75rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.settings-section h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.settings-text {
+  max-width: 34rem;
+  margin: 0.45rem 0 0;
+  color: var(--color-muted);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.settings-form {
+  display: grid;
+  gap: 0.9rem;
+  max-width: 27rem;
+  margin-top: 1.1rem;
+}
+
+.settings-form .actions {
+  margin-top: 0;
+}
+
+.settings-form .inline-error,
+.settings-section > .inline-error {
+  margin: 0;
+}
+
+.settings-section > .form-notice,
+.settings-section > .inline-error {
+  margin-top: 1rem;
+}
+
+.settings-empty {
+  margin: 1rem 0 0;
+  padding: 0.75rem 0.9rem;
+  border-radius: 8px;
+  background: var(--color-field);
+  color: var(--color-muted);
+  font-size: 15px;
+}
+
+.device-list {
+  margin: 1.1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.device {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-block: 0.85rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.device:first-child {
+  border-top: 1px solid var(--color-border);
+}
+
+.device-about {
+  min-width: 0;
+}
+
+.device-name {
+  margin: 0;
+  font-weight: 620;
+  overflow-wrap: anywhere;
+}
+
+.device-meta {
+  margin: 0.15rem 0 0;
+  color: var(--color-muted);
+  font-size: 14px;
+}
+
+.device form {
+  flex-shrink: 0;
+}
+
+/* --- Connecting a device ------------------------------------------------ */
+
+/* The code to compare with the app's: the one thing on the page to look at. */
+.device-code {
+  margin: 1.75rem 0 0;
+  padding: 1.1rem 1.25rem 1rem;
+  border-radius: 12px;
+  background: var(--color-field);
+}
+
+.device-code-value {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: clamp(1.9rem, 8vw, 2.4rem);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  line-height: 1.2;
+}
+
+.device-code figcaption {
+  display: grid;
+  gap: 0.1rem;
+  margin-top: 0.7rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.device-code .device-meta {
+  margin: 0;
+}
+
+.activate-warning {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+
+.field .activate-code-input {
+  max-width: 14rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
 @media (max-width: 900px) {
   .hero {
     grid-template-columns: minmax(0, 1fr);
@@ -529,6 +692,12 @@ main {
 }
 
 @media (max-width: 640px) {
+  .device {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
   .site-account-email {
     display: none;
   }

@@ -50,6 +50,7 @@ export const en = {
   "antenna.active": "Saving and syncing",
   "antenna.offline": "No connection: conspects are stored on this device and sync later",
   "syncHint.failed": "Sync failed",
+  "syncHint.disconnected": "Sync stopped",
   "syncHint.blocked": { one: "{count} not synced", other: "{count} not synced" },
   "syncHint.label": "Sync: {text}",
 
@@ -322,6 +323,7 @@ source, or delete this conspect when you are done.
   "sync.state.syncing": "Syncing…",
   "sync.state.offline": "Offline — changes are kept and sent when you are back online",
   "sync.state.error": "Sync failed; retrying",
+  "sync.state.disconnected": "Disconnected",
   "sync.pending": { one: "{count} waiting to upload", other: "{count} waiting to upload" },
   "sync.blocked": { one: "{count} held back", other: "{count} held back" },
   "sync.connectedTo": "Connected to {server} as {account}.",
@@ -331,10 +333,32 @@ source, or delete this conspect when you are done.
   "sync.now": "Sync now",
   "sync.disconnect": "Disconnect",
   "sync.intro":
-    "Conspects stay on this device either way. Connecting keeps them in step with a Konspecter server.",
+    "Conspects stay on this device either way. Connecting keeps them in step with your account on a Konspecter server.",
+  "sync.signInWithBrowser": "Sign in with browser",
+  "sync.enterCode": "Approve this code on the page that opened in your browser:",
+  "sync.waitingForApproval": "Waiting for approval…",
+  "sync.openPageAgain": "Open the page again",
+  "sync.cancel": "Cancel",
+  "sync.browserDenied": "The request was denied on the site. Nothing was connected.",
+  "sync.browserExpired": "The code expired before it was approved. Sign in again for a new one.",
+  "sync.browserUnavailable":
+    "This server does not offer signing in with the browser. Use an access token under Advanced.",
+  "sync.advanced": "Advanced: connect with an access token",
+  "sync.tokenHint": "A token issued by the server's administrator (server create-token).",
+  "sync.disconnectedBySite":
+    "This device was disconnected from {account} on {server}. Sync has stopped.",
+  "sync.disconnectedByServer":
+    "{server} no longer accepts this device for {account}. The account may have been deleted. Sync has stopped.",
+  "sync.disconnectedKept": "Every conspect is still on this device.",
+  "sync.disconnectedPending": {
+    one: "Every conspect is still on this device; {count} change waits to be sent once you sign in again.",
+    other:
+      "Every conspect is still on this device; {count} changes wait to be sent once you sign in again.",
+  },
+  "sync.signInAgain": "Sign in again",
+  "sync.forget": "Stop syncing",
   "sync.serverUrl": "Server URL",
   "sync.token": "Access token",
   "sync.connectFailed": "Could not connect: {error}",
-  "sync.tokenRejected": "The server did not accept the token. Connect again with a valid token.",
   "sync.connect": "Connect",
 };

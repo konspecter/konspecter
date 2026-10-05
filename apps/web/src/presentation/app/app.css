@@ -1384,6 +1384,37 @@ kbd {
   font-size: 14px;
 }
 
+/* Sign in with browser: the code to approve on the site, large enough to compare. */
+.device-login {
+  margin-top: 0.75rem;
+}
+
+.device-login-code {
+  margin: 0.25rem 0 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 1.6rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+}
+
+.connect-advanced {
+  margin-top: 1rem;
+}
+
+.connect-advanced summary {
+  color: var(--color-muted);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.connect-advanced summary:hover {
+  color: var(--color-fg);
+}
+
+.connect-advanced .connect-form {
+  margin-top: 0.5rem;
+}
+
 .sync-status {
   margin: 0 0 0.25rem;
   font-size: 14px;

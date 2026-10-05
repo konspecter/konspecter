@@ -123,13 +123,15 @@ function Preferences({ locale }: { locale: Locale }) {
   );
 }
 
-/** Sign in, or the signed-in address and Sign out. */
+/** Sign in, or the signed-in address (a link to the settings) and Sign out. */
 function AccountLinks({ email, accounts }: { email: string | null; accounts: boolean }) {
   const { t } = useT();
   if (email) {
     return (
       <form method="post" action="/logout" className="site-account">
-        <span className="site-account-email">{email}</span>
+        <Link to="/settings" className="site-account-email" title={t("site.settings")}>
+          {email}
+        </Link>
         <button type="submit" className="link-button">
           {t("site.signOut")}
         </button>

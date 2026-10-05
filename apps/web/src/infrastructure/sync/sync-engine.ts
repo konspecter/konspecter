@@ -6,12 +6,20 @@ import {
   NetworkError,
   RevisionConflictError,
   type Account,
+  type DeviceAuthorization,
+  type DeviceDescription,
   type ServerConfig,
 } from "../http/api-client";
 import type { NoteStore } from "../storage/note-store";
 import { ChangeStream } from "./change-stream";
+import { deviceLogin } from "./device-login";
 
-export type SyncState = "disabled" | "idle" | "syncing" | "offline" | "error";
+/**
+ * "disconnected": the server stopped accepting this device (disconnected on
+ * the site, or the account deleted). Nothing syncs until it signs in again;
+ * every note and its sync state stay.
+ */
+export type SyncState = "disabled" | "idle" | "syncing" | "offline" | "error" | "disconnected";
 
 export type SyncStatus = {
   readonly state: SyncState;
@@ -28,6 +36,9 @@ export type SyncStatus = {
 };
 
 type StoredConfig = ServerConfig & { readonly account: Account };
+
+/** Where this device was connected before the server let it go. */
+type Disconnected = { readonly serverUrl: string; readonly account: Account };
 
 /**
  * Where the access token is kept. Without one, it is stored with the rest of
@@ -98,6 +109,7 @@ export class SyncEngine {
   readonly #credentials: CredentialStore | null;
 
   #config: StoredConfig | null = null;
+  #disconnected: Disconnected | null = null;
   #status: SyncStatus = {
     state: "disabled",
     account: null,
@@ -146,6 +158,13 @@ export class SyncEngine {
 
   /** Loads the saved server connection and starts syncing if there is one. */
   async start(): Promise<void> {
+    const saved = parseStoredConfig(await this.#store.loadMeta(CONFIG_KEY));
+    if (saved?.disconnected) {
+      this.#disconnected = { serverUrl: saved.serverUrl, account: saved.account };
+      this.#listen();
+      await this.#refreshCounts({ state: "disconnected", ...this.#disconnected });
+      return;
+    }
     this.#config = await this.#loadConfig();
     this.#listen();
     if (this.#config) {
@@ -171,13 +190,15 @@ export class SyncEngine {
    * account queues every local note for upload to it.
    */
   async connect(config: ServerConfig): Promise<Account> {
-    const serverUrl = config.serverUrl.trim().replace(/\/+$/, "");
+    const serverUrl = normalizeServerUrl(config.serverUrl);
     const token = config.token.trim();
     const account = await this.#client({ serverUrl, token }).me();
-    const previous = this.#config;
+    // Back to the account this device was disconnected from: carry on.
+    const previous = this.#config ?? this.#disconnected;
     const sameAccount = previous?.serverUrl === serverUrl && previous.account.id === account.id;
     if (!sameAccount) await this.#store.resetSync();
     this.#closeStream();
+    this.#disconnected = null;
     this.#config = { serverUrl, token, account };
     await this.#saveConfig(this.#config);
     this.#failures = 0;
@@ -187,29 +208,96 @@ export class SyncEngine {
     return account;
   }
 
-  /** Stops syncing. Local notes stay; reconnecting to the same account resumes. */
+  /**
+   * Signs in through the browser: shows the owner a code (`onCode`), waits
+   * while they approve it on the site, then connects with the token the
+   * server hands over. Aborting `signal` cancels the wait.
+   */
+  async signInWithBrowser(
+    serverUrl: string,
+    device: DeviceDescription,
+    onCode: (authorization: DeviceAuthorization) => void,
+    signal?: AbortSignal,
+  ): Promise<Account> {
+    const url = normalizeServerUrl(serverUrl);
+    const token = await deviceLogin(url, device, {
+      fetch: this.#fetch,
+      onCode,
+      sleep: (ms) => this.#sleep(ms, signal),
+    });
+    signal?.throwIfAborted();
+    return this.connect({ serverUrl: url, token });
+  }
+
+  #sleep(ms: number, signal: AbortSignal | undefined): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (signal?.aborted) {
+        reject(signal.reason as Error);
+        return;
+      }
+      const handle = this.#scheduler.set(resolve, ms);
+      signal?.addEventListener(
+        "abort",
+        () => {
+          this.#scheduler.clear(handle);
+          reject(signal.reason as Error);
+        },
+        { once: true },
+      );
+    });
+  }
+
+  /**
+   * Stops syncing and signs this device out of the server (when it can be
+   * reached; the device then leaves the account's list). Local notes stay;
+   * reconnecting to the same account resumes.
+   */
   async disconnect(): Promise<void> {
     this.#closeStream();
     this.#cancelTimer();
     await this.#running;
+    const config = this.#config;
+    if (config)
+      void this.#client(config)
+        .revokeCurrentToken()
+        .catch(() => undefined);
     this.#config = null;
+    this.#disconnected = null;
     await this.#store.saveMeta(CONFIG_KEY, undefined);
     await this.#credentials?.clear();
     this.#setStatus({ state: "disabled", account: null, serverUrl: null, error: null });
   }
 
+  /**
+   * The server no longer accepts this device. Forget its token, keep every
+   * note and its sync state, and remember the account to resume it after
+   * signing in again.
+   */
+  async #becomeDisconnected(config: StoredConfig, error: ApiError): Promise<void> {
+    this.#closeStream();
+    this.#cancelTimer();
+    this.#config = null;
+    this.#disconnected = { serverUrl: config.serverUrl, account: config.account };
+    await this.#store.saveMeta(CONFIG_KEY, { ...this.#disconnected, disconnected: true });
+    await this.#credentials?.clear();
+    await this.#refreshCounts({ state: "disconnected", error, ...this.#disconnected });
+  }
+
   /** The saved connection, with the token from the credential store if there is one. */
   async #loadConfig(): Promise<StoredConfig | null> {
     const stored = parseStoredConfig(await this.#store.loadMeta(CONFIG_KEY));
-    if (!stored) return null;
-    if (!this.#credentials) return stored.token ? { ...stored, token: stored.token } : null;
+    if (!stored || stored.disconnected) return null;
+    const { serverUrl, account } = stored;
+    if (!this.#credentials)
+      return stored.token ? { serverUrl, account, token: stored.token } : null;
     if (stored.token) {
       // Saved before the credential store was used: move the token there.
-      await this.#saveConfig({ ...stored, token: stored.token });
-      return { ...stored, token: stored.token };
+      const config = { serverUrl, account, token: stored.token };
+      await this.#saveConfig(config);
+      return config;
     }
     const token = await this.#credentials.load();
-    return token ? { ...stored, token } : null;
+    return token ? { serverUrl, account, token } : null;
   }
 
   async #saveConfig(config: StoredConfig): Promise<void> {
@@ -342,6 +430,11 @@ export class SyncEngine {
       });
       this.#schedule(this.#streaming ? INTERVAL_MS : POLL_MS);
     } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        // Disconnected on the site, the account deleted, or the token revoked.
+        await this.#becomeDisconnected(config, error);
+        return;
+      }
       this.#failures += 1;
       const offline = error instanceof NetworkError;
       await this.#refreshCounts({
@@ -456,17 +549,32 @@ export class SyncEngine {
   }
 }
 
-/** The saved connection; the token is absent when a credential store holds it. */
-function parseStoredConfig(
-  value: unknown,
-): { serverUrl: string; token: string | null; account: Account } | null {
+function normalizeServerUrl(serverUrl: string): string {
+  return serverUrl.trim().replace(/\/+$/, "");
+}
+
+/**
+ * The saved connection; the token is absent when a credential store holds
+ * it, or when the server disconnected this device.
+ */
+function parseStoredConfig(value: unknown): {
+  serverUrl: string;
+  token: string | null;
+  account: Account;
+  disconnected: boolean;
+} | null {
   if (typeof value !== "object" || value === null) return null;
-  const { serverUrl, token, account } = value as Record<string, unknown>;
+  const { serverUrl, token, account, disconnected } = value as Record<string, unknown>;
   const { id, email } = (typeof account === "object" && account !== null ? account : {}) as Record<
     string,
     unknown
   >;
   if (typeof serverUrl !== "string") return null;
   if (typeof id !== "string" || typeof email !== "string") return null;
-  return { serverUrl, token: typeof token === "string" ? token : null, account: { id, email } };
+  return {
+    serverUrl,
+    token: typeof token === "string" ? token : null,
+    account: { id, email },
+    disconnected: disconnected === true,
+  };
 }

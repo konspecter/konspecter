@@ -263,28 +263,28 @@ func TestEventStreamOutlivesServerTimeouts(t *testing.T) {
 
 func TestHub(t *testing.T) {
 	h := newHub()
-	ada, err := h.subscribe("ada")
+	ada, err := h.subscribe("ada", "laptop")
 	if err != nil {
 		t.Fatal(err)
 	}
-	bob, _ := h.subscribe("bob")
+	bob, _ := h.subscribe("bob", "phone")
 
 	h.publish("ada")
 	h.publish("ada") // Coalesced, and never blocks.
-	if len(ada) != 1 || len(bob) != 0 {
-		t.Errorf("pending: ada %d, bob %d", len(ada), len(bob))
+	if len(ada.changed) != 1 || len(bob.changed) != 0 {
+		t.Errorf("pending: ada %d, bob %d", len(ada.changed), len(bob.changed))
 	}
 
 	for range maxStreamsPerUser - 1 {
-		if _, err := h.subscribe("ada"); err != nil {
+		if _, err := h.subscribe("ada", "laptop"); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := h.subscribe("ada"); !errors.Is(err, errTooManyStreams) {
+	if _, err := h.subscribe("ada", "laptop"); !errors.Is(err, errTooManyStreams) {
 		t.Errorf("over the limit: %v", err)
 	}
 	h.unsubscribe("ada", ada)
-	if _, err := h.subscribe("ada"); err != nil {
+	if _, err := h.subscribe("ada", "laptop"); err != nil {
 		t.Errorf("after unsubscribe: %v", err)
 	}
 
@@ -295,7 +295,36 @@ func TestHub(t *testing.T) {
 	default:
 		t.Error("done not closed")
 	}
-	if _, err := h.subscribe("carol"); !errors.Is(err, errHubClosed) {
+	if _, err := h.subscribe("carol", "tablet"); !errors.Is(err, errHubClosed) {
 		t.Errorf("after close: %v", err)
+	}
+}
+
+func TestHubEndsTheStreamsOfADeviceOrAUser(t *testing.T) {
+	h := newHub()
+	laptop, _ := h.subscribe("ada", "laptop")
+	phone, _ := h.subscribe("ada", "phone")
+	bob, _ := h.subscribe("bob", "phone")
+
+	h.end("ada", "laptop")
+	if !closed(laptop.ended) || closed(phone.ended) || closed(bob.ended) {
+		t.Error("ending ada's laptop ended other streams, or not it")
+	}
+	h.unsubscribe("ada", laptop) // After end: harmless.
+	h.end("ada", "")
+	if !closed(phone.ended) || closed(bob.ended) {
+		t.Error("ending ada's streams")
+	}
+	if len(h.users["ada"]) != 0 || len(h.users["bob"]) != 1 {
+		t.Errorf("streams left: %v", h.users)
+	}
+}
+
+func closed(ch chan struct{}) bool {
+	select {
+	case <-ch:
+		return true
+	default:
+		return false
 	}
 }

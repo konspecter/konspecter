@@ -56,6 +56,67 @@ export const ru: Dictionary = {
   "site.signIn": "Войти",
   "site.signOut": "Выйти",
   "site.account": "Аккаунт",
+  "site.settings": "Настройки аккаунта",
+
+  "settings.title": "Настройки",
+  "settings.lead": "Вы вошли как {email}.",
+  "settings.leadNamed": "Здравствуйте, {name}. Вы вошли как {email}.",
+  "settings.name.title": "Ваше имя",
+  "settings.name.label": "Имя",
+  "settings.name.hint":
+    "Им мы приветствуем вас на этой странице. Оставьте пустым — будет видна почта.",
+  "settings.name.save": "Сохранить имя",
+  "settings.name.saved": "Имя сохранено.",
+  "settings.devices.title": "Подключённые устройства",
+  "settings.devices.lead":
+    "Приложения, которые синхронизируются с этим аккаунтом. Отключённое устройство перестаёт синхронизироваться и сохраняет свои конспекты.",
+  "settings.devices.empty":
+    "Устройств пока нет. В приложении откройте «Настройки», затем «Синхронизация», и выберите «Войти через браузер».",
+  "settings.devices.failed":
+    "Не удалось загрузить устройства. Обновите страницу, чтобы попробовать снова.",
+  "settings.devices.platformVersion": "{platform}, версия {version}",
+  "settings.devices.lastSynced": "Синхронизировано {when}",
+  "settings.devices.lastActive": "Было активно {when}",
+  "settings.devices.connected": "Подключено {when}",
+  "settings.devices.disconnect": "Отключить",
+  "settings.devices.disconnectNamed": "Отключить {name}",
+  "settings.devices.disconnected":
+    "{name} отключено. Конспекты остаются на устройстве, синхронизация остановлена.",
+  "settings.delete.title": "Удаление аккаунта",
+  "settings.delete.lead":
+    "Аккаунт удаляется вместе со всеми конспектами, которые он хранит на сервере, а все устройства отключаются. Конспекты на ваших устройствах остаются. Отменить это нельзя.",
+  "settings.delete.label": "Введите {email} для подтверждения",
+  "settings.delete.submit": "Удалить аккаунт",
+  "settings.delete.signInAgain":
+    "Чтобы удалить аккаунт, сначала войдите заново. Так мы убедимся, что это вы, а не браузер, в котором кто-то забыл выйти.",
+  "settings.delete.signInAgainButton": "Войти заново",
+
+  "device.platform.web": "Браузер",
+  "device.platform.macos": "macOS",
+  "device.platform.windows": "Windows",
+  "device.platform.linux": "Linux",
+  "device.platform.android": "Android",
+  "device.platform.ios": "iOS",
+  "device.platform.other": "Другое",
+
+  "activate.title": "Подключение устройства",
+  "activate.lead":
+    "Приложение просит доступ к синхронизации с {email}. Проверьте, что код совпадает с кодом в приложении.",
+  "activate.codeLabelled": "Код {code}",
+  "activate.warning":
+    "Подтверждайте, только если вы сами начали подключение на своём устройстве. Подключённое приложение может читать и менять все синхронизируемые конспекты.",
+  "activate.approve": "Подтвердить",
+  "activate.deny": "Отклонить",
+  "activate.enterLead": "Введите код, который показывает приложение.",
+  "activate.codeLabel": "Код из приложения",
+  "activate.continue": "Продолжить",
+  "activate.approvedTitle": "Устройство подключено",
+  "activate.approved":
+    "{name} теперь синхронизируется с вашим аккаунтом. Вернитесь в приложение: дальше оно справится само.",
+  "activate.toSettings": "Посмотреть подключённые устройства",
+  "activate.deniedTitle": "Запрос отклонён",
+  "activate.denied":
+    "Ничего не подключено. Если подключение начинали не вы, просто ничего не делайте: код скоро истечёт.",
 
   "auth.email": "Почта",
   "auth.password": "Пароль",
@@ -141,6 +202,11 @@ export const ru: Dictionary = {
   "authError.oauth_cancelled": "Вход отменён. Попробуйте ещё раз или войдите по почте.",
   "authError.provider_unavailable": "Этот способ входа на сервере не настроен.",
   "authError.identity_expired": "Вход занял слишком много времени. Начните заново.",
+  "authError.invalid_name": "Имя — не длиннее 100 символов и без переносов строк.",
+  "authError.email_mismatch": "Это не почта этого аккаунта. Введите её точно, чтобы подтвердить.",
+  "authError.reauthentication_required": "Перед удалением аккаунта войдите заново.",
+  "authError.invalid_user_code":
+    "Ни одно устройство не ждёт этот код. Проверьте его или начните заново в приложении.",
   "authError.unknown": "На сервере что-то пошло не так. Попробуйте чуть позже.",
 
   "error.title": "Страница не найдена",

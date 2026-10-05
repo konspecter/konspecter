@@ -217,10 +217,10 @@ func (db *DB) CreateSession(ctx context.Context, userID string, idHash []byte, u
 func (db *DB) SessionByID(ctx context.Context, idHash []byte) (auth.Session, error) {
 	var s auth.Session
 	err := db.pool.QueryRow(ctx, `
-		SELECT u.id::text, u.email, s.last_seen_at, s.expires_at
+		SELECT u.id::text, u.email, s.created_at, s.last_seen_at, s.expires_at
 		FROM sessions s JOIN users u ON u.id = s.user_id
 		WHERE s.id_hash = $1 AND s.expires_at > now()`, idHash,
-	).Scan(&s.User.ID, &s.User.Email, &s.LastSeenAt, &s.ExpiresAt)
+	).Scan(&s.User.ID, &s.User.Email, &s.CreatedAt, &s.LastSeenAt, &s.ExpiresAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return auth.Session{}, auth.ErrUnauthorized
 	}
@@ -246,4 +246,49 @@ func (db *DB) DeleteSession(ctx context.Context, idHash []byte) error {
 		return fmt.Errorf("delete session: %w", err)
 	}
 	return nil
+}
+
+// Account returns the user's account as its owner sees it.
+func (db *DB) Account(ctx context.Context, userID string) (accounts.Account, error) {
+	return scanAccount(db.pool.QueryRow(ctx,
+		`SELECT id::text, email, display_name, created_at FROM users WHERE id = $1`, userID))
+}
+
+// RenameAccount sets the name the owner wants to be called by.
+func (db *DB) RenameAccount(ctx context.Context, userID, name string) (accounts.Account, error) {
+	return scanAccount(db.pool.QueryRow(ctx,
+		`UPDATE users SET display_name = $2 WHERE id = $1 RETURNING id::text, email, display_name, created_at`,
+		userID, name))
+}
+
+func scanAccount(row pgx.Row) (accounts.Account, error) {
+	var a accounts.Account
+	err := row.Scan(&a.ID, &a.Email, &a.Name, &a.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return accounts.Account{}, ErrUserNotFound
+	}
+	if err != nil {
+		return accounts.Account{}, fmt.Errorf("find account: %w", err)
+	}
+	return a, nil
+}
+
+// DeleteAccount deletes the user and everything that belongs to it: notes,
+// the change log, sessions, devices, identities and open email codes.
+func (db *DB) DeleteAccount(ctx context.Context, userID string) error {
+	return pgx.BeginFunc(ctx, db.pool, func(tx pgx.Tx) error {
+		var email string
+		err := tx.QueryRow(ctx, `DELETE FROM users WHERE id = $1 RETURNING email`, userID).Scan(&email)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrUserNotFound
+		}
+		if err != nil {
+			return fmt.Errorf("delete account: %w", err)
+		}
+		// Codes are keyed by address, not by user (they may create one).
+		if _, err := tx.Exec(ctx, `DELETE FROM email_codes WHERE email = $1`, email); err != nil {
+			return fmt.Errorf("delete email codes: %w", err)
+		}
+		return nil
+	})
 }

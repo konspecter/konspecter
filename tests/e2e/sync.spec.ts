@@ -14,6 +14,7 @@ async function device(browser: Browser): Promise<Page> {
   const page = await (await browser.newContext()).newPage();
   await page.goto("/settings");
   await page.getByLabel("Server URL").fill(serverUrl ?? "");
+  await page.getByText("Advanced: connect with an access token").click();
   await page.getByLabel("Access token").fill(token ?? "");
   await page.getByRole("button", { name: "Connect" }).click();
   await expect(page.getByText(/Up to date/)).toBeVisible();

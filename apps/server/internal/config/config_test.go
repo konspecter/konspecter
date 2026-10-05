@@ -35,8 +35,9 @@ func TestLoadUsesDefaults(t *testing.T) {
 		SessionTTL:       720 * time.Hour,
 		EmailCodeTTL:     10 * time.Minute,
 		PasswordResetTTL: 30 * time.Minute,
+		DeviceCodeTTL:    10 * time.Minute,
 		Mail:             Mail{Transport: "smtp", Port: 587, Security: "starttls"},
-		Rates:            Rates{LoginFailuresPerIP: 20, LoginFailuresPerEmail: 10, EmailsPerAddress: 5, EmailsPerIP: 20},
+		Rates:            Rates{LoginFailuresPerIP: 20, LoginFailuresPerEmail: 10, EmailsPerAddress: 5, EmailsPerIP: 20, DeviceRequestsPerIP: 20},
 		OAuth:            map[string]OAuthClient{},
 		LoginProviders:   map[string][]string{"en": {"google", "linkedin", "x"}, "ru": {"yandex", "vk"}},
 	}
@@ -69,6 +70,7 @@ func TestLoadReadsTheAccountSettings(t *testing.T) {
 		"KONSPECTER_SESSION_TTL":            "48h",
 		"KONSPECTER_EMAIL_CODE_TTL":         "5m",
 		"KONSPECTER_PASSWORD_RESET_TTL":     "1h",
+		"KONSPECTER_DEVICE_CODE_TTL":        "15m",
 		"KONSPECTER_MAIL_TRANSPORT":         "smtp",
 		"KONSPECTER_SMTP_HOST":              "smtp.example.com",
 		"KONSPECTER_SMTP_PORT":              "465",
@@ -81,6 +83,7 @@ func TestLoadReadsTheAccountSettings(t *testing.T) {
 		"KONSPECTER_RATE_LOGIN_PER_EMAIL":   "2",
 		"KONSPECTER_RATE_EMAIL_PER_ADDRESS": "1",
 		"KONSPECTER_RATE_EMAIL_PER_IP":      "4",
+		"KONSPECTER_RATE_DEVICE_PER_IP":     "6",
 	}))
 	if err != nil {
 		t.Fatal(err)
@@ -88,8 +91,9 @@ func TestLoadReadsTheAccountSettings(t *testing.T) {
 	if cfg.PublicURL != "https://notes.example.com" || cfg.RegistrationOpen {
 		t.Errorf("public URL %q, registration open %v", cfg.PublicURL, cfg.RegistrationOpen)
 	}
-	if cfg.SessionTTL != 48*time.Hour || cfg.EmailCodeTTL != 5*time.Minute || cfg.PasswordResetTTL != time.Hour {
-		t.Errorf("lifetimes %v %v %v", cfg.SessionTTL, cfg.EmailCodeTTL, cfg.PasswordResetTTL)
+	if cfg.SessionTTL != 48*time.Hour || cfg.EmailCodeTTL != 5*time.Minute || cfg.PasswordResetTTL != time.Hour ||
+		cfg.DeviceCodeTTL != 15*time.Minute {
+		t.Errorf("lifetimes %v %v %v %v", cfg.SessionTTL, cfg.EmailCodeTTL, cfg.PasswordResetTTL, cfg.DeviceCodeTTL)
 	}
 	wantMail := Mail{Transport: "smtp", Host: "smtp.example.com", Port: 465, Username: "user", Password: "secret",
 		From: "Konspecter <noreply@example.com>", Security: "tls"}
@@ -104,7 +108,7 @@ func TestLoadReadsTheAccountSettings(t *testing.T) {
 	if !reflect.DeepEqual(cfg.TrustedProxies, wantProxies) {
 		t.Errorf("proxies = %v", cfg.TrustedProxies)
 	}
-	if cfg.Rates != (Rates{LoginFailuresPerIP: 3, LoginFailuresPerEmail: 2, EmailsPerAddress: 1, EmailsPerIP: 4}) {
+	if cfg.Rates != (Rates{LoginFailuresPerIP: 3, LoginFailuresPerEmail: 2, EmailsPerAddress: 1, EmailsPerIP: 4, DeviceRequestsPerIP: 6}) {
 		t.Errorf("rates = %+v", cfg.Rates)
 	}
 }

@@ -20,8 +20,18 @@ type User struct {
 	Email string
 }
 
+// Device is an app signed in with an API token: the device it was issued to
+// and the device's user.
+type Device struct {
+	ID   string
+	User User
+}
+
 // ErrUnauthorized means the token or session is missing, malformed, unknown or expired.
 var ErrUnauthorized = errors.New("unauthorized")
+
+// ErrDeviceRevoked means the token's device was disconnected from its account.
+var ErrDeviceRevoked = errors.New("device revoked")
 
 // ErrUserNotFound means there is no user with that email address.
 var ErrUserNotFound = errors.New("user not found")
@@ -29,7 +39,9 @@ var ErrUserNotFound = errors.New("user not found")
 // Session is a browser signed in to the site. Its id lives in a cookie; its
 // expiry moves forward while it is used.
 type Session struct {
-	User       User
+	User User
+	// CreatedAt is when the browser signed in.
+	CreatedAt  time.Time
 	LastSeenAt time.Time
 	ExpiresAt  time.Time
 }

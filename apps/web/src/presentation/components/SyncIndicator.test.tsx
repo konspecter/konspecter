@@ -31,6 +31,11 @@ describe("SyncIndicator", () => {
     );
   });
 
+  it("says when the server disconnected this device", () => {
+    renderIndicator(syncIn("disconnected"));
+    expect(screen.getByRole("link", { name: "Sync: Sync stopped" })).toBeInTheDocument();
+  });
+
   it("counts the notes held back", () => {
     renderIndicator(syncIn("offline", 2));
     expect(screen.getByRole("link")).toHaveTextContent("2 not synced");

@@ -11,6 +11,7 @@ import (
 
 	"konspecter/server/internal/accounts"
 	"konspecter/server/internal/auth"
+	"konspecter/server/internal/devices"
 	"konspecter/server/internal/mail"
 	"konspecter/server/internal/oauth"
 )
@@ -29,6 +30,19 @@ type AccountStore interface {
 	SignInWithIdentity(ctx context.Context, identity accounts.Identity, createAllowed bool) (auth.User, error)
 	CreatePendingIdentity(ctx context.Context, tokenHash []byte, identity accounts.Identity, expiresAt time.Time) error
 	PendingIdentity(ctx context.Context, tokenHash []byte) (accounts.Identity, error)
+	Account(ctx context.Context, userID string) (accounts.Account, error)
+	RenameAccount(ctx context.Context, userID, name string) (accounts.Account, error)
+	DeleteAccount(ctx context.Context, userID string) error
+}
+
+// DeviceStore is the storage for connecting apps to accounts.
+type DeviceStore interface {
+	CreateDeviceAuthorization(ctx context.Context, deviceCodeHash, userCodeHash []byte, client devices.Client, expiresAt time.Time) error
+	PendingDeviceAuthorization(ctx context.Context, userCodeHash []byte) (devices.Client, error)
+	DecideDeviceAuthorization(ctx context.Context, userCodeHash []byte, userID string, approve bool) (devices.Client, error)
+	ExchangeDeviceCode(ctx context.Context, deviceCodeHash, tokenHash []byte) (devices.Device, auth.User, error)
+	ListDevices(ctx context.Context, userID string) ([]devices.Device, error)
+	RevokeDevice(ctx context.Context, userID, deviceID string) error
 }
 
 // Mailer sends one email.
@@ -39,6 +53,8 @@ type Mailer interface {
 // Accounts turns on sign-in for the account site.
 type Accounts struct {
 	Store AccountStore
+	// Devices connects apps through the browser (device authorization).
+	Devices DeviceStore
 	// Mailer sends codes and reset links; nil means no email, and the flows
 	// that need one answer 503.
 	Mailer Mailer
@@ -50,7 +66,9 @@ type Accounts struct {
 	SessionTTL       time.Duration
 	EmailCodeTTL     time.Duration
 	PasswordResetTTL time.Duration
-	Rates            Rates
+	// DeviceCodeTTL is how long an app's request to connect waits for approval.
+	DeviceCodeTTL time.Duration
+	Rates         Rates
 	// Providers are the configured sign-in providers by id.
 	Providers map[string]*oauth.Provider
 	// LoginProviders are the provider ids the site offers per language
@@ -64,6 +82,8 @@ type Rates struct {
 	LoginFailuresPerEmail int
 	EmailsPerAddress      int
 	EmailsPerIP           int
+	// DeviceRequestsPerIP: requests to connect an app per client address per hour.
+	DeviceRequestsPerIP int
 }
 
 // sessionRefresh is how stale a session's last use may get before its
@@ -79,6 +99,7 @@ type accountAPI struct {
 	loginEmail     *windowLimiter
 	mailIP         *windowLimiter
 	mailAddress    *windowLimiter
+	deviceIP       *windowLimiter
 }
 
 func newAccountAPI(config Accounts, now func() time.Time) *accountAPI {
@@ -97,6 +118,7 @@ func newAccountAPI(config Accounts, now func() time.Time) *accountAPI {
 		loginEmail:     newWindowLimiter(config.Rates.LoginFailuresPerEmail, 15*time.Minute, now),
 		mailIP:         newWindowLimiter(config.Rates.EmailsPerIP, time.Hour, now),
 		mailAddress:    newWindowLimiter(config.Rates.EmailsPerAddress, time.Hour, now),
+		deviceIP:       newWindowLimiter(config.Rates.DeviceRequestsPerIP, time.Hour, now),
 	}
 }
 
@@ -108,6 +130,8 @@ func (a *api) registerAccountRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /api/auth/password/forgot", a.siteRequest(a.forgotPassword))
 	mux.Handle("POST /api/auth/password/reset", a.siteRequest(a.resetPassword))
 	a.registerProviderRoutes(mux)
+	a.registerSettingsRoutes(mux)
+	a.registerDeviceRoutes(mux)
 }
 
 // siteRequest guards the site's requests: sign-in must be configured, and a
@@ -129,12 +153,19 @@ func (a *api) siteRequest(next http.HandlerFunc) http.Handler {
 
 // withSession runs next for the user signed in with the session cookie.
 func (a *api) withSession(next userHandler) http.Handler {
+	return a.withSessionInfo(func(w http.ResponseWriter, r *http.Request, session auth.Session) {
+		next(w, r, session.User)
+	})
+}
+
+// withSessionInfo runs next with the browser's session.
+func (a *api) withSessionInfo(next func(w http.ResponseWriter, r *http.Request, session auth.Session)) http.Handler {
 	return a.siteRequest(func(w http.ResponseWriter, r *http.Request) {
-		user, ok := a.sessionUser(w, r)
+		session, ok := a.currentSession(w, r)
 		if !ok {
 			return
 		}
-		next(w, r, user)
+		next(w, r, session)
 	})
 }
 
@@ -152,9 +183,9 @@ func (a *api) withTokenOrSession(next userHandler) http.Handler {
 	})
 }
 
-// sessionUser resolves the session cookie, moving its expiry forward when it
-// was last used a while ago. It answers 401 itself when there is no session.
-func (a *api) sessionUser(w http.ResponseWriter, r *http.Request) (auth.User, bool) {
+// currentSession resolves the session cookie, moving its expiry forward when
+// it was last used a while ago. It answers 401 itself when there is no session.
+func (a *api) currentSession(w http.ResponseWriter, r *http.Request) (auth.Session, bool) {
 	cookie, err := r.Cookie(a.accounts.cookieName)
 	if err == nil && strings.HasPrefix(cookie.Value, auth.SessionPrefix) {
 		hash := accounts.HashSecret(cookie.Value)
@@ -164,19 +195,19 @@ func (a *api) sessionUser(w http.ResponseWriter, r *http.Request) (auth.User, bo
 				expires := time.Now().Add(a.accounts.SessionTTL)
 				if err := a.accounts.Store.ExtendSession(r.Context(), hash, expires); err != nil {
 					a.internalError(w, r, err)
-					return auth.User{}, false
+					return auth.Session{}, false
 				}
 				a.setSessionCookie(w, cookie.Value, expires)
 			}
-			return session.User, true
+			return session, true
 		}
 		if !errors.Is(err, auth.ErrUnauthorized) {
 			a.internalError(w, r, err)
-			return auth.User{}, false
+			return auth.Session{}, false
 		}
 	}
 	writeError(w, http.StatusUnauthorized, "unauthorized", "sign in first")
-	return auth.User{}, false
+	return auth.Session{}, false
 }
 
 func (a *api) setSessionCookie(w http.ResponseWriter, id string, expires time.Time) {

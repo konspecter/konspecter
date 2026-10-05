@@ -2,6 +2,7 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import type { Plugin } from "vite";
 import { defineConfig } from "vitest/config";
+import packageJson from "./package.json" with { type: "json" };
 
 /**
  * Content-Security-Policy for the production build (see docs/security.md).
@@ -38,6 +39,10 @@ function csp(): Plugin {
 }
 
 export default defineConfig({
+  define: {
+    // The version the app reports to the sync server (its device list).
+    __KONSPECTER_VERSION__: JSON.stringify(packageJson.version),
+  },
   plugins: [
     react(),
     csp(),

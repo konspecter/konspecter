@@ -3,10 +3,12 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -14,6 +16,7 @@ import (
 	"time"
 
 	"konspecter/server/internal/auth"
+	"konspecter/server/internal/devices"
 	"konspecter/server/internal/notes"
 )
 
@@ -136,24 +139,214 @@ func (f *fakeRepository) Changes(_ context.Context, userID string, cursor int64,
 	return changed, next, nil
 }
 
-type fakeAuth map[string]auth.User
-
-var fakeAuthMu sync.Mutex
-
-func (f fakeAuth) UserByToken(_ context.Context, token string) (auth.User, error) {
-	fakeAuthMu.Lock()
-	defer fakeAuthMu.Unlock()
-	if user, ok := f[token]; ok {
-		return user, nil
-	}
-	return auth.User{}, auth.ErrUnauthorized
+// fakeDevices keeps devices in memory: the tokens apps sign in with
+// (Authenticator) and the browser flow that connects them (DeviceStore).
+type fakeDevices struct {
+	mu             sync.Mutex
+	byToken        map[string]*fakeDevice
+	authorizations map[string]*fakeAuthorization // by device code hash
+	next           int
 }
 
-func (f fakeAuth) RevokeToken(_ context.Context, token string) error {
-	fakeAuthMu.Lock()
-	defer fakeAuthMu.Unlock()
-	delete(f, token)
+type fakeDevice struct {
+	device  auth.Device
+	info    devices.Device
+	revoked bool
+}
+
+type fakeAuthorization struct {
+	userCodeHash string
+	client       devices.Client
+	status       string
+	userID       string
+	expiresAt    time.Time
+	lastPoll     time.Time
+}
+
+func newFakeDevices() *fakeDevices {
+	return &fakeDevices{byToken: map[string]*fakeDevice{}, authorizations: map[string]*fakeAuthorization{}}
+}
+
+// add connects a device for user under token.
+func (f *fakeDevices) add(token string, user auth.User, client devices.Client) devices.Device {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.addLocked(token, user, client)
+}
+
+func (f *fakeDevices) addLocked(token string, user auth.User, client devices.Client) devices.Device {
+	f.next++
+	id := fmt.Sprintf("00000000-0000-4000-8000-%012d", f.next)
+	info := devices.Device{ID: id, Name: client.Name, Platform: client.Platform, ClientVersion: client.ClientVersion, CreatedAt: time.Now()}
+	f.byToken[token] = &fakeDevice{device: auth.Device{ID: id, User: user}, info: info}
+	return info
+}
+
+func (f *fakeDevices) DeviceByToken(_ context.Context, token string) (auth.Device, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	d, ok := f.byToken[token]
+	switch {
+	case !ok:
+		return auth.Device{}, auth.ErrUnauthorized
+	case d.revoked:
+		return auth.Device{}, auth.ErrDeviceRevoked
+	}
+	now := time.Now()
+	d.info.LastUsedAt = &now
+	return d.device, nil
+}
+
+func (f *fakeDevices) RevokeToken(_ context.Context, token string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.byToken, token)
 	return nil
+}
+
+func (f *fakeDevices) RecordSync(_ context.Context, deviceID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, d := range f.byToken {
+		if d.device.ID == deviceID {
+			now := time.Now()
+			d.info.LastSyncAt = &now
+		}
+	}
+	return nil
+}
+
+func (f *fakeDevices) CreateDeviceAuthorization(_ context.Context, deviceCodeHash, userCodeHash []byte, client devices.Client, expiresAt time.Time) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.authorizations[string(deviceCodeHash)] = &fakeAuthorization{
+		userCodeHash: string(userCodeHash), client: client, status: "pending", expiresAt: expiresAt,
+	}
+	return nil
+}
+
+func (f *fakeDevices) pending(userCodeHash []byte) *fakeAuthorization {
+	for _, a := range f.authorizations {
+		if a.userCodeHash == string(userCodeHash) && a.status == "pending" && time.Now().Before(a.expiresAt) {
+			return a
+		}
+	}
+	return nil
+}
+
+func (f *fakeDevices) PendingDeviceAuthorization(_ context.Context, userCodeHash []byte) (devices.Client, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	a := f.pending(userCodeHash)
+	if a == nil {
+		return devices.Client{}, devices.ErrInvalidUserCode
+	}
+	return a.client, nil
+}
+
+func (f *fakeDevices) DecideDeviceAuthorization(_ context.Context, userCodeHash []byte, userID string, approve bool) (devices.Client, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	a := f.pending(userCodeHash)
+	if a == nil {
+		return devices.Client{}, devices.ErrInvalidUserCode
+	}
+	a.status, a.userID = "denied", userID
+	if approve {
+		a.status = "approved"
+	}
+	return a.client, nil
+}
+
+func (f *fakeDevices) ExchangeDeviceCode(_ context.Context, deviceCodeHash, tokenHash []byte) (devices.Device, auth.User, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	a, ok := f.authorizations[string(deviceCodeHash)]
+	switch {
+	case !ok || time.Now().After(a.expiresAt):
+		delete(f.authorizations, string(deviceCodeHash))
+		return devices.Device{}, auth.User{}, devices.ErrExpiredToken
+	case a.status == "denied":
+		delete(f.authorizations, string(deviceCodeHash))
+		return devices.Device{}, auth.User{}, devices.ErrAccessDenied
+	}
+	tooSoon := time.Since(a.lastPoll) < devices.Interval-time.Second
+	a.lastPoll = time.Now()
+	switch {
+	case tooSoon:
+		return devices.Device{}, auth.User{}, devices.ErrSlowDown
+	case a.status == "pending":
+		return devices.Device{}, auth.User{}, devices.ErrAuthorizationPending
+	}
+	delete(f.authorizations, string(deviceCodeHash))
+	// The token is known by its hash only; tests find it in the response.
+	user := auth.User{ID: a.userID, Email: strings.TrimPrefix(a.userID, "user-")}
+	return f.addLocked("hash:"+string(tokenHash), user, a.client), user, nil
+}
+
+// connectToken moves a device added by ExchangeDeviceCode to its token.
+func (f *fakeDevices) connectToken(token string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	key := "hash:" + string(auth.HashToken(token))
+	if d, ok := f.byToken[key]; ok {
+		delete(f.byToken, key)
+		f.byToken[token] = d
+	}
+}
+
+// expire makes every waiting authorization run out.
+func (f *fakeDevices) expire() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, a := range f.authorizations {
+		a.expiresAt = time.Now().Add(-time.Second)
+	}
+}
+
+// forgetPolls lets the next poll come at once.
+func (f *fakeDevices) forgetPolls() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, a := range f.authorizations {
+		a.lastPoll = time.Time{}
+	}
+}
+
+func (f *fakeDevices) ListDevices(_ context.Context, userID string) ([]devices.Device, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var list []devices.Device
+	for _, d := range f.byToken {
+		if d.device.User.ID == userID && !d.revoked {
+			list = append(list, d.info)
+		}
+	}
+	sort.Slice(list, func(i, j int) bool { return list[i].ID < list[j].ID })
+	return list, nil
+}
+
+func (f *fakeDevices) RevokeDevice(_ context.Context, userID, deviceID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, d := range f.byToken {
+		if d.device.ID == deviceID && d.device.User.ID == userID && !d.revoked {
+			d.revoked = true
+			return nil
+		}
+	}
+	return devices.ErrNotFound
+}
+
+// dropUser forgets the user's devices, as deleting the account does.
+func (f *fakeDevices) dropUser(userID string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for token, d := range f.byToken {
+		if d.device.User.ID == userID {
+			delete(f.byToken, token)
+		}
+	}
 }
 
 const (
@@ -178,14 +371,20 @@ func newTestServerWith(t *testing.T, options Options) (*httptest.Server, *fakeRe
 	return server, repository, handler
 }
 
+// newTestHandler serves ada's and bob's tokens, from the accounts' device
+// store when the options have one.
 func newTestHandler(options Options) (*Handler, *fakeRepository) {
 	repository := newFakeRepository()
-	users := fakeAuth{
-		adaToken: {ID: "user-ada", Email: "ada@example.com"},
-		bobToken: {ID: "user-bob", Email: "bob@example.com"},
+	known := newFakeDevices()
+	if options.Accounts != nil {
+		if d, ok := options.Accounts.Devices.(*fakeDevices); ok {
+			known = d
+		}
 	}
+	known.add(adaToken, auth.User{ID: "user-ada", Email: "ada@example.com"}, devices.Client{Name: "Ada's laptop", Platform: "macos"})
+	known.add(bobToken, auth.User{ID: "user-bob", Email: "bob@example.com"}, devices.Client{Name: "Bob's phone", Platform: "android"})
 	options.AllowedOrigins = append(options.AllowedOrigins, "https://app.example.com")
-	return NewHandler(repository, users, slog.New(slog.DiscardHandler), options), repository
+	return NewHandler(repository, known, slog.New(slog.DiscardHandler), options), repository
 }
 
 type response struct {

@@ -29,10 +29,12 @@ type NoteRepository interface {
 	Changes(ctx context.Context, userID string, cursor int64, limit int) ([]notes.Note, int64, error)
 }
 
-// Authenticator resolves bearer tokens to users and revokes them.
+// Authenticator resolves bearer tokens to the devices (apps) they were
+// issued to, and keeps track of those devices.
 type Authenticator interface {
-	UserByToken(ctx context.Context, token string) (auth.User, error)
+	DeviceByToken(ctx context.Context, token string) (auth.Device, error)
 	RevokeToken(ctx context.Context, token string) error
+	RecordSync(ctx context.Context, deviceID string) error
 }
 
 // maxBodyBytes leaves room for JSON escaping around the largest document.
@@ -107,8 +109,8 @@ func NewHandler(repository NoteRepository, authenticator Authenticator, logger *
 	mux.Handle("GET /api/notes/{id}", a.authenticated(a.getNote))
 	mux.Handle("PUT /api/notes/{id}", a.authenticated(a.updateNote))
 	mux.Handle("DELETE /api/notes/{id}", a.authenticated(a.deleteNote))
-	mux.Handle("GET /api/sync", a.authenticated(a.changes))
-	mux.Handle("GET /api/events", a.authenticated(a.events))
+	mux.Handle("GET /api/sync", a.withDevice(a.changes))
+	mux.Handle("GET /api/events", a.withDevice(a.events))
 	mux.Handle("DELETE /api/tokens/current", a.authenticated(a.revokeCurrentToken))
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, _ *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "no such endpoint")
@@ -166,7 +168,8 @@ func cors(allowed []string, next http.Handler) http.Handler {
 
 // changes returns notes changed since a cursor, deleted ones included, for
 // incremental sync. Clients repeat with the returned cursor while more is true.
-func (a *api) changes(w http.ResponseWriter, r *http.Request, user auth.User) {
+func (a *api) changes(w http.ResponseWriter, r *http.Request, device auth.Device) {
+	user := device.User
 	query := r.URL.Query()
 	cursor, err := parseOptionalInt(query.Get("since"), 0)
 	if err != nil || cursor < 0 {
@@ -182,6 +185,10 @@ func (a *api) changes(w http.ResponseWriter, r *http.Request, user auth.User) {
 	if err != nil {
 		a.internalError(w, r, err)
 		return
+	}
+	// For "last synced" on the site; sync itself does not depend on it.
+	if err := a.auth.RecordSync(r.Context(), device.ID); err != nil {
+		a.logger.WarnContext(r.Context(), "recording a sync failed", "error", err)
 	}
 	out := make([]noteJSON, 0, len(changed))
 	for _, n := range changed {
@@ -203,7 +210,20 @@ func parseOptionalInt(value string, fallback int64) (int64, error) {
 
 type userHandler func(w http.ResponseWriter, r *http.Request, user auth.User)
 
+// deviceHandler serves a request of an app, signed in as a device.
+type deviceHandler func(w http.ResponseWriter, r *http.Request, device auth.Device)
+
+// authenticated runs next for the user of the request's bearer token.
 func (a *api) authenticated(next userHandler) http.Handler {
+	return a.withDevice(func(w http.ResponseWriter, r *http.Request, device auth.Device) {
+		next(w, r, device.User)
+	})
+}
+
+// withDevice runs next for the device of the request's bearer token. A
+// disconnected device hears so (401 device_revoked): its app then stops
+// syncing and keeps its notes.
+func (a *api) withDevice(next deviceHandler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		client := clientAddress(r, a.trusted)
 		if retry, blocked := a.limiter.blocked(client); blocked {
@@ -213,20 +233,25 @@ func (a *api) authenticated(next userHandler) http.Handler {
 		}
 		token, err := auth.BearerToken(r.Header.Get("Authorization"))
 		if err == nil {
-			var user auth.User
-			user, err = a.auth.UserByToken(r.Context(), token)
+			var device auth.Device
+			device, err = a.auth.DeviceByToken(r.Context(), token)
 			if err == nil {
-				next(w, r, user)
+				next(w, r, device)
 				return
 			}
 		}
-		if errors.Is(err, auth.ErrUnauthorized) {
+		switch {
+		case errors.Is(err, auth.ErrDeviceRevoked):
+			a.limiter.record(client)
+			w.Header().Set("WWW-Authenticate", `Bearer realm="konspecter", error="invalid_token"`)
+			writeError(w, http.StatusUnauthorized, "device_revoked", "this device was disconnected from its account")
+		case errors.Is(err, auth.ErrUnauthorized):
 			a.limiter.record(client)
 			w.Header().Set("WWW-Authenticate", `Bearer realm="konspecter"`)
 			writeError(w, http.StatusUnauthorized, "unauthorized", "a valid bearer token is required")
-			return
+		default:
+			a.internalError(w, r, err)
 		}
-		a.internalError(w, r, err)
 	})
 }
 

@@ -56,6 +56,11 @@ export class ApiClient {
     this.#fetch = fetchFn;
   }
 
+  /** Signs this device out: its token stops working and it leaves the account's device list. */
+  async revokeCurrentToken(): Promise<void> {
+    await this.#request("DELETE", "api/tokens/current");
+  }
+
   async me(): Promise<Account> {
     const body = await this.#request("GET", "api/me");
     const { id, email } = asRecord(body);
@@ -119,28 +124,149 @@ export class ApiClient {
     return response.body;
   }
 
-  async #request(method: string, path: string, body?: unknown): Promise<unknown> {
-    let response: Response;
-    try {
-      response = await this.#fetch(new URL(path, this.#base).toString(), {
-        method,
-        headers: {
-          Authorization: `Bearer ${this.#token}`,
-          ...(body === undefined ? {} : { "Content-Type": "application/json" }),
-        },
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      });
-    } catch (error) {
-      throw new NetworkError("Could not reach the server", { cause: error });
-    }
-    if (response.status === 204) return null;
-    if (!response.ok) return failure(response);
-    try {
-      return (await response.json()) as unknown;
-    } catch {
-      throw invalid("response");
-    }
+  #request(method: string, path: string, body?: unknown): Promise<unknown> {
+    return send(this.#fetch, new URL(path, this.#base).toString(), method, body, this.#token);
   }
+}
+
+/** Sends a JSON request and returns the JSON answer (null for 204), or throws its error. */
+async function send(
+  fetchFn: Fetch,
+  url: string,
+  method: string,
+  body: unknown,
+  token: string | null,
+): Promise<unknown> {
+  let response: Response;
+  try {
+    response = await fetchFn(url, {
+      method,
+      headers: {
+        ...(token === null ? {} : { Authorization: `Bearer ${token}` }),
+        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+  } catch (error) {
+    throw new NetworkError("Could not reach the server", { cause: error });
+  }
+  if (response.status === 204) return null;
+  if (!response.ok) return failure(response);
+  try {
+    return (await response.json()) as unknown;
+  } catch {
+    throw invalid("response");
+  }
+}
+
+// --- Connecting through the browser (the device flow, RFC 8628) ------------
+
+/** What this app tells the server about itself; its owner sees it on the site. */
+export type DeviceDescription = {
+  readonly name: string;
+  readonly platform: string;
+  readonly clientVersion: string;
+};
+
+/** The codes of a request to connect: the app polls with one, its owner approves the other. */
+export type DeviceAuthorization = {
+  readonly deviceCode: string;
+  /** Shown to the owner, e.g. "BCDF-GHJK". */
+  readonly userCode: string;
+  readonly verificationUri: string;
+  /** The approval page with the code filled in. */
+  readonly verificationUriComplete: string;
+  readonly expiresInSeconds: number;
+  readonly intervalSeconds: number;
+};
+
+/** One poll's answer: the token once approved, else why not yet (or never). */
+export type DeviceTokenPoll =
+  | { readonly status: "approved"; readonly token: string }
+  | { readonly status: "pending" | "slow_down" | "denied" | "expired" };
+
+function apiUrl(serverUrl: string, path: string): string {
+  return new URL(path, serverUrl.endsWith("/") ? serverUrl : `${serverUrl}/`).toString();
+}
+
+/** Asks the server to connect this app; the owner then approves it in the browser. */
+export async function authorizeDevice(
+  serverUrl: string,
+  device: DeviceDescription,
+  fetchFn: Fetch = (input, init) => fetch(input, init),
+): Promise<DeviceAuthorization> {
+  const body = asRecord(
+    await send(
+      fetchFn,
+      apiUrl(serverUrl, "api/devices/authorize"),
+      "POST",
+      {
+        name: device.name,
+        platform: device.platform,
+        client_version: device.clientVersion,
+      },
+      null,
+    ),
+  );
+  const {
+    device_code: deviceCode,
+    user_code: userCode,
+    verification_uri: verificationUri,
+    verification_uri_complete: verificationUriComplete,
+    expires_in: expiresIn,
+    interval,
+  } = body;
+  if (
+    typeof deviceCode !== "string" ||
+    typeof userCode !== "string" ||
+    typeof verificationUri !== "string" ||
+    typeof verificationUriComplete !== "string" ||
+    typeof expiresIn !== "number" ||
+    typeof interval !== "number"
+  ) {
+    throw invalid("device authorization");
+  }
+  return {
+    deviceCode,
+    userCode,
+    verificationUri,
+    verificationUriComplete,
+    expiresInSeconds: expiresIn,
+    intervalSeconds: Math.max(1, interval),
+  };
+}
+
+const POLL_ERRORS = {
+  authorization_pending: "pending",
+  slow_down: "slow_down",
+  access_denied: "denied",
+  expired_token: "expired",
+} as const;
+
+/** Polls once with the device code. */
+export async function pollDeviceToken(
+  serverUrl: string,
+  deviceCode: string,
+  fetchFn: Fetch = (input, init) => fetch(input, init),
+): Promise<DeviceTokenPoll> {
+  let body: unknown;
+  try {
+    body = await send(
+      fetchFn,
+      apiUrl(serverUrl, "api/devices/token"),
+      "POST",
+      { device_code: deviceCode },
+      null,
+    );
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 400 && error.code in POLL_ERRORS) {
+      return { status: POLL_ERRORS[error.code as keyof typeof POLL_ERRORS] };
+    }
+    throw error;
+  }
+  const { token } = asRecord(body);
+  if (typeof token !== "string") throw invalid("device token");
+  return { status: "approved", token };
 }
 
 /** Throws the error a failed response describes. */

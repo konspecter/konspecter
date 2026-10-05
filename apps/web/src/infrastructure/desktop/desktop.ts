@@ -38,6 +38,20 @@ export async function onWindowClose(beforeClose: () => Promise<void>): Promise<v
   });
 }
 
+/**
+ * Opens a web page in the system browser (signing in to sync). The desktop
+ * app asks the shell (native command `open_url`); in a browser it is a new
+ * tab, and in the mobile app's web view Capacitor hands the address to the
+ * system browser.
+ */
+export async function openInBrowser(url: string): Promise<void> {
+  if (isDesktop()) {
+    await invoke("open_url", { url });
+    return;
+  }
+  window.open(url, "_blank", "noopener");
+}
+
 /** Details of the running desktop app (native command `app_info`). */
 export async function appInfo(): Promise<AppInfo> {
   const value = await invoke("app_info");

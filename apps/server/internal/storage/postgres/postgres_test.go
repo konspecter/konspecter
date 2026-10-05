@@ -81,7 +81,7 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"001_initial.sql", "002_sync.sql", "003_accounts.sql", "004_identities.sql"}
+	want := []string{"001_initial.sql", "002_sync.sql", "003_accounts.sql", "004_identities.sql", "005_devices.sql"}
 	if strings.Join(names, ",") != strings.Join(want, ",") {
 		t.Errorf("applied migrations = %v, want %v", names, want)
 	}
@@ -125,14 +125,14 @@ func TestUsersAndTokens(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, err := db.UserByToken(ctx, token); err != nil || got != user {
-		t.Errorf("UserByToken = %+v, %v", got, err)
+	if got, err := db.DeviceByToken(ctx, token); err != nil || got.User != user || got.ID == "" {
+		t.Errorf("DeviceByToken = %+v, %v", got, err)
 	}
-	if _, err := db.UserByToken(ctx, "ksp_unknown"); !errors.Is(err, auth.ErrUnauthorized) {
+	if _, err := db.DeviceByToken(ctx, "ksp_unknown"); !errors.Is(err, auth.ErrUnauthorized) {
 		t.Errorf("unknown token error = %v", err)
 	}
 	var stored int
-	if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM api_tokens WHERE token_hash = $1`, []byte(token)).Scan(&stored); err != nil || stored != 0 {
+	if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM devices WHERE token_hash = $1`, []byte(token)).Scan(&stored); err != nil || stored != 0 {
 		t.Errorf("plaintext token stored (count %d, %v)", stored, err)
 	}
 }
@@ -394,16 +394,16 @@ func TestRevokingTokens(t *testing.T) {
 	if err := db.RevokeToken(ctx, first); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.UserByToken(ctx, first); !errors.Is(err, auth.ErrUnauthorized) {
+	if _, err := db.DeviceByToken(ctx, first); !errors.Is(err, auth.ErrUnauthorized) {
 		t.Errorf("revoked token still works: %v", err)
 	}
-	if _, err := db.UserByToken(ctx, second); err != nil {
+	if _, err := db.DeviceByToken(ctx, second); err != nil {
 		t.Errorf("other token revoked too: %v", err)
 	}
 	if count, err := db.RevokeUserTokens(ctx, user.ID); err != nil || count != 1 {
 		t.Errorf("RevokeUserTokens = %d, %v", count, err)
 	}
-	if _, err := db.UserByToken(ctx, second); !errors.Is(err, auth.ErrUnauthorized) {
+	if _, err := db.DeviceByToken(ctx, second); !errors.Is(err, auth.ErrDeviceRevoked) {
 		t.Errorf("token survived RevokeUserTokens: %v", err)
 	}
 }

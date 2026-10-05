@@ -266,6 +266,28 @@ fn folder_reveal(state: State<'_, FolderState>, path: String) -> Result<(), Comm
     state.with(|f| f.reveal(&path))
 }
 
+/// Opens a web page in the system browser: signing in to sync approves this
+/// device on the account site. Only http(s) addresses are opened.
+#[tauri::command]
+fn open_url(url: String) -> Result<(), CommandError> {
+    if !is_web_url(&url) {
+        return Err(CommandError {
+            code: "invalid_url",
+            message: "only http and https addresses can be opened".into(),
+        });
+    }
+    open::that_detached(&url).map_err(|e| CommandError {
+        code: "io",
+        message: format!("open the browser: {e}"),
+    })
+}
+
+fn is_web_url(url: &str) -> bool {
+    let lower = url.to_ascii_lowercase();
+    (lower.starts_with("https://") || lower.starts_with("http://"))
+        && !url.chars().any(char::is_control)
+}
+
 #[derive(Debug, Deserialize)]
 struct ExportFile {
     title: String,
@@ -402,6 +424,7 @@ pub fn run() {
             folder_open_external,
             folder_reveal,
             export_to_folder,
+            open_url,
             credential_get,
             credential_set,
             credential_delete,
@@ -414,6 +437,18 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn opens_only_web_addresses() {
+        assert!(is_web_url(
+            "https://notes.example.com/activate?code=BCDF-GHJK"
+        ));
+        assert!(is_web_url("HTTP://localhost:5174/activate"));
+        assert!(!is_web_url("file:///etc/passwd"));
+        assert!(!is_web_url("javascript:alert(1)"));
+        assert!(!is_web_url("https://example.com/\nrm -rf"));
+        assert!(!is_web_url("https://example.com/\u{0}"));
+    }
 
     #[test]
     fn app_info_reports_the_package_version() {

@@ -31,11 +31,14 @@ type fakeAccounts struct {
 	sessions map[string]*auth.Session
 	links    map[string]string            // provider + "/" + subject → user email
 	pending  map[string]accounts.Identity // token hash → identity
+	// deleted runs after an account is deleted (its devices go too).
+	deleted func(userID string)
 }
 
 type fakeUser struct {
 	user         auth.User
 	passwordHash string
+	name         string
 }
 
 type fakeCode struct {
@@ -196,7 +199,7 @@ func (f *fakeAccounts) CreateSession(_ context.Context, userID string, idHash []
 	defer f.mu.Unlock()
 	for _, u := range f.users {
 		if u.user.ID == userID {
-			f.sessions[string(idHash)] = &auth.Session{User: u.user, LastSeenAt: time.Now(), ExpiresAt: expiresAt}
+			f.sessions[string(idHash)] = &auth.Session{User: u.user, CreatedAt: time.Now(), LastSeenAt: time.Now(), ExpiresAt: expiresAt}
 		}
 	}
 	return nil
@@ -228,6 +231,71 @@ func (f *fakeAccounts) DeleteSession(_ context.Context, idHash []byte) error {
 	return nil
 }
 
+// signedInAgo moves every session's sign-in back in time.
+func (f *fakeAccounts) signedInAgo(d time.Duration) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, s := range f.sessions {
+		s.CreatedAt = time.Now().Add(-d)
+	}
+}
+
+func (f *fakeAccounts) byID(userID string) (*fakeUser, error) {
+	for _, u := range f.users {
+		if u.user.ID == userID {
+			return u, nil
+		}
+	}
+	return nil, auth.ErrUserNotFound
+}
+
+func (f *fakeAccounts) Account(_ context.Context, userID string) (accounts.Account, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	u, err := f.byID(userID)
+	if err != nil {
+		return accounts.Account{}, err
+	}
+	return accounts.Account{ID: u.user.ID, Email: u.user.Email, Name: u.name}, nil
+}
+
+func (f *fakeAccounts) RenameAccount(ctx context.Context, userID, name string) (accounts.Account, error) {
+	f.mu.Lock()
+	u, err := f.byID(userID)
+	if err == nil {
+		u.name = name
+	}
+	f.mu.Unlock()
+	return f.Account(ctx, userID)
+}
+
+func (f *fakeAccounts) DeleteAccount(_ context.Context, userID string) error {
+	f.mu.Lock()
+	u, err := f.byID(userID)
+	if err != nil {
+		f.mu.Unlock()
+		return err
+	}
+	delete(f.users, u.user.Email)
+	delete(f.codes, u.user.Email)
+	for id, s := range f.sessions {
+		if s.User.ID == userID {
+			delete(f.sessions, id)
+		}
+	}
+	for key, email := range f.links {
+		if email == u.user.Email {
+			delete(f.links, key)
+		}
+	}
+	deleted := f.deleted
+	f.mu.Unlock()
+	if deleted != nil {
+		deleted(userID)
+	}
+	return nil
+}
+
 // fakeMailer keeps sent messages.
 type fakeMailer struct {
 	mu   sync.Mutex
@@ -254,24 +322,30 @@ func (m *fakeMailer) last(t *testing.T) mail.Message {
 const site = "https://notes.example.com"
 
 type accountSetup struct {
-	server *httptest.Server
-	store  *fakeAccounts
-	mailer *fakeMailer
+	server  *httptest.Server
+	store   *fakeAccounts
+	mailer  *fakeMailer
+	devices *fakeDevices
 }
 
 func newAccountServer(t *testing.T, change func(*Accounts)) accountSetup {
 	t.Helper()
-	store, mailer := newFakeAccounts(), &fakeMailer{}
+	store, mailer, known := newFakeAccounts(), &fakeMailer{}, newFakeDevices()
+	store.deleted = known.dropUser
 	config := Accounts{
-		Store: store, Mailer: mailer, PublicURL: site, RegistrationOpen: true,
+		Store: store, Devices: known, Mailer: mailer, PublicURL: site, RegistrationOpen: true,
 		SessionTTL: 24 * time.Hour, EmailCodeTTL: 10 * time.Minute, PasswordResetTTL: 30 * time.Minute,
-		Rates: Rates{LoginFailuresPerIP: 100, LoginFailuresPerEmail: 100, EmailsPerAddress: 100, EmailsPerIP: 100},
+		DeviceCodeTTL: 10 * time.Minute,
+		Rates: Rates{
+			LoginFailuresPerIP: 100, LoginFailuresPerEmail: 100, EmailsPerAddress: 100, EmailsPerIP: 100,
+			DeviceRequestsPerIP: 100,
+		},
 	}
 	if change != nil {
 		change(&config)
 	}
 	server, _, _ := newTestServerWith(t, Options{Accounts: &config})
-	return accountSetup{server: server, store: store, mailer: mailer}
+	return accountSetup{server: server, store: store, mailer: mailer, devices: known}
 }
 
 // browser is a site visitor: it keeps cookies and sends the site's Origin.

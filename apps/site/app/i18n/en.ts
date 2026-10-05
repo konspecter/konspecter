@@ -59,6 +59,65 @@ export const en = {
   "site.signIn": "Sign in",
   "site.signOut": "Sign out",
   "site.account": "Account",
+  "site.settings": "Account settings",
+
+  "settings.title": "Settings",
+  "settings.lead": "You are signed in as {email}.",
+  "settings.leadNamed": "Hello, {name}. You are signed in as {email}.",
+  "settings.name.title": "Your name",
+  "settings.name.label": "Name",
+  "settings.name.hint": "Used to greet you on this page. Leave it empty to see your email instead.",
+  "settings.name.save": "Save name",
+  "settings.name.saved": "Name saved.",
+  "settings.devices.title": "Connected devices",
+  "settings.devices.lead":
+    "Apps that sync with this account. A disconnected device stops syncing and keeps its conspects.",
+  "settings.devices.empty":
+    "No devices yet. In the app, open Settings, then Sync, and choose Sign in with browser.",
+  "settings.devices.failed": "The devices could not be loaded. Reload the page to try again.",
+  "settings.devices.platformVersion": "{platform}, version {version}",
+  "settings.devices.lastSynced": "Last synced {when}",
+  "settings.devices.lastActive": "Last active {when}",
+  "settings.devices.connected": "Connected {when}",
+  "settings.devices.disconnect": "Disconnect",
+  "settings.devices.disconnectNamed": "Disconnect {name}",
+  "settings.devices.disconnected":
+    "{name} is disconnected. It keeps its conspects and stops syncing.",
+  "settings.delete.title": "Delete account",
+  "settings.delete.lead":
+    "This deletes the account and every conspect it keeps on the server, and disconnects all devices. Your devices keep their own conspects. It cannot be undone.",
+  "settings.delete.label": "Type {email} to confirm",
+  "settings.delete.submit": "Delete account",
+  "settings.delete.signInAgain":
+    "To delete the account, sign in again first. This makes sure it is you and not a browser left signed in.",
+  "settings.delete.signInAgainButton": "Sign in again",
+
+  "device.platform.web": "Web browser",
+  "device.platform.macos": "macOS",
+  "device.platform.windows": "Windows",
+  "device.platform.linux": "Linux",
+  "device.platform.android": "Android",
+  "device.platform.ios": "iOS",
+  "device.platform.other": "Other",
+
+  "activate.title": "Connect a device",
+  "activate.lead":
+    "An app asks to sync with {email}. Check that this code is the one the app shows.",
+  "activate.codeLabelled": "Code {code}",
+  "activate.warning":
+    "Approve only if you started this yourself, on your own device. An approved app can read and change every conspect you sync.",
+  "activate.approve": "Approve",
+  "activate.deny": "Deny",
+  "activate.enterLead": "Enter the code the app shows you.",
+  "activate.codeLabel": "Code from the app",
+  "activate.continue": "Continue",
+  "activate.approvedTitle": "Device connected",
+  "activate.approved":
+    "{name} can now sync with your account. Go back to the app: it carries on by itself.",
+  "activate.toSettings": "See your connected devices",
+  "activate.deniedTitle": "Request denied",
+  "activate.denied":
+    "Nothing was connected. If you did not start this, you can ignore it: the code expires soon.",
 
   "auth.email": "Email",
   "auth.password": "Password",
@@ -144,6 +203,11 @@ export const en = {
   "authError.oauth_cancelled": "Sign-in was cancelled. Try again, or use your email.",
   "authError.provider_unavailable": "That way of signing in is not set up on this server.",
   "authError.identity_expired": "The sign-in took too long. Start it again.",
+  "authError.invalid_name": "A name has at most 100 characters and no line breaks.",
+  "authError.email_mismatch": "That is not this account's email. Type it exactly to confirm.",
+  "authError.reauthentication_required": "Sign in again before deleting the account.",
+  "authError.invalid_user_code":
+    "No device is waiting for this code. Check it, or start again in the app.",
   "authError.unknown": "Something went wrong on the server. Try again in a moment.",
 
   "error.title": "Page not found",

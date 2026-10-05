@@ -4,7 +4,7 @@
 //	server migrate                 apply database migrations and exit
 //	server create-user -email ADDR create a user and print an API token
 //	server create-token -email ADDR print a new API token for a user
-//	server revoke-tokens -email ADDR revoke every API token of a user
+//	server revoke-tokens -email ADDR disconnect every device of a user
 //	server version                 print the version
 //
 // Configuration comes from the environment and from an optional .env file
@@ -135,16 +135,19 @@ func accountOptions(cfg config.Config, db *postgres.DB, logger *slog.Logger) (*h
 	}
 	accounts := &httpapi.Accounts{
 		Store:            db,
+		Devices:          db,
 		PublicURL:        cfg.PublicURL,
 		RegistrationOpen: cfg.RegistrationOpen,
 		SessionTTL:       cfg.SessionTTL,
 		EmailCodeTTL:     cfg.EmailCodeTTL,
 		PasswordResetTTL: cfg.PasswordResetTTL,
+		DeviceCodeTTL:    cfg.DeviceCodeTTL,
 		Rates: httpapi.Rates{
 			LoginFailuresPerIP:    cfg.Rates.LoginFailuresPerIP,
 			LoginFailuresPerEmail: cfg.Rates.LoginFailuresPerEmail,
 			EmailsPerAddress:      cfg.Rates.EmailsPerAddress,
 			EmailsPerIP:           cfg.Rates.EmailsPerIP,
+			DeviceRequestsPerIP:   cfg.Rates.DeviceRequestsPerIP,
 		},
 		Providers:      providers,
 		LoginProviders: lists,

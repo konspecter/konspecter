@@ -47,6 +47,9 @@ type Config struct {
 	EmailCodeTTL time.Duration
 	// PasswordResetTTL is how long a reset link works (KONSPECTER_PASSWORD_RESET_TTL, default 30m).
 	PasswordResetTTL time.Duration
+	// DeviceCodeTTL is how long an app's request to connect waits for its
+	// owner's approval (KONSPECTER_DEVICE_CODE_TTL, default 10m).
+	DeviceCodeTTL time.Duration
 	// Mail configures sending email.
 	Mail Mail
 	// TrustedProxies are the addresses whose X-Forwarded-For is believed
@@ -100,6 +103,8 @@ type Rates struct {
 	EmailsPerAddress int
 	// EmailsPerIP: emails one client address may trigger per hour (default 20).
 	EmailsPerIP int
+	// DeviceRequestsPerIP: requests to connect an app per client address per hour (default 20).
+	DeviceRequestsPerIP int
 }
 
 // Load reads the settings. getenv looks up the real environment; the .env
@@ -120,6 +125,7 @@ func Load(getenv func(string) string) (Config, error) {
 		SessionTTL:       r.duration("KONSPECTER_SESSION_TTL", 30*24*time.Hour),
 		EmailCodeTTL:     r.duration("KONSPECTER_EMAIL_CODE_TTL", 10*time.Minute),
 		PasswordResetTTL: r.duration("KONSPECTER_PASSWORD_RESET_TTL", 30*time.Minute),
+		DeviceCodeTTL:    r.duration("KONSPECTER_DEVICE_CODE_TTL", 10*time.Minute),
 		Mail: Mail{
 			Transport: r.choice("KONSPECTER_MAIL_TRANSPORT", "smtp", "log"),
 			Host:      lookup("KONSPECTER_SMTP_HOST"),
@@ -135,6 +141,7 @@ func Load(getenv func(string) string) (Config, error) {
 			LoginFailuresPerEmail: r.integer("KONSPECTER_RATE_LOGIN_PER_EMAIL", 10),
 			EmailsPerAddress:      r.integer("KONSPECTER_RATE_EMAIL_PER_ADDRESS", 5),
 			EmailsPerIP:           r.integer("KONSPECTER_RATE_EMAIL_PER_IP", 20),
+			DeviceRequestsPerIP:   r.integer("KONSPECTER_RATE_DEVICE_PER_IP", 20),
 		},
 	}
 	cfg.OAuth = r.oauthClients()

@@ -33,20 +33,28 @@ var (
 
 // hub fans a user's change notifications out to the user's open streams.
 // Each subscriber has a buffer of one: a burst of changes arrives as one
-// event, and publishers never block.
+// event, and publishers never block. A stream also ends at once when its
+// device is disconnected or its account deleted.
 type hub struct {
 	mu     sync.Mutex
-	users  map[string]map[chan struct{}]struct{}
+	users  map[string]map[*subscriber]struct{}
 	closed bool
 	done   chan struct{} // closed by close: every stream ends
 }
 
-func newHub() *hub {
-	return &hub{users: map[string]map[chan struct{}]struct{}{}, done: make(chan struct{})}
+// subscriber is one open stream.
+type subscriber struct {
+	deviceID string
+	changed  chan struct{}
+	ended    chan struct{} // closed by end
 }
 
-// subscribe opens a stream for the user; unsubscribe must follow.
-func (h *hub) subscribe(userID string) (chan struct{}, error) {
+func newHub() *hub {
+	return &hub{users: map[string]map[*subscriber]struct{}{}, done: make(chan struct{})}
+}
+
+// subscribe opens a stream for the user's device; unsubscribe must follow.
+func (h *hub) subscribe(userID, deviceID string) (*subscriber, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.closed {
@@ -57,18 +65,22 @@ func (h *hub) subscribe(userID string) (chan struct{}, error) {
 		return nil, errTooManyStreams
 	}
 	if streams == nil {
-		streams = map[chan struct{}]struct{}{}
+		streams = map[*subscriber]struct{}{}
 		h.users[userID] = streams
 	}
-	ch := make(chan struct{}, 1)
-	streams[ch] = struct{}{}
-	return ch, nil
+	s := &subscriber{deviceID: deviceID, changed: make(chan struct{}, 1), ended: make(chan struct{})}
+	streams[s] = struct{}{}
+	return s, nil
 }
 
-func (h *hub) unsubscribe(userID string, ch chan struct{}) {
+func (h *hub) unsubscribe(userID string, s *subscriber) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	delete(h.users[userID], ch)
+	h.remove(userID, s)
+}
+
+func (h *hub) remove(userID string, s *subscriber) {
+	delete(h.users[userID], s)
 	if len(h.users[userID]) == 0 {
 		delete(h.users, userID)
 	}
@@ -78,10 +90,23 @@ func (h *hub) unsubscribe(userID string, ch chan struct{}) {
 func (h *hub) publish(userID string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	for ch := range h.users[userID] {
+	for s := range h.users[userID] {
 		select {
-		case ch <- struct{}{}:
+		case s.changed <- struct{}{}:
 		default: // An event is already pending.
+		}
+	}
+}
+
+// end closes the streams of one of the user's devices, or with deviceID ""
+// every stream of the user.
+func (h *hub) end(userID, deviceID string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for s := range h.users[userID] {
+		if deviceID == "" || s.deviceID == deviceID {
+			close(s.ended)
+			h.remove(userID, s)
 		}
 	}
 }
@@ -96,10 +121,11 @@ func (h *hub) close() {
 	}
 }
 
-// events streams change notifications to the user until the client leaves,
-// the token is revoked, a write fails or the server shuts down.
-func (a *api) events(w http.ResponseWriter, r *http.Request, user auth.User) {
-	changed, err := a.hub.subscribe(user.ID)
+// events streams change notifications to the device's user until the client
+// leaves, the device is disconnected, a write fails or the server shuts down.
+func (a *api) events(w http.ResponseWriter, r *http.Request, device auth.Device) {
+	user := device.User
+	stream, err := a.hub.subscribe(user.ID, device.ID)
 	switch {
 	case errors.Is(err, errTooManyStreams):
 		writeError(w, http.StatusTooManyRequests, "too_many_streams", "too many open event streams; close some and retry")
@@ -108,7 +134,7 @@ func (a *api) events(w http.ResponseWriter, r *http.Request, user auth.User) {
 		writeError(w, http.StatusServiceUnavailable, "shutting_down", "the server is shutting down")
 		return
 	}
-	defer a.hub.unsubscribe(user.ID, changed)
+	defer a.hub.unsubscribe(user.ID, stream)
 
 	token, _ := auth.BearerToken(r.Header.Get("Authorization"))
 	rc := http.NewResponseController(w)
@@ -138,16 +164,19 @@ func (a *api) events(w http.ResponseWriter, r *http.Request, user auth.User) {
 			return
 		case <-a.hub.done:
 			return
-		case <-changed:
+		case <-stream.ended:
+			return // Disconnected on the site: the next request hears why.
+		case <-stream.changed:
 			if !send(changesEvent) {
 				return
 			}
 		case <-heartbeat.C:
-			current, err := a.auth.UserByToken(r.Context(), token)
-			if err != nil && !errors.Is(err, auth.ErrUnauthorized) && r.Context().Err() == nil {
+			// Revoked from the command line, which this process does not hear of.
+			current, err := a.auth.DeviceByToken(r.Context(), token)
+			if err != nil && !errors.Is(err, auth.ErrUnauthorized) && !errors.Is(err, auth.ErrDeviceRevoked) && r.Context().Err() == nil {
 				a.logger.WarnContext(r.Context(), "event stream: token check failed", "error", err)
 			}
-			if err != nil || current.ID != user.ID {
+			if err != nil || current.ID != device.ID {
 				return // Revoked (or unverifiable): the client must authenticate again.
 			}
 			if !send(pingComment) {

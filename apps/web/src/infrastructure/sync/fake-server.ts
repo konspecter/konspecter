@@ -19,6 +19,14 @@ export class FakeServer {
   readonly tokens = new Map<string, { id: string; email: string }>([
     ["ksp_ada", { id: "user-ada", email: "ada@example.com" }],
   ]);
+  /** Tokens of devices disconnected on the site: 401 device_revoked. */
+  readonly revoked = new Set<string>();
+  /** Requests to connect through the browser, by device code. */
+  readonly authorizations = new Map<
+    string,
+    { userCode: string; device: Json; status: "pending" | "approved" | "denied"; token: string }
+  >();
+  #codes = 0;
   /** Makes the server fail requests: a status code, or "network" to refuse connections. */
   failWith: number | "network" | null = null;
   /** Runs before each request is answered (to simulate concurrent activity). */
@@ -38,11 +46,22 @@ export class FakeServer {
     if (typeof this.failWith === "number") return json(this.failWith, error("boom", "failure"));
     await this.beforeRespond?.(method, url.pathname);
 
-    const auth = new Headers(init?.headers).get("Authorization") ?? "";
-    const user = this.tokens.get(auth.replace(/^Bearer /, ""));
-    if (!user) return json(401, error("unauthorized", "a valid bearer token is required"));
-
     const body = typeof init?.body === "string" ? (JSON.parse(init.body) as Json) : {};
+    if (method === "POST" && url.pathname === "/api/devices/authorize")
+      return this.#authorize(body);
+    if (method === "POST" && url.pathname === "/api/devices/token") return this.#deviceToken(body);
+
+    const token = (new Headers(init?.headers).get("Authorization") ?? "").replace(/^Bearer /, "");
+    if (this.revoked.has(token)) {
+      return json(401, error("device_revoked", "this device was disconnected from its account"));
+    }
+    const user = this.tokens.get(token);
+    if (!user) return json(401, error("unauthorized", "a valid bearer token is required"));
+    if (method === "DELETE" && url.pathname === "/api/tokens/current") {
+      this.tokens.delete(token);
+      return new Response(null, { status: 204 });
+    }
+
     const noteId = /^\/api\/notes\/([^/]+)$/.exec(url.pathname)?.[1];
 
     if (method === "GET" && url.pathname === "/api/me") return json(200, user);
@@ -66,6 +85,49 @@ export class FakeServer {
     }
     return json(404, error("not_found", "no such endpoint"));
   };
+
+  /** Disconnects the device holding `token`, as its owner does on the site. */
+  disconnectDevice(token: string): void {
+    this.tokens.delete(token);
+    this.revoked.add(token);
+  }
+
+  /** The owner approves (or denies) the request with this user code on the site. */
+  decide(userCode: string, approve: boolean, token = "ksp_ada"): void {
+    for (const request of this.authorizations.values()) {
+      if (request.userCode === userCode) {
+        request.status = approve ? "approved" : "denied";
+        request.token = token;
+      }
+    }
+  }
+
+  #authorize(body: Json): Response {
+    this.#codes += 1;
+    const deviceCode = `ksd_${String(this.#codes)}`;
+    const userCode = `BCDF-GHJ${"KLMNPQRSTV"[this.#codes % 10] ?? "K"}`;
+    this.authorizations.set(deviceCode, { userCode, device: body, status: "pending", token: "" });
+    return json(200, {
+      device_code: deviceCode,
+      user_code: userCode,
+      verification_uri: "https://sync.example.com/activate",
+      verification_uri_complete: `https://sync.example.com/activate?code=${userCode}`,
+      expires_in: 600,
+      interval: 5,
+    });
+  }
+
+  #deviceToken(body: Json): Response {
+    const deviceCode = String(body.device_code);
+    const request = this.authorizations.get(deviceCode);
+    if (!request) return json(400, error("expired_token", "the code has expired"));
+    if (request.status === "pending") {
+      return json(400, error("authorization_pending", "waiting for approval"));
+    }
+    this.authorizations.delete(deviceCode);
+    if (request.status === "denied") return json(400, error("access_denied", "denied"));
+    return json(200, { token: request.token, device: { id: "d1" }, user: {} });
+  }
 
   /** A deletion made by another device, directly on the server. */
   remove(id: string): void {

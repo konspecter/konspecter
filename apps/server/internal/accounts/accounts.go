@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"golang.org/x/crypto/argon2"
@@ -96,12 +98,12 @@ func CheckPassword(hash, password string) bool {
 		return false
 	}
 	var memory uint32
-	var time uint32
+	var passes uint32
 	var threads uint8
-	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &memory, &time, &threads); err != nil {
+	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &memory, &passes, &threads); err != nil {
 		return false
 	}
-	if memory == 0 || memory > 1<<20 || time == 0 || time > 16 || threads == 0 {
+	if memory == 0 || memory > 1<<20 || passes == 0 || passes > 16 || threads == 0 {
 		return false
 	}
 	salt, err := base64.RawStdEncoding.DecodeString(parts[4])
@@ -112,7 +114,7 @@ func CheckPassword(hash, password string) bool {
 	if err != nil || len(want) == 0 {
 		return false
 	}
-	got := argon2.IDKey([]byte(password), salt, time, memory, threads, uint32(len(want)))
+	got := argon2.IDKey([]byte(password), salt, passes, memory, threads, uint32(len(want)))
 	return subtle.ConstantTimeCompare(got, want) == 1
 }
 
@@ -184,3 +186,32 @@ func HashSecret(secret string) []byte {
 	sum := sha256.Sum256([]byte(secret))
 	return sum[:]
 }
+
+// Account is what its owner sees and changes on the site's settings page.
+type Account struct {
+	ID    string
+	Email string
+	// Name is how the owner wants to be called; "" when not set.
+	Name      string
+	CreatedAt time.Time
+}
+
+// MaxNameLength is the longest name, in characters.
+const MaxNameLength = 100
+
+// NormalizeName trims a name and checks it: at most MaxNameLength
+// characters, valid UTF-8, no control characters. An empty name is allowed.
+func NormalizeName(name string) (string, error) {
+	name = strings.TrimSpace(name)
+	if !utf8.ValidString(name) || strings.ContainsFunc(name, unicode.IsControl) {
+		return "", errors.New("a name cannot contain control characters")
+	}
+	if utf8.RuneCountInString(name) > MaxNameLength {
+		return "", fmt.Errorf("a name has at most %d characters", MaxNameLength)
+	}
+	return name, nil
+}
+
+// RecentSignIn is how fresh a browser's sign-in must be for it to delete
+// the account: a session left open somewhere is not enough.
+const RecentSignIn = 15 * time.Minute

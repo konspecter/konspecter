@@ -34,6 +34,10 @@ const KNOWN = new Set([
   "oauth_cancelled",
   "provider_unavailable",
   "identity_expired",
+  "invalid_name",
+  "email_mismatch",
+  "reauthentication_required",
+  "invalid_user_code",
 ]);
 
 export function errorText(t: SiteTranslator["t"], error: FormError): string {

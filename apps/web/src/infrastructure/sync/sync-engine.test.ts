@@ -2,6 +2,7 @@ import { parseDocument } from "../../domain/document/document";
 import { createNote, updateNote, type Note } from "../../domain/note/note";
 import { openNoteStore, type NoteStore } from "../storage/note-store";
 import { FakeServer } from "./fake-server";
+import { DeviceLoginError } from "./device-login";
 import { SyncEngine, type Scheduler } from "./sync-engine";
 import { mustGet } from "../storage/test-utils";
 
@@ -278,10 +279,12 @@ describe("SyncEngine", () => {
     const note = createNote("# Same", date, "n1");
     await a.store.put(note);
     await a.engine.connect(config);
-    // The same account connected again from scratch: every note is re-uploaded.
+    // The same account connected again from scratch (disconnecting signed
+    // the old token out): every note is re-uploaded.
     await a.engine.disconnect();
     await a.store.resetSync();
-    await a.engine.connect(config);
+    server.tokens.set("ksp_ada_again", { id: "user-ada", email: "ada@example.com" });
+    await a.engine.connect({ ...config, token: "ksp_ada_again" });
 
     expect(await a.store.list()).toEqual([note]);
     expect(await a.store.syncEntry("n1")).toMatchObject({
@@ -460,6 +463,125 @@ describe("SyncEngine", () => {
     expect(again.getStatus().state).toBe("disabled");
     restarted.stop();
     again.stop();
+  });
+});
+
+describe("SyncEngine and the account's devices", () => {
+  const laptop = { name: "Firefox on Linux", platform: "web", clientVersion: "0.1.0" };
+
+  /** Runs the next scheduled wait (a poll's interval) once one is due. */
+  async function nextWait(d: Device) {
+    await vi.waitFor(() => {
+      expect(d.scheduler.pending).toHaveLength(1);
+    });
+    const task = d.scheduler.pending.shift();
+    task?.callback();
+  }
+
+  it("signs in through the browser once the owner approves the code", async () => {
+    const server = new FakeServer();
+    const a = await device(server);
+    await a.store.put(createNote("# Local", date, "n1"));
+    const codes: string[] = [];
+
+    const signingIn = a.engine.signInWithBrowser("https://sync.example.com/", laptop, (auth) => {
+      codes.push(auth.userCode);
+      expect(auth.verificationUriComplete).toBe(
+        `https://sync.example.com/activate?code=${auth.userCode}`,
+      );
+    });
+    await nextWait(a);
+    await vi.waitFor(() => {
+      expect(a.scheduler.pending).toHaveLength(1); // Not approved yet: waits again.
+    });
+    expect(codes).toHaveLength(1);
+    server.decide(codes[0] ?? "", true);
+    await nextWait(a);
+
+    expect((await signingIn).email).toBe("ada@example.com");
+    expect([...server.authorizations.values()]).toEqual([]);
+    expect(server.requests.filter((r) => r === "POST /api/devices/token")).toHaveLength(2);
+    expect(server.notes.has("n1")).toBe(true);
+    expect(a.engine.getStatus()).toMatchObject({ state: "idle", serverUrl: config.serverUrl });
+  });
+
+  it("tells when the owner denies the device", async () => {
+    const server = new FakeServer();
+    const a = await device(server);
+    const signingIn = a.engine.signInWithBrowser(config.serverUrl, laptop, (auth) => {
+      server.decide(auth.userCode, false);
+    });
+    void nextWait(a);
+    await expect(signingIn).rejects.toBeInstanceOf(DeviceLoginError);
+    await expect(signingIn).rejects.toMatchObject({ reason: "denied" });
+    expect(a.engine.getStatus().state).toBe("disabled");
+  });
+
+  it("stops waiting when the sign-in is cancelled", async () => {
+    const server = new FakeServer();
+    const a = await device(server);
+    const cancel = new AbortController();
+    const signingIn = a.engine.signInWithBrowser(
+      config.serverUrl,
+      laptop,
+      () => undefined,
+      cancel.signal,
+    );
+    await vi.waitFor(() => {
+      expect(a.scheduler.pending).toHaveLength(1);
+    });
+    cancel.abort();
+    await expect(signingIn).rejects.toMatchObject({ name: "AbortError" });
+    expect(a.scheduler.pending).toEqual([]);
+  });
+
+  it("keeps every note when the device is disconnected on the site, and resumes after signing in again", async () => {
+    const server = new FakeServer();
+    const a = await device(server);
+    await a.store.put(createNote("# Kept", date, "n1"));
+    await a.engine.connect(config);
+    server.disconnectDevice("ksp_ada");
+    await edit(a, "n1", "edited while disconnected", minutesLater(1));
+
+    await a.engine.syncNow();
+
+    expect(a.engine.getStatus()).toMatchObject({
+      state: "disconnected",
+      account: { email: "ada@example.com" },
+      serverUrl: config.serverUrl,
+      pending: 1,
+      error: { code: "device_revoked" },
+    });
+    expect(bodyOf(await a.store.get("n1"))).toBe("edited while disconnected");
+    expect(await a.store.syncEntry("n1")).toMatchObject({ baseRevision: 1, dirty: true });
+    expect(a.scheduler.pending).toEqual([]); // Nothing more is tried.
+    expect(JSON.stringify(await a.store.loadMeta("syncConfig"))).not.toContain("ksp_ada");
+
+    const restarted = new SyncEngine(a.store, { fetch: server.fetch, scheduler: a.scheduler });
+    await restarted.start();
+    expect(restarted.getStatus()).toMatchObject({ state: "disconnected", pending: 1 });
+
+    // Signing in again to the same account carries on where it stopped.
+    server.tokens.set("ksp_again", { id: "user-ada", email: "ada@example.com" });
+    await restarted.connect({ ...config, token: "ksp_again" });
+    expect(await a.store.syncEntry("n1")).toMatchObject({ baseRevision: 2, dirty: false });
+    expect(server.notes.get("n1")?.markdown).toContain("edited while disconnected");
+    expect(restarted.getStatus().state).toBe("idle");
+    restarted.stop();
+  });
+
+  it("signs the device out of the server when disconnecting", async () => {
+    const server = new FakeServer();
+    const a = await device(server);
+    await a.engine.connect(config);
+
+    await a.engine.disconnect();
+
+    await vi.waitFor(() => {
+      expect(server.requests).toContain("DELETE /api/tokens/current");
+    });
+    expect(server.tokens.has("ksp_ada")).toBe(false);
+    expect(a.engine.getStatus().state).toBe("disabled");
   });
 });
 
