@@ -10,9 +10,12 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
+
+	"konspecter/server/internal/oauth"
 )
 
 // DefaultEnvFile is read when KONSPECTER_ENV_FILE does not name another file.
@@ -51,6 +54,20 @@ type Config struct {
 	TrustedProxies []netip.Prefix
 	// Rates limits sign-in attempts and emails.
 	Rates Rates
+	// OAuth holds the sign-in providers' clients by provider id (one of
+	// oauth.IDs). A provider is on only when both of its
+	// KONSPECTER_OAUTH_<ID>_CLIENT_ID and _CLIENT_SECRET are set.
+	OAuth map[string]OAuthClient
+	// LoginProviders are the providers the site offers per language
+	// (KONSPECTER_LOGIN_PROVIDERS_EN, default "google,linkedin,x";
+	// KONSPECTER_LOGIN_PROVIDERS_RU, default "yandex,vk").
+	LoginProviders map[string][]string
+}
+
+// OAuthClient is the app registered with a sign-in provider.
+type OAuthClient struct {
+	ClientID     string
+	ClientSecret string
 }
 
 // Mail is how the server sends email (KONSPECTER_MAIL_TRANSPORT): "smtp"
@@ -119,6 +136,11 @@ func Load(getenv func(string) string) (Config, error) {
 			EmailsPerAddress:      r.integer("KONSPECTER_RATE_EMAIL_PER_ADDRESS", 5),
 			EmailsPerIP:           r.integer("KONSPECTER_RATE_EMAIL_PER_IP", 20),
 		},
+	}
+	cfg.OAuth = r.oauthClients()
+	cfg.LoginProviders = map[string][]string{
+		"en": r.providers("KONSPECTER_LOGIN_PROVIDERS_EN", "google,linkedin,x"),
+		"ru": r.providers("KONSPECTER_LOGIN_PROVIDERS_RU", "yandex,vk"),
 	}
 	if cfg.Mail.Transport == "smtp" && cfg.Mail.Host != "" && cfg.Mail.From == "" {
 		r.fail("KONSPECTER_SMTP_FROM is required with KONSPECTER_SMTP_HOST")
@@ -215,6 +237,32 @@ func (r *reader) prefixes(name string) []netip.Prefix {
 		out = append(out, netip.PrefixFrom(addr, addr.BitLen()))
 	}
 	return out
+}
+
+func (r *reader) oauthClients() map[string]OAuthClient {
+	clients := map[string]OAuthClient{}
+	for _, id := range oauth.IDs {
+		prefix := "KONSPECTER_OAUTH_" + strings.ToUpper(id)
+		client := OAuthClient{ClientID: r.lookup(prefix + "_CLIENT_ID"), ClientSecret: r.lookup(prefix + "_CLIENT_SECRET")}
+		switch {
+		case client.ClientID != "" && client.ClientSecret != "":
+			clients[id] = client
+		case client.ClientID != "" || client.ClientSecret != "":
+			r.fail("%s_CLIENT_ID and %s_CLIENT_SECRET must be set together", prefix, prefix)
+		}
+	}
+	return clients
+}
+
+// providers reads a list of sign-in provider ids.
+func (r *reader) providers(name, fallback string) []string {
+	ids := splitList(r.text(name, fallback))
+	for _, id := range ids {
+		if !slices.Contains(oauth.IDs, id) {
+			r.fail("%s: unknown provider %q (want some of %s)", name, id, strings.Join(oauth.IDs, ", "))
+		}
+	}
+	return ids
 }
 
 // withEnvFile returns a lookup that prefers getenv and falls back to the .env file.

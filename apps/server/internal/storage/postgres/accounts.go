@@ -15,8 +15,9 @@ import (
 
 // StartEmailCode stores a new sign-in code for a (normalized) address and
 // retires the address's earlier codes. passwordHash, when not empty, is set
-// as the account's password once the code is proven.
-func (db *DB) StartEmailCode(ctx context.Context, email string, codeHash []byte, passwordHash string, expiresAt time.Time) error {
+// as the account's password once the code is proven; identity, when it has
+// a provider, is linked to the account then.
+func (db *DB) StartEmailCode(ctx context.Context, email string, codeHash []byte, passwordHash string, identity accounts.Identity, expiresAt time.Time) error {
 	return pgx.BeginFunc(ctx, db.pool, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx,
 			`UPDATE email_codes SET consumed_at = now() WHERE email = $1 AND consumed_at IS NULL`, email,
@@ -29,8 +30,9 @@ func (db *DB) StartEmailCode(ctx context.Context, email string, codeHash []byte,
 			return fmt.Errorf("prune email codes: %w", err)
 		}
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO email_codes (email, code_hash, password_hash, expires_at)
-			VALUES ($1, $2, nullif($3, ''), $4)`, email, codeHash, passwordHash, expiresAt,
+			INSERT INTO email_codes (email, code_hash, password_hash, identity_provider, identity_subject, expires_at)
+			VALUES ($1, $2, nullif($3, ''), nullif($4, ''), nullif($5, ''), $6)`,
+			email, codeHash, passwordHash, identity.Provider, identity.Subject, expiresAt,
 		); err != nil {
 			return fmt.Errorf("store email code: %w", err)
 		}
@@ -42,7 +44,8 @@ func (db *DB) StartEmailCode(ctx context.Context, email string, codeHash []byte,
 // wrong guess counts against the code (it stops working after
 // accounts.MaxCodeAttempts). The right code signs in: the account is created
 // if there is none (and createAllowed), its address counts as verified, and
-// a password given with the code request becomes its password.
+// a password given with the code request becomes its password, and an
+// identity given with it is linked.
 func (db *DB) VerifyEmailCode(ctx context.Context, email string, codeHash []byte, createAllowed bool) (auth.User, error) {
 	var user auth.User
 	var outcome error
@@ -51,14 +54,16 @@ func (db *DB) VerifyEmailCode(ctx context.Context, email string, codeHash []byte
 			id           int64
 			stored       []byte
 			passwordHash *string
+			provider     *string
+			subject      *string
 			attempts     int
 			expired      bool
 		)
 		err := tx.QueryRow(ctx, `
-			SELECT id, code_hash, password_hash, attempts, expires_at <= now()
+			SELECT id, code_hash, password_hash, identity_provider, identity_subject, attempts, expires_at <= now()
 			FROM email_codes WHERE email = $1 AND consumed_at IS NULL
 			ORDER BY id DESC LIMIT 1 FOR UPDATE`, email,
-		).Scan(&id, &stored, &passwordHash, &attempts, &expired)
+		).Scan(&id, &stored, &passwordHash, &provider, &subject, &attempts, &expired)
 		if errors.Is(err, pgx.ErrNoRows) {
 			outcome = accounts.ErrInvalidCode
 			return nil
@@ -89,21 +94,25 @@ func (db *DB) VerifyEmailCode(ctx context.Context, email string, codeHash []byte
 				password_hash = coalesce($2, password_hash)
 			WHERE email = $1 RETURNING id::text, email`, email, passwordHash,
 		).Scan(&user.ID, &user.Email)
-		if !errors.Is(err, pgx.ErrNoRows) {
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			if !createAllowed {
+				outcome = accounts.ErrRegistrationClosed
+				return nil
+			}
+			if err := tx.QueryRow(ctx, `
+				INSERT INTO users (email, password_hash, email_verified_at) VALUES ($1, $2, now())
+				RETURNING id::text, email`, email, passwordHash,
+			).Scan(&user.ID, &user.Email); err != nil {
+				return fmt.Errorf("create user: %w", err)
+			}
+		case err != nil:
 			return err
 		}
-		if !createAllowed {
-			outcome = accounts.ErrRegistrationClosed
+		if provider == nil || subject == nil {
 			return nil
 		}
-		err = tx.QueryRow(ctx, `
-			INSERT INTO users (email, password_hash, email_verified_at) VALUES ($1, $2, now())
-			RETURNING id::text, email`, email, passwordHash,
-		).Scan(&user.ID, &user.Email)
-		if err != nil {
-			return fmt.Errorf("create user: %w", err)
-		}
-		return nil
+		return linkIdentity(ctx, tx, user.ID, accounts.Identity{Provider: *provider, Subject: *subject})
 	})
 	if err != nil {
 		return auth.User{}, fmt.Errorf("verify email code: %w", err)

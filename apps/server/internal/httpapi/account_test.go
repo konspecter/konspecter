@@ -29,6 +29,8 @@ type fakeAccounts struct {
 	codes    map[string]*fakeCode // newest open code by email
 	resets   map[string]string    // token hash → user email
 	sessions map[string]*auth.Session
+	links    map[string]string            // provider + "/" + subject → user email
+	pending  map[string]accounts.Identity // token hash → identity
 }
 
 type fakeUser struct {
@@ -39,6 +41,7 @@ type fakeUser struct {
 type fakeCode struct {
 	hash         []byte
 	passwordHash string
+	identity     accounts.Identity
 	attempts     int
 	expiresAt    time.Time
 }
@@ -47,6 +50,7 @@ func newFakeAccounts() *fakeAccounts {
 	return &fakeAccounts{
 		users: map[string]*fakeUser{}, codes: map[string]*fakeCode{},
 		resets: map[string]string{}, sessions: map[string]*auth.Session{},
+		links: map[string]string{}, pending: map[string]accounts.Identity{},
 	}
 }
 
@@ -62,10 +66,10 @@ func (f *fakeAccounts) addUser(email, password string) auth.User {
 	return u.user
 }
 
-func (f *fakeAccounts) StartEmailCode(_ context.Context, email string, codeHash []byte, passwordHash string, expiresAt time.Time) error {
+func (f *fakeAccounts) StartEmailCode(_ context.Context, email string, codeHash []byte, passwordHash string, identity accounts.Identity, expiresAt time.Time) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.codes[email] = &fakeCode{hash: codeHash, passwordHash: passwordHash, expiresAt: expiresAt}
+	f.codes[email] = &fakeCode{hash: codeHash, passwordHash: passwordHash, identity: identity, expiresAt: expiresAt}
 	return nil
 }
 
@@ -92,7 +96,60 @@ func (f *fakeAccounts) VerifyEmailCode(_ context.Context, email string, codeHash
 	if c.passwordHash != "" {
 		u.passwordHash = c.passwordHash
 	}
+	if c.identity.Provider != "" {
+		f.link(c.identity, email)
+	}
 	return u.user, nil
+}
+
+func (f *fakeAccounts) link(identity accounts.Identity, email string) {
+	key := identity.Provider + "/" + identity.Subject
+	if _, ok := f.links[key]; !ok {
+		f.links[key] = email
+	}
+	for hash, p := range f.pending {
+		if p.Provider == identity.Provider && p.Subject == identity.Subject {
+			delete(f.pending, hash)
+		}
+	}
+}
+
+func (f *fakeAccounts) SignInWithIdentity(_ context.Context, identity accounts.Identity, createAllowed bool) (auth.User, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if email, ok := f.links[identity.Provider+"/"+identity.Subject]; ok {
+		return f.users[email].user, nil
+	}
+	if !identity.EmailVerified || identity.Email == "" {
+		return auth.User{}, accounts.ErrEmailRequired
+	}
+	u, ok := f.users[identity.Email]
+	if !ok {
+		if !createAllowed {
+			return auth.User{}, accounts.ErrRegistrationClosed
+		}
+		u = &fakeUser{user: auth.User{ID: "user-" + identity.Email, Email: identity.Email}}
+		f.users[identity.Email] = u
+	}
+	f.link(identity, identity.Email)
+	return u.user, nil
+}
+
+func (f *fakeAccounts) CreatePendingIdentity(_ context.Context, tokenHash []byte, identity accounts.Identity, _ time.Time) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.pending[string(tokenHash)] = identity
+	return nil
+}
+
+func (f *fakeAccounts) PendingIdentity(_ context.Context, tokenHash []byte) (accounts.Identity, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	identity, ok := f.pending[string(tokenHash)]
+	if !ok {
+		return accounts.Identity{}, accounts.ErrIdentityExpired
+	}
+	return identity, nil
 }
 
 func (f *fakeAccounts) PasswordHash(_ context.Context, email string) (auth.User, string, error) {

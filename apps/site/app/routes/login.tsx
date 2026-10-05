@@ -1,15 +1,22 @@
-import { data, Form, Link, redirect, useActionData } from "react-router";
+import { data, Form, Link, redirect, useActionData, useLoaderData } from "react-router";
 import { nextPath, redirectIfSignedIn } from "../account.server";
 import { callApi, withCookies } from "../api.server";
 import { AuthPage, Field, FormMessage, formError, Submit, textField } from "../auth-form";
 import { useT } from "../i18n/i18n";
 import { pendingCookie } from "../pending.server";
 import { readPreferences } from "../preferences.server";
+import { ProviderButtons } from "../providers";
+import { loginProviders, returnedError } from "../providers.server";
 import type { Route } from "./+types/login";
 
-export function loader({ request, context }: Route.LoaderArgs) {
+/** The providers to offer, and the error a provider sign-in came back with. */
+export async function loader({ request, context }: Route.LoaderArgs) {
   redirectIfSignedIn(request, context);
-  return null;
+  return {
+    providers: await loginProviders(request),
+    next: nextPath(request),
+    error: returnedError(request),
+  };
 }
 
 /**
@@ -48,9 +55,16 @@ export async function action({ request }: Route.ActionArgs) {
 
 export default function Login() {
   const { t } = useT();
+  const { providers, next, error } = useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
   return (
     <AuthPage title={t("login.title")} lead={t("login.lead")}>
+      {!result && error && (
+        <div className="auth-returned">
+          <FormMessage error={error} />
+        </div>
+      )}
+      <ProviderButtons providers={providers} next={next} />
       <Form method="post" className="form" noValidate={false}>
         <Field
           label={t("auth.email")}

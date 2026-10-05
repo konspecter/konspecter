@@ -30,6 +30,10 @@ const KNOWN = new Set([
   "registration_closed",
   "invalid_token",
   "not_configured",
+  "oauth_failed",
+  "oauth_cancelled",
+  "provider_unavailable",
+  "identity_expired",
 ]);
 
 export function errorText(t: SiteTranslator["t"], error: FormError): string {

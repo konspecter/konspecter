@@ -23,8 +23,8 @@ An exception with `"scope": "dev"` is valid only while the package is not a runt
   exceptions so stale decisions get cleaned up.
 - Go: CI runs `go-licenses check` on the server's dependency tree and allows only the
   preferred licenses. Current dependencies: pgx and its jackc helpers (MIT), and
-  `golang.org/x/crypto` (argon2id password hashing), `golang.org/x/sync`, `golang.org/x/sys`
-  and `golang.org/x/text` (BSD-3-Clause).
+  `golang.org/x/crypto` (argon2id password hashing), `golang.org/x/oauth2` (sign-in with other
+  services), `golang.org/x/sync`, `golang.org/x/sys` and `golang.org/x/text` (BSD-3-Clause).
 
 - Rust (desktop app): `cargo deny check licenses` in `apps/desktop/src-tauri` against
   `deny.toml`. It allows the preferred licenses plus **Unicode-3.0** (Unicode data tables

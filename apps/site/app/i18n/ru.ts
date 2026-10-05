@@ -63,6 +63,19 @@ export const ru: Dictionary = {
   "auth.passwordHint": "Не меньше 8 символов.",
   "auth.working": "Минутку…",
 
+  "providers.label": "Вход через другие сервисы",
+  "providers.or": "или по почте",
+  "provider.google": "Войти через Google",
+  "provider.linkedin": "Войти через LinkedIn",
+  "provider.x": "Войти через X",
+  "provider.yandex": "Войти с Яндекс ID",
+  "provider.vk": "Войти с VK ID",
+  "providerName.google": "Google",
+  "providerName.linkedin": "LinkedIn",
+  "providerName.x": "X",
+  "providerName.yandex": "Яндекс ID",
+  "providerName.vk": "VK ID",
+
   "login.title": "Вход",
   "login.lead":
     "Войдите с паролем или получите одноразовый код на почту. Если аккаунта ещё нет, код его создаст.",
@@ -84,12 +97,20 @@ export const ru: Dictionary = {
   "code.lead": "Мы отправили 6-значный код на {email}. Введите его здесь; код действует недолго.",
   "code.leadRegister":
     "Мы отправили 6-значный код на {email}. Введите его здесь, чтобы создать аккаунт; код действует недолго.",
+  "code.leadComplete":
+    "Мы отправили 6-значный код на {email}. Введите его, чтобы подтвердить адрес и завершить вход; код действует недолго.",
   "code.label": "Код",
   "code.submit": "Продолжить",
   "code.resend": "Прислать новый код",
   "code.resent": "Новый код уже в пути.",
   "code.otherEmail": "Указать другую почту",
   "code.startOver": "Начать заново",
+
+  "complete.title": "Подтвердите почту",
+  "complete.lead":
+    "От {provider} не пришёл подтверждённый адрес почты. Укажите свой, и мы пришлём код для проверки. Если у вас уже есть аккаунт с этим адресом, вход через {provider} добавится к нему.",
+  "complete.submit": "Прислать код",
+  "complete.cancel": "Войти другим способом",
 
   "forgot.title": "Забыли пароль?",
   "forgot.lead": "Укажите почту, и мы пришлём ссылку, чтобы задать новый пароль.",
@@ -115,6 +136,11 @@ export const ru: Dictionary = {
   "authError.rate_limited": "Слишком много попыток. Попробуйте снова через {minutes} мин.",
   "authError.mail": "Не удалось отправить письмо. Попробуйте позже.",
   "authError.not_configured": "Вход на этом сервере не настроен.",
+  "authError.oauth_failed":
+    "Не удалось войти через этот сервис. Попробуйте ещё раз или войдите по почте.",
+  "authError.oauth_cancelled": "Вход отменён. Попробуйте ещё раз или войдите по почте.",
+  "authError.provider_unavailable": "Этот способ входа на сервере не настроен.",
+  "authError.identity_expired": "Вход занял слишком много времени. Начните заново.",
   "authError.unknown": "На сервере что-то пошло не так. Попробуйте чуть позже.",
 
   "error.title": "Страница не найдена",

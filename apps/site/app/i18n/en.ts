@@ -66,6 +66,19 @@ export const en = {
   "auth.passwordHint": "At least 8 characters.",
   "auth.working": "One moment…",
 
+  "providers.label": "Sign in with another service",
+  "providers.or": "or with your email",
+  "provider.google": "Continue with Google",
+  "provider.linkedin": "Continue with LinkedIn",
+  "provider.x": "Continue with X",
+  "provider.yandex": "Continue with Yandex ID",
+  "provider.vk": "Continue with VK ID",
+  "providerName.google": "Google",
+  "providerName.linkedin": "LinkedIn",
+  "providerName.x": "X",
+  "providerName.yandex": "Yandex ID",
+  "providerName.vk": "VK ID",
+
   "login.title": "Sign in",
   "login.lead":
     "Use your password, or get a one-time code by email. A code also creates your account if you have none yet.",
@@ -87,12 +100,20 @@ export const en = {
   "code.lead": "We sent a 6-digit code to {email}. Enter it here; it works for a limited time.",
   "code.leadRegister":
     "We sent a 6-digit code to {email}. Enter it here to create your account; it works for a limited time.",
+  "code.leadComplete":
+    "We sent a 6-digit code to {email}. Enter it to confirm the address and finish signing in; it works for a limited time.",
   "code.label": "Code",
   "code.submit": "Continue",
   "code.resend": "Send a new code",
   "code.resent": "A new code is on its way.",
   "code.otherEmail": "Use a different email",
   "code.startOver": "Start over",
+
+  "complete.title": "Confirm your email",
+  "complete.lead":
+    "{provider} did not give us a confirmed email address. Enter yours and we will send a code to check it. If you already have an account with this address, {provider} is added to it.",
+  "complete.submit": "Email me a code",
+  "complete.cancel": "Sign in another way",
 
   "forgot.title": "Forgot your password?",
   "forgot.lead": "Enter your email and we will send a link to set a new password.",
@@ -118,6 +139,11 @@ export const en = {
   "authError.rate_limited": "Too many attempts. Try again in {minutes} min.",
   "authError.mail": "The email could not be sent. Try again later.",
   "authError.not_configured": "Sign-in is not set up on this server.",
+  "authError.oauth_failed":
+    "Signing in with that service did not work. Try again, or use your email.",
+  "authError.oauth_cancelled": "Sign-in was cancelled. Try again, or use your email.",
+  "authError.provider_unavailable": "That way of signing in is not set up on this server.",
+  "authError.identity_expired": "The sign-in took too long. Start it again.",
   "authError.unknown": "Something went wrong on the server. Try again in a moment.",
 
   "error.title": "Page not found",

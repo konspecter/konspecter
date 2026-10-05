@@ -12,7 +12,7 @@ import (
 
 func startCode(t *testing.T, db *DB, email, code, passwordHash string) {
 	t.Helper()
-	err := db.StartEmailCode(context.Background(), email, accounts.HashCode(email, code), passwordHash, time.Now().Add(10*time.Minute))
+	err := db.StartEmailCode(context.Background(), email, accounts.HashCode(email, code), passwordHash, accounts.Identity{}, time.Now().Add(10*time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func TestAnExpiredCodeFails(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()
 	hash := accounts.HashCode("ann@example.com", "123456")
-	if err := db.StartEmailCode(ctx, "ann@example.com", hash, "", time.Now().Add(-time.Second)); err != nil {
+	if err := db.StartEmailCode(ctx, "ann@example.com", hash, "", accounts.Identity{}, time.Now().Add(-time.Second)); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.VerifyEmailCode(ctx, "ann@example.com", hash, true); !errors.Is(err, accounts.ErrInvalidCode) {

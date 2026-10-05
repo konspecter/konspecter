@@ -1,4 +1,5 @@
 import { RouterContextProvider } from "react-router";
+import { action as complete, loader as completeLoader } from "./complete";
 import { action as login } from "./login";
 import { action as loginCode, loader as loginCodeLoader } from "./login-code";
 import { action as logout } from "./logout";
@@ -151,4 +152,51 @@ it("signs out through the API", async () => {
   const response = await logout(args(post("/logout", {}, "ksp_session=kss_1")));
   expect(response.headers.get("Location")).toBe("/");
   expect(response.headers.getSetCookie()).toEqual([cleared]);
+});
+
+it("finishes a provider sign-in: a code to the entered address, remembered as such", async () => {
+  const calls = stubApi({
+    "/api/auth/complete": () => Response.json({ expires_in: 600 }, { status: 202 }),
+  });
+  const response = (await complete(
+    args(post("/complete?next=/settings", { email: "ann@example.com" }, "ksp_link=ksl_1")),
+  )) as Response;
+  expect(response.headers.get("Location")).toBe("/login/code?next=%2Fsettings");
+  expect(response.headers.getSetCookie()[0]).toMatch(/^ksp_pending=complete%3Aann%40example\.com;/);
+  expect(calls[0]?.body).toEqual({ email: "ann@example.com", locale: "ru" });
+});
+
+it("starts over when the provider sign-in has expired", async () => {
+  const expired = () =>
+    Response.json({ error: { code: "identity_expired", message: "" } }, { status: 404 });
+  stubApi({ "/api/auth/complete": expired });
+  await expect(
+    complete(args(post("/complete", { email: "ann@example.com" }))),
+  ).rejects.toMatchObject({ status: 302 });
+  await expect(completeLoader(args(new Request("http://site.test/complete")))).rejects.toSatisfy(
+    (response: Response) => response.headers.get("Location") === "/login?error=identity_expired",
+  );
+});
+
+it("shows which provider is waiting, with its suggested address", async () => {
+  stubApi({
+    "/api/auth/complete": () => Response.json({ provider: "vk", email: "ann@vk.com" }),
+  });
+  expect(await completeLoader(args(new Request("http://site.test/complete")))).toEqual({
+    provider: "vk",
+    suggested: "ann@vk.com",
+  });
+});
+
+it("asks again for a code that finishes the provider sign-in", async () => {
+  const calls = stubApi({
+    "/api/auth/complete": () => Response.json({ expires_in: 600 }, { status: 202 }),
+  });
+  const pending = "ksp_pending=complete%3Aann%40example.com";
+  const result = await loginCode(args(post("/login/code", { intent: "resend" }, pending)));
+  expect(result).toEqual({ error: null, resent: true });
+  expect(calls[0]).toEqual({
+    path: "/api/auth/complete",
+    body: { email: "ann@example.com", locale: "ru" },
+  });
 });

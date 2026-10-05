@@ -7,6 +7,7 @@ export default [
   route("register", "routes/register.tsx"),
   route("forgot", "routes/forgot.tsx"),
   route("reset", "routes/reset.tsx"),
+  route("complete", "routes/complete.tsx"),
   route("logout", "routes/logout.ts"),
   route("preferences", "routes/preferences.ts"),
   route("*", "routes/not-found.tsx"),

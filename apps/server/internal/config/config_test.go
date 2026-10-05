@@ -37,6 +37,8 @@ func TestLoadUsesDefaults(t *testing.T) {
 		PasswordResetTTL: 30 * time.Minute,
 		Mail:             Mail{Transport: "smtp", Port: 587, Security: "starttls"},
 		Rates:            Rates{LoginFailuresPerIP: 20, LoginFailuresPerEmail: 10, EmailsPerAddress: 5, EmailsPerIP: 20},
+		OAuth:            map[string]OAuthClient{},
+		LoginProviders:   map[string][]string{"en": {"google", "linkedin", "x"}, "ru": {"yandex", "vk"}},
 	}
 	if !reflect.DeepEqual(cfg, want) {
 		t.Errorf("Load() = %+v, want %+v", cfg, want)
@@ -137,6 +139,48 @@ func TestLoadReportsEveryBadSetting(t *testing.T) {
 	} {
 		if !strings.Contains(err.Error(), name) {
 			t.Errorf("the error does not name %s:\n%v", name, err)
+		}
+	}
+}
+
+func TestLoadReadsTheSignInProviders(t *testing.T) {
+	t.Chdir(t.TempDir())
+	cfg, err := Load(env(map[string]string{
+		"KONSPECTER_OAUTH_GOOGLE_CLIENT_ID":     "google-id",
+		"KONSPECTER_OAUTH_GOOGLE_CLIENT_SECRET": "google-secret",
+		"KONSPECTER_OAUTH_VK_CLIENT_ID":         "vk-id",
+		"KONSPECTER_OAUTH_VK_CLIENT_SECRET":     "vk-secret",
+		"KONSPECTER_LOGIN_PROVIDERS_EN":         "x, google",
+		"KONSPECTER_LOGIN_PROVIDERS_RU":         "vk,google",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantClients := map[string]OAuthClient{
+		"google": {ClientID: "google-id", ClientSecret: "google-secret"},
+		"vk":     {ClientID: "vk-id", ClientSecret: "vk-secret"},
+	}
+	if !reflect.DeepEqual(cfg.OAuth, wantClients) {
+		t.Errorf("OAuth = %+v", cfg.OAuth)
+	}
+	wantLists := map[string][]string{"en": {"x", "google"}, "ru": {"vk", "google"}}
+	if !reflect.DeepEqual(cfg.LoginProviders, wantLists) {
+		t.Errorf("LoginProviders = %v", cfg.LoginProviders)
+	}
+}
+
+func TestBadSignInProviders(t *testing.T) {
+	t.Chdir(t.TempDir())
+	_, err := Load(env(map[string]string{
+		"KONSPECTER_OAUTH_X_CLIENT_ID":  "x-id", // no secret
+		"KONSPECTER_LOGIN_PROVIDERS_RU": "yandex,odnoklassniki",
+	}))
+	if err == nil {
+		t.Fatal("Load() accepted bad providers")
+	}
+	for _, want := range []string{"KONSPECTER_OAUTH_X_CLIENT_SECRET", `"odnoklassniki"`} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the error does not name %s:\n%v", want, err)
 		}
 	}
 }

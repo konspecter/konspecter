@@ -434,6 +434,69 @@ main {
   margin-top: 1.5rem;
 }
 
+/* Sign-in with other services: one full-width row per provider, its mark
+   in the provider's colours, then a rule that leads on to the email form. */
+.providers {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1.75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.provider-button {
+  width: 100%;
+  gap: 0.7rem;
+  padding: 0.6rem 1rem;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.provider-mark {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+}
+
+.provider-mark svg {
+  width: 100%;
+  height: 100%;
+}
+
+.providers-or {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.5rem 0 0;
+  color: var(--color-muted);
+  font-size: 14px;
+}
+
+.providers-or::before,
+.providers-or::after {
+  flex: 1;
+  border-top: 1px solid var(--color-border);
+  content: "";
+}
+
+.providers-or + .form {
+  margin-top: 1.25rem;
+}
+
+/* An error a provider sign-in came back with, above the choices. */
+.auth-returned {
+  margin-top: 1.5rem;
+}
+
+.auth-returned .inline-error {
+  margin: 0;
+}
+
+.auth-returned + .providers {
+  margin-top: 1rem;
+}
+
 /* --- Small screens ------------------------------------------------------- */
 
 @media (max-width: 900px) {

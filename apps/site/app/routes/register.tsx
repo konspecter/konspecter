@@ -1,16 +1,18 @@
 import { richText } from "@konspecter/i18n/rich";
-import { data, Form, Link, redirect, useActionData } from "react-router";
+import { data, Form, Link, redirect, useActionData, useLoaderData } from "react-router";
 import { redirectIfSignedIn } from "../account.server";
 import { callApi, withCookies } from "../api.server";
 import { AuthPage, Field, FormMessage, formError, Submit, textField } from "../auth-form";
 import { useT } from "../i18n/i18n";
 import { pendingCookie } from "../pending.server";
 import { readPreferences } from "../preferences.server";
+import { ProviderButtons } from "../providers";
+import { loginProviders } from "../providers.server";
 import type { Route } from "./+types/register";
 
-export function loader({ request, context }: Route.LoaderArgs) {
+export async function loader({ request, context }: Route.LoaderArgs) {
   redirectIfSignedIn(request, context);
-  return null;
+  return { providers: await loginProviders(request) };
 }
 
 /** Asks for a code to the address; entering it creates the account with this password. */
@@ -32,9 +34,11 @@ export async function action({ request }: Route.ActionArgs) {
 
 export default function Register() {
   const { t } = useT();
+  const { providers } = useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
   return (
     <AuthPage title={t("register.title")} lead={t("register.lead")}>
+      <ProviderButtons providers={providers} next="/" />
       <Form method="post" className="form">
         <Field
           label={t("auth.email")}

@@ -22,7 +22,9 @@ export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
 
   if (form.get("intent") === "resend") {
-    const result = await callApi(request, "/api/auth/code", {
+    // Finishing a provider sign-in, the new code must carry it along too.
+    const path = pending.mode === "complete" ? "/api/auth/complete" : "/api/auth/code";
+    const result = await callApi(request, path, {
       method: "POST",
       body: { email: pending.email, locale: readPreferences(request).locale },
     });
@@ -66,6 +68,7 @@ export default function LoginCode() {
   const pending = useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
   const register = pending.mode === "register";
+  const complete = pending.mode === "complete";
   const verify = useRef<HTMLButtonElement>(null);
 
   // A pasted or autofilled code is sent at once; typed digits wait for Continue.
@@ -94,9 +97,12 @@ export default function LoginCode() {
   return (
     <AuthPage
       title={t("code.title")}
-      lead={richText(t(register ? "code.leadRegister" : "code.lead"), {
-        email: <strong className="auth-email">{pending.email}</strong>,
-      })}
+      lead={richText(
+        t(register ? "code.leadRegister" : complete ? "code.leadComplete" : "code.lead"),
+        {
+          email: <strong className="auth-email">{pending.email}</strong>,
+        },
+      )}
     >
       <Form method="post" className="form">
         <Field
@@ -129,7 +135,7 @@ export default function LoginCode() {
         </div>
       </Form>
       <p className="auth-links">
-        <Link to={register ? "/register" : "/login"}>
+        <Link to={register ? "/register" : complete ? "/complete" : "/login"}>
           {register ? t("code.startOver") : t("code.otherEmail")}
         </Link>
       </p>

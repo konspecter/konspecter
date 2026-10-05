@@ -81,7 +81,7 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"001_initial.sql", "002_sync.sql", "003_accounts.sql"}
+	want := []string{"001_initial.sql", "002_sync.sql", "003_accounts.sql", "004_identities.sql"}
 	if strings.Join(names, ",") != strings.Join(want, ",") {
 		t.Errorf("applied migrations = %v, want %v", names, want)
 	}

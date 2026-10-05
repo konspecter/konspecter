@@ -16,6 +16,7 @@
 //	KONSPECTER_ALLOWED_ORIGINS  comma-separated browser origins allowed to call the API
 //	KONSPECTER_PUBLIC_URL    the account site's origin; turns sign-in on
 //	KONSPECTER_MAIL_TRANSPORT, KONSPECTER_SMTP_*  how emails are sent
+//	KONSPECTER_OAUTH_*, KONSPECTER_LOGIN_PROVIDERS_*  sign-in with other services
 package main
 
 import (
@@ -35,6 +36,7 @@ import (
 	"konspecter/server/internal/config"
 	"konspecter/server/internal/httpapi"
 	"konspecter/server/internal/mail"
+	"konspecter/server/internal/oauth"
 	"konspecter/server/internal/storage/postgres"
 )
 
@@ -77,10 +79,14 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout 
 			if err := db.Migrate(ctx); err != nil {
 				return err
 			}
+			accounts, err := accountOptions(cfg, db, slog.Default())
+			if err != nil {
+				return err
+			}
 			options := httpapi.Options{
 				AllowedOrigins: cfg.AllowedOrigins,
 				TrustedProxies: cfg.TrustedProxies,
-				Accounts:       accountOptions(cfg, db, slog.Default()),
+				Accounts:       accounts,
 			}
 			handler := httpapi.NewHandler(db, db, slog.Default(), options)
 			return serve(ctx, cfg.Addr, handler, handler.CloseStreams)
@@ -118,10 +124,14 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout 
 }
 
 // accountOptions turns on sign-in on the site when the public URL is set.
-func accountOptions(cfg config.Config, db *postgres.DB, logger *slog.Logger) *httpapi.Accounts {
+func accountOptions(cfg config.Config, db *postgres.DB, logger *slog.Logger) (*httpapi.Accounts, error) {
 	if cfg.PublicURL == "" {
 		logger.Info("sign-in on the site is off: KONSPECTER_PUBLIC_URL is not set")
-		return nil
+		return nil, nil
+	}
+	providers, lists, err := loginProviders(cfg, logger)
+	if err != nil {
+		return nil, err
 	}
 	accounts := &httpapi.Accounts{
 		Store:            db,
@@ -136,6 +146,8 @@ func accountOptions(cfg config.Config, db *postgres.DB, logger *slog.Logger) *ht
 			EmailsPerAddress:      cfg.Rates.EmailsPerAddress,
 			EmailsPerIP:           cfg.Rates.EmailsPerIP,
 		},
+		Providers:      providers,
+		LoginProviders: lists,
 	}
 	switch {
 	case cfg.Mail.Transport == "log":
@@ -150,7 +162,32 @@ func accountOptions(cfg config.Config, db *postgres.DB, logger *slog.Logger) *ht
 	default:
 		logger.Warn("no email is sent (KONSPECTER_SMTP_HOST is not set): sign-in codes and password resets are off")
 	}
-	return accounts
+	return accounts, nil
+}
+
+// loginProviders sets up the configured sign-in providers, each calling back
+// to the public URL, and keeps only those in the site's per-language lists.
+func loginProviders(cfg config.Config, logger *slog.Logger) (map[string]*oauth.Provider, map[string][]string, error) {
+	providers := map[string]*oauth.Provider{}
+	for id, client := range cfg.OAuth {
+		provider, err := oauth.New(id, client.ClientID, client.ClientSecret, cfg.PublicURL+"/api/auth/"+id+"/callback")
+		if err != nil {
+			return nil, nil, err
+		}
+		providers[id] = provider
+	}
+	lists := map[string][]string{}
+	for locale, ids := range cfg.LoginProviders {
+		lists[locale] = []string{}
+		for _, id := range ids {
+			if providers[id] == nil {
+				logger.Info("a sign-in provider is listed but not set up", "provider", id, "locale", locale)
+				continue
+			}
+			lists[locale] = append(lists[locale], id)
+		}
+	}
+	return providers, lists, nil
 }
 
 func withDB(ctx context.Context, url string, use func(*postgres.DB) error) error {

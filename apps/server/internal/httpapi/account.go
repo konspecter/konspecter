@@ -12,11 +12,12 @@ import (
 	"konspecter/server/internal/accounts"
 	"konspecter/server/internal/auth"
 	"konspecter/server/internal/mail"
+	"konspecter/server/internal/oauth"
 )
 
 // AccountStore is the storage the site's sign-in needs.
 type AccountStore interface {
-	StartEmailCode(ctx context.Context, email string, codeHash []byte, passwordHash string, expiresAt time.Time) error
+	StartEmailCode(ctx context.Context, email string, codeHash []byte, passwordHash string, identity accounts.Identity, expiresAt time.Time) error
 	VerifyEmailCode(ctx context.Context, email string, codeHash []byte, createAllowed bool) (auth.User, error)
 	PasswordHash(ctx context.Context, email string) (auth.User, string, error)
 	CreatePasswordReset(ctx context.Context, userID string, tokenHash []byte, expiresAt time.Time) error
@@ -25,6 +26,9 @@ type AccountStore interface {
 	SessionByID(ctx context.Context, idHash []byte) (auth.Session, error)
 	ExtendSession(ctx context.Context, idHash []byte, expiresAt time.Time) error
 	DeleteSession(ctx context.Context, idHash []byte) error
+	SignInWithIdentity(ctx context.Context, identity accounts.Identity, createAllowed bool) (auth.User, error)
+	CreatePendingIdentity(ctx context.Context, tokenHash []byte, identity accounts.Identity, expiresAt time.Time) error
+	PendingIdentity(ctx context.Context, tokenHash []byte) (accounts.Identity, error)
 }
 
 // Mailer sends one email.
@@ -47,6 +51,11 @@ type Accounts struct {
 	EmailCodeTTL     time.Duration
 	PasswordResetTTL time.Duration
 	Rates            Rates
+	// Providers are the configured sign-in providers by id.
+	Providers map[string]*oauth.Provider
+	// LoginProviders are the provider ids the site offers per language
+	// ("en", "ru"), each one in Providers.
+	LoginProviders map[string][]string
 }
 
 // Rates are the abuse limits; see config.Rates.
@@ -63,29 +72,31 @@ const sessionRefresh = time.Hour
 
 type accountAPI struct {
 	Accounts
-	cookieName  string
-	secure      bool
-	loginIP     *windowLimiter
-	loginEmail  *windowLimiter
-	mailIP      *windowLimiter
-	mailAddress *windowLimiter
+	cookieName     string
+	linkCookieName string
+	secure         bool
+	loginIP        *windowLimiter
+	loginEmail     *windowLimiter
+	mailIP         *windowLimiter
+	mailAddress    *windowLimiter
 }
 
 func newAccountAPI(config Accounts, now func() time.Time) *accountAPI {
 	secure := strings.HasPrefix(config.PublicURL, "https://")
-	name := "ksp_session"
+	prefix := ""
 	if secure {
 		// __Host-: the browser keeps it to this exact host, Secure, path /.
-		name = "__Host-ksp_session"
+		prefix = "__Host-"
 	}
 	return &accountAPI{
-		Accounts:    config,
-		cookieName:  name,
-		secure:      secure,
-		loginIP:     newWindowLimiter(config.Rates.LoginFailuresPerIP, 15*time.Minute, now),
-		loginEmail:  newWindowLimiter(config.Rates.LoginFailuresPerEmail, 15*time.Minute, now),
-		mailIP:      newWindowLimiter(config.Rates.EmailsPerIP, time.Hour, now),
-		mailAddress: newWindowLimiter(config.Rates.EmailsPerAddress, time.Hour, now),
+		Accounts:       config,
+		cookieName:     prefix + "ksp_session",
+		linkCookieName: prefix + "ksp_link",
+		secure:         secure,
+		loginIP:        newWindowLimiter(config.Rates.LoginFailuresPerIP, 15*time.Minute, now),
+		loginEmail:     newWindowLimiter(config.Rates.LoginFailuresPerEmail, 15*time.Minute, now),
+		mailIP:         newWindowLimiter(config.Rates.EmailsPerIP, time.Hour, now),
+		mailAddress:    newWindowLimiter(config.Rates.EmailsPerAddress, time.Hour, now),
 	}
 }
 
@@ -96,6 +107,7 @@ func (a *api) registerAccountRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /api/auth/logout", a.siteRequest(a.logout))
 	mux.Handle("POST /api/auth/password/forgot", a.siteRequest(a.forgotPassword))
 	mux.Handle("POST /api/auth/password/reset", a.siteRequest(a.resetPassword))
+	a.registerProviderRoutes(mux)
 }
 
 // siteRequest guards the site's requests: sign-in must be configured, and a
@@ -176,26 +188,42 @@ func (a *api) setSessionCookie(w http.ResponseWriter, id string, expires time.Ti
 }
 
 func (a *api) clearSessionCookie(w http.ResponseWriter) {
+	a.clearCookie(w, a.accounts.cookieName, "/")
+}
+
+func (a *api) clearCookie(w http.ResponseWriter, name, path string) {
 	http.SetCookie(w, &http.Cookie{
-		Name: a.accounts.cookieName, Value: "", Path: "/", MaxAge: -1,
+		Name: name, Value: "", Path: path, MaxAge: -1,
 		HttpOnly: true, Secure: a.accounts.secure, SameSite: http.SameSiteLaxMode,
 	})
 }
 
 // signIn starts a session for user and answers with the user.
 func (a *api) signIn(w http.ResponseWriter, r *http.Request, user auth.User) {
-	id, hash, err := accounts.NewSecret(auth.SessionPrefix)
-	if err != nil {
+	if err := a.startSession(w, r, user); err != nil {
 		a.internalError(w, r, err)
 		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"user": userJSON(user)})
+}
+
+// startSession stores a session for user and sets its cookie. A sign-in
+// with another service that was waiting for an address is dropped: the
+// browser has signed in now, one way or another.
+func (a *api) startSession(w http.ResponseWriter, r *http.Request, user auth.User) error {
+	id, hash, err := accounts.NewSecret(auth.SessionPrefix)
+	if err != nil {
+		return err
 	}
 	expires := time.Now().Add(a.accounts.SessionTTL)
 	if err := a.accounts.Store.CreateSession(r.Context(), user.ID, hash, r.UserAgent(), expires); err != nil {
-		a.internalError(w, r, err)
-		return
+		return err
 	}
 	a.setSessionCookie(w, id, expires)
-	writeJSON(w, http.StatusOK, map[string]any{"user": userJSON(user)})
+	if _, err := r.Cookie(a.accounts.linkCookieName); err == nil {
+		a.clearCookie(w, a.accounts.linkCookieName, "/")
+	}
+	return nil
 }
 
 func userJSON(user auth.User) map[string]string {
@@ -248,14 +276,27 @@ func (a *api) sendCode(w http.ResponseWriter, r *http.Request) {
 	if !a.decode(w, r, &body) || a.mailUnavailable(w) {
 		return
 	}
-	email, err := auth.NormalizeEmail(body.Email)
+	a.emailCode(w, r, codeRequest{email: body.Email, password: body.Password, locale: body.Locale})
+}
+
+// codeRequest is what an email code will do once proven: sign in to the
+// address's account, set a password, link an identity.
+type codeRequest struct {
+	email    string
+	password *string
+	locale   string
+	identity accounts.Identity
+}
+
+func (a *api) emailCode(w http.ResponseWriter, r *http.Request, request codeRequest) {
+	email, err := auth.NormalizeEmail(request.email)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_email", "enter a valid email address")
 		return
 	}
 	passwordHash := ""
-	if body.Password != nil {
-		if err := accounts.ValidatePassword(*body.Password); err != nil {
+	if request.password != nil {
+		if err := accounts.ValidatePassword(*request.password); err != nil {
 			writeError(w, http.StatusBadRequest, "weak_password", err.Error())
 			return
 		}
@@ -266,14 +307,14 @@ func (a *api) sendCode(w http.ResponseWriter, r *http.Request) {
 	}
 	a.accounts.mailIP.record(client)
 	a.accounts.mailAddress.record(email)
-	if body.Password != nil {
-		if passwordHash, err = accounts.HashPassword(*body.Password); err != nil {
+	if request.password != nil {
+		if passwordHash, err = accounts.HashPassword(*request.password); err != nil {
 			a.internalError(w, r, err)
 			return
 		}
 	}
 
-	locale := mail.ParseLocale(body.Locale)
+	locale := mail.ParseLocale(request.locale)
 	_, _, err = a.accounts.Store.PasswordHash(r.Context(), email)
 	exists := err == nil
 	if err != nil && !errors.Is(err, auth.ErrUserNotFound) {
@@ -292,7 +333,7 @@ func (a *api) sendCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	expires := time.Now().Add(a.accounts.EmailCodeTTL)
-	if err := a.accounts.Store.StartEmailCode(r.Context(), email, accounts.HashCode(email, code), passwordHash, expires); err != nil {
+	if err := a.accounts.Store.StartEmailCode(r.Context(), email, accounts.HashCode(email, code), passwordHash, request.identity, expires); err != nil {
 		a.internalError(w, r, err)
 		return
 	}

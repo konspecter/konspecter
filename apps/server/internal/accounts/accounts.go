@@ -1,6 +1,7 @@
 // Package accounts holds the rules for signing in on the site: password
-// hashing, one-time email codes and password reset tokens. Storage and HTTP
-// live elsewhere; this package only makes and checks secrets.
+// hashing, one-time email codes, password reset tokens and identities at
+// other services. Storage and HTTP live elsewhere; this package only makes
+// and checks secrets.
 package accounts
 
 import (
@@ -28,7 +29,27 @@ var (
 	ErrInvalidResetToken = errors.New("invalid or expired reset link")
 	// ErrRegistrationClosed means new accounts are not accepted.
 	ErrRegistrationClosed = errors.New("registration is closed")
+	// ErrEmailRequired means an identity is new and its provider vouched for
+	// no address: its owner must prove one before it can sign in.
+	ErrEmailRequired = errors.New("an email address is required")
+	// ErrIdentityExpired means a pending identity is unknown or has expired.
+	ErrIdentityExpired = errors.New("the pending sign-in has expired")
 )
+
+// Identity is an account at another service (an OAuth provider) signing in.
+//
+// It signs in to the user it is linked to. A new identity is linked by its
+// address: only an address the provider vouches for (EmailVerified) may
+// reach an existing account or create one; without one, the owner proves an
+// address with an email code first (ErrEmailRequired).
+type Identity struct {
+	Provider string
+	Subject  string
+	// Email is the provider's address for the account, normalized; "" if none.
+	Email string
+	// EmailVerified says the provider vouches that the account owns Email.
+	EmailVerified bool
+}
 
 // Password length limits, in characters. The upper bound only keeps hashing cheap.
 const (

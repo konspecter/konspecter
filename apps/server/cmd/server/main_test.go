@@ -3,12 +3,16 @@ package main
 import (
 	"bytes"
 	"context"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"konspecter/server/internal/config"
 )
 
 func env(values map[string]string) func(string) string {
@@ -127,5 +131,26 @@ func TestVersionNeedsNoDatabase(t *testing.T) {
 	}
 	if !strings.HasPrefix(out.String(), "konspecter server ") {
 		t.Errorf("version output = %q", out.String())
+	}
+}
+
+func TestLoginProvidersKeepOnlyTheConfiguredOnes(t *testing.T) {
+	cfg := config.Config{
+		PublicURL: "https://notes.example.com",
+		OAuth:     map[string]config.OAuthClient{"google": {ClientID: "id", ClientSecret: "secret"}},
+		LoginProviders: map[string][]string{
+			"en": {"google", "linkedin", "x"},
+			"ru": {"yandex", "vk"},
+		},
+	}
+	providers, lists, err := loginProviders(cfg, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(providers) != 1 || providers["google"].Config.RedirectURL != "https://notes.example.com/api/auth/google/callback" {
+		t.Errorf("providers = %v", providers)
+	}
+	if !reflect.DeepEqual(lists, map[string][]string{"en": {"google"}, "ru": {}}) {
+		t.Errorf("lists = %v", lists)
 	}
 }
