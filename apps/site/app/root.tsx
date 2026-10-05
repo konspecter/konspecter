@@ -150,7 +150,8 @@ function Header({ data }: { data: RootData }) {
     <header className="site-header">
       <div className="site-frame site-header-row">
         <Link to="/" className="site-brand" aria-label={t("site.home")}>
-          <img src="/favicon.svg" alt="" width="28" height="28" />
+          <img className="logo-light" src="/logo.svg" alt="" width="28" height="28" />
+          <img className="logo-dark" src="/logo-dark.svg" alt="" width="28" height="28" />
           <span>Konspecter</span>
         </Link>
         <div className="site-header-end">

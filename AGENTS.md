@@ -126,10 +126,11 @@ docs/testing.md           test strategy and map
 docs/performance.md       measurements and optimizations
 docs/security.md          threat model and measures
 tests/e2e/                Playwright end-to-end tests
+logo/                     master logo artwork (SVG: black, white, colour, app tile)
 docs/license-policy.md    dependency license policy
 license-policy.json       machine-readable license policy used by CI
 scripts/check-licenses.mjs
-scripts/render-icons.mjs  the app icon (owl) for every platform: `pnpm icons`
+scripts/render-icons.mjs  the app icon (bookmark) for every platform: `pnpm icons`
 .github/workflows/        GitHub Actions: ci.yml (checks), release.yml (tagged releases)
 .gitlab-ci.yml            GitLab CI/CD: the same checks and release builds
 ```

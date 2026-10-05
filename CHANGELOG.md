@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **A new logo and app icon: the Konspecter bookmark.** A slanted, woven # (the tags and
+  Markdown headings conspects are made of) with one stroke turned into a red bookmark ribbon
+  (the app remembers where you stopped), white on a graphite plate. It replaces the owl on
+  every platform (macOS, Windows, iOS/Apple touch, Android adaptive and themed icons, PWA,
+  favicon, splash screens); the favicon uses a heavier cut that stays clear at 16 px. The
+  account site shows it without the plate, in graphite or white by the site's theme. The
+  master artwork is in `logo/`.
+
 ## Unreleased — updates package 2
 
 - The Tags field over the text is gone: tags are written in the text. A tag listed only in the

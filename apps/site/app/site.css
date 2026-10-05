@@ -53,6 +53,29 @@ main {
   display: block;
 }
 
+/* The logo's strokes are graphite on the light theme and white on the dark one. */
+.site-brand .logo-dark {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .site-brand .logo-light {
+    display: none;
+  }
+
+  :root:not([data-theme="light"]) .site-brand .logo-dark {
+    display: block;
+  }
+}
+
+:root[data-theme="dark"] .site-brand .logo-light {
+  display: none;
+}
+
+:root[data-theme="dark"] .site-brand .logo-dark {
+  display: block;
+}
+
 .site-header-end {
   display: flex;
   align-items: center;

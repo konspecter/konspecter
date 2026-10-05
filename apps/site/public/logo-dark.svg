@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#2a2f37"/><stop offset="1" stop-color="#1a1d22"/>
+  </linearGradient>
+  <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%">
+    <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000000" flood-opacity="0.3"/>
+  </filter></defs><g transform="translate(512 512) scale(0.98) translate(-512 -512)">
+    <path class="strokes" fill="#ffffff" d="M307.2 426.1 L337.2 314.1 L236.4 314.1 L206.4 426.1 Z M863.7 426.1 L893.7 314.1 L509 314.1 L479 426.1 Z M411.1 568 L514.2 183.4 L402.1 183.4 L299.1 568 Z M488.8 709.9 L518.9 597.9 L160.3 597.9 L130.3 709.9 Z M787.6 709.9 L817.6 597.9 L742.9 597.9 L712.9 709.9 Z M226 840.6 L338 840.6 L365.1 739.8 L253 739.8 Z"/>
+    <path fill="#e5484d" d="M659.8 183.4 L632.8 284.2 L797.1 284.2 L824.1 183.4 Z M545.8 915.3 L602 1012.4 L751.1 456 L586.8 456 L437.7 1012.4 Z"/></g></svg>
