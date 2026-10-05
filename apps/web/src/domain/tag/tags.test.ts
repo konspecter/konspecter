@@ -146,28 +146,32 @@ describe("tag chains", () => {
 });
 
 describe("tagTree", () => {
-  const count = (name: string, n: number, parents: string[] = []) => ({
+  /** A tag with its parents and the notes' chains that end in it ("java#collections"). */
+  const entry = (name: string, parents: string[] = [], chains: Record<string, string> = {}) => ({
     tag: { name },
-    count: n,
     parents,
+    chains: Object.entries(chains).map(([noteId, chain]) => ({ noteId, tags: chain.split("#") })),
   });
   const shape = (nodes: readonly TagNode[]): unknown[] =>
     nodes.map((node) => [node.label, node.count, shape(node.children)]);
+  const notes = (nodes: readonly TagNode[]): unknown[] =>
+    nodes.map((node) => [node.label, [...node.noteIds].sort(), notes(node.children)]);
 
   it("nests tags under their parents, sorted by name", () => {
     const tree = tagTree([
-      count("streams", 1, ["java"]),
-      count("go", 2),
-      count("java", 3),
-      count("collections", 2, ["java"]),
-      count("maps", 1, ["collections"]),
+      entry("streams", ["java"], { s: "java#streams" }),
+      entry("go", [], { g1: "go", g2: "go" }),
+      entry("java", [], { j: "java" }),
+      entry("collections", ["java"], { c: "java#collections" }),
+      entry("maps", ["collections"], { m: "java#collections#maps" }),
     ]);
 
+    // A folder counts its notes and those below it.
     expect(shape(tree)).toEqual([
       ["go", 2, []],
       [
         "java",
-        3,
+        4,
         [
           ["collections", 2, [["maps", 1, []]]],
           ["streams", 1, []],
@@ -176,42 +180,91 @@ describe("tagTree", () => {
     ]);
   });
 
-  it("shows a tag under each of its parents, never as a root", () => {
+  it("puts a note only in the folders its chain leads to", () => {
     const tree = tagTree([
-      count("java", 2),
-      count("python", 1),
-      count("collections", 3, ["java", "python"]),
+      entry("java", [], { both: "java" }),
+      entry("python"),
+      entry("collections", ["java", "python"], {
+        lists: "java#collections",
+        py: "python#collections",
+        bare: "collections",
+        both: "collections",
+      }),
+    ]);
+    expect(notes(tree)).toEqual([
+      ["java", ["both"], [["collections", ["bare", "both", "lists"], []]]],
+      ["python", [], [["collections", ["bare", "both", "py"], []]]],
     ]);
     expect(shape(tree)).toEqual([
-      ["java", 2, [["collections", 3, []]]],
-      ["python", 1, [["collections", 3, []]]],
+      ["java", 3, [["collections", 3, []]]],
+      ["python", 3, [["collections", 3, []]]],
+    ]);
+  });
+
+  it("matches the end of a folder's path, whatever is above it", () => {
+    const tree = tagTree([
+      entry("lang"),
+      entry("java", ["lang"]),
+      entry("python", ["lang"]),
+      entry("collections", ["java", "python"], { lists: "java#collections" }),
+    ]);
+    expect(notes(tree)).toEqual([
+      [
+        "lang",
+        [],
+        [
+          ["java", [], [["collections", ["lists"], []]]],
+          ["python", [], [["collections", [], []]]],
+        ],
+      ],
+    ]);
+  });
+
+  it("shows a tag under each of its parents, never as a root", () => {
+    const tree = tagTree([
+      entry("java"),
+      entry("python"),
+      entry("collections", ["java", "python"]),
+    ]);
+    expect(shape(tree)).toEqual([
+      ["java", 0, [["collections", 0, []]]],
+      ["python", 0, [["collections", 0, []]]],
     ]);
   });
 
   it("gives a cycle one root, the first by name, and stops before repeating a tag", () => {
-    const tree = tagTree([count("b", 1, ["a"]), count("a", 1, ["b"]), count("c", 1, ["c"])]);
+    const tree = tagTree([
+      entry("b", ["a"], { ab: "a#b" }),
+      entry("a", ["b"], { ba: "b#a" }),
+      entry("c", ["c"], { cc: "c#c" }),
+    ]);
     expect(shape(tree)).toEqual([
-      ["a", 1, [["b", 1, []]]],
+      ["a", 2, [["b", 1, []]]],
       ["c", 1, []],
+    ]);
+    // A chain that ends no path goes where the longest part of its end does.
+    expect(notes(tree)).toEqual([
+      ["a", ["ba"], [["b", ["ab"], []]]],
+      ["c", ["cc"], []],
     ]);
   });
 
   it("ignores parents that are not tags", () => {
-    expect(shape(tagTree([count("b", 1, ["a"])]))).toEqual([["b", 1, []]]);
+    expect(shape(tagTree([entry("b", ["a"], { n: "a#b" })]))).toEqual([["b", 1, []]]);
   });
 
   it("labels each tag with its spelling", () => {
     const tree = tagTree([
-      { ...count("java", 2), spelling: "Java" },
-      { ...count("linked_list", 1, ["java"]), spelling: "Linked_List" },
-      count("go", 1),
+      { ...entry("java"), spelling: "Java" },
+      { ...entry("linked_list", ["java"]), spelling: "Linked_List" },
+      entry("go"),
     ]);
     expect(tree.map((node) => node.label)).toEqual(["go", "Java"]);
     expect(tree[1]?.children.map((node) => node.label)).toEqual(["Linked List"]);
   });
 
   it("capitalizes every label on request", () => {
-    const tree = tagTree([count("java", 1), count("streams", 1, ["java"])], {
+    const tree = tagTree([entry("java"), entry("streams", ["java"])], {
       capitalize: true,
     });
     expect(tree.map((node) => node.label)).toEqual(["Java"]);
@@ -220,9 +273,9 @@ describe("tagTree", () => {
 
   it("finds a tag anywhere below a node", () => {
     const [java] = tagTree([
-      count("java", 1),
-      count("collections", 1, ["java"]),
-      count("maps", 1, ["collections"]),
+      entry("java"),
+      entry("collections", ["java"]),
+      entry("maps", ["collections"]),
     ]);
     expect(java && tagTreeContains(java, "maps")).toBe(true);
     expect(java && tagTreeContains(java, "java")).toBe(false);

@@ -43,6 +43,23 @@ describe("tag index", () => {
     ]);
   });
 
+  it("gives each tag the notes' chains that end in it", async () => {
+    const store = await openNoteStore(uniqueName());
+    await store.put(note("a", "#java#collections #java"));
+    await store.put(note("b", "#Python#Collections"));
+
+    expect(
+      (await store.tags()).map(({ tag, chains }) => [
+        tag.name,
+        chains.map(({ noteId, tags }) => `${noteId}:${tags.join("#")}`),
+      ]),
+    ).toEqual([
+      ["collections", ["a:java#collections", "b:python#collections"]],
+      ["java", ["a:java"]],
+      ["python", []],
+    ]);
+  });
+
   it("indexes the tags listed in the frontmatter", async () => {
     const store = await openNoteStore(uniqueName());
     await store.put(note("a", "---\ntags:\n  - parent_1#child\n  - parent_2\n---\nBody"));

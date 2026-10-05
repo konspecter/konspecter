@@ -6,7 +6,7 @@ import {
   readNote,
   type Note,
 } from "../../domain/note/note";
-import { parseTagChain, writtenTagList, type Tag } from "../../domain/tag/tags";
+import { writtenTagList } from "../../domain/tag/tags";
 import type { NoteChange, NoteRepository } from "./note-repository";
 
 /** What lists show of a note, without keeping its whole text in memory. */
@@ -73,18 +73,16 @@ function byTitleSummary(a: NoteSummary, b: NoteSummary): number {
 }
 
 /**
- * The notes with a tag chain that ends in `tag`, by title: the documents
- * inside a tag in the tag tree. A note written `#java#collections` sits in
- * collections, not in java; one written `#java #collections` sits in both.
+ * The notes with these ids, by title: the documents inside a folder of the
+ * tag tree (`TagNode.noteIds`). Ids without a note are skipped.
  */
-export async function notesInTag(store: NoteRepository, tag: Tag): Promise<NoteSummary[]> {
-  const notes = await store.notesWithTag(tag);
+export async function notesInFolder(
+  store: NoteRepository,
+  noteIds: readonly string[],
+): Promise<NoteSummary[]> {
+  const notes = await Promise.all(noteIds.map((id) => store.get(id)));
   return notes
-    .filter((note) =>
-      noteWrittenTags(readNote(note)).some(
-        (written) => parseTagChain(written)?.tags.at(-1)?.name === tag.name,
-      ),
-    )
+    .filter((note): note is Note => note !== undefined)
     .map(summarize)
     .sort(byTitleSummary);
 }

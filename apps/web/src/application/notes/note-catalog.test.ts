@@ -1,6 +1,6 @@
 import { createNote } from "../../domain/note/note";
 import { openNoteStore } from "../../infrastructure/storage/note-store";
-import { NoteCatalog, notesInTag, summarize, type NoteSummary } from "./note-catalog";
+import { NoteCatalog, notesInFolder, summarize, type NoteSummary } from "./note-catalog";
 
 let count = 0;
 const newStore = () => openNoteStore(`catalog-test-${String((count += 1))}`);
@@ -47,23 +47,17 @@ describe("summarize", () => {
   });
 });
 
-describe("notesInTag", () => {
-  const tag = (name: string) => ({ name });
-
-  it("lists the notes with a chain ending in the tag, by title", async () => {
+describe("notesInFolder", () => {
+  it("lists the notes with the ids, by title, skipping ids without a note", async () => {
     const store = await newStore();
     const now = new Date("2024-01-01");
     await store.put(createNote("# streams\n\n#java", now, "a"));
-    await store.put(createNote("# Collections\n\n#java#collections", now, "b"));
-    await store.put(createNote("# Arrays\n\n#java #java#collections", now, "c"));
+    await store.put(createNote("# Arrays\n\n#java", now, "c"));
     await store.put(createNote("#\n\n#java", now, "d"));
     await store.put(createNote("# Other\n\n#go", now, "e"));
-    await store.put(createNote("# Python\n\n#python#collections", now, "f"));
 
-    const java = await notesInTag(store, tag("java"));
-    expect(java.map((note) => note.id)).toEqual(["c", "a", "d"]);
-    const collections = await notesInTag(store, tag("collections"));
-    expect(collections.map((note) => note.id)).toEqual(["c", "b", "f"]);
+    const notes = await notesInFolder(store, ["d", "a", "gone", "c"]);
+    expect(notes.map((note) => note.id)).toEqual(["c", "a", "d"]);
   });
 });
 

@@ -132,12 +132,20 @@ export function chainLinks(chain: TagChain): [string, string][] {
   return links;
 }
 
+/** One tag chain of a note, by tag name, outermost first: java, collections. */
+export type NoteChain = {
+  readonly noteId: string;
+  readonly tags: readonly string[];
+};
+
 export type TagNode = {
   readonly tag: Tag;
   /** What the tree shows: see `tagLabel`. */
   readonly label: string;
-  /** Notes tagged with this tag. */
+  /** Notes in this folder and the folders below it, each once. */
   readonly count: number;
+  /** The notes in this folder itself, by id: see `tagTree`. */
+  readonly noteIds: readonly string[];
   readonly children: readonly TagNode[];
 };
 
@@ -149,12 +157,24 @@ export type TagNode = {
  * branch stops before a tag already above it. `spelling` is the tag as
  * written (see `tagSpellings`); without it the tag shows in lowercase.
  * `capitalize` starts every label with a capital letter.
+ *
+ * `chains` are the note chains ending in the tag. A note sits only in the
+ * folders its chains lead to: those whose path ends with the chain, so
+ * `#java#collections` is in Java › Collections but not in Python ›
+ * Collections, and a bare `#collections` is in every Collections. A chain
+ * that ends no path (`#b#a` when the cycle above shows a › b) goes to the
+ * folders that end with the longest part of its end that one does.
  */
 export function tagTree(
-  counts: readonly { tag: Tag; count: number; spelling?: string; parents?: readonly string[] }[],
+  entries: readonly {
+    tag: Tag;
+    spelling?: string;
+    parents?: readonly string[];
+    chains?: readonly NoteChain[];
+  }[],
   { capitalize = false }: { capitalize?: boolean } = {},
 ): TagNode[] {
-  const byName = new Map(counts.map((entry) => [entry.tag.name, entry]));
+  const byName = new Map(entries.map((entry) => [entry.tag.name, entry]));
   const names = [...byName.keys()].sort(byCodePoint);
   const children = new Map<string, string[]>();
   const hasParent = new Set<string>();
@@ -184,19 +204,62 @@ export function tagTree(
     }
   }
 
-  const node = (name: string, above: ReadonlySet<string>): TagNode => {
-    const entry = byName.get(name);
-    const path = new Set(above).add(name);
-    return {
-      tag: entry?.tag ?? { name },
-      label: tagLabel(entry?.spelling ?? name, capitalize),
-      count: entry?.count ?? 0,
+  // The folders, each with its path from the root; then the notes go in.
+  type Folder = {
+    readonly name: string;
+    readonly path: readonly string[];
+    readonly noteIds: Set<string>;
+    readonly children: readonly Folder[];
+  };
+  const foldersOf = new Map<string, Folder[]>();
+  const folder = (name: string, above: readonly string[]): Folder => {
+    const path = [...above, name];
+    const made: Folder = {
+      name,
+      path,
+      noteIds: new Set(),
       children: (children.get(name) ?? [])
-        .filter((child) => !path.has(child))
-        .map((child) => node(child, path)),
+        .filter((child) => !path.includes(child))
+        .map((child) => folder(child, path)),
+    };
+    foldersOf.set(name, [...(foldersOf.get(name) ?? []), made]);
+    return made;
+  };
+  const tree = roots.sort(byCodePoint).map((name) => folder(name, []));
+
+  for (const [name, entry] of byName) {
+    const candidates = foldersOf.get(name) ?? [];
+    for (const chain of entry.chains ?? []) {
+      for (let length = chain.tags.length; length > 0; length -= 1) {
+        const end = chain.tags.slice(-length);
+        const matching = candidates.filter((each) => endsWith(each.path, end));
+        matching.forEach((each) => each.noteIds.add(chain.noteId));
+        if (matching.length > 0) break;
+      }
+    }
+  }
+
+  const node = (each: Folder): { node: TagNode; below: ReadonlySet<string> } => {
+    const entry = byName.get(each.name);
+    const nested = each.children.map(node);
+    const below = new Set([...each.noteIds, ...nested.flatMap((child) => [...child.below])]);
+    return {
+      node: {
+        tag: entry?.tag ?? { name: each.name },
+        label: tagLabel(entry?.spelling ?? each.name, capitalize),
+        count: below.size,
+        noteIds: [...each.noteIds],
+        children: nested.map((child) => child.node),
+      },
+      below,
     };
   };
-  return roots.sort(byCodePoint).map((name) => node(name, new Set()));
+  return tree.map((each) => node(each).node);
+}
+
+function endsWith(path: readonly string[], end: readonly string[]): boolean {
+  const offset = path.length - end.length;
+  return offset >= 0 && end.every((name, index) => path[offset + index] === name);
 }
 
 function byCodePoint(a: string, b: string): number {

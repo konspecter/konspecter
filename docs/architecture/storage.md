@@ -63,8 +63,8 @@ upgrades never wait forever. The old tab then shows storage errors until it is r
 (`written`, e.g. `Java#Linked_List`: spellings and parent links), and the note's tags
 (`memberOf`, e.g. `java`, `linked_list`; see [tags](tags.md)). The `memberOf` multiEntry
 index answers "which notes carry `java`?" directly, including notes written
-`#java#collections`. The tag list with counts and parents (`countTags`) is computed from the
-entries (`infrastructure/storage/tag-index.ts`).
+`#java#collections`. The tag list with counts, parents and the chains ending in each tag (`countTags`, for the
+sidebar tree) is computed from the entries (`infrastructure/storage/tag-index.ts`).
 
 - **Always in step:** `put` and `delete` write the note and its entry in one transaction.
 - **Rebuildable:** `rebuildIndexes()` clears the store and recomputes it from the notes. On open,

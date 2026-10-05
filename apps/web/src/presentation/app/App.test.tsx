@@ -699,7 +699,7 @@ describe("tags", () => {
     );
   });
 
-  it("shows a tag under each of its parents, holding every note it ends a chain of", async () => {
+  it("shows a tag under each of its parents, holding the notes whose chains lead there", async () => {
     const store = await newStore();
     await store.put(createNote("# Lists\n\n#java#collections", new Date(), "lists"));
     await store.put(createNote("# Py\n\n#python#collections", new Date(), "py"));
@@ -718,14 +718,19 @@ describe("tags", () => {
     for (const link of within(tree).getAllByRole("link", { name: "Collections" })) {
       expect(link).toHaveAttribute("aria-current", "page");
     }
-    // The same notes in both: the folder is the tag, whatever its parent.
+    // #java#collections only in Java › Collections, #python#collections only in
+    // Python › Collections; a bare #collections in both.
     await waitFor(() => {
       expect(
         within(tree)
           .getAllByRole("link", { name: /^(Bare|Lists|Py)$/ })
           .map((link) => link.textContent),
-      ).toEqual(["Bare", "Lists", "Py", "Bare", "Lists", "Py"]);
+      ).toEqual(["Bare", "Lists", "Bare", "Py"]);
     });
+    // Each folder counts what it holds.
+    expect(within(tree).getAllByLabelText("2 conspects")).toHaveLength(4);
+    // The search still takes each chain as both its tags.
+    expect((await listTitles()).sort()).toEqual(["Bare", "Lists", "Py"]);
   });
 
   it("opens a note from the tag tree and marks it there", async () => {

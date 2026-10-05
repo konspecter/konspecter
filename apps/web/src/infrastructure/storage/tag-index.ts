@@ -1,6 +1,12 @@
 import type { IDBPDatabase, IDBPTransaction } from "idb";
 import { noteTags, noteWrittenTags, parseNote, readNote, type Note } from "../../domain/note/note";
-import { chainLinks, parseTagChain, tagSpellings, type Tag } from "../../domain/tag/tags";
+import {
+  chainLinks,
+  parseTagChain,
+  tagSpellings,
+  type NoteChain,
+  type Tag,
+} from "../../domain/tag/tags";
 import type { KonspecterDb } from "./schema";
 
 /**
@@ -26,6 +32,8 @@ export type TagCount = {
   readonly spelling: string;
   /** The tags written right before it in a chain, in any note, by name. */
   readonly parents: readonly string[];
+  /** The notes' chains that end in it: where the tag tree puts the notes. */
+  readonly chains: readonly NoteChain[];
 };
 
 type WriteTransaction = IDBPTransaction<KonspecterDb, ("notes" | "tags" | "meta")[], "readwrite">;
@@ -41,12 +49,19 @@ export function countTags(entries: Iterable<TagEntry>): TagCount[] {
   const list = [...entries];
   const counts = new Map<string, number>();
   const parents = new Map<string, Set<string>>();
+  const chains = new Map<string, NoteChain[]>();
   for (const entry of list) {
     for (const name of entry.memberOf) counts.set(name, (counts.get(name) ?? 0) + 1);
     for (const written of entry.written) {
       const chain = parseTagChain(written);
-      for (const [parent, child] of chain ? chainLinks(chain) : []) {
+      if (!chain) continue;
+      for (const [parent, child] of chainLinks(chain)) {
         parents.set(child, (parents.get(child) ?? new Set()).add(parent));
+      }
+      const tags = chain.tags.map((tag) => tag.name);
+      const last = tags.at(-1);
+      if (last !== undefined) {
+        chains.set(last, [...(chains.get(last) ?? []), { noteId: entry.noteId, tags }]);
       }
     }
   }
@@ -57,6 +72,7 @@ export function countTags(entries: Iterable<TagEntry>): TagCount[] {
       count,
       spelling: spellings.get(name) ?? name,
       parents: [...(parents.get(name) ?? [])].sort(),
+      chains: chains.get(name) ?? [],
     }))
     .sort((a, b) => (a.tag.name < b.tag.name ? -1 : a.tag.name > b.tag.name ? 1 : 0));
 }

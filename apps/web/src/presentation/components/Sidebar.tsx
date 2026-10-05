@@ -10,9 +10,9 @@ import {
   type Ref,
 } from "react";
 import { Link } from "react-router";
-import { tagTree, type Tag, type TagNode } from "../../domain/tag/tags";
+import { tagTree, type TagNode } from "../../domain/tag/tags";
 import {
-  notesInTag,
+  notesInFolder,
   type NoteCatalog,
   type NoteSummary,
 } from "../../application/notes/note-catalog";
@@ -210,7 +210,7 @@ function SidebarTags({ store, library, activeTag, currentNoteId, tagNames }: Sid
   const [tree, setTree] = useState<readonly TagNode[] | null>(null);
   // A new loader for every change, so open folders read their notes again.
   const loadNotes = useCallback(
-    (tag: Tag) => notesInTag(store, tag),
+    (noteIds: readonly string[]) => notesInFolder(store, noteIds),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- library marks the change
     [store, library],
   );

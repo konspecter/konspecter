@@ -20,10 +20,10 @@ type TagTreeViewProps = {
   /** The note open in the main area; marked where it appears. */
   currentNoteId?: string | null;
   /**
-   * The notes inside a tag (a chain of theirs ends in it). A new function
-   * means the notes changed: open folders read them again.
+   * The notes inside a folder, from its `noteIds`. A new function means the
+   * notes changed: open folders read them again.
    */
-  loadNotes: (tag: Tag) => Promise<readonly NoteSummary[]>;
+  loadNotes: (noteIds: readonly string[]) => Promise<readonly NoteSummary[]>;
 };
 
 /** The note list filtered to the tag (a search for `#tag`). */
@@ -33,8 +33,9 @@ function tagPath(tag: Tag): string {
 
 /**
  * The tags as a project tree: each tag is a folder holding its child tags,
- * then its notes; a tag with several parents is a folder under each. A
- * folder's name opens its filtered note list.
+ * then its notes; a tag with several parents is a folder under each, holding
+ * the notes whose chains lead there. A folder's name opens its filtered note
+ * list.
  */
 export function TagTreeView({
   nodes,
@@ -81,7 +82,7 @@ function indent(depth: number): CSSProperties {
 }
 
 function TagFolder({ node, depth, parent, activeTag, currentNoteId, loadNotes }: TagFolderProps) {
-  const { tag } = node;
+  const { tag, noteIds } = node;
   const label = useRef<HTMLAnchorElement>(null);
   const group = useRef<HTMLUListElement>(null);
   const [expanded, setExpanded] = useState(
@@ -93,7 +94,7 @@ function TagFolder({ node, depth, parent, activeTag, currentNoteId, loadNotes }:
   useEffect(() => {
     if (!expanded) return;
     let current = true;
-    loadNotes(tag).then(
+    loadNotes(noteIds).then(
       (next) => {
         if (current) setNotes(next);
       },
@@ -102,7 +103,7 @@ function TagFolder({ node, depth, parent, activeTag, currentNoteId, loadNotes }:
     return () => {
       current = false;
     };
-  }, [expanded, loadNotes, tag]);
+  }, [expanded, loadNotes, noteIds]);
 
   // → opens the folder, then goes to its first entry; ← closes it, then goes up.
   const onRowKey = (event: KeyboardEvent) => {

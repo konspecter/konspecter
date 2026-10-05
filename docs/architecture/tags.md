@@ -83,11 +83,16 @@ is matched only against plain text tokens. The `text_join` rule is disabled so a
   two kinds of node. A tag is a **folder** (`tagTree` in the domain) under each of its parents;
   only a tag without a parent is a root. Tags that only a cycle reaches (`#a#b` and `#b#a`)
   would never show, so the first of them by name becomes a root, and a branch stops before a
-  tag already above it. A folder is its tag, the same wherever it shows: it counts the notes
-  carrying the tag, links to its filter, and holds as **documents** the notes with a chain
-  ending in it (`notesInTag`). So a note written `#java#collections` sits in `collections`,
-  not directly in `java`; one written `#java #collections` sits in both. An open folder lists
-  its child tags, then its notes, both by name. Folders start closed; the active tag's
+  tag already above it. A folder's link filters by its tag alone. It holds as **documents**
+  only the notes whose chains lead to it: a folder holds a note when the folder's path ends
+  with one of the note's chains (`tagTree`, then `notesInFolder` reads them). So
+  `#java#collections` sits in Java › Collections only, not in Java nor in Python ›
+  Collections; a bare `#collections` sits in every Collections folder; `#java #collections`
+  sits in Java and in every Collections. A chain that ends no path (`#b#a` when a cycle
+  shows a › b) goes to the folders ending with the longest part of its end that one does.
+  A folder counts the notes in it and in the folders below it, each once. This is the tree
+  only: the note's tags (Details, search, filters) are still each tag of the chain. An open
+  folder lists its child tags, then its notes, both by name. Folders start closed; the active tag's
   folders and those above them start open. The tags are read again whenever a note changes,
   and so are the notes of every open folder.
 - **Tree labels:** a folder shows its tag as written, with `_` shown as a space and, by
