@@ -109,6 +109,16 @@ describe("text mode", () => {
     expect(textBox().querySelector("h1")).toHaveTextContent("Java");
   });
 
+  it("edits task lists, and ticking a task is an edit", async () => {
+    const { save } = renderEditor("---\ntitle: T\n---\n\n- [ ] todo\n- [x] done\n");
+    const [todo, done] = within(textBox()).getAllByRole("checkbox", { name: "Done" });
+    expect(todo).not.toBeChecked();
+    expect(done).toBeChecked();
+
+    await userEvent.click(todo as HTMLElement);
+    expect(save()).toBe("---\ntitle: T\n---\n\n* [x] todo\n* [x] done");
+  });
+
   it("reports nothing until something is edited, so the note stays as written", () => {
     const markdown = "---\n# comment\ntitle: T\n---\n\nTitle\n===\n\n- wrapped\n  line\n";
     const { save, onChange } = renderEditor(markdown);

@@ -21,16 +21,19 @@ function escapeTaken(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && target.closest("input, textarea, select") !== null;
 }
 
-function blocked(keys: string, target: EventTarget | null): boolean {
-  if (keys.startsWith("Mod+")) return false;
+function blocked(name: ShortcutName, target: EventTarget | null): boolean {
+  const shortcut: { keys: string; outsideText?: boolean } = SHORTCUTS[name];
+  const { keys } = shortcut;
+  if (keys.startsWith("Mod+")) return shortcut.outsideText === true && isTyping(target);
   return keys === "Escape" ? escapeTaken(target) : isTyping(target);
 }
 
 /**
  * Handles shortcuts from the registry (app/shortcuts.ts) for as long as the
  * component is mounted. Modifier shortcuts are caught before editors and the
- * browser see them (no print dialog on Ctrl+P); single keys are ignored while
- * typing, and Escape wherever something else uses it.
+ * browser see them (no print dialog on Ctrl+P), except those that are
+ * `outsideText` while typing; single keys are ignored while typing, and
+ * Escape wherever something else uses it.
  */
 export function useShortcuts(handlers: ShortcutHandlers): void {
   const latest = useRef(handlers);
@@ -43,7 +46,7 @@ export function useShortcuts(handlers: ShortcutHandlers): void {
       for (const [name, handler] of Object.entries(latest.current)) {
         const { keys } = SHORTCUTS[name as ShortcutName];
         if (!matchesShortcut(keys, event)) continue;
-        if (blocked(keys, event.target)) return;
+        if (blocked(name as ShortcutName, event.target)) return;
         // Ours alone: an editor's own binding for the keys (CodeMirror's Mod-/) does not run.
         event.preventDefault();
         event.stopPropagation();

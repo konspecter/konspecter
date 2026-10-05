@@ -1,5 +1,12 @@
 import type { ImportReport } from "../../application/library/import-markdown";
 
+/** File Mode: the files with tags outside their first chain's folder, and moving them there (ADR-013). */
+export type FolderReformat = {
+  misplaced(): Promise<readonly string[]>;
+  /** Moves them; returns how many moved. */
+  apply(): Promise<number>;
+};
+
 /** Choosing where notes live, on the desktop (see docs/architecture/filesystem-mode.md). */
 export type LibraryControls = {
   /** The open Markdown folder's path, or null for the app library. */
@@ -10,4 +17,6 @@ export type LibraryControls = {
   closeFolder: () => Promise<void>;
   /** Copies every Markdown file of the open folder into the app library. */
   importFolder: () => Promise<ImportReport>;
+  /** File Mode: reformats the folder so its files are in their tags' folders. */
+  reformat?: FolderReformat | undefined;
 };

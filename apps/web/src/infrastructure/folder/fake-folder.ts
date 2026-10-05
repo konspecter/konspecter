@@ -15,6 +15,8 @@ export class FakeFolder implements FolderBridge {
   readonly trashed: string[] = [];
   readonly opened: string[] = [];
   readonly revealed: string[] = [];
+  /** Folders removed because they were left empty. Folders are only implied by paths here. */
+  readonly removedFolders: string[] = [];
 
   openExternally(path: string) {
     this.opened.push(path);
@@ -97,6 +99,14 @@ export class FakeFolder implements FolderBridge {
     this.files.delete(from);
     this.files.set(to, file);
     return Promise.resolve(this.#entry(to));
+  }
+
+  removeEmptyFolder(path: string) {
+    const inside = `${path.toLowerCase()}/`;
+    if (![...this.files.keys()].some((name) => name.toLowerCase().startsWith(inside))) {
+      this.removedFolders.push(path);
+    }
+    return Promise.resolve();
   }
 
   trash(path: string) {

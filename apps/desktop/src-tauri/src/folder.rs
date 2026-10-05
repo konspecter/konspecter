@@ -94,23 +94,10 @@ impl Folder {
     /// inside the folder.
     pub fn resolve(&self, relative: &str) -> Result<PathBuf, FolderError> {
         let invalid = || FolderError::InvalidPath(relative.to_string());
-        if relative.is_empty() || relative.contains('\\') || relative.contains('\0') {
-            return Err(invalid());
-        }
-        let relative_path = Path::new(relative);
-        let mut joined = self.root.clone();
-        for component in relative_path.components() {
-            match component {
-                Component::Normal(part) => {
-                    let part = part.to_str().ok_or_else(invalid)?;
-                    if part.starts_with('.') || part.contains(':') {
-                        return Err(invalid());
-                    }
-                    joined.push(part);
-                }
-                _ => return Err(invalid()),
-            }
-        }
+        let joined = self
+            .parts(relative)?
+            .iter()
+            .fold(self.root.clone(), |path, part| path.join(part));
         if !is_markdown(&joined) {
             return Err(invalid());
         }
@@ -245,8 +232,85 @@ impl Folder {
         Err(FolderError::Io("could not find a free file name".into()))
     }
 
-    /// Creates a new file at exactly this path; `Exists` if it is taken.
+    /// The names a relative path is made of, checked: plain names (no `..`,
+    /// no absolute or drive paths, no backslashes), none hidden.
+    fn parts<'a>(&self, relative: &'a str) -> Result<Vec<&'a str>, FolderError> {
+        let invalid = || FolderError::InvalidPath(relative.to_string());
+        if relative.is_empty() || relative.contains('\\') || relative.contains('\0') {
+            return Err(invalid());
+        }
+        let mut names = Vec::new();
+        for component in Path::new(relative).components() {
+            match component {
+                Component::Normal(part) => {
+                    let part = part.to_str().ok_or_else(invalid)?;
+                    if part.starts_with('.') || part.contains(':') {
+                        return Err(invalid());
+                    }
+                    names.push(part);
+                }
+                _ => return Err(invalid()),
+            }
+        }
+        Ok(names)
+    }
+
+    /// Makes the folders a new file's path needs. Each one that exists must
+    /// really be a folder inside this one (no symlink out of it).
+    fn make_folders_for(&self, relative: &str) -> Result<(), FolderError> {
+        let names = self.parts(relative)?;
+        let mut dir = self.root.clone();
+        for name in names.iter().take(names.len().saturating_sub(1)) {
+            dir.push(name);
+            if dir.exists() {
+                let real = fs::canonicalize(&dir).map_err(|e| io("make folder", e))?;
+                if !real.starts_with(&self.root) || !real.is_dir() {
+                    return Err(FolderError::InvalidPath(relative.to_string()));
+                }
+            } else {
+                fs::create_dir(&dir).map_err(|e| io("make folder", e))?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Removes a folder (a relative path, not a file) if nothing is left in it
+    /// but a Finder `.DS_Store`, then each parent left empty the same way, up to
+    /// this folder. A folder with anything else in it stays.
+    pub fn remove_empty_dir(&self, relative: &str) -> Result<(), FolderError> {
+        let names = self.parts(relative)?;
+        let mut depth = names.len();
+        while depth > 0 {
+            let dir = names[..depth]
+                .iter()
+                .fold(self.root.clone(), |dir, name| dir.join(name));
+            let Ok(real) = fs::canonicalize(&dir) else {
+                return Ok(());
+            };
+            if !real.starts_with(&self.root) || real == self.root || !real.is_dir() {
+                return Err(FolderError::InvalidPath(relative.to_string()));
+            }
+            let entries: Vec<_> = fs::read_dir(&real)
+                .map_err(|e| io("read folder", e))?
+                .filter_map(Result::ok)
+                .map(|entry| entry.file_name())
+                .collect();
+            if entries.iter().any(|name| name != ".DS_Store") {
+                return Ok(());
+            }
+            if !entries.is_empty() {
+                fs::remove_file(real.join(".DS_Store")).map_err(|e| io("remove folder", e))?;
+            }
+            fs::remove_dir(&real).map_err(|e| io("remove folder", e))?;
+            depth -= 1;
+        }
+        Ok(())
+    }
+
+    /// Creates a new file at exactly this path, and the folders it needs;
+    /// `Exists` if it is taken.
     pub fn create_at(&self, relative: &str, contents: &str) -> Result<FileEntry, FolderError> {
+        self.make_folders_for(relative)?;
         let path = self.resolve(relative)?;
         if contents.len() as u64 > MAX_FILE_BYTES {
             return Err(FolderError::TooLarge(relative.to_string()));
@@ -269,10 +333,12 @@ impl Folder {
         self.entry(&path, &meta)
     }
 
-    /// Renames a file, never over another one (`Exists`). A change of case
-    /// only (`Test.md` → `test.md`) works on case-insensitive disks too.
+    /// Renames a file, never over another one (`Exists`), into another folder
+    /// too (made if needed). A change of case only (`Test.md` → `test.md`)
+    /// works on case-insensitive disks too.
     pub fn rename(&self, from: &str, to: &str) -> Result<FileEntry, FolderError> {
         let source = self.existing(from)?;
+        self.make_folders_for(to)?;
         let target = self.resolve(to)?;
         // A hard link cannot replace an existing file, so taking the new name
         // this way is atomic; then the old name goes.
@@ -548,6 +614,68 @@ mod tests {
             Err(FolderError::Exists("sub/hello-mir.md".into()))
         );
         assert_eq!(folder.read("sub/hello-mir.md").unwrap().text, "a");
+    }
+
+    #[test]
+    fn creates_and_renames_into_folders_it_makes() {
+        let (dir, folder) = folder();
+        let entry = folder.create_at("java/collections/maps.md", "a").unwrap();
+        assert_eq!(entry.path, "java/collections/maps.md");
+        assert!(dir.path().join("java/collections").is_dir());
+
+        let moved = folder
+            .rename("java/collections/maps.md", "go/maps.md")
+            .unwrap();
+        assert_eq!(moved.path, "go/maps.md");
+        assert_eq!(folder.read("go/maps.md").unwrap().text, "a");
+
+        for bad in ["../out/x.md", ".git/x.md", "a/.hidden/x.md"] {
+            assert!(matches!(
+                folder.create_at(bad, "x"),
+                Err(FolderError::InvalidPath(_))
+            ));
+        }
+        assert!(!dir.path().join("a").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn makes_no_folders_through_a_symlink_out() {
+        let (_dir, folder) = folder();
+        let outside = tempfile::tempdir().unwrap();
+        std::os::unix::fs::symlink(outside.path(), folder.root().join("link")).unwrap();
+        assert!(matches!(
+            folder.create_at("link/sub/x.md", "x"),
+            Err(FolderError::InvalidPath(_))
+        ));
+        assert!(!outside.path().join("sub").exists());
+    }
+
+    #[test]
+    fn removes_folders_left_empty_only() {
+        let (dir, folder) = folder();
+        let root = dir.path();
+        fs::create_dir_all(root.join("a/b/c")).unwrap();
+        fs::write(root.join("a/b/.DS_Store"), "finder").unwrap();
+        fs::write(root.join("a/keep.md"), "x").unwrap();
+
+        folder.remove_empty_dir("a/b/c").unwrap();
+        assert!(!root.join("a/b").exists(), "c, then b with only .DS_Store");
+        assert!(root.join("a/keep.md").exists(), "a still holds a file");
+
+        fs::create_dir(root.join("full")).unwrap();
+        fs::write(root.join("full/notes.txt"), "x").unwrap();
+        folder.remove_empty_dir("full").unwrap();
+        assert!(root.join("full/notes.txt").exists());
+
+        folder.remove_empty_dir("missing/folder").unwrap();
+        for bad in ["", "../x", ".git", "a/../.."] {
+            assert!(matches!(
+                folder.remove_empty_dir(bad),
+                Err(FolderError::InvalidPath(_))
+            ));
+        }
+        assert!(root.exists());
     }
 
     #[test]

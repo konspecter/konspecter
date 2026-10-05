@@ -91,6 +91,9 @@ try {
           window.location.reload();
         },
         importFolder: () => importFolder(folderBridge, store),
+        reformat: folderStore
+          ? { misplaced: () => folderStore.misplaced(), apply: () => folderStore.reformat() }
+          : undefined,
       }
     : undefined;
 

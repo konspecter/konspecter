@@ -7,7 +7,7 @@ interface speaks English and Russian ([i18n](i18n.md)).
 ## Layout
 
 ```text
-┌─ Sidebar ─────────────┬─ Top bar: ≡ [ search ]  (theme) (mode)             (antenna) ─┐
+┌─ Sidebar ─────────────┬─ Top bar: ≡ [‹ › search ]  (theme) (mode)           (antenna) ─┐
 │ ☰         ⚙  ✎        ├────────────────────────────────────────────────────────────────┤
 │ Tags (tree)           │                                                                │
 │ Recent (by last edit) │   Main content: note list · editor · settings                  │
@@ -38,7 +38,10 @@ interface speaks English and Russian ([i18n](i18n.md)).
 - **Top bar:** All notes (`/`) right before the search box, always (the list is what the search
   filters); the search box (centre), the theme toggle and the editor mode button to its
   right, a sync hint when sync needs attention, and the antenna at the far right. The
-  controls are never hidden. Wide windows (over 1024px): the search is centred, up to 30rem,
+  controls are never hidden. Wider than 760px, the search box starts with ‹ and ›: back and
+  forward in the app's history (the desktop app has no browser buttons), each disabled when
+  there is nowhere to go. The layout follows the router's pushes, replaces and pops to know
+  (`hooks/use-history-steps.ts`, `stepHistory`). Wide windows (over 1024px): the search is centred, up to 30rem,
   both sides at least as wide as the controls on the right (plus the macOS window buttons).
   Medium (761–1024px): the search fills the row between the controls, with the same gap on
   each side. Small (≤760px): the top bar keeps theme, mode, sync and the antenna; the list,
@@ -77,6 +80,11 @@ breakpoint in the CSS), in the browser, the PWA and the Android app alike
   the caret into view above it (`coveredBelow` in `editors/place.ts`, as ProseMirror's
   `scrollMargin` and CodeMirror's `scrollMargins`). The viewport meta has
   `interactive-widget=resizes-content`, so the island rides above the soft keyboard.
+- **Swipes** (`hooks/use-swipe.ts`, on every touch screen, wide ones too): a sideways swipe
+  shows the sidebar (to the right) or hides it (to the left). A swipe is one finger moving at
+  least 60px sideways, twice as far as up or down, within 600 ms (`swipeDirection`). It
+  does not count when it starts in a dialog or in something that scrolls sideways (a code
+  block, a table), or while text is selected.
 - **Sidebar:** a full-screen menu, without its own bar (the island holds those buttons), in
   bigger text (16px, the tree 15px, the details 14px). The note's details wait behind a
   "Details" button at its foot (`aria-expanded`).
@@ -194,12 +202,17 @@ matched, so the shortcuts work on Cyrillic layouts.
 | `Mod+,` | Settings                        | everywhere, also in editors    |
 | `Mod+\` | Show or hide the sidebar        | everywhere, also in editors    |
 | `Mod+/` | Switch text editor and Markdown | everywhere, also in editors    |
+| `Mod+←` | Back (the search box's ‹)       | outside text fields            |
+| `Mod+→` | Forward (the search box's ›)    | outside text fields            |
 | `Mod+S` | Save now                        | the editor                     |
 | `/` `n` | Search, new note                | outside text fields            |
 | `?`     | Show the shortcuts              | outside text fields            |
 
 Modifier shortcuts are caught in the capture phase, before editors and the browser (no print
 dialog on `Mod+P`), and go no further (CodeMirror's own `Mod-/` does not comment the line).
+`Mod+←`/`Mod+→` are the exception (`outsideText` in the registry): in text they keep moving the
+caret (to the line's ends on macOS, by words elsewhere), so they go back and forward only
+outside text fields, and only within the app's own history.
 `Esc` leaves the editor for the list, but gives way where Escape already means something: an
 open dialog closes, the search box and other form fields (CodeMirror's go-to-line field) let
 go of the focus. CodeMirror has no search panel of its own: `Mod+F` is the top bar's. `Mod+\` that shows the sidebar moves the focus into it, to the open note (else to what is

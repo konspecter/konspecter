@@ -5,9 +5,10 @@ import type { TextKey } from "../i18n/i18n";
  * the note page) and the lists shown to the user read the same table.
  *
  * `Mod` is ⌘ on macOS and Ctrl elsewhere. Modifier shortcuts work
- * everywhere, also while typing in an editor; single keys only outside text
- * fields, except Escape, which also works in the editors. Labels are message
- * keys (translated where they are shown).
+ * everywhere, also while typing in an editor, unless they are `outsideText`
+ * (in text ⌘←/⌘→ go to the line's ends, Ctrl+←/→ by words); single keys only
+ * outside text fields, except Escape, which also works in the editors. Labels
+ * are message keys (translated where they are shown).
  */
 export const SHORTCUTS = {
   search: { keys: "Mod+P", label: "shortcut.search" },
@@ -18,10 +19,12 @@ export const SHORTCUTS = {
   save: { keys: "Mod+S", label: "shortcut.save" },
   toggleSidebar: { keys: "Mod+\\", label: "shortcut.sidebar" },
   editorMode: { keys: "Mod+/", label: "shortcut.editorMode" },
+  back: { keys: "Mod+ArrowLeft", label: "shortcut.back", outsideText: true },
+  forward: { keys: "Mod+ArrowRight", label: "shortcut.forward", outsideText: true },
   quickSearch: { keys: "/", label: "shortcut.search" },
   quickNewNote: { keys: "n", label: "shortcut.newNote" },
   help: { keys: "?", label: "shortcut.help" },
-} as const satisfies Record<string, { keys: string; label: TextKey }>;
+} as const satisfies Record<string, { keys: string; label: TextKey; outsideText?: boolean }>;
 
 export type ShortcutName = keyof typeof SHORTCUTS;
 
@@ -44,12 +47,18 @@ export function isMac(): boolean {
   return /mac|iphone|ipad|ipod/i.test(nav.userAgentData?.platform ?? nav.platform);
 }
 
-/** "Mod+P" as the user sees it: "⌘P" on macOS, "Ctrl+P" elsewhere; "Escape" is "Esc". */
+const ARROWS: Readonly<Record<string, string>> = { ArrowLeft: "←", ArrowRight: "→" };
+
+/**
+ * "Mod+P" as the user sees it: "⌘P" on macOS, "Ctrl+P" elsewhere; "Escape"
+ * is "Esc", and arrow keys are arrows ("⌘←").
+ */
 export function formatKeys(keys: string, mac = isMac()): string {
   if (keys === "Escape") return "Esc";
   if (!keys.startsWith("Mod+")) return keys;
   const key = keys.slice(4);
-  return mac ? `⌘${key}` : `Ctrl+${key}`;
+  const shown = ARROWS[key] ?? key;
+  return mac ? `⌘${shown}` : `Ctrl+${shown}`;
 }
 
 /** The physical key, for layouts where ⌘/Ctrl + key reports another character (Cyrillic). */

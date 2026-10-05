@@ -79,3 +79,23 @@ describe("shortcutGroups", () => {
     expect(new Set(groups.map((group) => group.label)).size).toBe(groups.length);
   });
 });
+
+describe("arrow shortcuts", () => {
+  it("match ⌘/Ctrl with an arrow, and show the arrow", () => {
+    expect(matchesShortcut("Mod+ArrowLeft", key({ key: "ArrowLeft", metaKey: true }), true)).toBe(
+      true,
+    );
+    expect(
+      matchesShortcut("Mod+ArrowRight", key({ key: "ArrowRight", ctrlKey: true }), false),
+    ).toBe(true);
+    expect(
+      matchesShortcut(
+        "Mod+ArrowLeft",
+        key({ key: "ArrowLeft", metaKey: true, shiftKey: true }),
+        true,
+      ),
+    ).toBe(false);
+    expect(formatKeys("Mod+ArrowLeft", true)).toBe("⌘←");
+    expect(formatKeys("Mod+ArrowRight", false)).toBe("Ctrl+→");
+  });
+});

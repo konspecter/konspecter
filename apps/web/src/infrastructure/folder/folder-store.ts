@@ -1,7 +1,15 @@
 import type { NoteChange, NoteRepository } from "../../application/notes/note-repository";
 import { documentTitle, parseDocument } from "../../domain/document/document";
 import { slugFileNames, slugFor, stemFitsSlug } from "../../domain/note/file-name";
-import { createNote, type Note } from "../../domain/note/note";
+import {
+  chainFolder,
+  foldersOf,
+  inChainFolder,
+  placingChain,
+  sameChain,
+  withFolderTags,
+} from "../../domain/note/folders";
+import { createNote, readNote, type Note } from "../../domain/note/note";
 import type { EditorSelection, ReadingState } from "../../domain/reading/reading";
 import type { SearchQuery } from "../../domain/search/query";
 import type { Tag } from "../../domain/tag/tags";
@@ -33,6 +41,11 @@ type CachedFile = {
  * its path relative to the folder. The files are the only copy of the data;
  * this store keeps an in-memory cache and derived indexes (tags, search),
  * all rebuilt from the files.
+ *
+ * The folders follow the tags (ADR-013): a note's folder is its first tag
+ * chain. Files found without tags in folders get their folders' chain, a new
+ * note is made in its chain's folder, and a save that changes the chain moves
+ * the file there.
  */
 export class FolderStore implements NoteRepository {
   readonly #folder: FolderBridge;
@@ -141,14 +154,18 @@ export class FolderStore implements NoteRepository {
       this.#files.delete(path);
       this.#search?.remove(path);
     }
-    for (const file of [...added, ...changed]) this.#remember(file.entry, file.text);
+    // New files and moved ones take the tags of the folders they are in.
+    const adopted = await Promise.all(
+      added.map((file) => this.#adopt(file, renames.get(file.entry.path))),
+    );
+    for (const file of [...adopted, ...changed]) this.#remember(file.entry, file.text);
     for (const [newPath, oldPath] of renames) await this.#moveReadingState(oldPath, newPath);
 
     const renamedFrom = new Set(renames.values());
     for (const path of removed) {
       if (!renamedFrom.has(path)) this.#emit({ noteId: path, source: "remote" });
     }
-    for (const file of [...added, ...changed]) {
+    for (const file of [...adopted, ...changed]) {
       const previousId = renames.get(file.entry.path);
       this.#emit({
         noteId: file.entry.path,
@@ -193,9 +210,27 @@ export class FolderStore implements NoteRepository {
     return this.#folder.reveal(id);
   }
 
+  /**
+   * Disk → app: a file in folders without tags of its own gets its folders'
+   * chain, and one moved (from `movedFrom`) out of its chain's folder gets the
+   * new folders' (`withFolderTags`), written into the file. A file that cannot
+   * be written stays as it is.
+   */
+  async #adopt(file: FileContents, movedFrom?: string): Promise<FileContents> {
+    const text = withFolderTags(file.entry.path, file.text, movedFrom);
+    if (text === null) return file;
+    try {
+      return { entry: await this.#folder.write(file.entry.path, text), text };
+    } catch {
+      return file;
+    }
+  }
+
   async #readAll(): Promise<void> {
     const entries = await this.#folder.list();
-    const contents = await Promise.all(entries.map((entry) => this.#folder.read(entry.path)));
+    const contents = await Promise.all(
+      entries.map(async (entry) => this.#adopt(await this.#folder.read(entry.path))),
+    );
     this.#files.clear();
     for (const { entry, text } of contents) this.#remember(entry, text);
     this.#search = null;
@@ -231,11 +266,15 @@ export class FolderStore implements NoteRepository {
     return file && toNote(id, file.markdown, file.modifiedMs);
   }
 
-  /** Creates a new file in the folder's top level, named after the note's title. */
+  /**
+   * Creates a new file named after the note's title, in the folder of its
+   * first tag chain (the top level without tags).
+   */
   async create(markdown: string, now: Date): Promise<Note> {
     await this.#ensureLoaded();
     const note = createNote(markdown, now);
-    const entry = await this.#claimName("", slugFor(titleOf(note.markdown)), null, (path) =>
+    const folder = chainFolder(placingChain(readNote(note)), foldersOf(this.#files.keys()));
+    const entry = await this.#claimName(folder, slugFor(titleOf(note.markdown)), null, (path) =>
       this.#folder.createAt(path, note.markdown),
     );
     const created = this.#remember(entry, note.markdown);
@@ -246,48 +285,124 @@ export class FolderStore implements NoteRepository {
 
   /**
    * Writes the file, over whatever another program wrote meanwhile: the last
-   * write wins. A file deleted meanwhile is written again. When files follow
-   * their titles, a file whose name no longer fits the title is then renamed:
-   * the note returned has the new id.
+   * write wins. A file deleted meanwhile is written again. Then the file is
+   * moved where the note now says it belongs (`#relocate`): the note returned
+   * has the new id.
    */
   async put(note: Note): Promise<Note> {
     await this.#ensureLoaded();
+    const previous = this.#files.get(note.id)?.markdown;
     const entry = await this.#folder.write(note.id, note.markdown);
     const written = this.#remember(entry, note.markdown);
-    const renamed = this.#followTitles ? await this.#renameAfterTitle(note.id) : null;
+    const moved = await this.#relocate(note.id, previous);
     this.#emit({
-      noteId: renamed?.id ?? note.id,
+      noteId: moved?.id ?? note.id,
       source: "local",
-      ...(renamed ? { previousId: note.id } : {}),
+      ...(moved ? { previousId: note.id } : {}),
     });
-    return renamed ?? written;
+    return moved ?? written;
   }
 
-  /** Renames the file to its title's slug, in its folder, unless its name fits already. */
-  async #renameAfterTitle(path: string): Promise<Note | null> {
+  /**
+   * Moves a saved file where its note says it belongs, unless it is there:
+   * into the folder of its first tag chain when the save changed that chain
+   * (from `previous`), and to its title's slug when files follow their
+   * titles and its name no longer fits. A file whose chain the save kept stays
+   * in its folder, so files left where they are (see `reformat`) stay there.
+   */
+  async #relocate(path: string, previous: string | undefined): Promise<Note | null> {
     const file = this.#files.get(path);
     if (!file) return null;
-    const slug = slugFor(titleOf(file.markdown));
+    const read = readNote({ id: path, markdown: file.markdown });
+    if (!read.valid) return null;
     const slash = path.lastIndexOf("/") + 1;
-    if (stemFitsSlug(path.slice(slash).replace(/\.md$/i, ""), slug)) return null;
+    const here = path.slice(0, slash);
+    const stem = path.slice(slash).replace(/\.md$/i, "");
+    const chain = placingChain(read);
+    const before =
+      previous === undefined ? chain : placingChain(readNote({ id: path, markdown: previous }));
+    const folder =
+      sameChain(before, chain) || inChainFolder(path, read)
+        ? here
+        : chainFolder(chain, foldersOf(this.#files.keys()));
+    const slug = this.#followTitles ? slugFor(titleOf(file.markdown)) : stem;
+    const name = stemFitsSlug(stem, slug) ? stem : slug;
+    if (folder === here && name === stem) return null;
+    return this.#move(path, folder, name);
+  }
+
+  /**
+   * Moves the file to `folder` as `stem.md` (`stem-2.md` … if taken), with its
+   * reading position, and removes the folder it leaves empty.
+   */
+  async #move(path: string, folder: string, stem: string): Promise<Note> {
+    const file = this.#files.get(path);
+    if (!file) throw new FolderError("not_found", `${path} is not in the folder`);
     this.#moving.add(path);
     try {
-      const entry = await this.#claimName(path.slice(0, slash), slug, path, (target) =>
+      const entry = await this.#claimName(folder, stem, path, (target) =>
         this.#folder.rename(path, target),
       );
       this.#files.delete(path);
       this.#search?.remove(path);
-      const renamed = this.#remember(entry, file.markdown);
+      const moved = this.#remember(entry, file.markdown);
       this.#moving.delete(entry.path);
       await this.#moveReadingState(path, entry.path);
-      return renamed;
+      await this.#removeIfEmpty(path);
+      return moved;
     } finally {
       this.#moving.delete(path);
     }
   }
 
+  /** Removes the folder that held `path` if no file is left in it (nor its emptied parents). */
+  async #removeIfEmpty(path: string): Promise<void> {
+    const slash = path.lastIndexOf("/");
+    if (slash <= 0) return;
+    const folder = path.slice(0, slash);
+    const inside = `${folder.toLowerCase()}/`;
+    if ([...this.#files.keys()].some((known) => known.toLowerCase().startsWith(inside))) return;
+    try {
+      await this.#folder.removeEmptyFolder(folder);
+    } catch {
+      // An empty folder left behind is harmless.
+    }
+  }
+
+  /** The files with tags that are not in their first chain's folder (see `reformat`). */
+  async misplaced(): Promise<string[]> {
+    await this.#ensureLoaded();
+    return [...this.#files]
+      .filter(([path, file]) => {
+        const read = readNote({ id: path, markdown: file.markdown });
+        return read.valid && placingChain(read) !== "" && !inChainFolder(path, read);
+      })
+      .map(([path]) => path)
+      .sort();
+  }
+
   /**
-   * Takes the first free name for a slug in `dir` ("slug.md", "slug-2.md" …):
+   * Reformats the collection: every file with tags moves into the folder of
+   * its first tag chain, keeping its name (numbered if the name is taken
+   * there). Returns how many moved.
+   */
+  async reformat(): Promise<number> {
+    let count = 0;
+    for (const path of await this.misplaced()) {
+      const file = this.#files.get(path);
+      if (!file) continue;
+      const read = readNote({ id: path, markdown: file.markdown });
+      const folder = chainFolder(placingChain(read), foldersOf(this.#files.keys()));
+      const stem = path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/i, "");
+      const moved = await this.#move(path, folder, stem);
+      this.#emit({ noteId: moved.id, source: "local", previousId: path });
+      count += 1;
+    }
+    return count;
+  }
+
+  /**
+   * Takes the first free name for a stem in `dir` ("stem.md", "stem-2.md" …):
    * names of known files are skipped (ignoring case, as macOS and Windows
    * do, except the file's own name: `current`), and `take` fails with
    * "exists" for a file this store does not know yet. The name taken stays
@@ -323,6 +438,7 @@ export class FolderStore implements NoteRepository {
     await this.#folder.trash(id);
     this.#files.delete(id);
     this.#search?.remove(id);
+    await this.#removeIfEmpty(id);
     this.#emit({ noteId: id, source: "local" });
   }
 

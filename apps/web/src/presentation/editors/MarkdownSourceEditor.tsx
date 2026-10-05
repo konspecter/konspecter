@@ -2,7 +2,6 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirro
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { yamlFrontmatter } from "@codemirror/lang-yaml";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
-import { languages } from "@codemirror/language-data";
 import {
   gotoLine,
   highlightSelectionMatches,
@@ -29,6 +28,7 @@ import {
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 import { memo, useEffect, useLayoutEffect, useRef } from "react";
+import { codeHighlighter, codeLanguages } from "./code-highlight";
 import { textChanges } from "./diff";
 import { sourceEditorMarks } from "./source-marks";
 import { t } from "../i18n/i18n";
@@ -90,7 +90,8 @@ function replaceInPlace(view: EditorView, next: string, elsewhere = false): void
 
 // Colours come from the same tokens as the reader's code highlighting. The
 // Markdown itself: marks muted, headings strong, links in the accent colour,
-// code in the code colours; fenced code in its own language's colours.
+// code in the code colours. Fenced code and the frontmatter have their
+// language's tokens, classed by the highlighter the text editor uses too.
 const highlightStyle = HighlightStyle.define([
   { tag: tags.heading, fontWeight: "700", color: "var(--color-fg)" },
   { tag: tags.heading1, fontSize: "1.2em" },
@@ -104,18 +105,6 @@ const highlightStyle = HighlightStyle.define([
   { tag: [tags.labelName, tags.list], color: "var(--code-number)" },
   { tag: tags.monospace, color: "var(--code-string)" },
   { tag: tags.quote, color: "var(--color-muted)", fontStyle: "italic" },
-  { tag: [tags.escape, tags.character], color: "var(--code-number)" },
-  { tag: [tags.keyword, tags.modifier, tags.operatorKeyword], color: "var(--code-keyword)" },
-  { tag: [tags.string, tags.regexp, tags.special(tags.string)], color: "var(--code-string)" },
-  { tag: [tags.number, tags.bool, tags.null, tags.atom], color: "var(--code-number)" },
-  { tag: [tags.comment, tags.meta], color: "var(--code-comment)", fontStyle: "italic" },
-  {
-    tag: [tags.function(tags.variableName), tags.definition(tags.name)],
-    color: "var(--code-title)",
-  },
-  { tag: [tags.typeName, tags.className], color: "var(--code-type)" },
-  { tag: [tags.propertyName, tags.attributeName], color: "var(--code-number)" },
-  { tag: [tags.tagName, tags.angleBracket], color: "var(--code-meta)" },
 ]);
 
 /** A search in the text (the top bar's, see `NoteFind`): its matches and the selected one. */
@@ -214,8 +203,11 @@ export function createSourceExtensions(
     EditorView.scrollMargins.of(() => ({ bottom: coveredBelow() })),
     // Markdown with GFM, fenced code highlighted in its own language (grammars
     // load on demand), and a YAML frontmatter block.
-    yamlFrontmatter({ content: markdown({ base: markdownLanguage, codeLanguages: languages }) }),
+    yamlFrontmatter({
+      content: markdown({ base: markdownLanguage, codeLanguages: [...codeLanguages] }),
+    }),
     syntaxHighlighting(highlightStyle),
+    syntaxHighlighting(codeHighlighter),
     EditorView.lineWrapping,
     placeholder(t("editor.sourcePlaceholder")),
     sourceEditorMarks(),

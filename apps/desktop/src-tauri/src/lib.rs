@@ -367,6 +367,14 @@ fn folder_trash(state: State<'_, FolderState>, path: String) -> Result<(), Comma
     state.with(|f| f.trash(&path))
 }
 
+#[tauri::command]
+fn folder_remove_empty_dir(
+    state: State<'_, FolderState>,
+    path: String,
+) -> Result<(), CommandError> {
+    state.with(|f| f.remove_empty_dir(&path))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -390,6 +398,7 @@ pub fn run() {
             folder_create_at,
             folder_rename,
             folder_trash,
+            folder_remove_empty_dir,
             folder_open_external,
             folder_reveal,
             export_to_folder,

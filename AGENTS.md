@@ -62,9 +62,10 @@ All planned phases are done. New work needs a new plan in `.claude/plans/`.
 | Slug file  | File Mode names files by title slug; optional rename when the title changes | Done   |
 | Mode place | Switching modes keeps the caret and the text on screen where they were      | Done   |
 | Mobile     | Island buttons, full-screen sidebar, details button, top toolbar, sizes     | Done   |
+| Updates 4  | Code highlighting, swipes, back/forward, task lists, folders = tags, lists  | Done   |
 
 Specs and notes: `.claude/plans/updates-1.md` (+ `updates-1-implementation.md`), `updates-2.md`
-(+ `updates-2-implementation.md`), `markdown-single-source.md`, `last-write-wins.md`, `tag-chains.md` (item 1 of `updates-3.md`), `note-find.md` (item 3), `friendly-errors.md` (item 5), `slug-file-names.md` (item 8), `mode-switch-place.md` (item 14), `mobile-view.md` (mobile view updates). UI architecture: `docs/architecture/ui.md`; languages:
+(+ `updates-2-implementation.md`), `markdown-single-source.md`, `last-write-wins.md`, `tag-chains.md` (item 1 of `updates-3.md`), `note-find.md` (item 3), `friendly-errors.md` (item 5), `slug-file-names.md` (item 8), `mode-switch-place.md` (item 14), `mobile-view.md` (mobile view updates), `updates-4.md` (+ `updates-4-implementation.md`). UI architecture: `docs/architecture/ui.md`; languages:
 `docs/architecture/i18n.md`.
 
 ## Working rules

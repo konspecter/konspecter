@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { openDB } from "idb";
 import { MemoryRouter } from "react-router";
@@ -104,6 +104,77 @@ describe("layout", () => {
     expect(screen.queryByText("Konspecter")).not.toBeInTheDocument();
     expect(screen.queryByText(/Loading/)).not.toBeInTheDocument();
     expect(await listTitles()).toEqual(["Java Collections"]);
+  });
+
+  it("goes back and forward from the search box", async () => {
+    const store = await newStore();
+    await store.put(javaNote);
+    renderApp(store);
+    const search = () => within(topBar()).getByRole("search");
+    const back = () => within(search()).getByRole("button", { name: "Back" });
+    const forward = () => within(search()).getByRole("button", { name: "Forward" });
+    expect(back()).toBeDisabled();
+    expect(forward()).toBeDisabled();
+
+    await userEvent.click(within(await noteList()).getByRole("link", { name: /Java Collections/ }));
+    await textEditor();
+    expect(back()).toBeEnabled();
+    expect(forward()).toBeDisabled();
+
+    await userEvent.click(back());
+    expect(await listTitles()).toEqual(["Java Collections"]);
+    expect(back()).toBeDisabled();
+    expect(forward()).toBeEnabled();
+
+    await userEvent.click(forward());
+    await textEditor();
+    expect(forward()).toBeDisabled();
+  });
+
+  it("goes back and forward with Mod+← and Mod+→, but not while typing", async () => {
+    const store = await newStore();
+    await store.put(javaNote);
+    renderApp(store);
+    await userEvent.click(within(await noteList()).getByRole("link", { name: /Java Collections/ }));
+    const editor = await textEditor();
+
+    // In the text, the keys are the editor's (to the line's start).
+    await userEvent.click(editor);
+    await userEvent.keyboard("{Control>}{ArrowLeft}{/Control}");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.getByRole("textbox", { name: "Conspect text" })).toBeInTheDocument();
+
+    act(() => {
+      (document.activeElement as HTMLElement | null)?.blur();
+    });
+    await userEvent.keyboard("{Control>}{ArrowLeft}{/Control}");
+    expect(await listTitles()).toEqual(["Java Collections"]);
+    // Nowhere further back within the app: the list stays.
+    await userEvent.keyboard("{Control>}{ArrowLeft}{/Control}");
+    expect(await listTitles()).toEqual(["Java Collections"]);
+
+    await userEvent.keyboard("{Control>}{ArrowRight}{/Control}");
+    await textEditor();
+    expect(within(topBar()).getByRole("button", { name: "Back" })).toHaveAttribute(
+      "title",
+      "Back (Ctrl+←)",
+    );
+  });
+
+  it("hides and shows the sidebar with a sideways swipe", async () => {
+    renderApp(await newStore());
+    const swipe = (fromX: number, toX: number) => {
+      fireEvent.touchStart(document.body, { touches: [{ clientX: fromX, clientY: 300 }] });
+      fireEvent.touchEnd(document.body, {
+        touches: [],
+        changedTouches: [{ clientX: toX, clientY: 310 }],
+      });
+    };
+
+    swipe(300, 100);
+    expect(screen.queryByRole("complementary", { name: "Sidebar" })).not.toBeInTheDocument();
+    swipe(100, 300);
+    expect(sidebar()).toBeInTheDocument();
   });
 
   it("hides and shows the sidebar, and remembers the choice", async () => {
@@ -1685,6 +1756,73 @@ describe("file mode", () => {
       { timeout: 3000 },
     );
     expect([...folder.files.keys()]).toEqual(["race.md"]);
+  });
+
+  describe("folders following tags", () => {
+    async function reformatApp(path = "/") {
+      const folder = new FakeFolder();
+      folder.edit("x.md", "# X\n\n#java");
+      folder.edit("java/placed.md", "# Placed\n\n#java");
+      const store = new FolderStore(folder, await newStore(), { graceMs: 5 });
+      const show = () =>
+        render(
+          <MemoryRouter initialEntries={[path]}>
+            <App
+              store={store}
+              library={{
+                folder: "/Users/ada/Notes",
+                chooseFolder: () => Promise.resolve(),
+                closeFolder: () => Promise.resolve(),
+                importFolder: () => Promise.resolve({ imported: 0, duplicates: 0, rejected: [] }),
+                reformat: { misplaced: () => store.misplaced(), apply: () => store.reformat() },
+              }}
+            />
+          </MemoryRouter>,
+        );
+      return { folder, show };
+    }
+    const question = () =>
+      screen.findByRole("alertdialog", { name: "Reformat your local files collection?" });
+
+    it("asks once whether to reformat, and moves files with tags into their folders", async () => {
+      const { folder, show } = await reformatApp();
+      show();
+
+      expect(await question()).toHaveTextContent(
+        "1 conspect with tags is elsewhere and would move into its tags' folder.",
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Reformat" }));
+      await waitFor(() => {
+        expect([...folder.files.keys()].sort()).toEqual(["java/placed.md", "java/x.md"]);
+      });
+
+      cleanup();
+      folder.edit("y.md", "# Y\n\n#go");
+      show();
+      await listTitles();
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    });
+
+    it("keeps the files as they are when told so, until reformatted from settings", async () => {
+      const { folder, show } = await reformatApp("/settings");
+      show();
+
+      await userEvent.click(within(await question()).getByRole("button", { name: "Keep as is" }));
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+      expect(folder.files.has("x.md")).toBe(true);
+
+      await userEvent.click(screen.getByRole("button", { name: "Reformat the folder…" }));
+      await userEvent.click(within(await question()).getByRole("button", { name: "Reformat" }));
+      expect(
+        await screen.findByText("Moved 1 conspect into its tags' folder."),
+      ).toBeInTheDocument();
+      expect(folder.files.has("java/x.md")).toBe(true);
+
+      await userEvent.click(screen.getByRole("button", { name: "Reformat the folder…" }));
+      expect(
+        await screen.findByText("Every conspect with tags is in its tags' folder already."),
+      ).toBeInTheDocument();
+    });
   });
 
   it("shows the library choice in settings", async () => {

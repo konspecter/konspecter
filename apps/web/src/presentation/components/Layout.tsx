@@ -9,7 +9,9 @@ import type { Activity } from "../app/activity";
 import { rememberLocation } from "../app/last-location";
 import { SHORTCUTS } from "../app/shortcuts";
 import type { UpdateSource } from "../app/updates";
+import { useHistorySteps } from "../hooks/use-history-steps";
 import { useShortcuts } from "../hooks/use-shortcuts";
+import { useSwipe } from "../hooks/use-swipe";
 import { Antenna } from "./Antenna";
 import { DetailsSlot } from "./details-slot";
 import { IslandSlot } from "./island-slot";
@@ -104,6 +106,7 @@ export function Layout({
   const barToggleRef = useRef<HTMLButtonElement>(null);
   const dark = useDarkTheme(theme);
   const narrow = useNarrow();
+  const historySteps = useHistorySteps();
   // The island's search: opened by its button, shown too while the list has a query.
   const [islandSearch, setIslandSearch] = useState(false);
   // On the note page the search box searches the note, unless it was opened
@@ -163,6 +166,10 @@ export function Layout({
       )?.focus();
     });
   }, []);
+  // On touch screens a sideways swipe shows (to the right) or hides (to the left) the sidebar.
+  useSwipe((direction) => {
+    if ((direction === "right") !== sidebarOpen) toggleSidebar();
+  });
   // Mod+\ that shows the sidebar also goes into it, to the open note; hiding
   // it from there gives the focus back to where it was (the editor's caret).
   const returnFocus = useRef<HTMLElement | null>(null);
@@ -222,6 +229,13 @@ export function Layout({
     editorMode: () => {
       onModeChange(mode === "markdown" ? "text" : "markdown");
     },
+    // Only within the app's own history: never back out of it.
+    back: () => {
+      if (historySteps.back) void navigate(-1);
+    },
+    forward: () => {
+      if (historySteps.forward) void navigate(1);
+    },
     help: () => {
       setShowShortcuts(true);
     },
@@ -230,6 +244,7 @@ export function Layout({
   const searchBox = (onClose?: () => void) => (
     <SearchBox
       inputRef={searchRef}
+      history={narrow ? null : historySteps}
       find={
         onNote && !libraryScope
           ? {

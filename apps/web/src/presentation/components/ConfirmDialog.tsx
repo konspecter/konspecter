@@ -7,6 +7,8 @@ type ConfirmDialogProps = {
   message: string;
   /** The button that goes ahead, e.g. "Delete". */
   confirmLabel: string;
+  /** The button that does not go ahead; "Cancel" by default. */
+  cancelLabel?: string;
   /** Styles the confirming button as destructive. */
   danger?: boolean;
   onConfirm: () => void;
@@ -23,6 +25,7 @@ export function ConfirmDialog({
   title,
   message,
   confirmLabel,
+  cancelLabel = t("app.cancel"),
   danger = false,
   onConfirm,
   onCancel,
@@ -70,7 +73,7 @@ export function ConfirmDialog({
         </p>
         <div className="actions dialog-actions">
           <button ref={cancelRef} type="button" className="button" onClick={onCancel}>
-            {t("app.cancel")}
+            {cancelLabel}
           </button>
           <button
             ref={confirmRef}

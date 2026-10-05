@@ -1,8 +1,8 @@
 import type { Node } from "prosemirror-model";
-import { schema } from "prosemirror-markdown";
 import { describe, expect, it } from "vitest";
 import { mapPlace, positionMap } from "./place";
 import { markdownToTextDoc } from "./text-markdown";
+import { textSchema } from "./text-schema";
 
 function textDoc(body: string): Node {
   const content = markdownToTextDoc(body);
@@ -103,11 +103,11 @@ describe("positions between the text editor and the source", () => {
 
 describe("positions in documents that are not written as read", () => {
   it("steps over an empty paragraph, which the source leaves out", () => {
-    const { paragraph } = schema.nodes;
-    const doc = schema.node("doc", null, [
-      paragraph.create(null, schema.text("one")),
+    const { paragraph } = textSchema.nodes;
+    const doc = textSchema.node("doc", null, [
+      paragraph.create(null, textSchema.text("one")),
       paragraph.create(),
-      paragraph.create(null, schema.text("two")),
+      paragraph.create(null, textSchema.text("two")),
     ]);
     const map = positionMap(doc, "one\n\ntwo\n");
     expect(map.toSource(positionOf(doc, "two"))).toBe(5);

@@ -119,8 +119,30 @@
  * line between the items in the Markdown) that paragraph adds no margin, so
  * the list looks as the reader shows it; a loose list keeps paragraph spacing.
  */
-.text-editor-content :is(ul, ol)[data-tight] > li > p {
+.text-editor-content :is(ul, ol)[data-tight] > li > :is(p, .task-text > p) {
   margin: 0;
+}
+
+/*
+ * A task list item: its checkbox sits where the bullet would be, so its text
+ * lines up with the other items' (`task-items.ts`).
+ */
+.text-editor-content li.task-item {
+  position: relative;
+  list-style: none;
+}
+
+/* The box takes the text's size and line height, so it is centred on the first line. */
+.text-editor-content .task-box {
+  position: absolute;
+  top: calc((1lh - 0.85em) / 2);
+  left: -1.45em;
+  width: 0.85em;
+  height: 0.85em;
+  margin: 0;
+  font: inherit;
+  accent-color: var(--color-accent);
+  cursor: pointer;
 }
 
 /*
@@ -308,27 +330,58 @@
   color: var(--color-danger);
 }
 
+/*
+ * Code tokens, in both editors (`code-highlight.ts`): the reader's code
+ * colours, so fenced code looks the same in the reader, the text editor and
+ * the Markdown source.
+ */
+.tok-keyword {
+  color: var(--code-keyword);
+}
+
+.tok-string {
+  color: var(--code-string);
+}
+
+.tok-number,
+.tok-property {
+  color: var(--code-number);
+}
+
+.tok-comment {
+  color: var(--code-comment);
+  font-style: italic;
+}
+
+.tok-title {
+  color: var(--code-title);
+}
+
+.tok-type {
+  color: var(--code-type);
+}
+
+.tok-tag {
+  color: var(--code-meta);
+}
+
 /* Monospace has no weight between medium and semibold. */
 .markdown-source .md-tag {
   font-weight: 500;
 }
 
-/* Code blocks in the source read as blocks, as in the reader. */
+/*
+ * Code blocks in the source read as blocks, as in the reader: the block's
+ * background is a layer under the selection (`source-marks.ts`), so selected
+ * code shows as selected.
+ */
 .markdown-source .cm-code-line {
   padding-inline: 12px;
-  background: var(--code-bg);
 }
 
-.markdown-source .cm-code-first {
-  border-radius: 6px 6px 0 0;
-}
-
-.markdown-source .cm-code-last {
-  border-radius: 0 0 6px 6px;
-}
-
-.markdown-source .cm-code-first.cm-code-last {
+.markdown-source .cm-code-block {
   border-radius: 6px;
+  background: var(--code-bg);
 }
 
 /*

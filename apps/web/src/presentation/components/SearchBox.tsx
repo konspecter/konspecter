@@ -45,6 +45,8 @@ type SearchBoxProps = {
   onLeave?: () => void;
   /** Ends the search: a close button at the end empties the query, then calls it (the island). */
   onClose?: () => void;
+  /** Back and forward buttons at the start, enabled where the history has somewhere to go. */
+  history?: { readonly back: boolean; readonly forward: boolean } | null;
 };
 
 /**
@@ -62,8 +64,16 @@ type SearchBoxProps = {
  * move between the matches.
  *
  * With `onClose` it ends in a close button, as the mobile island shows it.
+ * With `history` it starts with back and forward buttons (the top bar on
+ * wider screens: the desktop app has no browser buttons).
  */
-export function SearchBox({ inputRef, find = null, onLeave, onClose }: SearchBoxProps) {
+export function SearchBox({
+  inputRef,
+  find = null,
+  onLeave,
+  onClose,
+  history = null,
+}: SearchBoxProps) {
   const id = useId();
   const location = useLocation();
   const navigate = useNavigate();
@@ -117,6 +127,7 @@ export function SearchBox({ inputRef, find = null, onLeave, onClose }: SearchBox
         if (!find) firstResult()?.click();
       }}
     >
+      {history && <HistoryControls history={history} />}
       <SearchIcon />
       {!find && tags.length > 0 && (
         <ul className="search-chips" aria-label={t("list.tagFilters")}>
@@ -220,6 +231,42 @@ export function SearchBox({ inputRef, find = null, onLeave, onClose }: SearchBox
       )}
     </form>
   );
+}
+
+/** Back and forward in the app's history. */
+function HistoryControls({ history }: { history: NonNullable<SearchBoxProps["history"]> }) {
+  const navigate = useNavigate();
+  const steps = [
+    {
+      step: -1,
+      label: t("topbar.back"),
+      keys: SHORTCUTS.back.keys,
+      enabled: history.back,
+      className: "search-back",
+    },
+    {
+      step: 1,
+      label: t("topbar.forward"),
+      keys: SHORTCUTS.forward.keys,
+      enabled: history.forward,
+      className: "search-forward",
+    },
+  ] as const;
+  return steps.map(({ step, label, keys, enabled, className }) => (
+    <button
+      key={step}
+      type="button"
+      className={`search-history ${className}`}
+      aria-label={label}
+      title={`${label} (${formatKeys(keys)})`}
+      disabled={!enabled}
+      onClick={() => {
+        void navigate(step);
+      }}
+    >
+      <ChevronIcon />
+    </button>
+  ));
 }
 
 /** The count of matches and the buttons that move between them. */

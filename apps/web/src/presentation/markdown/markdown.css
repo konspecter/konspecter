@@ -61,6 +61,18 @@
   margin-bottom: 0;
 }
 
+/*
+ * An item adds no blank line at its edges, in a tight list or a loose one: one
+ * blank line between any two items makes the whole list loose in CommonMark,
+ * and every item then holds paragraphs. So an item's last block has no bottom
+ * margin, nor a paragraph right before its nested list; blocks inside one item
+ * keep their spacing. (In the text editor a task's blocks are in `.task-text`.)
+ */
+.markdown :is(li, li > .task-text) > :last-child,
+.markdown :is(li, li > .task-text) > p:has(+ :is(ul, ol)) {
+  margin-bottom: 0;
+}
+
 .markdown .contains-task-list {
   padding-left: 0.4em;
   list-style: none;

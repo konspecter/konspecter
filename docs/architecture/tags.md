@@ -97,6 +97,9 @@ is matched only against plain text tokens. The `text_join` rule is disabled so a
   order, so capitals win (`tagSpellings`). Links, filters and the index use the lowercase
   name.
   A folder's name opens its filtered list (and opens the folder); a document opens the note.
+- **File Mode:** the tree is also the folder tree. A note's folder is its first chain
+  (`java/collections/` ⇄ `#java#collections`), kept so in both directions
+  ([ADR-013](decisions/ADR-013-folders-follow-tags.md), [File Mode](filesystem-mode.md#folders-are-tags)).
 - **Filtering:** a tag opens the note list searched for it, `/?q=%23collections` (a
   [search](search.md) tag filter), which finds the notes carrying it. A chain gives a note
   each of its tags, so `#java` finds notes written `#java#collections`. The filter shows as a

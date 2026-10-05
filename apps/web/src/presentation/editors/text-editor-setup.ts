@@ -14,9 +14,8 @@ import {
   wrappingInputRule,
 } from "prosemirror-inputrules";
 import { keymap } from "prosemirror-keymap";
-import { schema } from "prosemirror-markdown";
 import type { MarkType, Node, NodeType } from "prosemirror-model";
-import { liftListItem, sinkListItem, splitListItem, wrapInList } from "prosemirror-schema-list";
+import { liftListItem, sinkListItem, wrapInList } from "prosemirror-schema-list";
 import {
   EditorState,
   Plugin,
@@ -28,10 +27,14 @@ import {
 import { Decoration, DecorationSet, type EditorView } from "prosemirror-view";
 import { findMatches, type Match } from "../../domain/search/find";
 import { tagRanges } from "../../domain/tag/tags";
+import { blockDecorations, updatedBlockDecorations } from "./block-decorations";
+import { codeHighlighting } from "./code-highlight";
+import { ListItemView, splitItem, taskInputRule, toggleTask, untask } from "./task-items";
+import { textSchema } from "./text-schema";
 import { diffSequences, offsets } from "./diff";
 import { t, type TextKey } from "../i18n/i18n";
 
-const { nodes, marks } = schema;
+const { nodes, marks } = textSchema;
 
 const insertHardBreak: Command = (state, dispatch) => {
   dispatch?.(state.tr.replaceSelectionWith(nodes.hard_break.create()).scrollIntoView());
@@ -51,10 +54,21 @@ const markdownInputRules = inputRules({
       (match) => ({ order: Number(match[1]), tight: true }),
       (match, node) => node.childCount + (node.attrs.order as number) === Number(match[1]),
     ),
-    textblockTypeInputRule(/^```([\w-]*)\s$/, nodes.code_block, (match) => ({
+    // Any info string: ```go, ```c++, ```c#.
+    textblockTypeInputRule(/^```([^\s`]*)\s$/, nodes.code_block, (match) => ({
       params: match[1] ?? "",
     })),
+    taskInputRule,
   ],
+});
+
+/** List items draw themselves: a task has a checkbox that ticks it. */
+const listItems = new Plugin({
+  props: {
+    nodeViews: {
+      list_item: (node, view, getPos) => new ListItemView(node, view, getPos),
+    },
+  },
 });
 
 /** Shows placeholder text while the document is a single empty paragraph. */
@@ -93,44 +107,14 @@ function blockTags(block: Node, pos: number): Decoration[] {
 
 /** The tags in the document, marked for styling. */
 export function tagDecorations(doc: Node): DecorationSet {
-  const decorations: Decoration[] = [];
-  doc.descendants((node, pos) => {
-    if (!node.isTextblock) return true;
-    decorations.push(...blockTags(node, pos));
-    return false;
-  });
-  return DecorationSet.create(doc, decorations);
-}
-
-/**
- * The tags after `tr`: the previous ones moved with the text, and those of
- * the text blocks it changed found anew. Building the set for a whole long
- * document on every keystroke would make typing in it slow.
- */
-function updatedTags(tr: Transaction, previous: DecorationSet): DecorationSet {
-  const mapped = previous.map(tr.mapping, tr.doc);
-  const start = tr.before.content.findDiffStart(tr.doc.content);
-  const end = tr.before.content.findDiffEnd(tr.doc.content);
-  if (start === null || end === null) return mapped;
-  // Repeated text can make the ends overlap the start: move them after it.
-  const to = end.b + Math.max(0, start - Math.min(end.a, end.b));
-  const size = tr.doc.content.size;
-  const stale: Decoration[] = [];
-  const fresh: Decoration[] = [];
-  // One position wider, so a change at a block's edge counts for that block.
-  tr.doc.nodesBetween(Math.max(0, start - 1), Math.min(size, to + 1), (node, pos) => {
-    if (!node.isTextblock) return true;
-    stale.push(...mapped.find(pos, pos + node.nodeSize));
-    fresh.push(...blockTags(node, pos));
-    return false;
-  });
-  return mapped.remove(stale).add(tr.doc, fresh);
+  return blockDecorations(doc, blockTags);
 }
 
 const tags: Plugin<DecorationSet> = new Plugin<DecorationSet>({
   state: {
     init: (_, state) => tagDecorations(state.doc),
-    apply: (tr, previous) => (tr.docChanged ? updatedTags(tr, previous) : previous),
+    apply: (tr, previous) =>
+      tr.docChanged ? updatedBlockDecorations(tr, previous, blockTags) : previous,
   },
   props: {
     decorations(state) {
@@ -421,15 +405,18 @@ export function createTextEditorState(
         "Shift-Mod-z": redo,
         "Mod-y": redo,
         ...toolShortcuts(),
-        Enter: splitListItem(nodes.list_item),
+        Enter: splitItem,
+        "Mod-Enter": toggleTask,
         "Mod-[": liftListItem(nodes.list_item),
         "Mod-]": sinkListItem(nodes.list_item),
         "Shift-Enter": chainCommands(exitCode, insertHardBreak),
-        Backspace: undoInputRule,
+        Backspace: chainCommands(undoInputRule, untask),
       }),
       keymap(baseKeymap),
       placeholder(t("editor.placeholder")),
+      listItems,
       tags,
+      codeHighlighting(),
       find,
       typing(),
     ],

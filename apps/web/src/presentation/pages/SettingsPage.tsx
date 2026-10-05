@@ -20,6 +20,7 @@ import type { SyncEngine } from "../../infrastructure/sync/sync-engine";
 import { useErrorMessage } from "../hooks/use-error-message";
 import { SyncSettings } from "../components/SyncSettings";
 import { ImportExport } from "../components/ImportExport";
+import { ReformatDialog } from "../components/ReformatPrompt";
 import { BackupRecovery } from "../components/BackupRecovery";
 import { ShortcutList } from "../components/ShortcutsDialog";
 import type { NoteRepository } from "../../application/notes/note-repository";
@@ -297,6 +298,9 @@ function DesktopAbout() {
 
 function LibrarySettings({ library }: { library: LibraryControls }) {
   const [busy, setBusy] = useState(false);
+  /** How many files the reformat question is about, while it is asked. */
+  const [asking, setAsking] = useState<number | null>(null);
+  const { reformat } = library;
   const [message, setMessage] = useState<string | null>(null);
   const [failure, setFailure] = useState<unknown>(null);
   const failureText = useErrorMessage(failure);
@@ -345,7 +349,25 @@ function LibrarySettings({ library }: { library: LibraryControls }) {
             {rich("settings.library.folder", { folder: <strong>{library.folder}</strong> })}
           </p>
           <p className="setting-hint">{t("settings.library.folderSync")}</p>
+          <p className="setting-hint">{t("settings.library.folders")}</p>
           <div className="actions">
+            {reformat && (
+              <button
+                type="button"
+                className="button"
+                disabled={busy}
+                onClick={() => {
+                  run(async () => {
+                    const { length } = await reformat.misplaced();
+                    if (length === 0) return t("settings.library.nothingToReformat");
+                    setAsking(length);
+                    return null;
+                  });
+                }}
+              >
+                {t("settings.library.reformat")}
+              </button>
+            )}
             <button
               type="button"
               className="button"
@@ -376,6 +398,17 @@ function LibrarySettings({ library }: { library: LibraryControls }) {
             </button>
           </div>
         </>
+      )}
+      {reformat && asking !== null && (
+        <ReformatDialog
+          count={asking}
+          onAnswer={(yes) => {
+            setAsking(null);
+            if (yes) {
+              run(async () => tn("settings.library.reformatted", await reformat.apply()));
+            }
+          }}
+        />
       )}
       {message && (
         <p role="status" className="setting-hint">

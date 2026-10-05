@@ -10,6 +10,7 @@ import { NoteCatalog } from "../../application/notes/note-catalog";
 import type { NoteRepository } from "../../application/notes/note-repository";
 import type { SyncEngine } from "../../infrastructure/sync/sync-engine";
 import { Layout } from "../components/Layout";
+import { ReformatPrompt } from "../components/ReformatPrompt";
 import { preloadEditor } from "../editors/LazyNoteEditor";
 import { preloadReader } from "../markdown/LazyMarkdownView";
 import { NotFoundPage } from "../pages/NotFoundPage";
@@ -118,41 +119,46 @@ export function App({
   // A new language renders everything again: labels are looked up when
   // rendering, and memoized parts would otherwise keep the old ones.
   return (
-    <Routes key={settings.language}>
-      <Route
-        element={
-          <Layout
-            store={store}
-            catalog={catalog}
-            activity={activity}
-            theme={settings.theme}
-            onThemeChange={setTheme}
-            mode={settings.defaultEditor}
-            onModeChange={setMode}
-            tagNames={settings.tagNames}
-            updates={updates}
-            sync={sync}
-          />
-        }
-      >
-        <Route index element={<NotesPage store={store} catalog={catalog} />} />
-        {/* The same element for both, so a new note keeps its editor once saved. */}
-        <Route path="notes/new" element={notePage} />
-        <Route path="notes/:id" element={notePage} />
+    <>
+      {library?.folder != null && library.reformat && (
+        <ReformatPrompt folder={library.folder} reformat={library.reformat} />
+      )}
+      <Routes key={settings.language}>
         <Route
-          path="settings"
           element={
-            <SettingsPage
-              settings={settings}
-              onChange={saveSettings}
-              sync={sync}
-              library={library}
+            <Layout
               store={store}
+              catalog={catalog}
+              activity={activity}
+              theme={settings.theme}
+              onThemeChange={setTheme}
+              mode={settings.defaultEditor}
+              onModeChange={setMode}
+              tagNames={settings.tagNames}
+              updates={updates}
+              sync={sync}
             />
           }
-        />
-        <Route path="*" element={<NotFoundPage />} />
-      </Route>
-    </Routes>
+        >
+          <Route index element={<NotesPage store={store} catalog={catalog} />} />
+          {/* The same element for both, so a new note keeps its editor once saved. */}
+          <Route path="notes/new" element={notePage} />
+          <Route path="notes/:id" element={notePage} />
+          <Route
+            path="settings"
+            element={
+              <SettingsPage
+                settings={settings}
+                onChange={saveSettings}
+                sync={sync}
+                library={library}
+                store={store}
+              />
+            }
+          />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+      </Routes>
+    </>
   );
 }

@@ -1,12 +1,9 @@
 import MarkdownIt from "markdown-it";
 import type Token from "markdown-it/lib/token.mjs";
-import {
-  defaultMarkdownParser,
-  defaultMarkdownSerializer,
-  MarkdownSerializer,
-} from "prosemirror-markdown";
+import { defaultMarkdownSerializer, MarkdownSerializer } from "prosemirror-markdown";
 import type { Node } from "prosemirror-model";
 import { t, type TextKey } from "../i18n/i18n";
+import { textMarkdownParser } from "./text-schema";
 
 export type TextEditorContent =
   | { readonly supported: true; readonly doc: Node }
@@ -15,8 +12,7 @@ export type TextEditorContent =
 /** A GFM-aware reference parser used only to compare documents. */
 const reference = new MarkdownIt({ html: true, linkify: true });
 
-// GFM extensions markdown-it does not parse; the text editor would escape them.
-const TASK_ITEM = /^[ \t]*(?:[-+*]|\d+[.)])[ \t]+\[[ xX]\](?:[ \t]|$)/m;
+// A GFM extension markdown-it does not parse; the text editor would escape it.
 const FOOTNOTE = /\[\^[^\]\s]+\]/;
 
 const FEATURE_NAMES: Record<string, TextKey> = {
@@ -33,7 +29,6 @@ const FEATURE_NAMES: Record<string, TextKey> = {
  */
 export function markdownToTextDoc(body: string): TextEditorContent {
   const features = new Set<TextKey>();
-  if (TASK_ITEM.test(body)) features.add("editor.feature.taskLists");
   if (FOOTNOTE.test(body)) features.add("editor.feature.footnotes");
   for (const token of flatten(reference.parse(body, {}))) {
     const name = FEATURE_NAMES[token.type];
@@ -44,7 +39,7 @@ export function markdownToTextDoc(body: string): TextEditorContent {
     return { supported: false, reason: t("editor.uses", { features: names }) };
   }
 
-  const doc = defaultMarkdownParser.parse(body);
+  const doc = textMarkdownParser.parse(body);
   if (signature(body) !== signature(textDocToMarkdown(doc))) {
     return { supported: false, reason: t("editor.wouldChange") };
   }
@@ -65,6 +60,16 @@ const defaultText = defaultMarkdownSerializer.nodes.text;
 const serializer = new MarkdownSerializer(
   {
     ...defaultMarkdownSerializer.nodes,
+    // A task's marker goes right after the bullet: `* [x] done`.
+    list_item(state, node, parent, index) {
+      const { checked } = node.attrs;
+      if (checked !== null) {
+        // No space after the marker of an empty task, so no line ends in one.
+        const space = node.firstChild?.content.size ? " " : "";
+        state.write((checked === true ? "[x]" : "[ ]") + space);
+      }
+      defaultMarkdownSerializer.nodes.list_item?.(state, node, parent, index);
+    },
     text(state, node, parent, index) {
       const escape = state.esc.bind(state);
       state.esc = (text, startOfLine) =>
@@ -88,6 +93,9 @@ function flatten(tokens: readonly Token[]): Token[] {
   return tokens.flatMap((token) => [token, ...flatten(token.children ?? [])]);
 }
 
+/** A task list item ticked with a capital `[X]`. */
+const TICKED_UPPER = /^([ \t]*(?:[-+*]|\d+[.)])[ \t]+)\[X\]/gm;
+
 const COMPARED_ATTRIBUTES = new Set(["href", "src", "title", "start"]);
 const TEXT_LIKE = new Set(["text", "text_special", "softbreak"]);
 
@@ -97,12 +105,14 @@ const TEXT_LIKE = new Set(["text", "text_special", "softbreak"]);
  */
 function signature(markdown: string): string {
   const parts: unknown[] = [];
+  // `[X]` and `[x]` tick a task alike; the editor writes `[x]`.
+  const source = markdown.replace(TICKED_UPPER, "$1[x]");
   let text = "";
   const flushText = () => {
     if (text !== "") parts.push(["text", text]);
     text = "";
   };
-  for (const token of flatten(reference.parse(markdown, {}))) {
+  for (const token of flatten(reference.parse(source, {}))) {
     if (TEXT_LIKE.has(token.type)) {
       text += token.type === "softbreak" ? " " : token.content;
       continue;

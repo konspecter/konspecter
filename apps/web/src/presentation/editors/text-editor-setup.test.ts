@@ -1,4 +1,3 @@
-import { defaultMarkdownParser, schema } from "prosemirror-markdown";
 import { TextSelection, type EditorState } from "prosemirror-state";
 import { DecorationSet, EditorView } from "prosemirror-view";
 import {
@@ -12,10 +11,11 @@ import {
 } from "./text-editor-setup";
 import { textDocToMarkdown } from "./text-markdown";
 import { toolbarTopFor } from "./TextEditor";
+import { textMarkdownParser, textSchema } from "./text-schema";
 
 function editorWith(markdown: string) {
   const view = new EditorView(document.createElement("div"), {
-    state: createTextEditorState(defaultMarkdownParser.parse(markdown)),
+    state: createTextEditorState(textMarkdownParser.parse(markdown)),
   });
   /** Types `key` at `pos` as a system substitution does: the key, then `inserted`. */
   const type = (pos: number, key: string, inserted: string) => {
@@ -100,7 +100,7 @@ describe("tag highlighting", () => {
 
   it("follows every edit as a rebuild of the whole document would", () => {
     let state = createTextEditorState(
-      defaultMarkdownParser.parse("#one text `#code` #two\n\n- #item x\n\n```\n#no\n```\n\nend"),
+      textMarkdownParser.parse("#one text `#code` #two\n\n- #item x\n\n```\n#no\n```\n\nend"),
     );
     // A fixed pseudo-random series of edits: typing, deleting, inline code,
     // code blocks, splitting and joining blocks.
@@ -127,7 +127,7 @@ describe("tag highlighting", () => {
           if (state.doc.resolve(from).sameParent(state.doc.resolve(to))) tr.delete(from, to);
           break;
         case 3:
-          tr.addMark(from, to, schema.marks.code.create());
+          tr.addMark(from, to, textSchema.marks.code.create());
           break;
         case 4:
           tr.split(at);
@@ -136,7 +136,7 @@ describe("tag highlighting", () => {
           tr.setBlockType(
             from,
             to,
-            random(2) === 0 ? schema.nodes.code_block : schema.nodes.paragraph,
+            random(2) === 0 ? textSchema.nodes.code_block : textSchema.nodes.paragraph,
           );
       }
       if (!tr.docChanged) continue;
@@ -178,7 +178,7 @@ describe("list tools", () => {
 
   it("run on any selection in nested lists without failing", () => {
     const state = createTextEditorState(
-      defaultMarkdownParser.parse("text\n\n- one\n  1. inner\n- two\n\nafter"),
+      textMarkdownParser.parse("text\n\n- one\n  1. inner\n- two\n\nafter"),
     );
     const lists = toolbarActions.filter(
       (action) => action.label === "tool.bulletList" || action.label === "tool.orderedList",
@@ -202,7 +202,7 @@ describe("list tools", () => {
 describe("tools in effect", () => {
   /** The state of `markdown` with the caret inside the first `word`. */
   const caretIn = (markdown: string, word: string) => {
-    const state = createTextEditorState(defaultMarkdownParser.parse(markdown));
+    const state = createTextEditorState(textMarkdownParser.parse(markdown));
     let at = -1;
     state.doc.descendants((node, pos) => {
       const index = node.isText ? (node.text ?? "").indexOf(word) : -1;
@@ -265,7 +265,7 @@ describe("toolbar placement", () => {
 
 describe("text editor search", () => {
   const found = (markdown: string, query: string) => {
-    const doc = defaultMarkdownParser.parse(markdown);
+    const doc = textMarkdownParser.parse(markdown);
     return findInDocument(doc, query).map(({ from, to }) => doc.textBetween(from, to));
   };
 
@@ -289,5 +289,72 @@ describe("text editor search", () => {
     expect(foundMatches(view.state)).toHaveLength(3);
     view.dispatch(findTransaction(view.state, "", 0));
     expect(classes()).toEqual([]);
+  });
+});
+
+describe("task lists", () => {
+  /** Presses `key` in the editor, as the keymaps see it. */
+  const press = (view: EditorView, key: string, init: KeyboardEventInit = {}) =>
+    view.someProp("handleKeyDown", (handle) =>
+      handle(view, new KeyboardEvent("keydown", { key, ...init })),
+    );
+  const caretAt = (view: EditorView, pos: number) => {
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, pos)));
+  };
+
+  it("shows a checkbox that ticks and unticks the task", () => {
+    const { view } = editorWith("- [ ] todo\n- plain");
+    const boxes = () => [...view.dom.querySelectorAll<HTMLInputElement>("input[type=checkbox]")];
+    expect(boxes().map((box) => box.checked)).toEqual([false]);
+
+    boxes()[0]?.click();
+    expect(textDocToMarkdown(view.state.doc)).toBe("* [x] todo\n* plain");
+    expect(boxes().map((box) => box.checked)).toEqual([true]);
+    expect(view.dom.querySelector("li")).toHaveAttribute("data-checked", "true");
+
+    boxes()[0]?.click();
+    expect(textDocToMarkdown(view.state.doc)).toBe("* [ ] todo\n* plain");
+  });
+
+  it("makes a task of a list item when [ ] or [x] is typed at its start", () => {
+    const { view, type } = editorWith("- one\n- two");
+    for (const key of "[x]") type(view.state.selection.from, key, key);
+    type(view.state.selection.from, " ", " ");
+    expect(textDocToMarkdown(view.state.doc)).toBe("* [x] one\n* two");
+
+    caretAt(view, 10);
+    for (const key of "[]") type(view.state.selection.from, key, key);
+    type(view.state.selection.from, " ", " ");
+    expect(textDocToMarkdown(view.state.doc)).toBe("* [x] one\n* [ ] two");
+  });
+
+  it("leaves [ ] typed outside a list item's start as text", () => {
+    const { view, type } = editorWith("text");
+    caretAt(view, 1);
+    for (const key of "[ ] ") type(view.state.selection.from, key, key);
+    expect(textDocToMarkdown(view.state.doc)).toBe("\\[ \\] text");
+  });
+
+  it("continues a task list with an unticked task on Enter", () => {
+    const { view } = editorWith("- [x] one");
+    caretAt(view, 6);
+    press(view, "Enter");
+    view.dispatch(view.state.tr.insertText("two"));
+    expect(textDocToMarkdown(view.state.doc)).toBe("* [x] one\n* [ ] two");
+  });
+
+  it("makes a task an ordinary item with Backspace at the start of its text", () => {
+    const { view } = editorWith("- [ ] one");
+    caretAt(view, 3);
+    press(view, "Backspace");
+    expect(textDocToMarkdown(view.state.doc)).toBe("* one");
+    expect(view.dom.querySelector("input[type=checkbox]")).toBeNull();
+  });
+
+  it("ticks the task at the caret with Mod-Enter", () => {
+    const { view } = editorWith("- [ ] one\n- two");
+    caretAt(view, 4);
+    press(view, "Enter", { ctrlKey: true });
+    expect(textDocToMarkdown(view.state.doc)).toBe("* [x] one\n* two");
   });
 });

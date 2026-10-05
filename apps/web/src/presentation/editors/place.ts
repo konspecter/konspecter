@@ -1,6 +1,6 @@
-import { defaultMarkdownParser } from "prosemirror-markdown";
 import type { Node } from "prosemirror-model";
 import { diffSequences, type Hunk } from "./diff";
+import { textMarkdownParser } from "./text-schema";
 
 /**
  * Where the reader is in an editor, in that editor's positions (ProseMirror
@@ -90,7 +90,7 @@ function sourceBlocks(body: string): Block[] {
   }
   const lineStart = (line: number) => lineStarts[line] ?? body.length;
   const blocks: Block[] = [];
-  for (const token of defaultMarkdownParser.tokenizer.parse(body, {})) {
+  for (const token of textMarkdownParser.tokenizer.parse(body, {})) {
     if (!TEXT_TOKENS.has(token.type) || !token.map) continue;
     let [first, last] = token.map;
     if (token.type === "fence") {

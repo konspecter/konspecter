@@ -76,10 +76,15 @@ export type FolderBridge = {
   read(path: string): Promise<FileContents>;
   /** Writes the file atomically, over whatever is there (the last write wins). */
   write(path: string, contents: string): Promise<FileEntry>;
-  /** Creates a file at exactly this path; fails with "exists" if it is taken. */
+  /** Creates a file at exactly this path, and the folders it needs; fails with "exists" if it is taken. */
   createAt(path: string, contents: string): Promise<FileEntry>;
-  /** Renames a file, never over another one (fails with "exists"). */
+  /**
+   * Renames a file, never over another one (fails with "exists"). Like
+   * `createAt`, it makes the folders the new path needs.
+   */
   rename(from: string, to: string): Promise<FileEntry>;
+  /** Removes a folder (a path without a trailing "/") if it is empty, and its parents that are left empty. */
+  removeEmptyFolder(path: string): Promise<void>;
   trash(path: string): Promise<void>;
   openExternally(path: string): Promise<void>;
   reveal(path: string): Promise<void>;
@@ -146,6 +151,9 @@ export const folderBridge: FolderBridge = {
   },
   async rename(from, to) {
     return parseEntry(await folderCommand("folder_rename", { from, to }));
+  },
+  async removeEmptyFolder(path) {
+    await folderCommand("folder_remove_empty_dir", { path });
   },
   async trash(path) {
     await folderCommand("folder_trash", { path });

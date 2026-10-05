@@ -55,14 +55,31 @@ with a contextual formatting toolbar and Markdown-style shortcuts.
   are active (a quote while the selection is inside one). A list tool toggles: in a list of its kind it takes the selected items out, in
   a list of the other kind it changes that list's kind (the innermost list, when nested).
 - **Shortcuts:** typing `#`–`######` + space makes a heading, `>` a quote, `-`/`*`/`+` a
-  list, `1.` a numbered list, and ` ```lang ` + space a code block. Backspace right
+  list, `1.` a numbered list, and ` ```lang ` + space a code block (any info string: `c++`, `c#`). Backspace right
   after a shortcut undoes it. `Mod-B/I/\`` toggle marks, `Mod-Z`/`Mod-Shift-Z`undo and redo,`Mod-[`/`Mod-]`outdent and indent list items, and`Shift-Enter` inserts a line break.
+- **Task lists:** GFM task items (`- [ ] todo`, `- [x] done`) are list items with a
+  checkbox where the bullet would be; clicking it ticks or unticks the task, as an edit. The
+  schema (`text-schema.ts`) is the CommonMark one with a `checked` attribute on list items
+  (null for an ordinary item), read by a small markdown-it rule (the marker at the start of
+  an item's first paragraph; `\[ ]` stays text) and written back after the bullet
+  (`* [x] done`). Typing `[ ] `, `[] ` or `[x] ` at the start of a list item makes it a
+  task, Enter in a task makes the next item an unticked task, Backspace at the start of a
+  task's text makes it an ordinary item, and `Mod-Enter` ticks the task at the caret
+  (`task-items.ts`).
 - **First line as title:** in a new note, Enter at the end of the first line makes it the
   title (a level 1 heading) when it is shorter than 50 characters, while the note is still
   that one line, so only once (`firstLineTitle`). Markdown mode does the same by writing
   `# ` in front, unless the line already starts with Markdown syntax.
 - **Tags** are marked (a decoration, weight 560: heavier than the text, not bold), outside
   code, with the parser's rules (`tagRanges`).
+- **Code blocks** are highlighted in the language their info string names (` ```go `),
+  with Markdown mode's grammars (`@codemirror/language-data`, matched by name, alias or
+  extension: ` ```c `, ` ```cpp `/` ```c++ `, ` ```cs `/` ```c# `,
+  ` ```php ` …; PHP is read as plain code, with or without `<?php`) and its token
+  classes (`code-highlight.ts`: one `tagHighlighter` for both
+  editors, `tok-*` classes in the reader's code colours). A grammar loads on first use and
+  the blocks are highlighted when it arrives; only the code blocks a change touches are parsed
+  again (`block-decorations.ts`, shared with the tag marks).
 - **Quotes in code:** a typographic quote the system puts in for a typed `"` or `'` (macOS
   smart quotes, «» in Russian) is replaced by the straight quote in code blocks and inline
   code; text keeps the system's choice.
@@ -76,6 +93,12 @@ with a contextual formatting toolbar and Markdown-style shortcuts.
   except that `_` between letters or digits of any script is written as it is (the library
   escapes it unless both neighbours are ASCII, which cut `#новые_технологии` to `#новые`).
   The frontmatter is kept byte for byte (`replaceBody` in the document module).
+- **Lists** look as the reader shows them. Every item holds a paragraph in the editor; in a
+  tight list it has no margin. In a loose list (CommonMark makes a whole list loose for one
+  blank line between any two of its items) blocks inside an item keep their spacing, but no
+  item adds a blank line at its edges, in the editor and the reader alike: an item's last
+  block, and a paragraph right before its nested list, have no bottom margin
+  (`markdown.css`).
 - **Canonical output:** until the first edit, the document is untouched, so opening and saving
   never reformats a note. After an edit, the body is written in the serializer's style:
   `*` bullets, ATX headings, and soft line breaks joined into one line.
@@ -86,10 +109,11 @@ The text editor only opens a note if it can represent the body without changing 
 means. `markdownToTextDoc` checks two things:
 
 1. **Known unsupported features:** tables, strikethrough and HTML (found with a GFM-aware
-   markdown-it pass), plus task lists and footnotes (found by pattern, because markdown-it
-   does not parse them and the editor would escape them).
+   markdown-it pass), plus footnotes (found by pattern, because markdown-it does not parse
+   them and the editor would escape them).
 2. **A round trip:** parse → serialize, then compare what the original and the result _mean_:
-   token structure, text (soft breaks as spaces), URLs and code, ignoring markers and escapes.
+   token structure, text (soft breaks as spaces), URLs and code, ignoring markers and escapes
+   (and the case of a task's `[X]`).
 
 If either check fails, Text mode shows the note **rendered** (read-only, with GFM tables and
 highlighted code) with a notice that explains why ("This note uses tables, so it can only be
@@ -104,7 +128,9 @@ CodeMirror 6 over the whole document, frontmatter included (`MarkdownSourceEdito
   inline code, escapes), YAML in the frontmatter block, and fenced code in its own language
   (grammars from `@codemirror/language-data`, loaded on demand), with code blocks on the code
   background. Colours are the reader's code tokens (global in `app.css`), so both themes
-  match. Tags are marked (outside code, HTML, URLs and the frontmatter).
+  match; code tokens get the same classes as in the text editor (`code-highlight.ts`). A code
+  block's background is drawn as a layer under the selection (`source-marks.ts`), not on its
+  lines, which would hide the selection CodeMirror draws behind the text. Tags are marked (outside code, HTML, URLs and the frontmatter).
 - **Quotes:** in code blocks, inline code and the frontmatter a typed `"` or `'` stays
   straight even when the system substitutes a typographic quote (see Text mode); `autocorrect`
   and `autocapitalize` are off.

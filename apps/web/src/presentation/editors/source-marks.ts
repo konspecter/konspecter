@@ -1,8 +1,16 @@
 import { syntaxTree } from "@codemirror/language";
-import { EditorSelection, type EditorState, type Extension, type Range } from "@codemirror/state";
+import {
+  EditorSelection,
+  Prec,
+  type EditorState,
+  type Extension,
+  type Range,
+} from "@codemirror/state";
 import {
   Decoration,
   EditorView,
+  layer,
+  RectangleMarker,
   ViewPlugin,
   type DecorationSet,
   type ViewUpdate,
@@ -38,35 +46,75 @@ function within(state: EditorState, pos: number, names: ReadonlySet<string>): bo
 
 const tagMark = Decoration.mark({ class: "md-tag" });
 const codeLine = Decoration.line({ class: "cm-code-line" });
-const codeFirst = Decoration.line({ class: "cm-code-line cm-code-first" });
-const codeLast = Decoration.line({ class: "cm-code-line cm-code-last" });
-const codeOnly = Decoration.line({ class: "cm-code-line cm-code-first cm-code-last" });
+
+const isCodeBlock = (name: string) => name === "FencedCode" || name === "CodeBlock";
+
+/**
+ * Code blocks read as blocks: their background is drawn in a layer under the
+ * selection, from the first line's top to the last line's bottom, across the
+ * text's width. (A background on the lines themselves would hide the
+ * selection, which CodeMirror draws behind the text.)
+ */
+const codeBlocks = layer({
+  above: false,
+  class: "cm-code-blocks",
+  update: (update) =>
+    update.docChanged ||
+    update.viewportChanged ||
+    syntaxTree(update.startState) !== syntaxTree(update.state),
+  markers(view) {
+    const scroller = view.scrollDOM.getBoundingClientRect();
+    const content = view.contentDOM.getBoundingClientRect();
+    const left = content.left - scroller.left + view.scrollDOM.scrollLeft;
+    const top = view.documentTop - scroller.top + view.scrollDOM.scrollTop;
+    const markers: RectangleMarker[] = [];
+    const seen = new Set<number>();
+    const tree = syntaxTree(view.state);
+    for (const { from, to } of view.visibleRanges) {
+      tree.iterate({
+        from,
+        to,
+        enter(node) {
+          if (!isCodeBlock(node.name)) return undefined;
+          if (!seen.has(node.from)) {
+            seen.add(node.from);
+            const first = view.lineBlockAt(node.from);
+            const last = view.lineBlockAt(node.to);
+            markers.push(
+              new RectangleMarker(
+                "cm-code-block",
+                left,
+                top + first.top,
+                content.width,
+                last.bottom - first.top,
+              ),
+            );
+          }
+          return false;
+        },
+      });
+    }
+    return markers;
+  },
+});
 
 function decorations(view: EditorView): DecorationSet {
   const { state } = view;
   const ranges: Range<Decoration>[] = [];
   const tree = syntaxTree(state);
   for (const { from, to } of view.visibleRanges) {
-    // Code blocks read as blocks: a background on each of their lines.
+    // Code block lines are set in from the block's edges (`codeBlocks` draws the block).
     tree.iterate({
       from,
       to,
       enter(node) {
-        if (node.name !== "FencedCode" && node.name !== "CodeBlock") return undefined;
+        if (!isCodeBlock(node.name)) return undefined;
         const first = state.doc.lineAt(node.from).number;
         const last = state.doc.lineAt(node.to).number;
         for (let number = first; number <= last; number += 1) {
           const line = state.doc.line(number);
           if (line.to < from || line.from > to) continue;
-          const decoration =
-            first === last
-              ? codeOnly
-              : number === first
-                ? codeFirst
-                : number === last
-                  ? codeLast
-                  : codeLine;
-          ranges.push(decoration.range(line.from));
+          ranges.push(codeLine.range(line.from));
         }
         return false;
       },
@@ -194,5 +242,6 @@ function typing(): Extension {
 }
 
 export function sourceEditorMarks(): Extension {
-  return [sourceMarks, typing()];
+  // Lowest: layers below the text stack in order, so this one goes under the selection's.
+  return [sourceMarks, Prec.lowest(codeBlocks), typing()];
 }

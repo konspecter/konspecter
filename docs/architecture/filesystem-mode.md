@@ -83,7 +83,8 @@ lower case, Cyrillic transliterated, accents dropped from Latin letters, everyth
 is not a letter or digit collapsed into `-`, at most 80 characters, `untitled` when nothing
 is left. "Hello мир!" is `hello-mir.md`. Letters of other scripts are kept as they are.
 
-- **New notes** always get the slug name, in the folder's top level. A taken name gets a
+- **New notes** always get the slug name, in the folder of their first tag chain
+  ([Folders are tags](#folders-are-tags)), the top level without tags. A taken name gets a
   number: `hello-mir-2.md`, `hello-mir-3.md` … Names compare ignoring case, as on macOS and
   Windows disks.
 - **Title changes** (Settings → **File names**, File Mode only; off by default): when on, a
@@ -101,6 +102,30 @@ is left. "Hello мир!" is `hello-mir.md`. Letters of other scripts are kept as
   shows notes that arrive by sync. The editor reloads a changed note only while nothing is
   unsaved; with unsaved text it keeps the version it opened, so the next save detects the
   change and keeps both versions instead of overwriting.
+
+## Folders are tags
+
+The folder tree and the tag tree are one ([ADR-013](decisions/ADR-013-folders-follow-tags.md),
+rules in `domain/note/folders.ts`): a note's folder is its **first tag chain**.
+
+```text
+~/Notes/folder1/folder2/file-1.md   ⇄   # File 1   tags: folder1#folder2
+```
+
+- **Disk → app:** a file without tags in folders gets its folders' chain written into its
+  frontmatter `tags` when the folder opens or the file appears (`withFolderTags`). A file
+  another program moves out of its chain's folder gets the new folders' chain instead.
+  Folder names become tag names with what a tag cannot hold as `_` (`My Notes` →
+  `My_Notes`); a folder whose name gives no tag (`2024/`) leaves its files alone.
+- **App → disk:** a new note is created in its chain's folder, and a save that changes the
+  first chain moves the file there, keeping its name (numbered if taken). Existing folders
+  are reused whatever their case. The folder a move or a deletion leaves empty is removed,
+  with its parents left empty (`folder_remove_empty_dir`; a `.DS_Store` does not count).
+  A save that keeps the chain never moves a file.
+- **Reformatting:** when a folder opens with files that have tags but sit elsewhere
+  (`misplaced`), the app asks once for that folder whether to reformat the collection
+  (`ReformatPrompt`); yes moves them into their chains' folders (`reformat`). Settings →
+  Library → _Reformat the folder…_ asks again at any time.
 
 ## External editors
 
@@ -131,16 +156,17 @@ Konspecter  ⇄  ~/Notes/java.md  ⇄  VS Code / Vim / Neovim / …
 
 `src-tauri/src/folder.rs`, exposed as commands in `lib.rs`:
 
-| Command                          | Does                                                                                                                  |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `folder_pick`                    | system folder picker; opens and remembers the folder                                                                  |
-| `folder_current`, `folder_close` | the open folder, or none                                                                                              |
-| `folder_list`                    | every `.md` file, recursively, sorted by path                                                                         |
-| `folder_read`                    | a file's text and entry (path, modification time, size)                                                               |
-| `folder_write`                   | atomic write (temporary file + rename); refuses with `changed_on_disk` if the file changed since `expectedModifiedMs` |
-| `folder_create_at`               | a new file at exactly the given path; `exists` if it is taken (never overwrites)                                      |
-| `folder_rename`                  | renames a file, never over another one (`exists`); a change of case only works on case-insensitive disks too          |
-| `folder_trash`                   | moves the file to the system trash                                                                                    |
+| Command                          | Does                                                                                                                                                  |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `folder_pick`                    | system folder picker; opens and remembers the folder                                                                                                  |
+| `folder_current`, `folder_close` | the open folder, or none                                                                                                                              |
+| `folder_list`                    | every `.md` file, recursively, sorted by path                                                                                                         |
+| `folder_read`                    | a file's text and entry (path, modification time, size)                                                                                               |
+| `folder_write`                   | atomic write (temporary file + rename); refuses with `changed_on_disk` if the file changed since `expectedModifiedMs`                                 |
+| `folder_create_at`               | a new file at exactly the given path, making its folders; `exists` if it is taken (never overwrites)                                                  |
+| `folder_rename`                  | renames a file, into other folders too (made as needed), never over another one (`exists`); a change of case only works on case-insensitive disks too |
+| `folder_remove_empty_dir`        | removes a folder left empty (but for a `.DS_Store`), then its parents left empty                                                                      |
+| `folder_trash`                   | moves the file to the system trash                                                                                                                    |
 
 ### Safety
 
@@ -158,10 +184,12 @@ Konspecter  ⇄  ~/Notes/java.md  ⇄  VS Code / Vim / Neovim / …
 
 - Rust unit tests (`folder.rs`) on temporary folders: path validation, symlink escape,
   recursive listing, atomic write, the changed-on-disk refusal, unique names, exact-path
-  creation and renames that never overwrite (a change of case included), invalid
+  creation and renames that never overwrite (a change of case included), folders made for
+  new paths (never through a symlink out) and removed only when empty, invalid
   UTF-8, size limits, watcher path classification, and a real watcher seeing an external write.
 - `FakeFolder` (TypeScript) mirrors those rules for `FolderStore`, import, and app-level tests:
   listing, editing, creating, trashing, tags, search, reading positions, external edits,
   deletions, renames, rescans, ignoring its own writes, and live pages. File names ignore
   case there, as on macOS. Slug names and renames after the title are covered in
-  `folder-store.test.ts` and in the app tests (the open note keeps its editor).
+  `folder-store.test.ts` and in the app tests (the open note keeps its editor), and so are
+  folders following tags (`folders.test.ts` for the rules) and the reformat question.

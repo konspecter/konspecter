@@ -1,5 +1,5 @@
 import { importFolder } from "../../application/library/import-folder";
-import { parseDocument } from "../../domain/document/document";
+import { frontmatterTags, parseDocument } from "../../domain/document/document";
 import { readNotes, updateNote } from "../../domain/note/note";
 import { parseQuery } from "../../domain/search/query";
 import { openNoteStore } from "../storage/note-store";
@@ -124,7 +124,7 @@ describe("FolderStore", () => {
     await store.create("# New\n\nhashmap #go", now);
     expect((await store.search(parseQuery("hashmap #go"))).map((hit) => hit.id).sort()).toEqual([
       "b.md",
-      "new.md",
+      "go/new.md",
     ]);
   });
 
@@ -138,8 +138,9 @@ describe("FolderStore", () => {
       });
       await store.saveReadingPosition("sub/test.md", 0.3);
 
+      const note = await mustGet(store, "sub/test.md");
       const saved = await store.put(
-        updateNote(await mustGet(store, "sub/test.md"), "# Hello мир!", now),
+        updateNote(note, note.markdown.replace("# Test", "# Hello мир!"), now),
       );
 
       expect(saved.id).toBe("sub/hello-mir.md");
@@ -235,6 +236,105 @@ describe("FolderStore", () => {
 
     expect((await store.get("note.md"))?.markdown).toBe("v2");
     expect(await store.get("added.md")).toBeDefined();
+  });
+});
+
+describe("FolderStore with folders following tags", () => {
+  const tagsOf = (folder: FakeFolder, path: string) =>
+    frontmatterTags(folder.files.get(path)?.text ?? "");
+
+  it("gives files without tags their folders' chain when the folder opens", async () => {
+    const { folder, store } = await setup();
+    folder.edit("folder1/folder2/file1.md", "# File 1");
+    folder.edit("top.md", "# Top");
+    folder.edit("notes/tagged.md", "# Tagged #go");
+
+    expect((await store.tags()).map(({ tag }) => tag.name)).toEqual(["folder1", "folder2", "go"]);
+    expect(tagsOf(folder, "folder1/folder2/file1.md")).toEqual(["folder1#folder2"]);
+    expect(folder.files.get("top.md")?.text).toBe("# Top");
+    expect(folder.files.get("notes/tagged.md")?.text).toBe("# Tagged #go");
+  });
+
+  it("creates a note in the folder of its first chain, using the folders there", async () => {
+    const { folder, store } = await setup();
+    folder.edit("Folder1/old.md", "# Old");
+
+    const nested = await store.create("# File 1\n\n#folder1#folder2", now);
+    const fresh = await store.create("# Go\n\n#go #web", now);
+
+    expect([nested.id, fresh.id]).toEqual(["Folder1/folder2/file-1.md", "go/go.md"]);
+    expect(folder.files.has("Folder1/folder2/file-1.md")).toBe(true);
+  });
+
+  it("moves a file when a save changes its chain, and removes the folder left empty", async () => {
+    const { folder, store } = await setup();
+    folder.edit("java/note.md", "# Note");
+    const changes: string[] = [];
+    store.onChange((change) => changes.push(`${change.previousId ?? ""}→${change.noteId}`));
+    const note = await mustGet(store, "java/note.md");
+    await store.saveReadingPosition("java/note.md", 0.4);
+
+    const saved = await store.put(
+      updateNote(note, note.markdown.replace("- java", "- go#web"), now),
+    );
+
+    expect(saved.id).toBe("go/web/note.md");
+    expect([...folder.files.keys()]).toEqual(["go/web/note.md"]);
+    expect(folder.removedFolders).toEqual(["java"]);
+    expect(changes).toEqual(["java/note.md→go/web/note.md"]);
+    expect((await store.readingState("go/web/note.md"))?.position).toBe(0.4);
+
+    const top = await store.put(
+      updateNote(saved, saved.markdown.replace(/---[^]*?---\n\n/, ""), now),
+    );
+    expect(top.id).toBe("note.md");
+  });
+
+  it("leaves a file where it is while a save keeps its chain", async () => {
+    const { folder, store } = await setup();
+    folder.edit("notes/x.md", "# X #java");
+
+    const saved = await store.put(updateNote(await mustGet(store, "notes/x.md"), "# Y #java", now));
+
+    expect(saved.id).toBe("notes/x.md");
+    expect(folder.removedFolders).toEqual([]);
+  });
+
+  it("gives a file moved by another program its new folders' chain", async () => {
+    const { folder, store } = await setup();
+    folder.edit("a/one.md", "# One");
+    await store.watch();
+    await store.list();
+
+    folder.move("a/one.md", "b/c/one.md");
+    folder.notify({ paths: ["a/one.md", "b/c/one.md"], rescan: false });
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    expect(tagsOf(folder, "b/c/one.md")).toEqual(["b#c"]);
+    expect((await store.tags()).map(({ tag }) => tag.name)).toEqual(["b", "c"]);
+  });
+
+  it("reformats the collection: files with tags move into their chains' folders", async () => {
+    const { folder, store } = await setup();
+    folder.edit("x.md", "# X #java");
+    folder.edit("old/y.md", "# Y #go#web");
+    folder.edit("java/x.md", "# Placed #java");
+    folder.edit("untagged.md", "# Untagged");
+    const changes: string[] = [];
+    store.onChange((change) => changes.push(`${change.previousId ?? ""}→${change.noteId}`));
+
+    expect(await store.misplaced()).toEqual(["old/y.md", "x.md"]);
+    expect(await store.reformat()).toBe(2);
+
+    expect([...folder.files.keys()].sort()).toEqual([
+      "go/web/y.md",
+      "java/x-2.md",
+      "java/x.md",
+      "untagged.md",
+    ]);
+    expect(changes).toEqual(["old/y.md→go/web/y.md", "x.md→java/x-2.md"]);
+    expect(folder.removedFolders).toEqual(["old"]);
+    expect(await store.misplaced()).toEqual([]);
   });
 });
 

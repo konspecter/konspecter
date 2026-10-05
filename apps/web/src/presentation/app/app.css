@@ -764,7 +764,8 @@ mark {
   white-space: nowrap;
 }
 
-.search-step {
+.search-step,
+.search-history {
   display: inline-grid;
   flex-shrink: 0;
   place-items: center;
@@ -782,17 +783,20 @@ mark {
   margin-left: 2px;
 }
 
-.search-step:hover:not(:disabled) {
+.search-step:hover:not(:disabled),
+.search-history:hover:not(:disabled) {
   background: var(--color-hover);
   color: var(--color-fg);
 }
 
-.search-step:disabled {
+.search-step:disabled,
+.search-history:disabled {
   opacity: 0.45;
   cursor: default;
 }
 
-.search-step .icon {
+.search-step .icon,
+.search-history .icon {
   width: 16px;
   height: 16px;
 }
@@ -803,6 +807,19 @@ mark {
 
 .search-step-down .icon {
   transform: rotate(90deg);
+}
+
+/* Wider screens: the box starts with back and forward (‹ ›), then the search icon. */
+.search-box:has(.search-history) {
+  padding-left: 5px;
+}
+
+.search-forward {
+  margin-right: 3px;
+}
+
+.search-back .icon {
+  transform: rotate(180deg);
 }
 
 /* The island's search ends in its close button. */
