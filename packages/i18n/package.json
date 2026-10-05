@@ -1,0 +1,26 @@
+{
+  "name": "@konspecter/i18n",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Message lookup, plurals and locale detection shared by the app and the site.",
+  "exports": {
+    ".": "./src/i18n.ts",
+    "./rich": "./src/rich.tsx"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -b"
+  },
+  "peerDependencies": {
+    "react": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.2"
+  }
+}

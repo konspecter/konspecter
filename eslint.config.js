@@ -8,6 +8,8 @@ export default tseslint.config(
     ignores: [
       "**/dist/",
       "**/coverage/",
+      "apps/site/build/",
+      "apps/site/.react-router/",
       "apps/server/",
       "apps/desktop/src-tauri/",
       "apps/mobile/android/",
@@ -32,6 +34,21 @@ export default tseslint.config(
   {
     files: ["**/*.tsx"],
     extends: [reactHooks.configs.flat.recommended],
+  },
+  {
+    // React Router loaders and middleware stop with a thrown response (`data(…)`, `redirect(…)`).
+    files: ["apps/site/**/*.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/only-throw-error": [
+        "error",
+        {
+          allow: [
+            { from: "package", package: "react-router", name: "DataWithResponseInit" },
+            { from: "lib", name: "Response" },
+          ],
+        },
+      ],
+    },
   },
   {
     files: ["**/*.{js,mjs}"],

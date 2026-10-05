@@ -1,9 +1,18 @@
+import {
+  createTranslator,
+  detectLocale as detectAmong,
+  type Dictionary as I18nDictionary,
+  type Params,
+  type PluralKey as I18nPluralKey,
+  type TextKey as I18nTextKey,
+} from "@konspecter/i18n";
 import { en } from "./en";
 import { ru } from "./ru";
 
 /**
- * The interface languages. English is the default; the system's preferred
- * languages or the Language setting pick another one (see docs/architecture/i18n.md).
+ * The app's interface languages, on the shared engine (@konspecter/i18n).
+ * English is the default; the system's preferred languages or the Language
+ * setting pick another one (see docs/architecture/i18n.md).
  */
 export const LOCALES = ["en", "ru"] as const;
 export type Locale = (typeof LOCALES)[number];
@@ -11,71 +20,41 @@ export const DEFAULT_LOCALE: Locale = "en";
 /** Each language's name in that language, as the Language setting lists them. */
 export const LOCALE_NAMES: Record<Locale, string> = { en: "English", ru: "Русский" };
 
-/** Plural forms, chosen by `Intl.PluralRules`: English uses one/other, Russian one/few/many. */
-export type Plural = {
-  readonly one: string;
-  readonly few?: string;
-  readonly many?: string;
-  readonly other: string;
-};
-
 type Messages = typeof en;
+export type { Params, Plural } from "@konspecter/i18n";
 /** Keys of plain messages. */
-export type TextKey = {
-  [K in keyof Messages]: Messages[K] extends string ? K : never;
-}[keyof Messages];
+export type TextKey = I18nTextKey<Messages>;
 /** Keys of messages with plural forms. */
-export type PluralKey = Exclude<keyof Messages, TextKey>;
+export type PluralKey = I18nPluralKey<Messages>;
 /** A translation: every English key, each as text or as plural forms. */
-export type Dictionary = {
-  readonly [K in keyof Messages]: Messages[K] extends string ? string : Plural;
-};
+export type Dictionary = I18nDictionary<Messages>;
 
 const dictionaries: Record<Locale, Dictionary> = { en, ru };
 
 /** The first of the preferred languages the app speaks ("ru-RU" → ru), else English. */
 export function detectLocale(languages: readonly string[]): Locale {
-  for (const language of languages) {
-    const base = language.toLowerCase().split("-")[0];
-    const match = LOCALES.find((locale) => locale === base);
-    if (match) return match;
-  }
-  return DEFAULT_LOCALE;
+  return detectAmong(languages, LOCALES, DEFAULT_LOCALE);
 }
 
 let current: Locale = DEFAULT_LOCALE;
+let translator = createTranslator(dictionaries[current], current);
 
 /** Sets the interface language; text rendered afterwards uses it (see `applyLanguage`). */
 export function setLocale(locale: Locale): void {
   current = locale;
+  translator = createTranslator(dictionaries[locale], locale);
 }
 
 export function currentLocale(): Locale {
   return current;
 }
 
-export type Params = Readonly<Record<string, string | number>>;
-
-function fill(template: string, params: Params | undefined): string {
-  if (!params) return template;
-  return template.replace(/\{(\w+)\}/g, (placeholder, name: string) => {
-    const value = params[name];
-    return value === undefined ? placeholder : String(value);
-  });
-}
-
 /** The message in the current language, with `{name}` placeholders filled in. */
 export function t(key: TextKey, params?: Params): string {
-  return fill(dictionaries[current][key], params);
+  return translator.t(key, params);
 }
 
 /** The plural form for `count` in the current language; `{count}` is the formatted number. */
 export function tn(key: PluralKey, count: number, params?: Params): string {
-  const forms: Plural = dictionaries[current][key];
-  const category = new Intl.PluralRules(current).select(count);
-  const template =
-    (category === "one" || category === "few" || category === "many"
-      ? forms[category]
-      : undefined) ?? forms.other;
-  return fill(template, { count: new Intl.NumberFormat(current).format(count), ...params });
+  return translator.tn(key, count, params);
 }

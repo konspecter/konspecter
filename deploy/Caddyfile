@@ -1,0 +1,16 @@
+# One origin for the API and the site. Caddy gets a certificate for the
+# address on its own (a domain name), or a local one for "localhost".
+{$KONSPECTER_SITE_ADDRESS:localhost} {
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy server:8080 {
+			# Change events are a stream: pass every event on at once.
+			flush_interval -1
+		}
+	}
+
+	handle {
+		reverse_proxy site:3000
+	}
+}

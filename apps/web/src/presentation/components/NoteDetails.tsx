@@ -15,7 +15,13 @@ import { writtenTagList } from "../../domain/tag/tags";
 import { exportToFolder, isDesktop } from "../../infrastructure/desktop/desktop";
 import { downloadFile } from "../../infrastructure/files/files";
 import { useErrorMessage } from "../hooks/use-error-message";
-import { DownloadIcon, ExternalIcon, RevealIcon, TitleCoverIcon, TrashIcon } from "./icons";
+import {
+  DownloadIcon,
+  ExternalIcon,
+  RevealIcon,
+  TitleCoverIcon,
+  TrashIcon,
+} from "@konspecter/ui/icons";
 import { NoteDate } from "./NoteDate";
 import { displayTitle } from "./note-title";
 import { t, tn } from "../i18n/i18n";

@@ -1,0 +1,79 @@
+/* Page defaults shared by the app and the account site (after tokens.css). */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--color-bg);
+}
+
+/* The page scrolls; the scrollbar's room is kept, so content never shifts when it appears. */
+html {
+  scrollbar-gutter: stable;
+}
+
+body {
+  color: var(--color-fg);
+  font-family: var(--font-text);
+  font-size: calc(17px * var(--font-scale));
+  line-height: 1.62;
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--color-accent);
+}
+
+/* Buttons and links keep a focus ring for keyboard users. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Text never gets a box: fields and editors show focus with their background. */
+input:not([type="radio"], [type="checkbox"]):focus-visible,
+textarea:focus-visible,
+[contenteditable="true"]:focus-visible {
+  outline: none;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* "Skip to content": hidden above the page until it gets keyboard focus. */
+.skip-link {
+  position: absolute;
+  z-index: 30;
+  left: var(--gutter);
+  top: -3rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  background: var(--color-bg);
+  font-family: var(--font-ui);
+  font-size: 14px;
+}
+
+.skip-link:focus {
+  top: 0.5rem;
+}
+
+/* The line icons (icons.tsx). */
+.icon {
+  display: block;
+  flex-shrink: 0;
+}

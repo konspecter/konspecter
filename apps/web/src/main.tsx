@@ -26,7 +26,10 @@ import type { LibraryControls } from "./presentation/app/library";
 import type { UpdateSource } from "./presentation/app/updates";
 import { isMac } from "./presentation/app/shortcuts";
 import { ErrorState } from "./presentation/components/ErrorState";
-import "./presentation/app/fonts.css";
+import "@konspecter/ui/fonts.css";
+import "@konspecter/ui/tokens.css";
+import "@konspecter/ui/base.css";
+import "@konspecter/ui/controls.css";
 import "./presentation/app/app.css";
 
 const rootElement = document.getElementById("root");

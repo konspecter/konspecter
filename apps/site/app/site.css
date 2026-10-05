@@ -1,0 +1,474 @@
+/*
+ * The account site, in the app's look: the palette, Inter and the controls
+ * come from @konspecter/ui. The one picture on the landing page is a
+ * conspect's Markdown source; everything around it stays quiet.
+ */
+
+:root {
+  --site-width: 1120px;
+  --site-gutter: clamp(16px, 4vw, 40px);
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  font-family: var(--font-ui);
+}
+
+main {
+  flex: 1;
+}
+
+.site-frame {
+  width: 100%;
+  max-width: var(--site-width);
+  margin-inline: auto;
+  padding-inline: var(--site-gutter);
+}
+
+/* --- Header and footer --------------------------------------------------- */
+
+.site-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  height: 64px;
+}
+
+.site-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--color-fg);
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+
+.site-brand img {
+  display: block;
+}
+
+.site-header-end {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.site-sign-in {
+  padding: 0.3rem 0.85rem;
+}
+
+.site-account {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+  margin: 0;
+  font-size: 14px;
+}
+
+.site-account-email {
+  overflow: hidden;
+  max-width: 16rem;
+  color: var(--color-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.site-preferences {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.site-preferences form {
+  display: flex;
+  margin: 0;
+}
+
+.language-switch {
+  padding: 0.3rem 0.6rem;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--color-muted);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.language-switch:hover {
+  background: var(--color-hover);
+  color: var(--color-fg);
+}
+
+/* Light shows the way to dark, dark the way to light; "system" follows the scheme. */
+.theme-to-light {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .theme-to-light {
+    display: inline-grid;
+  }
+
+  :root:not([data-theme="light"]) .theme-to-dark {
+    display: none;
+  }
+}
+
+:root[data-theme="dark"] .theme-to-light {
+  display: inline-grid;
+}
+
+:root[data-theme="dark"] .theme-to-dark {
+  display: none;
+}
+
+.site-footer {
+  margin-top: 2.5rem;
+  padding-block: 2rem calc(2rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--color-border);
+  color: var(--color-muted);
+  font-size: 14px;
+}
+
+.site-footer p {
+  margin: 0;
+}
+
+/* --- Landing page -------------------------------------------------------- */
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  align-items: center;
+  gap: clamp(2.5rem, 5vw, 4.5rem);
+  padding-block: clamp(2.5rem, 7vw, 6rem) clamp(3rem, 6vw, 5rem);
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(2.25rem, 1.45rem + 3.1vw, 3.55rem);
+  font-weight: 720;
+  line-height: 1.06;
+  letter-spacing: -0.028em;
+  text-wrap: balance;
+}
+
+.hero-lead {
+  max-width: 34rem;
+  margin: 1.4rem 0 0;
+  color: var(--color-muted);
+  font-size: 1.12rem;
+  line-height: 1.6;
+}
+
+.hero-actions {
+  margin-top: 2rem;
+}
+
+.hero-actions .button {
+  padding: 0.6rem 1.1rem;
+  font-size: 15px;
+}
+
+/* The conspect, as its Markdown source in the editor's monospace. */
+.specimen {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-sidebar);
+  box-shadow: 0 18px 50px -24px var(--color-shadow);
+}
+
+.specimen-file {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.specimen-source {
+  margin: 0;
+  padding: 1.1rem 0;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.75;
+  tab-size: 2;
+}
+
+/* Long lines wrap, as in the app's editor; the header and code keep their own lines. */
+.md-line {
+  display: block;
+  min-height: 1.75em;
+  padding-inline: 1.25rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.md-code-line {
+  background: var(--color-field);
+}
+
+.md-fence,
+.md-key,
+.md-code {
+  color: var(--color-faint);
+}
+
+.md-heading {
+  font-weight: 700;
+}
+
+.md-tag {
+  color: var(--color-accent);
+}
+
+/* The caret at the end of the conspect: the page's one moving thing. */
+.caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.15em;
+  margin-left: 2px;
+  vertical-align: -0.2em;
+  background: var(--color-fg);
+  animation: caret-blink 1.1s steps(1) infinite;
+}
+
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caret {
+    animation: none;
+  }
+}
+
+.features,
+.downloads {
+  padding-block: clamp(2.5rem, 5vw, 4rem);
+}
+
+.features h2,
+.downloads h2,
+.message-page h1 {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 680;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+}
+
+.feature-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2rem clamp(2rem, 5vw, 4.5rem);
+  margin: 2rem 0 0;
+}
+
+.feature dt {
+  font-weight: 620;
+}
+
+.feature dd {
+  max-width: 32rem;
+  margin: 0.35rem 0 0;
+  color: var(--color-muted);
+  font-size: 15.5px;
+  line-height: 1.6;
+}
+
+.section-lead {
+  margin: 0.6rem 0 0;
+  color: var(--color-muted);
+}
+
+.platform-list {
+  margin: 1.75rem 0 0;
+  padding: 0;
+  border-top: 1px solid var(--color-border);
+  list-style: none;
+}
+
+.platform {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding-block: 0.85rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.platform-name {
+  font-weight: 620;
+}
+
+.platform-note {
+  color: var(--color-muted);
+  font-size: 15px;
+}
+
+.message-page {
+  padding-block: clamp(3rem, 8vw, 6rem);
+}
+
+.message-page p {
+  color: var(--color-muted);
+}
+
+/* --- Sign-in pages ------------------------------------------------------- */
+
+.auth {
+  max-width: calc(27rem + 2 * var(--site-gutter));
+  padding-block: clamp(2.5rem, 7vw, 5rem) 1rem;
+}
+
+.auth h1 {
+  margin: 0;
+  font-size: 1.9rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.auth-lead {
+  margin: 0.7rem 0 0;
+  color: var(--color-muted);
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.auth-email {
+  color: var(--color-fg);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.form {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.75rem;
+}
+
+.form .inline-error {
+  margin: 0;
+}
+
+.form .actions {
+  margin-top: 0.25rem;
+}
+
+.form .actions .button {
+  padding: 0.55rem 1rem;
+  font-size: 15px;
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.field label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* As the app's fields: no border, focus shown by the background. */
+.field input {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 0;
+  border-radius: 8px;
+  background: var(--color-field);
+  color: var(--color-fg);
+  font: inherit;
+  font-size: 16px;
+}
+
+.field input:focus {
+  background: var(--color-field-focus);
+}
+
+.field-hint {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.field .code-input {
+  max-width: 11rem;
+  font-family: var(--font-mono);
+  font-size: 1.35rem;
+  letter-spacing: 0.3em;
+}
+
+.form-notice {
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+  background: var(--color-field);
+  font-size: 15px;
+}
+
+.auth-links {
+  margin: 1rem 0 0;
+  color: var(--color-muted);
+  font-size: 14.5px;
+}
+
+.auth .form + .auth-links {
+  margin-top: 1.5rem;
+}
+
+/* --- Small screens ------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .site-account-email {
+    display: none;
+  }
+
+  .feature-list {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+  }
+
+  .platform {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.15rem 1rem;
+  }
+
+  .platform-note {
+    grid-row: 2;
+    grid-column: 1;
+    font-size: 14px;
+  }
+
+  .platform .button {
+    grid-row: 1 / span 2;
+    grid-column: 2;
+  }
+
+  .specimen-source {
+    font-size: 12.5px;
+  }
+}

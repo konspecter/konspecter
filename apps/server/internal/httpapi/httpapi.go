@@ -1,6 +1,7 @@
-// Package httpapi is the HTTP/JSON API. It authenticates requests with bearer
-// tokens, scopes every note operation to the authenticated user and streams
-// change events (Server-Sent Events) to the user's clients.
+// Package httpapi is the HTTP/JSON API. It authenticates the apps with bearer
+// tokens and the account site with session cookies, scopes every note
+// operation to the authenticated user and streams change events
+// (Server-Sent Events) to the user's clients.
 package httpapi
 
 import (
@@ -10,6 +11,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"strconv"
 	"time"
 
@@ -46,7 +48,9 @@ type api struct {
 	notes     NoteRepository
 	auth      Authenticator
 	logger    *slog.Logger
-	limiter   *failureLimiter
+	limiter   *windowLimiter
+	trusted   []netip.Prefix
+	accounts  *accountAPI
 	hub       *hub
 	heartbeat time.Duration
 }
@@ -56,6 +60,11 @@ type Options struct {
 	// AllowedOrigins may call the API from a browser (CORS), e.g.
 	// "https://notes.example.com". Empty means same-origin only.
 	AllowedOrigins []string
+	// TrustedProxies may report the client's address in X-Forwarded-For
+	// (the reverse proxy, the site's server).
+	TrustedProxies []netip.Prefix
+	// Accounts turns on sign-in for the account site; nil leaves it off.
+	Accounts *Accounts
 	// heartbeat overrides defaultHeartbeat (tests).
 	heartbeat time.Duration
 }
@@ -75,19 +84,24 @@ func (h *Handler) CloseStreams() { h.hub.close() }
 func NewHandler(repository NoteRepository, authenticator Authenticator, logger *slog.Logger, options Options) *Handler {
 	a := &api{
 		notes: repository, auth: authenticator, logger: logger,
-		limiter:   newFailureLimiter(authFailuresPerMinute, time.Minute, time.Now),
+		limiter:   newWindowLimiter(authFailuresPerMinute, time.Minute, time.Now),
+		trusted:   options.TrustedProxies,
 		hub:       newHub(),
 		heartbeat: defaultHeartbeat,
 	}
 	if options.heartbeat > 0 {
 		a.heartbeat = options.heartbeat
 	}
+	if options.Accounts != nil {
+		a.accounts = newAccountAPI(*options.Accounts, time.Now)
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
-	mux.Handle("GET /api/me", a.authenticated(a.me))
+	mux.Handle("GET /api/me", a.withTokenOrSession(a.me))
+	a.registerAccountRoutes(mux)
 	mux.Handle("GET /api/notes", a.authenticated(a.listNotes))
 	mux.Handle("POST /api/notes", a.authenticated(a.createNote))
 	mux.Handle("GET /api/notes/{id}", a.authenticated(a.getNote))
@@ -191,7 +205,7 @@ type userHandler func(w http.ResponseWriter, r *http.Request, user auth.User)
 
 func (a *api) authenticated(next userHandler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		client := clientAddress(r)
+		client := clientAddress(r, a.trusted)
 		if retry, blocked := a.limiter.blocked(client); blocked {
 			w.Header().Set("Retry-After", strconv.Itoa(int(retry.Seconds())+1))
 			writeError(w, http.StatusTooManyRequests, "rate_limited", "too many failed sign-in attempts; try again later")
@@ -207,7 +221,7 @@ func (a *api) authenticated(next userHandler) http.Handler {
 			}
 		}
 		if errors.Is(err, auth.ErrUnauthorized) {
-			a.limiter.fail(client)
+			a.limiter.record(client)
 			w.Header().Set("WWW-Authenticate", `Bearer realm="konspecter"`)
 			writeError(w, http.StatusUnauthorized, "unauthorized", "a valid bearer token is required")
 			return

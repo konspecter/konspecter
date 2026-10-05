@@ -9,7 +9,7 @@ import {
 import { Link } from "react-router";
 import type { NoteSummary } from "../../application/notes/note-catalog";
 import { tagTreeContains, type Tag, type TagNode } from "../../domain/tag/tags";
-import { ChevronIcon, DocumentIcon, FolderIcon, FolderOpenIcon } from "./icons";
+import { ChevronIcon, DocumentIcon, FolderIcon, FolderOpenIcon } from "@konspecter/ui/icons";
 import { summaryTitle } from "./note-title";
 import { t, tn } from "../i18n/i18n";
 

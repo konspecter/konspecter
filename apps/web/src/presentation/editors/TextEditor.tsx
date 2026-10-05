@@ -13,7 +13,7 @@ import {
   type FocusEvent,
   type ReactNode,
 } from "react";
-import { ChevronIcon } from "../components/icons";
+import { ChevronIcon } from "@konspecter/ui/icons";
 import { InIsland } from "../components/island-slot";
 import { NO_FIND, revealMatch, type NoteFind } from "../components/note-find";
 import {

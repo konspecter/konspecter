@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef } from "react";
 import { formatKeys, shortcutGroups } from "../app/shortcuts";
 import { t } from "../i18n/i18n";
-import { CloseIcon } from "./icons";
+import { CloseIcon } from "@konspecter/ui/icons";
 
 /** The shortcut registry as a definition list, one row per action (the dialog and Settings). */
 export function ShortcutList() {

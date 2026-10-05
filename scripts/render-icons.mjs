@@ -10,6 +10,7 @@
 //   apps/desktop/src-tauri/icons/   macOS: squircle with margin and shadow (PNGs, .icns);
 //                                   Windows: rounded square (.ico)
 //   apps/web/public/                favicon.svg, PWA icons (any + maskable), Apple touch icon
+//   apps/site/public/               favicon.svg (also the header logo), Apple touch icon
 //   apps/mobile/android/.../res/    adaptive icon (foreground; the gradient background is
 //                                   drawable/ic_launcher_background.xml), themed-icon
 //                                   monochrome layer, legacy square and round icons, splashes
@@ -224,6 +225,11 @@ try {
   await png(VARIANTS.macos, join(web, "icon-512.png"), 512);
   await png(VARIANTS.maskable, join(web, "icon-maskable-512.png"), 512);
   await png(VARIANTS.ios, join(web, "apple-touch-icon.png"), 180);
+
+  // The account site: the same favicon and touch icon.
+  const site = join(root, "apps/site/public");
+  copyFileSync(join(web, "favicon.svg"), join(site, "favicon.svg"));
+  copyFileSync(join(web, "apple-touch-icon.png"), join(site, "apple-touch-icon.png"));
 
   // Android.
   const res = join(root, "apps/mobile/android/app/src/main/res");

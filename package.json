@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "pnpm --filter @konspecter/web dev",
+    "dev:site": "pnpm --filter @konspecter/site dev",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",

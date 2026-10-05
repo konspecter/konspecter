@@ -500,12 +500,12 @@ func TestRepeatedAuthFailuresAreRateLimited(t *testing.T) {
 
 func TestFailureLimiterWindow(t *testing.T) {
 	now := time.Date(2026, 9, 28, 10, 0, 0, 0, time.UTC)
-	limiter := newFailureLimiter(2, time.Minute, func() time.Time { return now })
-	limiter.fail("a")
+	limiter := newWindowLimiter(2, time.Minute, func() time.Time { return now })
+	limiter.record("a")
 	if _, blocked := limiter.blocked("a"); blocked {
 		t.Error("blocked after one failure")
 	}
-	limiter.fail("a")
+	limiter.record("a")
 	if retry, blocked := limiter.blocked("a"); !blocked || retry != time.Minute {
 		t.Errorf("blocked = %v, retry = %v", blocked, retry)
 	}

@@ -1,5 +1,6 @@
-// Package auth identifies users by API tokens. Tokens are random secrets
-// shown once; only their SHA-256 hashes are stored.
+// Package auth identifies users: apps by API tokens, browsers on the site by
+// sessions. Both are random secrets shown once; only their SHA-256 hashes
+// are stored.
 package auth
 
 import (
@@ -10,6 +11,7 @@ import (
 	"fmt"
 	"net/mail"
 	"strings"
+	"time"
 )
 
 // User is an account that owns notes.
@@ -18,8 +20,22 @@ type User struct {
 	Email string
 }
 
-// ErrUnauthorized means the token is missing, malformed or unknown.
+// ErrUnauthorized means the token or session is missing, malformed, unknown or expired.
 var ErrUnauthorized = errors.New("unauthorized")
+
+// ErrUserNotFound means there is no user with that email address.
+var ErrUserNotFound = errors.New("user not found")
+
+// Session is a browser signed in to the site. Its id lives in a cookie; its
+// expiry moves forward while it is used.
+type Session struct {
+	User       User
+	LastSeenAt time.Time
+	ExpiresAt  time.Time
+}
+
+// SessionPrefix starts every session id.
+const SessionPrefix = "kss_"
 
 const tokenPrefix = "ksp_"
 

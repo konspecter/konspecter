@@ -1,0 +1,66 @@
+# Konspecter on one host: PostgreSQL, the Go API, the account site and Caddy
+# in front of both, on one origin (/api/* to the API, everything else to the
+# site). Settings come from deploy/.env (see .env.example):
+#   cp .env.example .env && docker compose up -d --build
+name: konspecter
+
+services:
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: konspecter
+      POSTGRES_DB: konspecter
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U konspecter -d konspecter"]
+      interval: 5s
+      retries: 10
+
+  server:
+    build: ../apps/server
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      KONSPECTER_DATABASE_URL: postgres://konspecter:${POSTGRES_PASSWORD}@db:5432/konspecter?sslmode=disable
+      KONSPECTER_ADDR: ":8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  site:
+    build:
+      context: ..
+      dockerfile: apps/site/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      KONSPECTER_API_URL: http://server:8080
+      PORT: "3000"
+    depends_on:
+      - server
+
+  proxy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      KONSPECTER_SITE_ADDRESS: ${KONSPECTER_SITE_ADDRESS:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      - server
+      - site
+
+volumes:
+  db:
+  caddy-data:

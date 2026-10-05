@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import type { SyncEngine, SyncStatus } from "../../infrastructure/sync/sync-engine";
 import type { Activity } from "../app/activity";
-import { AntennaIcon, AntennaOffIcon } from "./icons";
+import { AntennaIcon, AntennaOffIcon } from "@konspecter/ui/icons";
 import { t } from "../i18n/i18n";
 
 const noSync = () => () => undefined;

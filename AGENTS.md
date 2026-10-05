@@ -109,13 +109,18 @@ apps/web/                 React + Vite web app (the shared UI for all clients)
                           browser files, ZIP, downloads (files/)
   src/presentation/       UI: app/ (routes, styles), components/, editors/, hooks/, i18n/ (en, ru),
                           markdown/, pages/
+apps/site/                Account site: React Router (framework mode) with server rendering in
+                          Node; landing page now, accounts next (sync-app-site plan); calls the Go API
 apps/mobile/              Capacitor 8 Android app around apps/web (android/: generated Gradle project)
 apps/desktop/             Tauri 2 desktop shell around apps/web
   src-tauri/src/          Rust: lib.rs (commands), folder.rs (File Mode file access)
 apps/server/              Go HTTP server (module konspecter/server)
   cmd/server/             entry point (serve, migrate, create-user, create-token, revoke-tokens)
-  internal/               notes, auth, httpapi, storage/postgres
+  internal/               config (env + .env), notes, auth, httpapi, storage/postgres
   migrations/             embedded SQL migrations
+packages/ui/              shared look of the app and the site: tokens, fonts, base, controls, icons
+packages/i18n/            shared message engine: translators, plurals, locale detection, rich text
+deploy/                   docker compose: PostgreSQL, the API, the site and Caddy on one origin
 docs/architecture/        architecture overview, UI (ui.md) and ADRs
 docs/testing.md           test strategy and map
 docs/performance.md       measurements and optimizations
@@ -129,7 +134,7 @@ scripts/render-icons.mjs  the app icon (owl) for every platform: `pnpm icons`
 .gitlab-ci.yml            GitLab CI/CD: the same checks and release builds
 ```
 
-Every application (web, mobile, desktop, server) lives in `apps/`. Libraries shared between
+Every application (web, site, mobile, desktop, server) lives in `apps/`. Libraries shared between
 applications go in `packages/`, introduced only when there is real shared code to put there.
 
 ## Commands
@@ -139,6 +144,7 @@ Run from the repository root (Node ≥ 22.22, pnpm 10, Go 1.27):
 ```sh
 pnpm install
 pnpm dev              # web app dev server
+pnpm dev:site         # account site dev server (proxies /api to KONSPECTER_API_URL)
 pnpm test             # Vitest
 pnpm lint             # ESLint
 pnpm typecheck        # tsc -b

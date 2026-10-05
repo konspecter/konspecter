@@ -15,7 +15,7 @@ import { useSwipe } from "../hooks/use-swipe";
 import { Antenna } from "./Antenna";
 import { DetailsSlot } from "./details-slot";
 import { IslandSlot } from "./island-slot";
-import { GearIcon, ListIcon, NewNoteIcon, SearchIcon, SidebarIcon } from "./icons";
+import { GearIcon, ListIcon, NewNoteIcon, SearchIcon, SidebarIcon } from "@konspecter/ui/icons";
 import { NO_FIND, NoteFindContext, type NoteFind, type NoteFindChannel } from "./note-find";
 import { SearchBox } from "./SearchBox";
 import { ShortcutsDialog } from "./ShortcutsDialog";

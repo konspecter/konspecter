@@ -1,8 +1,11 @@
 pnpm-lock.yaml
 dist/
 coverage/
+apps/site/build/
+apps/site/.react-router/
 apps/server/
 .claude/plans/
+.claude/skills/
 apps/desktop/src-tauri/target/
 apps/desktop/src-tauri/gen/
 apps/desktop/src-tauri/icons/

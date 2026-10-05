@@ -19,7 +19,7 @@ import {
 import type { NoteRepository } from "../../application/notes/note-repository";
 import type { TagNames } from "../../domain/settings/settings";
 import { formatKeys, SHORTCUTS } from "../app/shortcuts";
-import { ChevronIcon, GearIcon, NewNoteIcon, SidebarIcon } from "./icons";
+import { ChevronIcon, GearIcon, NewNoteIcon, SidebarIcon } from "@konspecter/ui/icons";
 import { summaryTitle } from "./note-title";
 import { TagTreeView } from "./TagTreeView";
 import { t } from "../i18n/i18n";

@@ -3,7 +3,7 @@ import { useLocation, useMatch, useNavigate, useSearchParams } from "react-route
 import { joinQuery, queryParts, takeTags, type QueryParts } from "../../domain/search/query";
 import type { Tag } from "../../domain/tag/tags";
 import { formatKeys, SHORTCUTS } from "../app/shortcuts";
-import { ChevronIcon, CloseIcon, SearchIcon } from "./icons";
+import { ChevronIcon, CloseIcon, SearchIcon } from "@konspecter/ui/icons";
 import { t } from "../i18n/i18n";
 
 type Shown = QueryParts & {

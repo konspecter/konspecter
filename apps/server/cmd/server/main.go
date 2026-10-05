@@ -7,11 +7,15 @@
 //	server revoke-tokens -email ADDR revoke every API token of a user
 //	server version                 print the version
 //
-// Configuration comes from the environment:
+// Configuration comes from the environment and from an optional .env file
+// (KONSPECTER_ENV_FILE, default ./.env); the environment wins. See
+// .env.example and package config:
 //
 //	KONSPECTER_DATABASE_URL  PostgreSQL connection URL (required)
 //	KONSPECTER_ADDR          listen address (default ":8080")
 //	KONSPECTER_ALLOWED_ORIGINS  comma-separated browser origins allowed to call the API
+//	KONSPECTER_PUBLIC_URL    the account site's origin; turns sign-in on
+//	KONSPECTER_MAIL_TRANSPORT, KONSPECTER_SMTP_*  how emails are sent
 package main
 
 import (
@@ -25,21 +29,19 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
+	"konspecter/server/internal/config"
 	"konspecter/server/internal/httpapi"
+	"konspecter/server/internal/mail"
 	"konspecter/server/internal/storage/postgres"
 )
 
 // version is set at build time: -ldflags "-X main.version=0.1.0".
 var version = "dev"
 
-const (
-	defaultAddr     = ":8080"
-	shutdownTimeout = 10 * time.Second
-)
+const shutdownTimeout = 10 * time.Second
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -61,33 +63,36 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout 
 		return err
 	}
 
-	databaseURL := getenv("KONSPECTER_DATABASE_URL")
-	if databaseURL == "" {
+	cfg, err := config.Load(getenv)
+	if err != nil {
+		return err
+	}
+	if cfg.DatabaseURL == "" {
 		return errors.New("KONSPECTER_DATABASE_URL is not set")
 	}
 
 	switch command {
 	case "serve":
-		return withDB(ctx, databaseURL, func(db *postgres.DB) error {
+		return withDB(ctx, cfg.DatabaseURL, func(db *postgres.DB) error {
 			if err := db.Migrate(ctx); err != nil {
 				return err
 			}
-			addr := getenv("KONSPECTER_ADDR")
-			if addr == "" {
-				addr = defaultAddr
+			options := httpapi.Options{
+				AllowedOrigins: cfg.AllowedOrigins,
+				TrustedProxies: cfg.TrustedProxies,
+				Accounts:       accountOptions(cfg, db, slog.Default()),
 			}
-			options := httpapi.Options{AllowedOrigins: splitList(getenv("KONSPECTER_ALLOWED_ORIGINS"))}
 			handler := httpapi.NewHandler(db, db, slog.Default(), options)
-			return serve(ctx, addr, handler, handler.CloseStreams)
+			return serve(ctx, cfg.Addr, handler, handler.CloseStreams)
 		})
 	case "migrate":
-		return withDB(ctx, databaseURL, func(db *postgres.DB) error { return db.Migrate(ctx) })
+		return withDB(ctx, cfg.DatabaseURL, func(db *postgres.DB) error { return db.Migrate(ctx) })
 	case "create-user", "create-token":
 		email, err := parseEmail(command, args)
 		if err != nil {
 			return err
 		}
-		return withDB(ctx, databaseURL, func(db *postgres.DB) error {
+		return withDB(ctx, cfg.DatabaseURL, func(db *postgres.DB) error {
 			return issueToken(ctx, db, command == "create-user", email, stdout)
 		})
 	case "revoke-tokens":
@@ -95,7 +100,7 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout 
 		if err != nil {
 			return err
 		}
-		return withDB(ctx, databaseURL, func(db *postgres.DB) error {
+		return withDB(ctx, cfg.DatabaseURL, func(db *postgres.DB) error {
 			user, err := db.UserByEmail(ctx, email)
 			if err != nil {
 				return err
@@ -112,14 +117,40 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout 
 	}
 }
 
-func splitList(value string) []string {
-	var items []string
-	for _, item := range strings.Split(value, ",") {
-		if item = strings.TrimSpace(item); item != "" {
-			items = append(items, item)
-		}
+// accountOptions turns on sign-in on the site when the public URL is set.
+func accountOptions(cfg config.Config, db *postgres.DB, logger *slog.Logger) *httpapi.Accounts {
+	if cfg.PublicURL == "" {
+		logger.Info("sign-in on the site is off: KONSPECTER_PUBLIC_URL is not set")
+		return nil
 	}
-	return items
+	accounts := &httpapi.Accounts{
+		Store:            db,
+		PublicURL:        cfg.PublicURL,
+		RegistrationOpen: cfg.RegistrationOpen,
+		SessionTTL:       cfg.SessionTTL,
+		EmailCodeTTL:     cfg.EmailCodeTTL,
+		PasswordResetTTL: cfg.PasswordResetTTL,
+		Rates: httpapi.Rates{
+			LoginFailuresPerIP:    cfg.Rates.LoginFailuresPerIP,
+			LoginFailuresPerEmail: cfg.Rates.LoginFailuresPerEmail,
+			EmailsPerAddress:      cfg.Rates.EmailsPerAddress,
+			EmailsPerIP:           cfg.Rates.EmailsPerIP,
+		},
+	}
+	switch {
+	case cfg.Mail.Transport == "log":
+		logger.Warn("emails are written to the log, not sent (KONSPECTER_MAIL_TRANSPORT=log): use this for development only")
+		accounts.Mailer = &mail.Log{Logger: logger}
+	case cfg.Mail.Host != "":
+		security, _ := mail.ParseSecurity(cfg.Mail.Security) // validated by config
+		accounts.Mailer = &mail.SMTP{
+			Host: cfg.Mail.Host, Port: cfg.Mail.Port, Username: cfg.Mail.Username, Password: cfg.Mail.Password,
+			From: cfg.Mail.From, Security: security,
+		}
+	default:
+		logger.Warn("no email is sent (KONSPECTER_SMTP_HOST is not set): sign-in codes and password resets are off")
+	}
+	return accounts
 }
 
 func withDB(ctx context.Context, url string, use func(*postgres.DB) error) error {

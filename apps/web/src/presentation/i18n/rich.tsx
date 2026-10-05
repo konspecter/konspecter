@@ -1,4 +1,5 @@
-import { Fragment, type ReactNode } from "react";
+import type { ReactNode } from "react";
+import { richText } from "@konspecter/i18n/rich";
 import { t, type Params, type TextKey } from "./i18n";
 
 /**
@@ -11,10 +12,5 @@ export function rich(
   parts: Readonly<Record<string, ReactNode>>,
   params?: Params,
 ): ReactNode {
-  const message = t(key, params);
-  return message.split(/(\{\w+\})/).map((piece, index) => {
-    const name = /^\{(\w+)\}$/.exec(piece)?.[1];
-    const part = name === undefined ? undefined : parts[name];
-    return <Fragment key={index}>{part ?? piece}</Fragment>;
-  });
+  return richText(t(key, params), parts);
 }

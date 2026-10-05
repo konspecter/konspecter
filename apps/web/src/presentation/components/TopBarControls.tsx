@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { EditorMode, Theme } from "../../domain/settings/settings";
-import { MarkdownIcon, MoonIcon, SunIcon, TextIcon } from "./icons";
+import { MarkdownIcon, MoonIcon, SunIcon, TextIcon } from "@konspecter/ui/icons";
 import { t } from "../i18n/i18n";
 import { formatKeys, SHORTCUTS } from "../app/shortcuts";
 

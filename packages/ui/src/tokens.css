@@ -1,0 +1,73 @@
+/*
+ * Konspecter's shared palette and type, used by the app and the account site.
+ * Soft colours only: no pure white, black, red, green or blue anywhere.
+ * Light is the default; dark follows the system unless a theme is chosen
+ * (`data-theme="light"` or `"dark"` on <html>).
+ * Dark is a dark grey with a slight yellow shade, never near black or brown.
+ */
+:root {
+  color-scheme: light dark;
+
+  --color-bg: #fbfbfa;
+  --color-sidebar: #f3f3f1;
+  --color-fg: #1f2023;
+  --color-muted: #5d6167;
+  /* Quieter than muted, still readable (AA) on the sidebar: secondary details. */
+  --color-faint: #666a70;
+  --color-border: #e3e3df;
+  --color-hover: #ebebe8;
+  --color-active: #e3e3df;
+  --color-field: #efefec;
+  --color-field-focus: #e7e7e3;
+  --color-accent: #2d6aa6;
+  --color-danger: #a8322a;
+  --color-shadow: rgb(31 32 35 / 14%);
+
+  --font-ui:
+    "Inter Variable", system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  --font-text: var(--font-ui);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* The app sets it from the "Text size" setting; scales reading and editing text. */
+  --font-scale: 1;
+  --gutter: 16px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-bg: #31302d;
+    --color-sidebar: #292826;
+    --color-fg: #f0eee8;
+    --color-muted: #bfbdb5;
+    --color-faint: #acaaa1;
+    --color-border: #4e4d49;
+    --color-hover: #3b3a37;
+    --color-active: #43423e;
+    --color-field: #3b3a37;
+    --color-field-focus: #43423e;
+    --color-accent: #a6c8e8;
+    --color-danger: #f5c3ba;
+    --color-shadow: rgb(12 12 10 / 45%);
+  }
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #31302d;
+  --color-sidebar: #292826;
+  --color-fg: #f0eee8;
+  --color-muted: #bfbdb5;
+  --color-faint: #acaaa1;
+  --color-border: #4e4d49;
+  --color-hover: #3b3a37;
+  --color-active: #43423e;
+  --color-field: #3b3a37;
+  --color-field-focus: #43423e;
+  --color-accent: #a6c8e8;
+  --color-danger: #f5c3ba;
+  --color-shadow: rgb(12 12 10 / 45%);
+}

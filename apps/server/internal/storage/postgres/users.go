@@ -14,7 +14,7 @@ import (
 var ErrUserExists = errors.New("user already exists")
 
 // ErrUserNotFound means there is no user with that email address.
-var ErrUserNotFound = errors.New("user not found")
+var ErrUserNotFound = auth.ErrUserNotFound
 
 // CreateUser registers a user by (normalized) email address.
 func (db *DB) CreateUser(ctx context.Context, email string) (auth.User, error) {
