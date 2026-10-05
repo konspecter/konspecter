@@ -1,3 +1,4 @@
+import { createKey, keyToJson } from "@konspecter/crypto";
 import { createNote, updateNote } from "../../domain/note/note";
 import { openNoteStore } from "../storage/note-store";
 import { SyncEngine } from "./sync-engine";
@@ -7,21 +8,42 @@ import { mustGet } from "../storage/test-utils";
  * Two devices syncing through a real Konspecter server. Runs only when
  * KONSPECTER_E2E_URL and KONSPECTER_E2E_TOKEN are set (see
  * docs/architecture/sync.md); the fake server covers the same rules otherwise.
+ * When the account has no encryption yet, the test sets it up with
+ * KONSPECTER_E2E_PASSPHRASE (default below); otherwise that must be its
+ * passphrase.
  */
 // Read without Node types: the app's TypeScript config targets the browser.
 const env = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env;
 const url = env?.KONSPECTER_E2E_URL;
 const token = env?.KONSPECTER_E2E_TOKEN;
+const passphrase = env?.KONSPECTER_E2E_PASSPHRASE ?? "konspecter e2e passphrase";
+
+/** Sets up encryption for the account, unless it has a key already. */
+async function ensureKey(serverUrl: string, accessToken: string): Promise<void> {
+  const headers = { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" };
+  const existing = await fetch(`${serverUrl}/api/keys`, { headers });
+  if (existing.ok) return;
+  const { record } = await createKey(passphrase);
+  const created = await fetch(`${serverUrl}/api/keys`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify(keyToJson(record)),
+  });
+  if (!created.ok) throw new Error(`Setting up encryption failed: ${String(created.status)}`);
+}
 
 describe.skipIf(!url || !token)("sync against a real server", () => {
   const config = { serverUrl: url ?? "", token: token ?? "" };
   const noop = { set: () => null, clear: () => undefined };
   const run = Date.now().toString(36);
 
+  beforeAll(() => ensureKey(config.serverUrl, config.token), 30_000);
+
   async function device(name: string) {
     const store = await openNoteStore(`e2e-${run}-${name}`);
     const engine = new SyncEngine(store, { scheduler: noop, isOnline: () => true });
     await engine.connect(config);
+    await engine.unlock(passphrase);
     return { store, engine };
   }
 

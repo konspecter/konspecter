@@ -4,13 +4,15 @@ import { requireUser, signInPath } from "../account.server";
 import { callApi, withCookies, type ApiResult } from "../api.server";
 import { Field, FormMessage, formError, Submit, textField, type FormError } from "../auth-form";
 import { parseDevices, timeAgo, type Device } from "../devices";
+import { Encryption } from "../encryption";
 import { useLocale, useT } from "../i18n/i18n";
 import type { Route } from "./+types/settings";
 
 /**
  * The account's settings: its name, the connected devices (each can be
- * disconnected: it stops syncing and keeps its conspects), and deleting
- * the account. Plain forms, so the page works without JavaScript.
+ * disconnected: it stops syncing and keeps its conspects), encryption, and
+ * deleting the account. Plain forms, so the page works without JavaScript,
+ * except the encryption, which runs in the browser (encryption.tsx).
  */
 
 interface AccountData {
@@ -169,6 +171,12 @@ export default function Settings() {
             ))}
           </ul>
         )}
+      </section>
+
+      <section className="settings-section" id="encryption" aria-labelledby="encryption-heading">
+        <h2 id="encryption-heading">{t("encryption.title")}</h2>
+        <p className="settings-text">{t("encryption.lead")}</p>
+        <Encryption />
       </section>
 
       <section className="settings-section" id="delete" aria-labelledby="delete-heading">

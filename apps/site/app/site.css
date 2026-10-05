@@ -621,6 +621,11 @@ main {
   border-top: 1px solid var(--color-border);
 }
 
+/* The next section's rule closes the list. */
+.device:last-child {
+  border-bottom: 0;
+}
+
 .device-about {
   min-width: 0;
 }
@@ -639,6 +644,61 @@ main {
 
 .device form {
   flex-shrink: 0;
+}
+
+/* Encryption: the recovery key is shown once, in the mono face, to copy. */
+.encryption > .form-notice {
+  margin-top: 1rem;
+}
+
+.recovery-key {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin-top: 1rem;
+  padding: 0.9rem 1.1rem;
+  border-radius: 12px;
+  background: var(--color-field);
+}
+
+.recovery-key-value {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: clamp(1rem, 4vw, 1.2rem);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  overflow-wrap: anywhere;
+}
+
+.field .recovery-input {
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+}
+
+.encryption-action {
+  margin-top: 1rem;
+}
+
+.encryption-action summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.encryption-action > .settings-text {
+  margin-top: 0.6rem;
+}
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.check input {
+  margin-top: 0.2rem;
 }
 
 /* --- Connecting a device ------------------------------------------------ */

@@ -145,8 +145,8 @@ func TestEventStreamAnnouncesChangesOfTheUserOnly(t *testing.T) {
 	bob.nextEvent(t)
 
 	changes := []struct{ method, path, body string }{
-		{"POST", "/api/notes", `{"id":"n1","markdown":"v1"}`},
-		{"PUT", "/api/notes/n1", `{"markdown":"v2","base_revision":1}`},
+		{"POST", "/api/notes", noteBody("n1", "v1")},
+		{"PUT", "/api/notes/n1", updateBody("v2", 1)},
 		{"DELETE", "/api/notes/n1?base_revision=2", ""},
 	}
 	for _, c := range changes {
@@ -158,7 +158,7 @@ func TestEventStreamAnnouncesChangesOfTheUserOnly(t *testing.T) {
 		}
 	}
 	// Failed changes announce nothing; Bob hears only heartbeats.
-	if r := call(t, server, "PUT", "/api/notes/n1", adaToken, `{"markdown":"stale","base_revision":1}`); r.status != http.StatusConflict {
+	if r := call(t, server, "PUT", "/api/notes/n1", adaToken, updateBody("stale", 1)); r.status != http.StatusConflict {
 		t.Fatalf("stale update = %d", r.status)
 	}
 	for range 3 {

@@ -16,17 +16,23 @@ import (
 	"time"
 
 	"konspecter/server/internal/auth"
+	"konspecter/server/internal/keys"
 	"konspecter/server/internal/notes"
 )
 
-// NoteRepository is the note storage the API needs.
+// NoteRepository is the storage the API needs for notes and the content key
+// they are encrypted with.
 type NoteRepository interface {
 	ListNotes(ctx context.Context, userID string) ([]notes.Note, error)
 	GetNote(ctx context.Context, userID, id string) (notes.Note, error)
-	CreateNote(ctx context.Context, userID, id, markdown string) (notes.Note, error)
-	UpdateNote(ctx context.Context, userID, id, markdown string, baseRevision int64) (notes.Note, error)
+	CreateNote(ctx context.Context, userID, id, content, keyID string) (notes.Note, error)
+	UpdateNote(ctx context.Context, userID, id, content, keyID string, baseRevision int64) (notes.Note, error)
 	DeleteNote(ctx context.Context, userID, id string, baseRevision int64) (notes.Note, error)
 	Changes(ctx context.Context, userID string, cursor int64, limit int) ([]notes.Note, int64, error)
+	Key(ctx context.Context, userID string) (keys.Key, error)
+	CurrentKeyID(ctx context.Context, userID string) (string, error)
+	PutKey(ctx context.Context, userID string, key keys.Key, base *time.Time) (keys.Key, error)
+	DeleteKey(ctx context.Context, userID string) error
 }
 
 // Authenticator resolves bearer tokens to the devices (apps) they were
@@ -37,8 +43,9 @@ type Authenticator interface {
 	RecordSync(ctx context.Context, deviceID string) error
 }
 
-// maxBodyBytes leaves room for JSON escaping around the largest document.
-const maxBodyBytes = notes.MaxMarkdownBytes*2 + 1024
+// maxBodyBytes leaves room for the JSON around the largest envelope
+// (base64url needs no escaping).
+const maxBodyBytes = notes.MaxContentBytes + 4096
 
 // Sync pages hold at most this many notes.
 const (
@@ -111,6 +118,7 @@ func NewHandler(repository NoteRepository, authenticator Authenticator, logger *
 	mux.Handle("DELETE /api/notes/{id}", a.authenticated(a.deleteNote))
 	mux.Handle("GET /api/sync", a.withDevice(a.changes))
 	mux.Handle("GET /api/events", a.withDevice(a.events))
+	a.registerKeyRoutes(mux)
 	mux.Handle("DELETE /api/tokens/current", a.authenticated(a.revokeCurrentToken))
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, _ *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "no such endpoint")
@@ -190,6 +198,13 @@ func (a *api) changes(w http.ResponseWriter, r *http.Request, device auth.Device
 	if err := a.auth.RecordSync(r.Context(), device.ID); err != nil {
 		a.logger.WarnContext(r.Context(), "recording a sync failed", "error", err)
 	}
+	// The key the notes are encrypted with: a client holding another one
+	// (the key was reset, or set up anew) must unlock the current one.
+	keyID, err := a.notes.CurrentKeyID(r.Context(), user.ID)
+	if err != nil {
+		a.internalError(w, r, err)
+		return
+	}
 	out := make([]noteJSON, 0, len(changed))
 	for _, n := range changed {
 		out = append(out, toJSON(n))
@@ -198,6 +213,7 @@ func (a *api) changes(w http.ResponseWriter, r *http.Request, device auth.Device
 		"notes":  out,
 		"cursor": next,
 		"more":   len(changed) == int(limit),
+		"key_id": nullable(keyID),
 	})
 }
 
@@ -255,10 +271,18 @@ func (a *api) withDevice(next deviceHandler) http.Handler {
 	})
 }
 
+func nullable(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
 // noteJSON is the wire format of a note.
 type noteJSON struct {
-	ID        string     `json:"id"`
-	Markdown  string     `json:"markdown"`
+	ID string `json:"id"`
+	// Content is the encrypted envelope.
+	Content   string     `json:"content"`
 	Revision  int64      `json:"revision"`
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
@@ -267,7 +291,7 @@ type noteJSON struct {
 
 func toJSON(n notes.Note) noteJSON {
 	return noteJSON{
-		ID: n.ID, Markdown: n.Markdown, Revision: n.Revision,
+		ID: n.ID, Content: n.Content, Revision: n.Revision,
 		CreatedAt: n.CreatedAt.UTC(), UpdatedAt: n.UpdatedAt.UTC(), DeletedAt: utc(n.DeletedAt),
 	}
 }
@@ -309,20 +333,21 @@ func (a *api) getNote(w http.ResponseWriter, r *http.Request, user auth.User) {
 
 func (a *api) createNote(w http.ResponseWriter, r *http.Request, user auth.User) {
 	var body struct {
-		ID       string  `json:"id"`
-		Markdown *string `json:"markdown"`
+		ID      string  `json:"id"`
+		Content *string `json:"content"`
 	}
 	if !a.decode(w, r, &body) {
 		return
 	}
-	if body.Markdown == nil {
-		writeError(w, http.StatusBadRequest, "invalid_request", `"markdown" is required`)
+	if body.Content == nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", `"content" is required`)
 		return
 	}
-	if !validNote(w, body.ID, *body.Markdown) {
+	keyID, ok := validNote(w, body.ID, *body.Content)
+	if !ok {
 		return
 	}
-	n, err := a.notes.CreateNote(r.Context(), user.ID, body.ID, *body.Markdown)
+	n, err := a.notes.CreateNote(r.Context(), user.ID, body.ID, *body.Content, keyID)
 	if err != nil {
 		a.noteError(w, r, err)
 		return
@@ -335,20 +360,21 @@ func (a *api) createNote(w http.ResponseWriter, r *http.Request, user auth.User)
 func (a *api) updateNote(w http.ResponseWriter, r *http.Request, user auth.User) {
 	id := r.PathValue("id")
 	var body struct {
-		Markdown     *string `json:"markdown"`
+		Content      *string `json:"content"`
 		BaseRevision *int64  `json:"base_revision"`
 	}
 	if !a.decode(w, r, &body) {
 		return
 	}
-	if body.Markdown == nil || body.BaseRevision == nil {
-		writeError(w, http.StatusBadRequest, "invalid_request", `"markdown" and "base_revision" are required`)
+	if body.Content == nil || body.BaseRevision == nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", `"content" and "base_revision" are required`)
 		return
 	}
-	if !validNote(w, id, *body.Markdown) {
+	keyID, ok := validNote(w, id, *body.Content)
+	if !ok {
 		return
 	}
-	n, err := a.notes.UpdateNote(r.Context(), user.ID, id, *body.Markdown, *body.BaseRevision)
+	n, err := a.notes.UpdateNote(r.Context(), user.ID, id, *body.Content, keyID, *body.BaseRevision)
 	if err != nil {
 		a.noteError(w, r, err)
 		return
@@ -372,16 +398,19 @@ func (a *api) deleteNote(w http.ResponseWriter, r *http.Request, user auth.User)
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func validNote(w http.ResponseWriter, id, markdown string) bool {
+// validNote checks a note's id and envelope and returns the key id the
+// envelope names. The server takes only encrypted notes.
+func validNote(w http.ResponseWriter, id, content string) (string, bool) {
 	if err := notes.ValidateID(id); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_id", err.Error())
-		return false
+		return "", false
 	}
-	if err := notes.ValidateMarkdown(markdown); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_markdown", err.Error())
-		return false
+	keyID, err := notes.ParseEnvelope(content)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_content", err.Error())
+		return "", false
 	}
-	return true
+	return keyID, true
 }
 
 // decode reads a JSON request body strictly: JSON content type, size limit,
@@ -414,6 +443,10 @@ func (a *api) noteError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, notes.ErrNotFound):
 		writeError(w, http.StatusNotFound, "not_found", "note not found")
+	case errors.Is(err, notes.ErrEncryptionRequired):
+		writeError(w, http.StatusConflict, "encryption_required", "set up encryption before syncing notes")
+	case errors.Is(err, notes.ErrKeyMismatch):
+		writeError(w, http.StatusConflict, "key_mismatch", "the note is encrypted with a key that is no longer the account's")
 	case errors.As(err, &conflict):
 		// The client's copy is stale (or the id to create is taken); send the
 		// current version so nothing is overwritten and the client can reconcile.

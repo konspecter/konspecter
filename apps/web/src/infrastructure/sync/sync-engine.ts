@@ -1,3 +1,4 @@
+import { unlock } from "@konspecter/crypto";
 import { planResolution } from "../../domain/sync/conflicts";
 import type { RemoteNote, SyncEntry } from "../../domain/sync/sync-state";
 import {
@@ -6,6 +7,7 @@ import {
   NetworkError,
   RevisionConflictError,
   type Account,
+  type Cipher,
   type DeviceAuthorization,
   type DeviceDescription,
   type ServerConfig,
@@ -18,8 +20,16 @@ import { deviceLogin } from "./device-login";
  * "disconnected": the server stopped accepting this device (disconnected on
  * the site, or the account deleted). Nothing syncs until it signs in again;
  * every note and its sync state stay.
+ *
+ * "locked": connected, but without the account's content key, so no note
+ * can be sent or read: encryption must be set up on the site first, or the
+ * passphrase entered (see SyncStatus.lock).
  */
-export type SyncState = "disabled" | "idle" | "syncing" | "offline" | "error" | "disconnected";
+export type SyncState =
+  "disabled" | "idle" | "syncing" | "offline" | "error" | "disconnected" | "locked";
+
+/** Why sync is locked: no key on the server yet ("setup"), or one to unlock ("unlock"). */
+export type SyncLock = "setup" | "unlock";
 
 export type SyncStatus = {
   readonly state: SyncState;
@@ -33,7 +43,24 @@ export type SyncStatus = {
   readonly blocked: number;
   /** Why the last cycle failed (not set when offline); the interface words it. */
   readonly error: Error | null;
+  /** Set while the state is "locked". */
+  readonly lock: SyncLock | null;
 };
+
+/** There is no key to unlock: encryption is not set up on the server. */
+export class NoKeyError extends Error {
+  override readonly name = "NoKeyError";
+  constructor() {
+    super("Encryption is not set up for this account");
+  }
+}
+
+/** The server's key is not the one this device holds (reset, or set up anew). */
+class KeyChangedError extends Error {
+  constructor(readonly keyId: string | null) {
+    super("The account's key changed");
+  }
+}
 
 type StoredConfig = ServerConfig & { readonly account: Account };
 
@@ -67,6 +94,12 @@ export type SyncEngineOptions = {
 };
 
 const CONFIG_KEY = "syncConfig";
+/**
+ * The content key: `{ keyId, key }`, the key a non-extractable CryptoKey,
+ * or null once it was dropped (its id is kept, to tell whether a key
+ * unlocked later is the same one).
+ */
+const KEY_KEY = "syncKey";
 /** Between cycles while the change stream reports changes as they happen. */
 const INTERVAL_MS = 60_000;
 /** Between cycles while it is down (or the server has none). */
@@ -110,6 +143,9 @@ export class SyncEngine {
 
   #config: StoredConfig | null = null;
   #disconnected: Disconnected | null = null;
+  #cipher: Cipher | null = null;
+  /** The id of the key this device last held; null if it never held one. */
+  #keyId: string | null = null;
   #status: SyncStatus = {
     state: "disabled",
     account: null,
@@ -118,6 +154,7 @@ export class SyncEngine {
     pending: 0,
     blocked: 0,
     error: null,
+    lock: null,
   };
   readonly #listeners = new Set<() => void>();
   #timer: unknown = null;
@@ -158,6 +195,7 @@ export class SyncEngine {
 
   /** Loads the saved server connection and starts syncing if there is one. */
   async start(): Promise<void> {
+    await this.#loadKey();
     const saved = parseStoredConfig(await this.#store.loadMeta(CONFIG_KEY));
     if (saved?.disconnected) {
       this.#disconnected = { serverUrl: saved.serverUrl, account: saved.account };
@@ -196,16 +234,42 @@ export class SyncEngine {
     // Back to the account this device was disconnected from: carry on.
     const previous = this.#config ?? this.#disconnected;
     const sameAccount = previous?.serverUrl === serverUrl && previous.account.id === account.id;
-    if (!sameAccount) await this.#store.resetSync();
+    if (!sameAccount) {
+      await this.#store.resetSync();
+      await this.#saveKey(null, null); // Another account has another key.
+    }
     this.#closeStream();
     this.#disconnected = null;
     this.#config = { serverUrl, token, account };
     await this.#saveConfig(this.#config);
     this.#failures = 0;
-    this.#setStatus({ state: "idle", account, serverUrl, error: null });
+    this.#setStatus({ state: "idle", account, serverUrl, error: null, lock: null });
     this.#openStream();
     await this.syncNow();
     return account;
+  }
+
+  /**
+   * Unlocks the account's content key with the passphrase and syncs. A key
+   * this device has not held before (the first, or a new one after a reset)
+   * means the server's notes were made without this device: everything is
+   * uploaded again. Throws WrongSecretError for a wrong passphrase and
+   * NoKeyError when encryption is not set up.
+   */
+  async unlock(passphrase: string): Promise<void> {
+    const config = this.#config;
+    if (!config) throw new Error("Not connected");
+    const record = await this.#client(config).key();
+    if (!record) {
+      this.#setStatus({ state: "locked", lock: "setup" });
+      throw new NoKeyError();
+    }
+    const key = await unlock(record, passphrase);
+    if (record.keyId !== this.#keyId) await this.#store.resetSync();
+    await this.#saveKey(record.keyId, key);
+    this.#failures = 0;
+    this.#setStatus({ state: "idle", lock: null, error: null });
+    await this.syncNow();
   }
 
   /**
@@ -265,7 +329,38 @@ export class SyncEngine {
     this.#disconnected = null;
     await this.#store.saveMeta(CONFIG_KEY, undefined);
     await this.#credentials?.clear();
-    this.#setStatus({ state: "disabled", account: null, serverUrl: null, error: null });
+    await this.#saveKey(null, null);
+    this.#setStatus({
+      state: "disabled",
+      account: null,
+      serverUrl: null,
+      error: null,
+      lock: null,
+    });
+  }
+
+  async #loadKey(): Promise<void> {
+    const { keyId, key } = parseStoredKey(await this.#store.loadMeta(KEY_KEY));
+    this.#keyId = keyId;
+    this.#cipher = keyId !== null && key !== null ? { keyId, key } : null;
+  }
+
+  async #saveKey(keyId: string | null, key: CryptoKey | null): Promise<void> {
+    this.#keyId = keyId;
+    this.#cipher = keyId !== null && key !== null ? { keyId, key } : null;
+    await this.#store.saveMeta(KEY_KEY, keyId === null ? undefined : { keyId, key });
+  }
+
+  /** Sync stops until the owner sets up encryption or enters the passphrase. */
+  async #lock(serverKeyId: string | null, client: ApiClient | null): Promise<void> {
+    if (this.#cipher && this.#cipher.keyId !== serverKeyId) {
+      await this.#saveKey(this.#keyId, null); // That key is gone; keep its id.
+    }
+    let lock: SyncLock = serverKeyId === null ? "setup" : "unlock";
+    if (serverKeyId === null && client) lock = (await client.key()) ? "unlock" : "setup";
+    await this.#refreshCounts({ state: "locked", lock, error: null });
+    // Set-up on the site wakes the stream; meanwhile look now and then.
+    this.#schedule(INTERVAL_MS);
   }
 
   /**
@@ -280,7 +375,8 @@ export class SyncEngine {
     this.#disconnected = { serverUrl: config.serverUrl, account: config.account };
     await this.#store.saveMeta(CONFIG_KEY, { ...this.#disconnected, disconnected: true });
     await this.#credentials?.clear();
-    await this.#refreshCounts({ state: "disconnected", error, ...this.#disconnected });
+    await this.#saveKey(this.#keyId, null); // Forget the key; its id tells the same one again.
+    await this.#refreshCounts({ state: "disconnected", error, lock: null, ...this.#disconnected });
   }
 
   /** The saved connection, with the token from the credential store if there is one. */
@@ -417,6 +513,12 @@ export class SyncEngine {
     this.#setStatus({ state: "syncing" });
     const client = this.#client(config);
     try {
+      if (!this.#cipher) {
+        // Nothing can be sent or read without the key: say what is missing.
+        const record = await client.key();
+        await this.#lock(record?.keyId ?? null, null);
+        return;
+      }
       await this.#push(client);
       await this.#pull(client);
       if (await this.#resolveConflicts(client)) {
@@ -427,9 +529,14 @@ export class SyncEngine {
         state: "idle",
         lastSyncedAt: this.#now().toISOString(),
         error: null,
+        lock: null,
       });
       this.#schedule(this.#streaming ? INTERVAL_MS : POLL_MS);
     } catch (error) {
+      if (error instanceof KeyChangedError) {
+        await this.#lock(error.keyId, error.keyId === null ? client : null);
+        return;
+      }
       if (error instanceof ApiError && error.status === 401) {
         // Disconnected on the site, the account deleted, or the token revoked.
         await this.#becomeDisconnected(config, error);
@@ -482,6 +589,13 @@ export class SyncEngine {
           : await client.updateNote(noteId, note.markdown, baseRevision);
       await this.#store.markPushed(noteId, { revision: remote.revision, markdown: note.markdown });
     } catch (error) {
+      if (
+        error instanceof ApiError &&
+        error.status === 409 &&
+        (error.code === "key_mismatch" || error.code === "encryption_required")
+      ) {
+        throw new KeyChangedError(null); // Not this note's fault: the key changed.
+      }
       if (error instanceof RevisionConflictError && entry.deleted && error.current.deleted) {
         await this.#store.markPushed(noteId, "deleted"); // Deleted on both sides.
       } else if (error instanceof RevisionConflictError) {
@@ -512,6 +626,7 @@ export class SyncEngine {
     let cursor = await this.#store.syncCursor();
     for (;;) {
       const page = await client.changes(cursor);
+      if (page.keyId !== this.#cipher?.keyId) throw new KeyChangedError(page.keyId);
       for (const remote of page.notes) {
         await this.#store.applyRemote(remote);
       }
@@ -545,8 +660,18 @@ export class SyncEngine {
   }
 
   #client(config: ServerConfig): ApiClient {
-    return new ApiClient(config, this.#fetch);
+    return new ApiClient(config, this.#fetch, this.#cipher);
   }
+}
+
+/** The stored content key; a key that is not a CryptoKey (or is missing) reads as null. */
+function parseStoredKey(value: unknown): { keyId: string | null; key: CryptoKey | null } {
+  if (typeof value !== "object" || value === null) return { keyId: null, key: null };
+  const { keyId, key } = value as Record<string, unknown>;
+  return {
+    keyId: typeof keyId === "string" ? keyId : null,
+    key: key instanceof CryptoKey ? key : null,
+  };
 }
 
 function normalizeServerUrl(serverUrl: string): string {

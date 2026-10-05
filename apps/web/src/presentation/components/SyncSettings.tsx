@@ -7,6 +7,7 @@ import {
   type ReactNode,
   type SubmitEvent,
 } from "react";
+import { WrongSecretError } from "@konspecter/crypto";
 import { appInfo, isDesktop, openInBrowser } from "../../infrastructure/desktop/desktop";
 import { ApiError, type DeviceAuthorization } from "../../infrastructure/http/api-client";
 import { isNativeMobile } from "../../infrastructure/mobile/mobile";
@@ -15,7 +16,11 @@ import {
   describeDevice,
   DeviceLoginError,
 } from "../../infrastructure/sync/device-login";
-import type { SyncEngine, SyncStatus } from "../../infrastructure/sync/sync-engine";
+import {
+  NoKeyError,
+  type SyncEngine,
+  type SyncStatus,
+} from "../../infrastructure/sync/sync-engine";
 import { useErrorMessage } from "../hooks/use-error-message";
 import { NoteDate } from "./NoteDate";
 import { t, tn } from "../i18n/i18n";
@@ -39,6 +44,8 @@ export function SyncSettings({ sync }: { sync: SyncEngine }) {
         <ConnectForm sync={sync} />
       ) : status.state === "disconnected" ? (
         <Disconnected sync={sync} status={status} />
+      ) : status.state === "locked" ? (
+        <Locked sync={sync} status={status} />
       ) : (
         <SyncState sync={sync} status={status} />
       )}
@@ -100,6 +107,99 @@ function Disconnected({ sync, status }: { sync: SyncEngine; status: SyncStatus }
           {t("sync.forget")}
         </button>
       </BrowserSignIn>
+    </>
+  );
+}
+
+/**
+ * Connected, but the content key is not here: set up encryption on the site
+ * first, or unlock it with the passphrase.
+ */
+function Locked({ sync, status }: { sync: SyncEngine; status: SyncStatus }) {
+  const siteSettings = `${status.serverUrl ?? ""}/settings#encryption`;
+  const passphraseId = useId();
+  const [passphrase, setPassphrase] = useState("");
+  const [unlocking, setUnlocking] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const known = error instanceof WrongSecretError || error instanceof NoKeyError;
+  const errorText = useErrorMessage(known ? null : error);
+
+  async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setUnlocking(true);
+    setError(null);
+    try {
+      await sync.unlock(passphrase);
+    } catch (unlockError) {
+      setError(unlockError);
+      setUnlocking(false);
+    }
+  }
+
+  const openSite = (
+    <button type="button" className="button" onClick={() => void openInBrowser(siteSettings)}>
+      {t("sync.openEncryptionSettings")}
+    </button>
+  );
+
+  return (
+    <>
+      <p className="setting-hint">
+        {rich("sync.connectedTo", {
+          server: <strong>{status.serverUrl}</strong>,
+          account: <strong>{status.account?.email}</strong>,
+        })}
+      </p>
+      {status.lock === "setup" ? (
+        <>
+          <p role="status" className="sync-status">
+            {t("sync.lockedSetup")}
+          </p>
+          <div className="actions">
+            {openSite}
+            <button type="button" className="button" onClick={() => void sync.disconnect()}>
+              {t("sync.disconnect")}
+            </button>
+          </div>
+        </>
+      ) : (
+        <form className="connect-form" onSubmit={(event) => void handleSubmit(event)}>
+          <p role="status" className="sync-status">
+            {t("sync.lockedUnlock")}
+          </p>
+          <label htmlFor={passphraseId}>{t("sync.passphrase")}</label>
+          <input
+            id={passphraseId}
+            type="password"
+            required
+            autoComplete="current-password"
+            value={passphrase}
+            onChange={(event) => {
+              setPassphrase(event.target.value);
+            }}
+          />
+          {error !== null && (
+            <p role="alert" className="inline-error">
+              {error instanceof WrongSecretError
+                ? t("sync.wrongPassphrase")
+                : error instanceof NoKeyError
+                  ? t("sync.lockedSetup")
+                  : t("sync.unlockFailed", { error: errorText ?? "" })}
+            </p>
+          )}
+          <p className="setting-hint">{t("sync.forgotPassphrase")}</p>
+          <div className="actions">
+            <button type="submit" className="button button-primary" disabled={unlocking}>
+              {unlocking ? t("sync.unlocking") : t("sync.unlock")}
+            </button>
+            {openSite}
+            <button type="button" className="button" onClick={() => void sync.disconnect()}>
+              {t("sync.disconnect")}
+            </button>
+          </div>
+        </form>
+      )}
+      {status.pending > 0 && <p className="setting-hint">{tn("sync.pending", status.pending)}</p>}
     </>
   );
 }

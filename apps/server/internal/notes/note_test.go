@@ -18,15 +18,27 @@ func TestValidateID(t *testing.T) {
 	}
 }
 
-func TestValidateMarkdown(t *testing.T) {
-	if err := ValidateMarkdown("# Title\n\nЗаметка"); err != nil {
-		t.Errorf("valid Markdown rejected: %v", err)
+func TestParseEnvelope(t *testing.T) {
+	payload := strings.Repeat("A", 40)
+	keyID, err := ParseEnvelope("ksp1.k-1_x." + payload)
+	if err != nil || keyID != "k-1_x" {
+		t.Errorf("ParseEnvelope = %q, %v", keyID, err)
 	}
-	if err := ValidateMarkdown(strings.Repeat("a", MaxMarkdownBytes+1)); err == nil {
-		t.Error("oversized Markdown accepted")
-	}
-	if err := ValidateMarkdown("bad \xff byte"); err == nil {
-		t.Error("invalid UTF-8 accepted")
+	for _, bad := range []string{
+		"# Plain Markdown",
+		"ksp1." + payload,
+		"ksp2.key." + payload,
+		"ksp1..key" + payload,
+		"ksp1.key." + strings.Repeat("A", 20),             // shorter than an IV and a tag
+		"ksp1.key." + payload + "+",                       // not base64url
+		"ksp1.key." + strings.Repeat("A", 41),             // impossible base64 length
+		"ksp1.ke.y." + payload,                            // a dot in the payload
+		"ksp1." + strings.Repeat("k", 65) + "." + payload, // key id too long
+		"ksp1.key." + strings.Repeat("A", MaxContentBytes),
+	} {
+		if _, err := ParseEnvelope(bad); err == nil {
+			t.Errorf("ParseEnvelope(%.40q…) accepted", bad)
+		}
 	}
 }
 

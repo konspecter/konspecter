@@ -36,6 +36,11 @@ describe("SyncIndicator", () => {
     expect(screen.getByRole("link", { name: "Sync: Sync stopped" })).toBeInTheDocument();
   });
 
+  it("says when sync waits for the passphrase", () => {
+    renderIndicator(syncIn("locked"));
+    expect(screen.getByRole("link", { name: "Sync: Sync locked" })).toBeInTheDocument();
+  });
+
   it("counts the notes held back", () => {
     renderIndicator(syncIn("offline", 2));
     expect(screen.getByRole("link")).toHaveTextContent("2 not synced");

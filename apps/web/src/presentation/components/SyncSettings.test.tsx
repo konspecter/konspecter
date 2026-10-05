@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { openNoteStore } from "../../infrastructure/storage/note-store";
-import { FakeServer } from "../../infrastructure/sync/fake-server";
+import { FakeServer, TEST_PASSPHRASE } from "../../infrastructure/sync/fake-server";
 import { SyncEngine, type Scheduler } from "../../infrastructure/sync/sync-engine";
 import { SyncSettings } from "./SyncSettings";
 
@@ -24,10 +24,9 @@ class ManualScheduler implements Scheduler {
   }
 }
 
-async function setup() {
+async function setup(server = new FakeServer()) {
   databases += 1;
   const store = await openNoteStore(`sync-settings-${String(databases)}`);
-  const server = new FakeServer();
   const scheduler = new ManualScheduler();
   const engine = new SyncEngine(store, {
     fetch: server.fetch,
@@ -61,6 +60,22 @@ it("signs in with the browser: shows the code, opens the page, connects once app
   expect(await screen.findByText(/Connected to/)).toHaveTextContent(
     "Connected to https://sync.example.com as ada@example.com.",
   );
+  // Then the passphrase unlocks the key.
+  await user.type(await screen.findByLabelText("Encryption passphrase"), "wrong horse battery");
+  await user.click(screen.getByRole("button", { name: "Unlock" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("That passphrase does not open");
+  await user.clear(screen.getByLabelText("Encryption passphrase"));
+  await user.type(screen.getByLabelText("Encryption passphrase"), TEST_PASSPHRASE);
+  await user.click(screen.getByRole("button", { name: "Unlock" }));
+  expect(await screen.findByText(/Up to date/)).toBeInTheDocument();
+});
+
+it("sends the owner to the site when encryption is not set up", async () => {
+  const { engine, opened } = await setup(new FakeServer({ encrypted: false }));
+  await engine.connect({ serverUrl: "https://sync.example.com", token: "ksp_ada" });
+  expect(await screen.findByRole("status")).toHaveTextContent("no encryption set up yet");
+  await userEvent.setup().click(screen.getByRole("button", { name: "Open encryption settings" }));
+  expect(opened).toEqual(["https://sync.example.com/settings#encryption"]);
 });
 
 it("keeps the token form under Advanced", async () => {

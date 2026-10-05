@@ -1,9 +1,10 @@
+import { WrongSecretError } from "@konspecter/crypto";
 import { parseDocument } from "../../domain/document/document";
 import { createNote, updateNote, type Note } from "../../domain/note/note";
 import { openNoteStore, type NoteStore } from "../storage/note-store";
-import { FakeServer } from "./fake-server";
+import { FakeServer, TEST_PASSPHRASE } from "./fake-server";
 import { DeviceLoginError } from "./device-login";
-import { SyncEngine, type Scheduler } from "./sync-engine";
+import { NoKeyError, SyncEngine, type Scheduler } from "./sync-engine";
 import { mustGet } from "../storage/test-utils";
 
 let databaseCount = 0;
@@ -34,13 +35,13 @@ type Device = {
   online: { value: boolean };
 };
 
-async function device(server: FakeServer): Promise<Device> {
+async function device(server: FakeServer, fetch = server.fetch): Promise<Device> {
   databaseCount += 1;
   const store = await openNoteStore(`sync-test-${String(databaseCount)}`);
   const scheduler = new ManualScheduler();
   const online = { value: true };
   const engine = new SyncEngine(store, {
-    fetch: server.fetch,
+    fetch,
     scheduler,
     random: () => 0.5,
     isOnline: () => online.value,
@@ -48,6 +49,12 @@ async function device(server: FakeServer): Promise<Device> {
     isVisible: () => true,
   });
   return { store, engine, scheduler, online };
+}
+
+/** Connects an engine and unlocks the account's key, as its owner would. */
+async function connected(engine: SyncEngine, to: typeof config = config): Promise<void> {
+  await engine.connect(to);
+  await engine.unlock(TEST_PASSPHRASE);
 }
 
 /** Edits the note on a device, as saved at `when`. */
@@ -67,7 +74,7 @@ describe("SyncEngine", () => {
     const a = await device(server);
     await a.store.put(createNote("# Local", date, "n1"));
 
-    await a.engine.connect(config);
+    await connected(a.engine, config);
 
     expect(server.notes.get("n1")?.markdown).toBe(await markdownOf(a.store, "n1"));
     expect(await a.store.syncEntry("n1")).toMatchObject({ baseRevision: 1, dirty: false });
@@ -80,7 +87,7 @@ describe("SyncEngine", () => {
     const a = await device(server);
     await a.store.put(createNote("old", date, "old"));
 
-    await a.engine.connect(config);
+    await connected(a.engine, config);
 
     expect(server.notes.has("old")).toBe(true);
   });
@@ -90,9 +97,9 @@ describe("SyncEngine", () => {
     const a = await device(server);
     const b = await device(server);
     await a.store.put(createNote("# Shared", date, "n1"));
-    await a.engine.connect(config);
+    await connected(a.engine, config);
 
-    await b.engine.connect(config);
+    await connected(b.engine, config);
     expect(await markdownOf(b.store, "n1")).toBe(await markdownOf(a.store, "n1"));
 
     const note = await mustGet(b.store, "n1");
@@ -110,8 +117,8 @@ describe("SyncEngine", () => {
     const b = await device(server);
     await a.store.put(createNote("x", date, "x"));
     await a.store.put(createNote("y", date, "y"));
-    await a.engine.connect(config);
-    await b.engine.connect(config);
+    await connected(a.engine, config);
+    await connected(b.engine, config);
 
     await a.store.delete("x");
     await b.store.delete("y");
@@ -131,8 +138,8 @@ describe("SyncEngine", () => {
     const a = await device(server);
     const b = await device(server);
     await a.store.put(createNote("x", date, "x"));
-    await a.engine.connect(config);
-    await b.engine.connect(config);
+    await connected(a.engine, config);
+    await connected(b.engine, config);
 
     await a.store.delete("x");
     await b.store.delete("x");
@@ -146,7 +153,7 @@ describe("SyncEngine", () => {
   it("forgets a note deleted before it was ever synced", async () => {
     const server = new FakeServer();
     const a = await device(server);
-    await a.engine.connect(config);
+    await connected(a.engine, config);
     await a.store.put(createNote("draft", date, "draft"));
     await a.store.delete("draft");
 
@@ -159,7 +166,7 @@ describe("SyncEngine", () => {
   it("queues edits made offline and pushes the latest version once", async () => {
     const server = new FakeServer();
     const a = await device(server);
-    await a.engine.connect(config);
+    await connected(a.engine, config);
     a.online.value = false;
     const note = createNote("v1", date, "n1");
     await a.store.put(note);
@@ -182,7 +189,7 @@ describe("SyncEngine", () => {
   it("keeps a note queued when it is edited while its push is in flight", async () => {
     const server = new FakeServer();
     const a = await device(server);
-    await a.engine.connect(config);
+    await connected(a.engine, config);
     const note = createNote("first", date, "n1");
     await a.store.put(note);
     server.beforeRespond = async (method) => {
@@ -205,8 +212,8 @@ describe("SyncEngine", () => {
     const a = await device(server);
     const b = await device(server);
     await a.store.put(createNote("# Plan\n\noriginal", date, "n1"));
-    await a.engine.connect(config);
-    await b.engine.connect(config);
+    await connected(a.engine, config);
+    await connected(b.engine, config);
 
     await edit(b, "n1", "# Plan\n\nedited on B, later", minutesLater(5));
     await edit(a, "n1", "# Plan\n\nedited on A", minutesLater(1));
@@ -228,8 +235,8 @@ describe("SyncEngine", () => {
     const a = await device(server);
     const b = await device(server);
     await a.store.put(createNote("# Plan\n\noriginal", date, "n1"));
-    await a.engine.connect(config);
-    await b.engine.connect(config);
+    await connected(a.engine, config);
+    await connected(b.engine, config);
 
     b.online.value = false;
     await edit(b, "n1", "# Plan\n\nold offline edit", minutesLater(1));
@@ -246,7 +253,7 @@ describe("SyncEngine", () => {
     const server = new FakeServer();
     const a = await device(server);
     await a.store.put(createNote("# Draft", date, "n1"));
-    await a.engine.connect(config);
+    await connected(a.engine, config);
     server.remove("n1");
     await edit(a, "n1", "# Draft\n\nmore work", minutesLater(1));
 
@@ -262,8 +269,8 @@ describe("SyncEngine", () => {
     const server = new FakeServer();
     const a = await device(server);
     await a.store.put(createNote("# Keep me", date, "n1"));
-    await a.engine.connect(config);
-    server.write("n1", "# Keep me\n\nedited elsewhere");
+    await connected(a.engine, config);
+    await server.write("n1", "# Keep me\n\nedited elsewhere");
     await a.store.delete("n1");
 
     await a.engine.syncNow();
@@ -278,13 +285,13 @@ describe("SyncEngine", () => {
     const a = await device(server);
     const note = createNote("# Same", date, "n1");
     await a.store.put(note);
-    await a.engine.connect(config);
+    await connected(a.engine, config);
     // The same account connected again from scratch (disconnecting signed
     // the old token out): every note is re-uploaded.
     await a.engine.disconnect();
     await a.store.resetSync();
     server.tokens.set("ksp_ada_again", { id: "user-ada", email: "ada@example.com" });
-    await a.engine.connect({ ...config, token: "ksp_ada_again" });
+    await connected(a.engine, { ...config, token: "ksp_ada_again" });
 
     expect(await a.store.list()).toEqual([note]);
     expect(await a.store.syncEntry("n1")).toMatchObject({
@@ -299,7 +306,7 @@ describe("SyncEngine", () => {
     const devices = [await device(server), await device(server), await device(server)];
     const [a, b, c] = devices as [Device, Device, Device];
     await a.store.put(createNote("start", date, "n1"));
-    for (const d of devices) await d.engine.connect(config);
+    for (const d of devices) await connected(d.engine, config);
 
     await edit(a, "n1", "version A", minutesLater(1));
     await edit(b, "n1", "version B, the latest", minutesLater(3));
@@ -316,7 +323,7 @@ describe("SyncEngine", () => {
   it("holds back a note the server refuses and syncs the rest", async () => {
     const server = new FakeServer();
     const a = await device(server);
-    await a.engine.connect(config);
+    await connected(a.engine, config);
     await a.store.put(createNote("x".repeat(2000), date, "huge"));
     await a.store.put(createNote("fine", date, "ok"));
 
@@ -333,7 +340,7 @@ describe("SyncEngine", () => {
   it("retries with exponential backoff and recovers", async () => {
     const server = new FakeServer();
     const a = await device(server);
-    await a.engine.connect(config);
+    await connected(a.engine, config);
     await a.store.put(createNote("n", date, "n1"));
 
     server.failWith = 503;
@@ -359,7 +366,7 @@ describe("SyncEngine", () => {
     const server = new FakeServer();
     const a = await device(server);
     await a.engine.start();
-    await a.engine.connect(config);
+    await connected(a.engine, config);
 
     await a.store.put(createNote("new", date, "n1"));
 
@@ -376,8 +383,8 @@ describe("SyncEngine", () => {
     const a = await device(server);
     const b = await device(server);
     await a.store.put(createNote("# Live", date, "n1"));
-    await a.engine.connect(config);
-    await b.engine.connect(config);
+    await connected(a.engine, config);
+    await connected(b.engine, config);
     await vi.waitFor(() => {
       expect(server.openStreams).toBe(2);
     });
@@ -401,7 +408,7 @@ describe("SyncEngine", () => {
     const server = new FakeServer();
     server.eventStreams = true;
     const a = await device(server);
-    await a.engine.connect(config);
+    await connected(a.engine, config);
     await vi.waitFor(() => {
       expect(server.openStreams).toBe(1);
     });
@@ -424,7 +431,7 @@ describe("SyncEngine", () => {
   it("does without a change stream on a server that has none", async () => {
     const server = new FakeServer();
     const a = await device(server);
-    await a.engine.connect(config);
+    await connected(a.engine, config);
     await a.engine.syncNow();
 
     await vi.waitFor(() => {
@@ -446,7 +453,7 @@ describe("SyncEngine", () => {
   it("remembers the connection across restarts and can disconnect", async () => {
     const server = new FakeServer();
     const a = await device(server);
-    await a.engine.connect(config);
+    await connected(a.engine, config);
 
     const restarted = new SyncEngine(a.store, {
       fetch: server.fetch,
@@ -501,6 +508,10 @@ describe("SyncEngine and the account's devices", () => {
     expect((await signingIn).email).toBe("ada@example.com");
     expect([...server.authorizations.values()]).toEqual([]);
     expect(server.requests.filter((r) => r === "POST /api/devices/token")).toHaveLength(2);
+    // Signed in, but nothing goes out before the passphrase unlocks the key.
+    expect(a.engine.getStatus()).toMatchObject({ state: "locked", lock: "unlock" });
+    expect(server.notes.has("n1")).toBe(false);
+    await a.engine.unlock(TEST_PASSPHRASE);
     expect(server.notes.has("n1")).toBe(true);
     expect(a.engine.getStatus()).toMatchObject({ state: "idle", serverUrl: config.serverUrl });
   });
@@ -539,7 +550,7 @@ describe("SyncEngine and the account's devices", () => {
     const server = new FakeServer();
     const a = await device(server);
     await a.store.put(createNote("# Kept", date, "n1"));
-    await a.engine.connect(config);
+    await connected(a.engine, config);
     server.disconnectDevice("ksp_ada");
     await edit(a, "n1", "edited while disconnected", minutesLater(1));
 
@@ -563,7 +574,7 @@ describe("SyncEngine and the account's devices", () => {
 
     // Signing in again to the same account carries on where it stopped.
     server.tokens.set("ksp_again", { id: "user-ada", email: "ada@example.com" });
-    await restarted.connect({ ...config, token: "ksp_again" });
+    await connected(restarted, { ...config, token: "ksp_again" });
     expect(await a.store.syncEntry("n1")).toMatchObject({ baseRevision: 2, dirty: false });
     expect(server.notes.get("n1")?.markdown).toContain("edited while disconnected");
     expect(restarted.getStatus().state).toBe("idle");
@@ -573,7 +584,7 @@ describe("SyncEngine and the account's devices", () => {
   it("signs the device out of the server when disconnecting", async () => {
     const server = new FakeServer();
     const a = await device(server);
-    await a.engine.connect(config);
+    await connected(a.engine, config);
 
     await a.engine.disconnect();
 
@@ -582,6 +593,108 @@ describe("SyncEngine and the account's devices", () => {
     });
     expect(server.tokens.has("ksp_ada")).toBe(false);
     expect(a.engine.getStatus().state).toBe("disabled");
+  });
+});
+
+describe("SyncEngine and end-to-end encryption", () => {
+  it("sends and receives only ciphertext", async () => {
+    const server = new FakeServer();
+    const bodies: string[] = [];
+    const a = await device(server, (input, init) => {
+      if (typeof init?.body === "string") bodies.push(init.body);
+      return server.fetch(input, init);
+    });
+    await a.store.put(createNote("# Secret plan\n\nnobody reads this", date, "n1"));
+    await connected(a.engine);
+
+    const stored = server.notes.get("n1");
+    expect(stored?.content).toMatch(new RegExp(`^ksp1\\.${server.keyId ?? ""}\\.`));
+    expect(stored?.content).not.toContain("Secret");
+    expect(bodies.some((body) => body.includes("Secret"))).toBe(false);
+    expect(stored?.markdown).toBe(await markdownOf(a.store, "n1")); // What the server holds, opened.
+
+    const b = await device(server);
+    await connected(b.engine);
+    expect(bodyOf(await b.store.get("n1"))).toBe("# Secret plan\n\nnobody reads this");
+  });
+
+  it("asks to set up encryption on the site first, then for the passphrase", async () => {
+    const server = new FakeServer({ encrypted: false });
+    const a = await device(server);
+    await a.store.put(createNote("# Waiting", date, "n1"));
+    await a.engine.connect(config);
+
+    expect(a.engine.getStatus()).toMatchObject({ state: "locked", lock: "setup", pending: 1 });
+    await expect(a.engine.unlock(TEST_PASSPHRASE)).rejects.toBeInstanceOf(NoKeyError);
+    expect(server.requests).not.toContain("POST /api/notes");
+
+    await server.setUpKey();
+    await a.engine.syncNow();
+    expect(a.engine.getStatus()).toMatchObject({ state: "locked", lock: "unlock" });
+    await a.engine.unlock(TEST_PASSPHRASE);
+    expect(a.engine.getStatus()).toMatchObject({ state: "idle", lock: null, pending: 0 });
+    expect(server.notes.get("n1")?.markdown).toBe(await markdownOf(a.store, "n1"));
+  });
+
+  it("refuses a wrong passphrase and stays locked", async () => {
+    const server = new FakeServer();
+    const a = await device(server);
+    await a.engine.connect(config);
+    await expect(a.engine.unlock("wrong horse battery")).rejects.toBeInstanceOf(WrongSecretError);
+    expect(a.engine.getStatus()).toMatchObject({ state: "locked", lock: "unlock" });
+  });
+
+  it("keeps the unlocked key across restarts, out of reach", async () => {
+    const server = new FakeServer();
+    const a = await device(server);
+    await connected(a.engine);
+    const stored = (await a.store.loadMeta("syncKey")) as { keyId: string; key: CryptoKey };
+    expect(stored.keyId).toBe(server.keyId);
+    expect(stored.key.extractable).toBe(false);
+
+    const restarted = new SyncEngine(a.store, {
+      fetch: server.fetch,
+      scheduler: a.scheduler,
+      isOnline: () => true,
+      isVisible: () => true,
+    });
+    await restarted.start();
+    expect(restarted.getStatus()).toMatchObject({ state: "idle", lock: null });
+    restarted.stop();
+  });
+
+  it("after a reset on the site, unlocks the new key and uploads everything again", async () => {
+    const server = new FakeServer();
+    const a = await device(server);
+    await a.store.put(createNote("# Kept on the device", date, "n1"));
+    await connected(a.engine);
+
+    server.resetKey();
+    await a.engine.syncNow();
+    expect(a.engine.getStatus()).toMatchObject({ state: "locked", lock: "setup" });
+    await server.setUpKey("a new passphrase");
+    await a.engine.syncNow();
+    expect(a.engine.getStatus()).toMatchObject({ state: "locked", lock: "unlock" });
+    await expect(a.engine.unlock(TEST_PASSPHRASE)).rejects.toBeInstanceOf(WrongSecretError);
+
+    await a.engine.unlock("a new passphrase");
+    expect(server.notes.get("n1")?.markdown).toBe(await markdownOf(a.store, "n1"));
+    expect(server.notes.get("n1")?.content).toContain(`ksp1.${server.keyId ?? ""}.`);
+    expect(a.engine.getStatus()).toMatchObject({ state: "idle", pending: 0 });
+  });
+
+  it("locks when a push meets another key, without holding the note back", async () => {
+    const server = new FakeServer();
+    const a = await device(server);
+    await a.store.put(createNote("# One", date, "n1"));
+    await connected(a.engine);
+    await server.setUpKey("rotated"); // A key this device does not have yet.
+    await edit(a, "n1", "edited", minutesLater(1));
+
+    await a.engine.syncNow();
+
+    expect(a.engine.getStatus()).toMatchObject({ state: "locked", lock: "unlock", blocked: 0 });
+    expect(await a.store.syncEntry("n1")).toMatchObject({ dirty: true, blocked: null });
   });
 });
 
@@ -615,7 +728,7 @@ describe("SyncEngine with a credential store", () => {
       isOnline: () => true,
     });
 
-    await engine.connect(config);
+    await connected(engine, config);
 
     expect(credentials.token).toBe("ksp_ada");
     expect(JSON.stringify(await a.store.loadMeta("syncConfig"))).not.toContain("ksp_ada");
@@ -637,7 +750,7 @@ describe("SyncEngine with a credential store", () => {
   it("moves a token saved in the database into the credential store", async () => {
     const server = new FakeServer();
     const a = await device(server);
-    await a.engine.connect(config); // Saved in the database (no credential store).
+    await connected(a.engine, config); // Saved in the database (no credential store).
     const credentials = memoryCredentials();
 
     const engine = new SyncEngine(a.store, {

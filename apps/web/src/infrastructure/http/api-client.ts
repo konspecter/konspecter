@@ -1,3 +1,4 @@
+import { decryptNote, encryptNote, keyFromJson, type KeyRecord } from "@konspecter/crypto";
 import { parseRemoteNote, type RemoteNote } from "../../domain/sync/sync-state";
 
 export type ServerConfig = {
@@ -12,7 +13,17 @@ export type ChangesPage = {
   readonly notes: readonly RemoteNote[];
   readonly cursor: number;
   readonly more: boolean;
+  /** The account's current content key; null when encryption is not set up. */
+  readonly keyId: string | null;
 };
+
+/** The account's content key, unlocked: notes are encrypted and decrypted with it. */
+export type Cipher = { readonly keyId: string; readonly key: CryptoKey };
+
+/** The client has no unlocked key, so it cannot send or read notes. */
+export class LockedError extends Error {
+  override readonly name = "LockedError";
+}
 
 /** The server answered with an error. */
 export class ApiError extends Error {
@@ -44,16 +55,72 @@ export class NetworkError extends Error {
 
 type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
-/** HTTP/JSON client for the server API. Every response is validated. */
+/** A 409 revision conflict as the server sent it, before decryption. */
+class WireConflict extends Error {
+  constructor(
+    message: string,
+    readonly current: unknown,
+  ) {
+    super(message);
+  }
+}
+
+/**
+ * HTTP/JSON client for the server API. Every response is validated.
+ *
+ * It is the one place notes are encrypted: with a cipher, notes go out as
+ * envelopes and come back decrypted, so everything above it (the sync
+ * engine, conflict resolution, the note store) works with plain Markdown.
+ */
 export class ApiClient {
   readonly #base: string;
   readonly #token: string;
   readonly #fetch: Fetch;
+  readonly #cipher: Cipher | null;
 
-  constructor(config: ServerConfig, fetchFn: Fetch = (input, init) => fetch(input, init)) {
+  constructor(
+    config: ServerConfig,
+    fetchFn: Fetch = (input, init) => fetch(input, init),
+    cipher: Cipher | null = null,
+  ) {
     this.#base = config.serverUrl.endsWith("/") ? config.serverUrl : `${config.serverUrl}/`;
     this.#token = config.token;
     this.#fetch = fetchFn;
+    this.#cipher = cipher;
+  }
+
+  /** The account's wrapped content key, or null when encryption is not set up. */
+  async key(): Promise<KeyRecord | null> {
+    try {
+      return parseKey(await this.#request("GET", "api/keys"));
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return null;
+      throw error;
+    }
+  }
+
+  #requireCipher(): Cipher {
+    if (!this.#cipher) throw new LockedError("Encryption is locked");
+    return this.#cipher;
+  }
+
+  async #encrypt(noteId: string, markdown: string): Promise<string> {
+    const { key, keyId } = this.#requireCipher();
+    return encryptNote(key, keyId, noteId, markdown);
+  }
+
+  /** A note from the wire, decrypted. A deleted note's text is not needed (and not read). */
+  async #remote(value: unknown): Promise<RemoteNote> {
+    const wire = asRecord(value);
+    const { id, content, deleted_at: deletedAt } = wire;
+    const deleted = deletedAt !== undefined && deletedAt !== null;
+    if (typeof id !== "string" || typeof content !== "string") throw invalid("note");
+    let markdown = "";
+    if (!deleted) {
+      const { key, keyId } = this.#requireCipher();
+      markdown = await decryptNote(key, keyId, id, content);
+    }
+    return parseRemoteNote({ id, markdown, revision: wire.revision, deleted });
   }
 
   /** Signs this device out: its token stops working and it leaves the account's device list. */
@@ -71,7 +138,7 @@ export class ApiClient {
   /** The server's version of a note, or null if it has none (or deleted it). */
   async getNote(id: string): Promise<RemoteNote | null> {
     try {
-      return parseRemoteNote(await this.#request("GET", `api/notes/${encodeURIComponent(id)}`));
+      return await this.#remote(await this.#request("GET", `api/notes/${encodeURIComponent(id)}`));
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) return null;
       throw error;
@@ -79,14 +146,14 @@ export class ApiClient {
   }
 
   async createNote(id: string, markdown: string): Promise<RemoteNote> {
-    return parseRemoteNote(await this.#request("POST", "api/notes", { id, markdown }));
+    const content = await this.#encrypt(id, markdown);
+    return this.#remote(await this.#request("POST", "api/notes", { id, content }));
   }
 
   async updateNote(id: string, markdown: string, baseRevision: number): Promise<RemoteNote> {
     const path = `api/notes/${encodeURIComponent(id)}`;
-    return parseRemoteNote(
-      await this.#request("PUT", path, { markdown, base_revision: baseRevision }),
-    );
+    const content = await this.#encrypt(id, markdown);
+    return this.#remote(await this.#request("PUT", path, { content, base_revision: baseRevision }));
   }
 
   async deleteNote(id: string, baseRevision: number): Promise<void> {
@@ -98,11 +165,18 @@ export class ApiClient {
     const body = asRecord(
       await this.#request("GET", `api/sync?since=${String(since)}&limit=${String(limit)}`),
     );
-    const { notes, cursor, more } = body;
+    const { notes, cursor, more, key_id: keyId } = body;
     if (!Array.isArray(notes) || typeof cursor !== "number" || typeof more !== "boolean") {
       throw invalid("changes");
     }
-    return { notes: notes.map(parseRemoteNote), cursor, more };
+    const current = typeof keyId === "string" ? keyId : null;
+    // Notes of another key cannot be read: nothing is taken (the cursor stays),
+    // and the caller sees keyId and unlocks the current key first.
+    if (current !== this.#cipher?.keyId)
+      return { notes: [], cursor: since, more: false, keyId: current };
+    const remote: RemoteNote[] = [];
+    for (const note of notes as unknown[]) remote.push(await this.#remote(note));
+    return { notes: remote, cursor, more, keyId: current };
   }
 
   /**
@@ -124,8 +198,29 @@ export class ApiClient {
     return response.body;
   }
 
-  #request(method: string, path: string, body?: unknown): Promise<unknown> {
-    return send(this.#fetch, new URL(path, this.#base).toString(), method, body, this.#token);
+  async #request(method: string, path: string, body?: unknown): Promise<unknown> {
+    try {
+      return await send(
+        this.#fetch,
+        new URL(path, this.#base).toString(),
+        method,
+        body,
+        this.#token,
+      );
+    } catch (error) {
+      if (error instanceof WireConflict) {
+        throw new RevisionConflictError(error.message, await this.#remote(error.current));
+      }
+      throw error;
+    }
+  }
+}
+
+function parseKey(value: unknown): KeyRecord {
+  try {
+    return keyFromJson(value);
+  } catch {
+    throw invalid("key");
   }
 }
 
@@ -283,7 +378,7 @@ async function failure(response: Response): Promise<never> {
   const message =
     typeof error.message === "string" ? error.message : `Server error ${String(response.status)}`;
   if (response.status === 409 && code === "revision_conflict") {
-    throw new RevisionConflictError(message, parseRemoteNote(record.current));
+    throw new WireConflict(message, record.current);
   }
   throw new ApiError(response.status, code, message);
 }

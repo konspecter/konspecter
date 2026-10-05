@@ -10,7 +10,7 @@ import { openNoteStore, type NoteStore } from "../../infrastructure/storage/note
 import { setSourceValue, sourceValue } from "../editors/test-helpers";
 import { FakeFolder } from "../../infrastructure/folder/fake-folder";
 import { FolderStore } from "../../infrastructure/folder/folder-store";
-import { FakeServer } from "../../infrastructure/sync/fake-server";
+import { FakeServer, TEST_PASSPHRASE } from "../../infrastructure/sync/fake-server";
 import { SyncEngine } from "../../infrastructure/sync/sync-engine";
 import type { NoteRepository } from "../../application/notes/note-repository";
 import { applyLanguage } from "../i18n/setup";
@@ -1521,6 +1521,8 @@ describe("sync", () => {
     await userEvent.type(screen.getByLabelText("Server URL"), "https://sync.example.com");
     await userEvent.type(screen.getByLabelText("Access token"), "ksp_ada");
     await userEvent.click(screen.getByRole("button", { name: "Connect" }));
+    await userEvent.type(await screen.findByLabelText("Encryption passphrase"), TEST_PASSPHRASE);
+    await userEvent.click(screen.getByRole("button", { name: "Unlock" }));
 
     expect(await screen.findByText(/Up to date/)).toBeInTheDocument();
     expect(screen.getByText("ada@example.com")).toBeInTheDocument();
@@ -1553,6 +1555,7 @@ describe("sync", () => {
     const sync = syncFor(store, server);
     await store.put(createNote("x".repeat(2000), new Date(), "huge"));
     await sync.connect({ serverUrl: "https://sync.example.com", token: "ksp_ada" });
+    await sync.unlock(TEST_PASSPHRASE);
     render(
       <MemoryRouter>
         <App store={store} sync={sync} />

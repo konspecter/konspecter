@@ -70,6 +70,9 @@ importers:
         specifier: ^8.4.0
         version: 8.4.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
     devDependencies:
+      '@konspecter/crypto':
+        specifier: workspace:*
+        version: link:../../packages/crypto
       '@konspecter/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
@@ -139,6 +142,9 @@ importers:
       '@codemirror/view':
         specifier: ^6.43.13
         version: 6.43.13
+      '@konspecter/crypto':
+        specifier: workspace:*
+        version: link:../../packages/crypto
       '@konspecter/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
@@ -276,6 +282,15 @@ importers:
         specifier: ^5.0.2
         version: 5.0.2(@types/node@24.19.0)(@vitest/coverage-v8@5.0.2)(jsdom@30.1.1)(vite@8.3.1(@types/node@24.19.0)(terser@5.51.2)(yaml@2.9.1))
 
+  packages/crypto:
+    devDependencies:
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^5.0.2
+        version: 5.0.2(@types/node@24.19.0)(@vitest/coverage-v8@5.0.2)(jsdom@30.1.1)(vite@8.3.1(@types/node@24.19.0)(terser@5.51.2)(yaml@2.9.1))
+
   packages/i18n:
     devDependencies:
       '@types/react':
@@ -318,6 +333,9 @@ importers:
       '@axe-core/playwright':
         specifier: ^4.13.0
         version: 4.13.0(playwright-core@1.63.0)
+      '@konspecter/crypto':
+        specifier: workspace:*
+        version: link:../packages/crypto
       '@playwright/test':
         specifier: ^1.63.0
         version: 1.63.0

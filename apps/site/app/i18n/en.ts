@@ -92,6 +92,54 @@ export const en = {
     "To delete the account, sign in again first. This makes sure it is you and not a browser left signed in.",
   "settings.delete.signInAgainButton": "Sign in again",
 
+  "encryption.title": "Encryption",
+  "encryption.lead":
+    "Conspects are encrypted on your devices before they are synced, with a key only your passphrase opens. The server stores ciphertext it cannot read.",
+  "encryption.loading": "Checking encryption…",
+  "encryption.needsScript": "Encryption settings run in your browser and need JavaScript.",
+  "encryption.offLead":
+    "Encryption is not set up yet, so nothing syncs. Choose a passphrase: you will enter it once on each device. It is not your sign-in password, and we cannot reset it for you.",
+  "encryption.newPassphrase": "New passphrase",
+  "encryption.repeatPassphrase": "Repeat the passphrase",
+  "encryption.passphraseHint": "At least {count} characters. A few unrelated words work well.",
+  "encryption.setUp": "Set up encryption",
+  "encryption.recoveryLead":
+    "This is your recovery key. If you forget the passphrase, it is the only way to set a new one. Write it down or keep it in a password manager: it is shown only now.",
+  "encryption.recoveryKey": "Recovery key",
+  "encryption.copy": "Copy",
+  "encryption.copied": "Copied",
+  "encryption.confirmRecovery": "Type the recovery key to confirm you saved it",
+  "encryption.finishSetUp": "Finish setting up",
+  "encryption.setUpDone": "Encryption is set up. Unlock sync in each app with your passphrase.",
+  "encryption.onLead": "Encryption is on, since {date}.",
+  "encryption.change": "Change the passphrase",
+  "encryption.currentPassphrase": "Current passphrase",
+  "encryption.changeSubmit": "Change passphrase",
+  "encryption.changed":
+    "The passphrase is changed. Devices already unlocked keep syncing; new ones need the new passphrase.",
+  "encryption.recover": "Forgot the passphrase?",
+  "encryption.recoverLead": "Set a new passphrase with your recovery key.",
+  "encryption.recoverSubmit": "Set new passphrase",
+  "encryption.reset": "Reset encryption",
+  "encryption.resetLead":
+    "If you lost both the passphrase and the recovery key: this deletes the key and every conspect stored on the server. Your devices keep their conspects and upload them again after you set up encryption anew and unlock them.",
+  "encryption.resetConfirm": "I understand that the conspects on the server are deleted.",
+  "encryption.resetSubmit": "Delete server copies and reset",
+  "encryption.resetDone":
+    "Encryption is reset and the server's conspects are deleted. Set it up again to sync.",
+  "encryption.error.short": "Use a longer passphrase.",
+  "encryption.error.mismatch": "The two passphrases are different.",
+  "encryption.error.recoveryMismatch":
+    "That is not the recovery key shown above. Check it, letter by letter.",
+  "encryption.error.wrongCurrent": "The current passphrase is wrong.",
+  "encryption.error.wrongRecovery": "That recovery key does not open this account's key.",
+  "encryption.error.conflict":
+    "Encryption was changed in another window or device. Reload the page and try again.",
+  "encryption.error.gone": "Encryption was reset meanwhile. Reload the page.",
+  "encryption.error.signedOut": "You were signed out. Sign in again and retry.",
+  "encryption.error.network": "The server could not be reached. Check the connection and retry.",
+  "encryption.error.failed": "Something went wrong on the server. Try again in a moment.",
+
   "device.platform.web": "Web browser",
   "device.platform.macos": "macOS",
   "device.platform.windows": "Windows",

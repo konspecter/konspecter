@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"konspecter/server/internal/auth"
+	"konspecter/server/internal/keys"
 	"konspecter/server/internal/notes"
 )
 
@@ -62,13 +64,25 @@ func openTestDB(t *testing.T) *DB {
 	return db
 }
 
+// testKeyID is the content key every test user has set up. The storage
+// keeps a note's content as it is, so the tests use readable stand-ins.
+const testKeyID = "k1"
+
 func createUser(t *testing.T, db *DB, email string) auth.User {
 	t.Helper()
 	user, err := db.CreateUser(context.Background(), email)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if _, err := db.PutKey(context.Background(), user.ID, testKey(testKeyID), nil); err != nil {
+		t.Fatal(err)
+	}
 	return user
+}
+
+func testKey(id string) keys.Key {
+	b64 := func(n int) string { return base64.RawURLEncoding.EncodeToString(make([]byte, n)) }
+	return keys.Key{ID: id, KDF: keys.KDF, Iterations: 600_000, Salt: b64(16), WrappedKey: b64(60), RecoveryWrappedKey: b64(60)}
 }
 
 func TestMigrateIsIdempotent(t *testing.T) {
@@ -81,7 +95,7 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"001_initial.sql", "002_sync.sql", "003_accounts.sql", "004_identities.sql", "005_devices.sql"}
+	want := []string{"001_initial.sql", "002_sync.sql", "003_accounts.sql", "004_identities.sql", "005_devices.sql", "006_e2e.sql"}
 	if strings.Join(names, ",") != strings.Join(want, ",") {
 		t.Errorf("applied migrations = %v, want %v", names, want)
 	}
@@ -142,23 +156,23 @@ func TestNoteLifecycle(t *testing.T) {
 	ctx := context.Background()
 	user := createUser(t, db, "ada@example.com")
 
-	created, err := db.CreateNote(ctx, user.ID, "n1", "# One")
+	created, err := db.CreateNote(ctx, user.ID, "n1", "# One", testKeyID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if created.Revision != 1 || created.Markdown != "# One" || created.Deleted() {
+	if created.Revision != 1 || created.Content != "# One" || created.Deleted() {
 		t.Errorf("created = %+v", created)
 	}
 	var conflict *notes.ConflictError
-	if _, err := db.CreateNote(ctx, user.ID, "n1", "again"); !errors.As(err, &conflict) || conflict.Current.Markdown != "# One" || conflict.Current.Revision != 1 {
+	if _, err := db.CreateNote(ctx, user.ID, "n1", "again", testKeyID); !errors.As(err, &conflict) || conflict.Current.Content != "# One" || conflict.Current.Revision != 1 {
 		t.Errorf("duplicate create error = %v, want ConflictError with the current note", err)
 	}
 
-	updated, err := db.UpdateNote(ctx, user.ID, "n1", "# One, edited", 1)
+	updated, err := db.UpdateNote(ctx, user.ID, "n1", "# One, edited", testKeyID, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updated.Revision != 2 || updated.Markdown != "# One, edited" || !updated.UpdatedAt.After(created.UpdatedAt) && !updated.UpdatedAt.Equal(created.UpdatedAt) {
+	if updated.Revision != 2 || updated.Content != "# One, edited" || !updated.UpdatedAt.After(created.UpdatedAt) && !updated.UpdatedAt.Equal(created.UpdatedAt) {
 		t.Errorf("updated = %+v", updated)
 	}
 
@@ -175,8 +189,8 @@ func TestNoteLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !deleted.Deleted() || deleted.Revision != 3 || deleted.Markdown != "# One, edited" {
-		t.Errorf("deleted = %+v (the Markdown must be kept)", deleted)
+	if !deleted.Deleted() || deleted.Revision != 3 || deleted.Content != "# One, edited" {
+		t.Errorf("deleted = %+v (the content must be kept)", deleted)
 	}
 	if _, err := db.GetNote(ctx, user.ID, "n1"); !errors.Is(err, notes.ErrNotFound) {
 		t.Errorf("GetNote after delete error = %v", err)
@@ -190,19 +204,19 @@ func TestStaleRevisionsConflict(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()
 	user := createUser(t, db, "ada@example.com")
-	if _, err := db.CreateNote(ctx, user.ID, "n1", "v1"); err != nil {
+	if _, err := db.CreateNote(ctx, user.ID, "n1", "v1", testKeyID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.UpdateNote(ctx, user.ID, "n1", "v2 from device A", 1); err != nil {
+	if _, err := db.UpdateNote(ctx, user.ID, "n1", "v2 from device A", testKeyID, 1); err != nil {
 		t.Fatal(err)
 	}
 
-	_, err := db.UpdateNote(ctx, user.ID, "n1", "v2 from device B", 1)
+	_, err := db.UpdateNote(ctx, user.ID, "n1", "v2 from device B", testKeyID, 1)
 	var conflict *notes.ConflictError
 	if !errors.As(err, &conflict) {
 		t.Fatalf("stale update error = %v, want ConflictError", err)
 	}
-	if conflict.Current.Revision != 2 || conflict.Current.Markdown != "v2 from device A" {
+	if conflict.Current.Revision != 2 || conflict.Current.Content != "v2 from device A" {
 		t.Errorf("conflict current = %+v", conflict.Current)
 	}
 	if _, err := db.DeleteNote(ctx, user.ID, "n1", 1); !errors.As(err, &conflict) {
@@ -212,14 +226,14 @@ func TestStaleRevisionsConflict(t *testing.T) {
 	if _, err := db.DeleteNote(ctx, user.ID, "n1", 2); err != nil {
 		t.Fatal(err)
 	}
-	_, err = db.UpdateNote(ctx, user.ID, "n1", "stale edit after delete", 2)
+	_, err = db.UpdateNote(ctx, user.ID, "n1", "stale edit after delete", testKeyID, 2)
 	if !errors.As(err, &conflict) || !conflict.Current.Deleted() || conflict.Current.Revision != 3 {
 		t.Errorf("stale update of deleted note error = %v, want conflict with deleted current", err)
 	}
 	if _, err := db.DeleteNote(ctx, user.ID, "n1", 3); !errors.As(err, &conflict) || !conflict.Current.Deleted() {
 		t.Errorf("delete of deleted note error = %v, want conflict", err)
 	}
-	if _, err := db.UpdateNote(ctx, user.ID, "missing", "x", 1); !errors.Is(err, notes.ErrNotFound) {
+	if _, err := db.UpdateNote(ctx, user.ID, "missing", "x", testKeyID, 1); !errors.Is(err, notes.ErrNotFound) {
 		t.Errorf("update of missing note error = %v", err)
 	}
 }
@@ -228,7 +242,7 @@ func TestDeletedNotes(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()
 	user := createUser(t, db, "ada@example.com")
-	if _, err := db.CreateNote(ctx, user.ID, "n1", "v1"); err != nil {
+	if _, err := db.CreateNote(ctx, user.ID, "n1", "v1", testKeyID); err != nil {
 		t.Fatal(err)
 	}
 	deleted, err := db.DeleteNote(ctx, user.ID, "n1", 1)
@@ -237,21 +251,21 @@ func TestDeletedNotes(t *testing.T) {
 	}
 
 	// Creating over a tombstone conflicts, with the tombstone as current.
-	_, err = db.CreateNote(ctx, user.ID, "n1", "again")
+	_, err = db.CreateNote(ctx, user.ID, "n1", "again", testKeyID)
 	var conflict *notes.ConflictError
-	if !errors.As(err, &conflict) || !conflict.Current.Deleted() || conflict.Current.Revision != 2 || conflict.Current.Markdown != "v1" {
+	if !errors.As(err, &conflict) || !conflict.Current.Deleted() || conflict.Current.Revision != 2 || conflict.Current.Content != "v1" {
 		t.Fatalf("create over tombstone error = %v, want ConflictError with the tombstone", err)
 	}
 
 	// An edit at the tombstone's revision restores the note (edits beat deletions).
-	restored, err := db.UpdateNote(ctx, user.ID, "n1", "v2, restored", 2)
+	restored, err := db.UpdateNote(ctx, user.ID, "n1", "v2, restored", testKeyID, 2)
 	if err != nil {
 		t.Fatalf("restore: %v", err)
 	}
-	if restored.Deleted() || restored.Revision != 3 || restored.Markdown != "v2, restored" || restored.UpdatedAt.Before(deleted.UpdatedAt) {
+	if restored.Deleted() || restored.Revision != 3 || restored.Content != "v2, restored" || restored.UpdatedAt.Before(deleted.UpdatedAt) {
 		t.Errorf("restored = %+v", restored)
 	}
-	if got, err := db.GetNote(ctx, user.ID, "n1"); err != nil || got.Markdown != "v2, restored" {
+	if got, err := db.GetNote(ctx, user.ID, "n1"); err != nil || got.Content != "v2, restored" {
 		t.Errorf("GetNote after restore = %+v, %v", got, err)
 	}
 	if list, _ := db.ListNotes(ctx, user.ID); len(list) != 1 {
@@ -277,7 +291,7 @@ func TestConcurrentUpdatesOnlyOneWins(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()
 	user := createUser(t, db, "ada@example.com")
-	if _, err := db.CreateNote(ctx, user.ID, "n1", "v1"); err != nil {
+	if _, err := db.CreateNote(ctx, user.ID, "n1", "v1", testKeyID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -285,7 +299,7 @@ func TestConcurrentUpdatesOnlyOneWins(t *testing.T) {
 	results := make(chan error, 8)
 	for i := range 8 {
 		wg.Go(func() {
-			_, err := db.UpdateNote(ctx, user.ID, "n1", "writer "+string(rune('a'+i)), 1)
+			_, err := db.UpdateNote(ctx, user.ID, "n1", "writer "+string(rune('a'+i)), testKeyID, 1)
 			results <- err
 		})
 	}
@@ -313,20 +327,20 @@ func TestUsersCannotSeeEachOthersNotes(t *testing.T) {
 	ctx := context.Background()
 	ada := createUser(t, db, "ada@example.com")
 	bob := createUser(t, db, "bob@example.com")
-	if _, err := db.CreateNote(ctx, ada.ID, "shared-id", "Ada's"); err != nil {
+	if _, err := db.CreateNote(ctx, ada.ID, "shared-id", "Ada's", testKeyID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.GetNote(ctx, bob.ID, "shared-id"); !errors.Is(err, notes.ErrNotFound) {
 		t.Errorf("Bob read Ada's note: %v", err)
 	}
-	if _, err := db.CreateNote(ctx, bob.ID, "shared-id", "Bob's"); err != nil {
+	if _, err := db.CreateNote(ctx, bob.ID, "shared-id", "Bob's", testKeyID); err != nil {
 		t.Errorf("same id for another user: %v", err)
 	}
-	if _, err := db.UpdateNote(ctx, bob.ID, "shared-id", "overwrite", 1); err != nil {
+	if _, err := db.UpdateNote(ctx, bob.ID, "shared-id", "overwrite", testKeyID, 1); err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := db.GetNote(ctx, ada.ID, "shared-id"); got.Markdown != "Ada's" {
-		t.Errorf("Ada's note changed to %q", got.Markdown)
+	if got, _ := db.GetNote(ctx, ada.ID, "shared-id"); got.Content != "Ada's" {
+		t.Errorf("Ada's note changed to %q", got.Content)
 	}
 }
 
@@ -336,13 +350,13 @@ func TestChangesAreIncrementalAndOrdered(t *testing.T) {
 	user := createUser(t, db, "ada@example.com")
 	other := createUser(t, db, "bob@example.com")
 
-	if _, err := db.CreateNote(ctx, user.ID, "a", "A"); err != nil {
+	if _, err := db.CreateNote(ctx, user.ID, "a", "A", testKeyID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.CreateNote(ctx, user.ID, "b", "B"); err != nil {
+	if _, err := db.CreateNote(ctx, user.ID, "b", "B", testKeyID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.CreateNote(ctx, other.ID, "x", "not Ada's"); err != nil {
+	if _, err := db.CreateNote(ctx, other.ID, "x", "not Ada's", testKeyID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -351,14 +365,14 @@ func TestChangesAreIncrementalAndOrdered(t *testing.T) {
 		t.Fatalf("Changes = %+v, %d, %v", all, cursor, err)
 	}
 
-	if _, err := db.UpdateNote(ctx, user.ID, "a", "A2", 1); err != nil {
+	if _, err := db.UpdateNote(ctx, user.ID, "a", "A2", testKeyID, 1); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.DeleteNote(ctx, user.ID, "b", 1); err != nil {
 		t.Fatal(err)
 	}
 	// A failed (conflicting) change must not consume a sequence number.
-	if _, err := db.UpdateNote(ctx, user.ID, "a", "stale", 1); err == nil {
+	if _, err := db.UpdateNote(ctx, user.ID, "a", "stale", testKeyID, 1); err == nil {
 		t.Fatal("stale update succeeded")
 	}
 
@@ -366,7 +380,7 @@ func TestChangesAreIncrementalAndOrdered(t *testing.T) {
 	if err != nil || len(since) != 2 || next != 4 {
 		t.Fatalf("Changes since %d = %+v, %d, %v", cursor, since, next, err)
 	}
-	if since[0].ID != "a" || since[0].Markdown != "A2" || since[1].ID != "b" || !since[1].Deleted() {
+	if since[0].ID != "a" || since[0].Content != "A2" || since[1].ID != "b" || !since[1].Deleted() {
 		t.Errorf("changes = %+v", since)
 	}
 	if empty, same, _ := db.Changes(ctx, user.ID, next, 10); len(empty) != 0 || same != next {

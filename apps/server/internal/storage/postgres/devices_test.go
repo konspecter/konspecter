@@ -182,7 +182,7 @@ func TestAccountNameAndDeletion(t *testing.T) {
 	}
 
 	// Everything of hers: notes, devices, sessions, identities, codes.
-	if _, err := db.CreateNote(ctx, ann.ID, "n1", "# Note"); err != nil {
+	if _, err := db.CreateNote(ctx, ann.ID, "n1", "# Note", testKeyID); err != nil {
 		t.Fatal(err)
 	}
 	token, _ := db.CreateToken(ctx, ann.ID)
@@ -197,7 +197,7 @@ func TestAccountNameAndDeletion(t *testing.T) {
 	if _, err := db.DecideDeviceAuthorization(ctx, []byte("USER"), ann.ID, true); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.CreateNote(ctx, bob.ID, "n1", "# Bob's"); err != nil {
+	if _, err := db.CreateNote(ctx, bob.ID, "n1", "# Bob's", testKeyID); err != nil {
 		t.Fatal(err)
 	}
 

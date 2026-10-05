@@ -1,0 +1,18 @@
+{
+  "name": "@konspecter/crypto",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "End-to-end encryption of synced notes on WebCrypto, shared by the app and the site.",
+  "exports": {
+    ".": "./src/crypto.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -b"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.2"
+  }
+}

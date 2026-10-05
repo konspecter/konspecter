@@ -10,11 +10,11 @@ import (
 	"konspecter/server/internal/notes"
 )
 
-const noteColumns = `id, markdown, revision, created_at, updated_at, deleted_at`
+const noteColumns = `id, content, revision, created_at, updated_at, deleted_at`
 
 func scanNote(row pgx.Row) (notes.Note, error) {
 	var n notes.Note
-	err := row.Scan(&n.ID, &n.Markdown, &n.Revision, &n.CreatedAt, &n.UpdatedAt, &n.DeletedAt)
+	err := row.Scan(&n.ID, &n.Content, &n.Revision, &n.CreatedAt, &n.UpdatedAt, &n.DeletedAt)
 	return n, err
 }
 
@@ -64,19 +64,24 @@ func (db *DB) currentNote(ctx context.Context, q querier, userID, id string) (no
 	return n, nil
 }
 
-// CreateNote stores a new note at revision 1. If the id is taken, by a live
-// or a deleted note, it returns a *notes.ConflictError with that note.
-func (db *DB) CreateNote(ctx context.Context, userID, id, markdown string) (notes.Note, error) {
+// CreateNote stores a new note at revision 1, encrypted with the key keyID.
+// If the id is taken, by a live or a deleted note, it returns a
+// *notes.ConflictError with that note; if keyID is not the account's
+// current key, notes.ErrEncryptionRequired or notes.ErrKeyMismatch.
+func (db *DB) CreateNote(ctx context.Context, userID, id, content, keyID string) (notes.Note, error) {
 	var result notes.Note
 	err := pgx.BeginFunc(ctx, db.pool, func(tx pgx.Tx) error {
 		seq, err := nextChange(ctx, tx, userID)
 		if err != nil {
 			return err
 		}
+		if err := checkKey(ctx, tx, userID, keyID); err != nil {
+			return err
+		}
 		n, err := scanNote(tx.QueryRow(ctx, `
-			INSERT INTO notes (user_id, id, markdown, revision, change_seq) VALUES ($1, $2, $3, 1, $4)
+			INSERT INTO notes (user_id, id, content, key_id, revision, change_seq) VALUES ($1, $2, $3, $5, 1, $4)
 			ON CONFLICT DO NOTHING
-			RETURNING `+noteColumns, userID, id, markdown, seq))
+			RETURNING `+noteColumns, userID, id, content, seq, keyID))
 		if errors.Is(err, pgx.ErrNoRows) {
 			current, err := db.currentNote(ctx, tx, userID, id)
 			if err != nil {
@@ -107,6 +112,23 @@ func nextChange(ctx context.Context, tx pgx.Tx, userID string) (int64, error) {
 	return seq, nil
 }
 
+// checkKey makes sure keyID is the user's current content key. Called after
+// nextChange, under the user's row lock, so a key reset (which takes the
+// same lock) cannot slip in between the check and the write.
+func checkKey(ctx context.Context, tx pgx.Tx, userID, keyID string) error {
+	var current string
+	err := tx.QueryRow(ctx, `SELECT key_id FROM encryption_keys WHERE user_id = $1`, userID).Scan(&current)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return notes.ErrEncryptionRequired
+	case err != nil:
+		return fmt.Errorf("find key: %w", err)
+	case current != keyID:
+		return notes.ErrKeyMismatch
+	}
+	return nil
+}
+
 func recordChange(ctx context.Context, tx pgx.Tx, userID string, seq int64, n notes.Note, operation string) error {
 	_, err := tx.Exec(ctx, `INSERT INTO sync_changes (user_id, seq, note_id, revision, operation)
 		VALUES ($1, $2, $3, $4, $5)`, userID, seq, n.ID, n.Revision, operation)
@@ -116,20 +138,21 @@ func recordChange(ctx context.Context, tx pgx.Tx, userID string, seq int64, n no
 	return nil
 }
 
-// UpdateNote replaces the Markdown if the note is still at baseRevision. A
+// UpdateNote replaces the content if the note is still at baseRevision. A
 // deleted note at baseRevision is restored: edits beat deletions. Otherwise it
-// returns a *notes.ConflictError with the current version.
-func (db *DB) UpdateNote(ctx context.Context, userID, id, markdown string, baseRevision int64) (notes.Note, error) {
-	return db.change(ctx, userID, id, baseRevision, "update", `
-		UPDATE notes SET markdown = $5, revision = revision + 1, updated_at = now(), deleted_at = NULL, change_seq = $4
+// returns a *notes.ConflictError with the current version. keyID is checked
+// as for CreateNote.
+func (db *DB) UpdateNote(ctx context.Context, userID, id, content, keyID string, baseRevision int64) (notes.Note, error) {
+	return db.change(ctx, userID, id, baseRevision, "update", keyID, `
+		UPDATE notes SET content = $5, key_id = $6, revision = revision + 1, updated_at = now(), deleted_at = NULL, change_seq = $4
 		WHERE user_id = $1 AND id = $2 AND revision = $3
-		RETURNING `+noteColumns, markdown)
+		RETURNING `+noteColumns, content, keyID)
 }
 
 // DeleteNote marks the note deleted if it is still at baseRevision. The
-// Markdown is kept.
+// content is kept.
 func (db *DB) DeleteNote(ctx context.Context, userID, id string, baseRevision int64) (notes.Note, error) {
-	return db.change(ctx, userID, id, baseRevision, "delete", `
+	return db.change(ctx, userID, id, baseRevision, "delete", "", `
 		UPDATE notes SET revision = revision + 1, updated_at = now(), deleted_at = now(), change_seq = $4
 		WHERE user_id = $1 AND id = $2 AND revision = $3 AND deleted_at IS NULL
 		RETURNING `+noteColumns)
@@ -137,13 +160,18 @@ func (db *DB) DeleteNote(ctx context.Context, userID, id string, baseRevision in
 
 // change runs a conditional UPDATE. When no row matches, it reports why: the
 // note does not exist, or it changed (or, for a deletion, was already
-// deleted) since baseRevision.
-func (db *DB) change(ctx context.Context, userID, id string, baseRevision int64, operation, sql string, extra ...any) (notes.Note, error) {
+// deleted) since baseRevision. A keyID, when given, must be the current key.
+func (db *DB) change(ctx context.Context, userID, id string, baseRevision int64, operation, keyID, sql string, extra ...any) (notes.Note, error) {
 	var result notes.Note
 	err := pgx.BeginFunc(ctx, db.pool, func(tx pgx.Tx) error {
 		seq, err := nextChange(ctx, tx, userID)
 		if err != nil {
 			return err
+		}
+		if keyID != "" {
+			if err := checkKey(ctx, tx, userID, keyID); err != nil {
+				return err
+			}
 		}
 		args := append([]any{userID, id, baseRevision, seq}, extra...)
 		n, err := scanNote(tx.QueryRow(ctx, sql, args...))
@@ -178,7 +206,7 @@ func (db *DB) Changes(ctx context.Context, userID string, cursor int64, limit in
 	next := cursor
 	for rows.Next() {
 		var n notes.Note
-		if err := rows.Scan(&n.ID, &n.Markdown, &n.Revision, &n.CreatedAt, &n.UpdatedAt, &n.DeletedAt, &next); err != nil {
+		if err := rows.Scan(&n.ID, &n.Content, &n.Revision, &n.CreatedAt, &n.UpdatedAt, &n.DeletedAt, &next); err != nil {
 			return nil, 0, fmt.Errorf("list changes: %w", err)
 		}
 		changed = append(changed, n)

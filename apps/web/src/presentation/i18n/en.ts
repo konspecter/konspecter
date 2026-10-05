@@ -51,6 +51,7 @@ export const en = {
   "antenna.offline": "No connection: conspects are stored on this device and sync later",
   "syncHint.failed": "Sync failed",
   "syncHint.disconnected": "Sync stopped",
+  "syncHint.locked": "Sync locked",
   "syncHint.blocked": { one: "{count} not synced", other: "{count} not synced" },
   "syncHint.label": "Sync: {text}",
 
@@ -324,6 +325,19 @@ source, or delete this conspect when you are done.
   "sync.state.offline": "Offline — changes are kept and sent when you are back online",
   "sync.state.error": "Sync failed; retrying",
   "sync.state.disconnected": "Disconnected",
+  "sync.state.locked": "Locked",
+  "sync.lockedSetup":
+    "Conspects are encrypted before they leave this device, and this account has no encryption set up yet. Set it up on the site, then come back here.",
+  "sync.lockedUnlock":
+    "Enter your encryption passphrase to unlock sync on this device. Conspects are encrypted with it before they leave the device.",
+  "sync.openEncryptionSettings": "Open encryption settings",
+  "sync.passphrase": "Encryption passphrase",
+  "sync.unlock": "Unlock",
+  "sync.unlocking": "Unlocking…",
+  "sync.wrongPassphrase":
+    "That passphrase does not open this account's key. Check it and try again.",
+  "sync.unlockFailed": "Could not unlock: {error}",
+  "sync.forgotPassphrase": "Forgot it? Set a new passphrase on the site with your recovery key.",
   "sync.pending": { one: "{count} waiting to upload", other: "{count} waiting to upload" },
   "sync.blocked": { one: "{count} held back", other: "{count} held back" },
   "sync.connectedTo": "Connected to {server} as {account}.",

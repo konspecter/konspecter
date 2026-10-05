@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,6 +18,7 @@ import (
 
 	"konspecter/server/internal/auth"
 	"konspecter/server/internal/devices"
+	"konspecter/server/internal/keys"
 	"konspecter/server/internal/notes"
 )
 
@@ -28,10 +30,98 @@ type fakeRepository struct {
 	order   []string              // keys by last change, oldest first
 	lastSeq int64
 	fail    error
+	keys    map[string]keys.Key // by user id
 }
 
+// testKeyID is the key ada's and bob's notes are encrypted with.
+const testKeyID = "k1"
+
 func newFakeRepository() *fakeRepository {
-	return &fakeRepository{notes: map[string]notes.Note{}, seq: map[string]int64{}}
+	f := &fakeRepository{notes: map[string]notes.Note{}, seq: map[string]int64{}, keys: map[string]keys.Key{}}
+	for _, user := range []string{"user-ada", "user-bob"} {
+		f.keys[user] = keys.Key{ID: testKeyID, KDF: keys.KDF, Iterations: 600_000, UpdatedAt: time.Now()}
+	}
+	return f
+}
+
+// sealed stands for text encrypted with testKeyID: the server sees only
+// an envelope (it is not real ciphertext, which the server cannot tell).
+func sealed(text string) string {
+	return sealedWith(testKeyID, text)
+}
+
+func sealedWith(keyID, text string) string {
+	payload := append(append(make([]byte, 12), text...), make([]byte, 16)...)
+	return "ksp1." + keyID + "." + base64.RawURLEncoding.EncodeToString(payload)
+}
+
+func noteBody(id, text string) string {
+	return fmt.Sprintf(`{"id":%q,"content":%q}`, id, sealed(text))
+}
+
+func updateBody(text string, base int) string {
+	return fmt.Sprintf(`{"content":%q,"base_revision":%d}`, sealed(text), base)
+}
+
+// checkKey mirrors the storage: keyID must be the user's key (caller holds mu).
+func (f *fakeRepository) checkKey(userID, keyID string) error {
+	k, ok := f.keys[userID]
+	switch {
+	case !ok:
+		return notes.ErrEncryptionRequired
+	case k.ID != keyID:
+		return notes.ErrKeyMismatch
+	}
+	return nil
+}
+
+func (f *fakeRepository) Key(_ context.Context, userID string) (keys.Key, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	k, ok := f.keys[userID]
+	if !ok {
+		return keys.Key{}, keys.ErrNoKey
+	}
+	return k, nil
+}
+
+func (f *fakeRepository) CurrentKeyID(_ context.Context, userID string) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.keys[userID].ID, nil
+}
+
+func (f *fakeRepository) PutKey(_ context.Context, userID string, key keys.Key, base *time.Time) (keys.Key, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	current, exists := f.keys[userID]
+	switch {
+	case base == nil && exists:
+		return keys.Key{}, &keys.ConflictError{Current: current}
+	case base == nil:
+		key.CreatedAt = time.Now()
+	case !exists:
+		return keys.Key{}, keys.ErrNoKey
+	case current.ID != key.ID || !current.UpdatedAt.Equal(*base):
+		return keys.Key{}, &keys.ConflictError{Current: current}
+	default:
+		key.CreatedAt = current.CreatedAt
+	}
+	key.UpdatedAt = time.Now()
+	f.keys[userID] = key
+	return key, nil
+}
+
+func (f *fakeRepository) DeleteKey(_ context.Context, userID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.keys, userID)
+	for key := range f.notes {
+		if strings.HasPrefix(key, userID+"/") {
+			delete(f.notes, key)
+		}
+	}
+	return nil
 }
 
 // touch records a change to key (caller holds mu).
@@ -72,15 +162,18 @@ func (f *fakeRepository) GetNote(_ context.Context, userID, id string) (notes.No
 	return n, nil
 }
 
-func (f *fakeRepository) CreateNote(_ context.Context, userID, id, markdown string) (notes.Note, error) {
+func (f *fakeRepository) CreateNote(_ context.Context, userID, id, content, keyID string) (notes.Note, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if err := f.checkKey(userID, keyID); err != nil {
+		return notes.Note{}, err
+	}
 	key := userID + "/" + id
 	if n, ok := f.notes[key]; ok {
 		return notes.Note{}, &notes.ConflictError{Current: n}
 	}
 	now := time.Date(2026, 9, 28, 10, 0, 0, 0, time.UTC)
-	n := notes.Note{ID: id, Markdown: markdown, Revision: 1, CreatedAt: now, UpdatedAt: now}
+	n := notes.Note{ID: id, Content: content, Revision: 1, CreatedAt: now, UpdatedAt: now}
 	f.notes[key] = n
 	f.touch(key)
 	return n, nil
@@ -88,9 +181,14 @@ func (f *fakeRepository) CreateNote(_ context.Context, userID, id, markdown stri
 
 // change applies a change at base. Only an update may change a deleted note
 // (restoring it); a deletion of one conflicts.
-func (f *fakeRepository) change(userID, id string, base int64, restores bool, apply func(*notes.Note)) (notes.Note, error) {
+func (f *fakeRepository) change(userID, id, keyID string, base int64, restores bool, apply func(*notes.Note)) (notes.Note, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if keyID != "" {
+		if err := f.checkKey(userID, keyID); err != nil {
+			return notes.Note{}, err
+		}
+	}
 	key := userID + "/" + id
 	n, ok := f.notes[key]
 	if !ok {
@@ -106,15 +204,15 @@ func (f *fakeRepository) change(userID, id string, base int64, restores bool, ap
 	return n, nil
 }
 
-func (f *fakeRepository) UpdateNote(_ context.Context, userID, id, markdown string, base int64) (notes.Note, error) {
-	return f.change(userID, id, base, true, func(n *notes.Note) {
-		n.Markdown = markdown
+func (f *fakeRepository) UpdateNote(_ context.Context, userID, id, content, keyID string, base int64) (notes.Note, error) {
+	return f.change(userID, id, keyID, base, true, func(n *notes.Note) {
+		n.Content = content
 		n.DeletedAt = nil
 	})
 }
 
 func (f *fakeRepository) DeleteNote(_ context.Context, userID, id string, base int64) (notes.Note, error) {
-	return f.change(userID, id, base, false, func(n *notes.Note) {
+	return f.change(userID, id, "", base, false, func(n *notes.Note) {
 		now := time.Now()
 		n.DeletedAt = &now
 	})
@@ -456,14 +554,14 @@ func TestAPIRequiresAValidToken(t *testing.T) {
 func TestNoteCRUD(t *testing.T) {
 	server, _ := newTestServer(t)
 
-	r := call(t, server, "POST", "/api/notes", adaToken, `{"id":"n1","markdown":"# One"}`)
+	r := call(t, server, "POST", "/api/notes", adaToken, noteBody("n1", "# One"))
 	if r.status != http.StatusCreated || r.body["revision"] != 1.0 || r.header.Get("Location") != "/api/notes/n1" {
 		t.Fatalf("create = %d %v", r.status, r.body)
 	}
-	if r := call(t, server, "GET", "/api/notes/n1", adaToken, ""); r.status != http.StatusOK || r.body["markdown"] != "# One" {
+	if r := call(t, server, "GET", "/api/notes/n1", adaToken, ""); r.status != http.StatusOK || r.body["content"] != sealed("# One") {
 		t.Errorf("get = %d %v", r.status, r.body)
 	}
-	r = call(t, server, "PUT", "/api/notes/n1", adaToken, `{"markdown":"# One, edited","base_revision":1}`)
+	r = call(t, server, "PUT", "/api/notes/n1", adaToken, updateBody("# One, edited", 1))
 	if r.status != http.StatusOK || r.body["revision"] != 2.0 {
 		t.Errorf("update = %d %v", r.status, r.body)
 	}
@@ -481,60 +579,60 @@ func TestNoteCRUD(t *testing.T) {
 
 func TestStaleChangesReturnTheCurrentVersion(t *testing.T) {
 	server, _ := newTestServer(t)
-	call(t, server, "POST", "/api/notes", adaToken, `{"id":"n1","markdown":"v1"}`)
-	call(t, server, "PUT", "/api/notes/n1", adaToken, `{"markdown":"v2 from A","base_revision":1}`)
+	call(t, server, "POST", "/api/notes", adaToken, noteBody("n1", "v1"))
+	call(t, server, "PUT", "/api/notes/n1", adaToken, updateBody("v2 from A", 1))
 
-	r := call(t, server, "PUT", "/api/notes/n1", adaToken, `{"markdown":"v2 from B","base_revision":1}`)
+	r := call(t, server, "PUT", "/api/notes/n1", adaToken, updateBody("v2 from B", 1))
 	current, _ := r.body["current"].(map[string]any)
-	if r.status != http.StatusConflict || errorCode(r) != "revision_conflict" || current["markdown"] != "v2 from A" || current["revision"] != 2.0 {
+	if r.status != http.StatusConflict || errorCode(r) != "revision_conflict" || current["content"] != sealed("v2 from A") || current["revision"] != 2.0 {
 		t.Errorf("stale update = %d %v", r.status, r.body)
 	}
 	if r := call(t, server, "DELETE", "/api/notes/n1?base_revision=1", adaToken, ""); r.status != http.StatusConflict {
 		t.Errorf("stale delete = %d", r.status)
 	}
-	r = call(t, server, "POST", "/api/notes", adaToken, `{"id":"n1","markdown":"x"}`)
+	r = call(t, server, "POST", "/api/notes", adaToken, noteBody("n1", "x"))
 	current, _ = r.body["current"].(map[string]any)
-	if r.status != http.StatusConflict || errorCode(r) != "revision_conflict" || current["markdown"] != "v2 from A" {
+	if r.status != http.StatusConflict || errorCode(r) != "revision_conflict" || current["content"] != sealed("v2 from A") {
 		t.Errorf("duplicate create = %d %v", r.status, r.body)
 	}
 }
 
 func TestDeletedNotes(t *testing.T) {
 	server, _ := newTestServer(t)
-	call(t, server, "POST", "/api/notes", adaToken, `{"id":"n1","markdown":"v1"}`)
+	call(t, server, "POST", "/api/notes", adaToken, noteBody("n1", "v1"))
 	call(t, server, "DELETE", "/api/notes/n1?base_revision=1", adaToken, "")
 
 	// Creating over a tombstone conflicts, with the tombstone as current.
-	r := call(t, server, "POST", "/api/notes", adaToken, `{"id":"n1","markdown":"again"}`)
+	r := call(t, server, "POST", "/api/notes", adaToken, noteBody("n1", "again"))
 	current, _ := r.body["current"].(map[string]any)
 	if r.status != http.StatusConflict || errorCode(r) != "revision_conflict" || current["revision"] != 2.0 || current["deleted_at"] == nil {
 		t.Errorf("create over tombstone = %d %v", r.status, r.body)
 	}
 	// A stale base still conflicts.
-	if r := call(t, server, "PUT", "/api/notes/n1", adaToken, `{"markdown":"stale","base_revision":1}`); r.status != http.StatusConflict || errorCode(r) != "revision_conflict" {
+	if r := call(t, server, "PUT", "/api/notes/n1", adaToken, updateBody("stale", 1)); r.status != http.StatusConflict || errorCode(r) != "revision_conflict" {
 		t.Errorf("stale update of tombstone = %d %v", r.status, r.body)
 	}
 	// An edit at the tombstone's revision restores the note.
-	r = call(t, server, "PUT", "/api/notes/n1", adaToken, `{"markdown":"restored","base_revision":2}`)
-	if r.status != http.StatusOK || r.body["revision"] != 3.0 || r.body["deleted_at"] != nil || r.body["markdown"] != "restored" {
+	r = call(t, server, "PUT", "/api/notes/n1", adaToken, updateBody("restored", 2))
+	if r.status != http.StatusOK || r.body["revision"] != 3.0 || r.body["deleted_at"] != nil || r.body["content"] != sealed("restored") {
 		t.Errorf("restore = %d %v", r.status, r.body)
 	}
-	if r := call(t, server, "GET", "/api/notes/n1", adaToken, ""); r.status != http.StatusOK || r.body["markdown"] != "restored" {
+	if r := call(t, server, "GET", "/api/notes/n1", adaToken, ""); r.status != http.StatusOK || r.body["content"] != sealed("restored") {
 		t.Errorf("get after restore = %d %v", r.status, r.body)
 	}
-	if r := call(t, server, "PUT", "/api/notes/missing", adaToken, `{"markdown":"x","base_revision":1}`); r.status != http.StatusNotFound {
+	if r := call(t, server, "PUT", "/api/notes/missing", adaToken, updateBody("x", 1)); r.status != http.StatusNotFound {
 		t.Errorf("update of missing note = %d", r.status)
 	}
 }
 
 func TestNotesAreScopedToTheUser(t *testing.T) {
 	server, _ := newTestServer(t)
-	call(t, server, "POST", "/api/notes", adaToken, `{"id":"n1","markdown":"Ada's"}`)
+	call(t, server, "POST", "/api/notes", adaToken, noteBody("n1", "Ada's"))
 
 	if r := call(t, server, "GET", "/api/notes/n1", bobToken, ""); r.status != http.StatusNotFound {
 		t.Errorf("Bob got Ada's note: %d %v", r.status, r.body)
 	}
-	if r := call(t, server, "PUT", "/api/notes/n1", bobToken, `{"markdown":"x","base_revision":1}`); r.status != http.StatusNotFound {
+	if r := call(t, server, "PUT", "/api/notes/n1", bobToken, updateBody("x", 1)); r.status != http.StatusNotFound {
 		t.Errorf("Bob updated Ada's note: %d", r.status)
 	}
 }
@@ -545,12 +643,13 @@ func TestRejectsInvalidRequests(t *testing.T) {
 		name, method, path, body, code string
 		status                         int
 	}{
-		{"unknown field", "POST", "/api/notes", `{"id":"n1","markdown":"x","extra":1}`, "invalid_json", 400},
-		{"missing markdown", "POST", "/api/notes", `{"id":"n1"}`, "invalid_request", 400},
-		{"bad id", "POST", "/api/notes", `{"id":"no spaces","markdown":"x"}`, "invalid_id", 400},
-		{"trailing data", "POST", "/api/notes", `{"id":"n1","markdown":"x"} {}`, "invalid_json", 400},
-		{"not JSON", "POST", "/api/notes", `markdown`, "invalid_json", 400},
-		{"missing base revision", "PUT", "/api/notes/n1", `{"markdown":"x"}`, "invalid_request", 400},
+		{"unknown field", "POST", "/api/notes", `{"id":"n1","content":"x","extra":1}`, "invalid_json", 400},
+		{"the old field", "POST", "/api/notes", `{"id":"n1","markdown":"# Plain"}`, "invalid_json", 400},
+		{"missing content", "POST", "/api/notes", `{"id":"n1"}`, "invalid_request", 400},
+		{"bad id", "POST", "/api/notes", noteBody("no spaces", "x"), "invalid_id", 400},
+		{"trailing data", "POST", "/api/notes", noteBody("n1", "x") + ` {}`, "invalid_json", 400},
+		{"not JSON", "POST", "/api/notes", `content`, "invalid_json", 400},
+		{"missing base revision", "PUT", "/api/notes/n1", `{"content":"x"}`, "invalid_request", 400},
 		{"delete without revision", "DELETE", "/api/notes/n1", "", "invalid_request", 400},
 		{"unknown endpoint", "GET", "/api/nothing", "", "not_found", 404},
 	}
@@ -562,9 +661,41 @@ func TestRejectsInvalidRequests(t *testing.T) {
 	}
 }
 
+func TestTakesOnlyEnvelopesOfTheCurrentKey(t *testing.T) {
+	server, repository := newTestServer(t)
+	for _, plain := range []string{"# Plain Markdown", "ksp1.k1.short", "ksp1.k1." + strings.Repeat("A", 39) + "!"} {
+		body := fmt.Sprintf(`{"id":"n1","content":%q}`, plain)
+		if r := call(t, server, "POST", "/api/notes", adaToken, body); r.status != http.StatusBadRequest || errorCode(r) != "invalid_content" {
+			t.Errorf("%.20q: %d %v", plain, r.status, r.body)
+		}
+	}
+	other := fmt.Sprintf(`{"id":"n1","content":%q}`, sealedWith("old-key", "x"))
+	if r := call(t, server, "POST", "/api/notes", adaToken, other); r.status != http.StatusConflict || errorCode(r) != "key_mismatch" {
+		t.Errorf("another key: %d %v", r.status, r.body)
+	}
+	call(t, server, "POST", "/api/notes", adaToken, noteBody("n2", "v1"))
+	update := fmt.Sprintf(`{"content":%q,"base_revision":1}`, sealedWith("old-key", "v2"))
+	if r := call(t, server, "PUT", "/api/notes/n2", adaToken, update); r.status != http.StatusConflict || errorCode(r) != "key_mismatch" {
+		t.Errorf("an update with another key: %d %v", r.status, r.body)
+	}
+
+	repository.mu.Lock()
+	delete(repository.keys, "user-bob")
+	repository.mu.Unlock()
+	if r := call(t, server, "POST", "/api/notes", bobToken, noteBody("b", "x")); r.status != http.StatusConflict || errorCode(r) != "encryption_required" {
+		t.Errorf("without a key: %d %v", r.status, r.body)
+	}
+	if r := call(t, server, "GET", "/api/sync", bobToken, ""); r.body["key_id"] != nil {
+		t.Errorf("sync without a key names %v", r.body["key_id"])
+	}
+	if r := call(t, server, "GET", "/api/sync", adaToken, ""); r.body["key_id"] != testKeyID {
+		t.Errorf("sync names key %v", r.body["key_id"])
+	}
+}
+
 func TestRequiresJSONContentType(t *testing.T) {
 	server, _ := newTestServer(t)
-	req, _ := http.NewRequest("POST", server.URL+"/api/notes", strings.NewReader(`{"id":"n1","markdown":"x"}`))
+	req, _ := http.NewRequest("POST", server.URL+"/api/notes", strings.NewReader(noteBody("n1", "x")))
 	req.Header.Set("Authorization", "Bearer "+adaToken)
 	req.Header.Set("Content-Type", "text/plain")
 	res, err := server.Client().Do(req)
@@ -579,7 +710,7 @@ func TestRequiresJSONContentType(t *testing.T) {
 
 func TestRejectsOversizedBodies(t *testing.T) {
 	server, _ := newTestServer(t)
-	body := `{"id":"n1","markdown":"` + strings.Repeat("a", maxBodyBytes) + `"}`
+	body := `{"id":"n1","content":"ksp1.k1.` + strings.Repeat("a", maxBodyBytes) + `"}`
 	if r := call(t, server, "POST", "/api/notes", adaToken, body); r.status != http.StatusRequestEntityTooLarge {
 		t.Errorf("status = %d, want 413", r.status)
 	}
@@ -599,9 +730,9 @@ func TestHidesInternalErrors(t *testing.T) {
 
 func TestSyncReturnsChangesSinceACursor(t *testing.T) {
 	server, _ := newTestServer(t)
-	call(t, server, "POST", "/api/notes", adaToken, `{"id":"a","markdown":"A"}`)
-	call(t, server, "POST", "/api/notes", adaToken, `{"id":"b","markdown":"B"}`)
-	call(t, server, "POST", "/api/notes", bobToken, `{"id":"bob","markdown":"not Ada's"}`)
+	call(t, server, "POST", "/api/notes", adaToken, noteBody("a", "A"))
+	call(t, server, "POST", "/api/notes", adaToken, noteBody("b", "B"))
+	call(t, server, "POST", "/api/notes", bobToken, noteBody("bob", "not Ada's"))
 
 	first := call(t, server, "GET", "/api/sync?limit=1", adaToken, "")
 	firstNotes, _ := first.body["notes"].([]any)

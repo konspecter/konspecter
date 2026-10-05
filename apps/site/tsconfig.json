@@ -7,5 +7,9 @@
     "rootDirs": [".", "./.react-router/types"]
   },
   "include": ["app", ".react-router/types/**/*", "vite.config.ts", "react-router.config.ts"],
-  "references": [{ "path": "../../packages/i18n" }, { "path": "../../packages/ui" }]
+  "references": [
+    { "path": "../../packages/crypto" },
+    { "path": "../../packages/i18n" },
+    { "path": "../../packages/ui" }
+  ]
 }
