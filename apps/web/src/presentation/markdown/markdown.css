@@ -12,7 +12,7 @@
 .markdown h4,
 .markdown h5,
 .markdown h6 {
-  margin: 1.8em 0 0.5em;
+  margin: 1.2em 0 0.5em;
   font-weight: 700;
   line-height: 1.25;
 }
@@ -216,4 +216,29 @@
 
 .hljs-strong {
   font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .markdown h1 {
+    font-size: calc(24px * var(--font-scale));
+  }
+
+  .markdown h2 {
+    font-size: calc(22px * var(--font-scale));
+  }
+
+  .markdown h3 {
+    font-size: calc(18px * var(--font-scale));
+  }
+
+  .markdown h1,
+  .markdown h2,
+  .markdown h3,
+  .markdown h4,
+  .markdown h5,
+  .markdown h6 {
+    margin: 1em 0 0.5em;
+    font-weight: 700;
+    line-height: 1.1;
+  }
 }

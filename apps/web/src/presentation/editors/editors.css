@@ -353,7 +353,11 @@
   }
 
   .title-field {
-    font-size: calc(28px * var(--font-scale));
+    font-size: calc(26px * var(--font-scale));
+  }
+
+  .text-editor {
+    font-size: calc(15px * var(--font-scale));
   }
 
   .markdown-source .cm-editor {
