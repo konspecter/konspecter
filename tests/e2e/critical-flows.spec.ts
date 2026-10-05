@@ -26,6 +26,15 @@ async function createNote(page: Page, lines: string[]) {
 
 const list = (page: Page) => page.getByRole("list", { name: "Conspects" });
 
+/**
+ * Opens the list through the app's own link. Loading "/" would not do: the app opens
+ * where it was last (presentation/app/last-location.ts).
+ */
+async function openList(page: Page) {
+  await page.getByRole("banner").getByRole("link", { name: "All conspects" }).click();
+  await expect(page).toHaveURL(/\/$/);
+}
+
 /** The modifier the app uses for its shortcuts on this (possibly emulated) platform. */
 async function mod(page: Page): Promise<"Meta" | "Control"> {
   const mac = await page.evaluate(() => {
@@ -39,6 +48,7 @@ test("Markdown → index → search, and Markdown → tags → navigation", asyn
   await createNote(page, ["# Hash maps", "Buckets and collisions #java#collections"]);
   await createNote(page, ["# Networking", "TCP handshakes #net"]);
 
+  await openList(page);
   await page.keyboard.press(`${await mod(page)}+p`);
   const search = page.getByRole("searchbox", { name: "Search conspects" });
   await expect(search).toBeFocused();
@@ -77,7 +87,7 @@ test("notes persist in IndexedDB across reloads and render as Markdown", async (
   await page.getByRole("banner").getByRole("button", { name: "Markdown", pressed: true }).click();
   await expect(page.getByRole("table")).toContainText("sorted");
   await expect(page.locator("pre code.language-java .hljs-keyword").first()).toBeVisible();
-  await page.goto("/");
+  await openList(page);
   await expect(list(page)).toContainText("Persisted");
 });
 
@@ -95,7 +105,7 @@ test("keeps working offline after the first visit", async ({ page, context }) =>
     "Written before going offline.",
   );
   await createNote(page, ["# Written offline", "Still works."]);
-  await page.goto("/");
+  await openList(page);
   await expect(list(page).getByRole("link")).toHaveText(["Written offline", "Offline ready"]);
 });
 
@@ -162,7 +172,7 @@ test("the later edit wins (editing while the note changes in another tab)", asyn
   await expect(otherEditor).toContainText("original my edit again");
   await expect(otherEditor).not.toContainText("other tab's edit");
   await expect(page.getByText(/conflict copy/)).toHaveCount(0);
-  await page.goto("/");
+  await openList(page);
   await expect(list(page).getByRole("link", { name: /Shared/ })).toHaveCount(1);
 });
 

@@ -59,7 +59,9 @@ apps/desktop/
 - **Native boundary:** `apps/web/src/infrastructure/desktop/desktop.ts`. `isDesktop()` detects
   the shell, and typed wrappers call Rust commands with validated results. Today there is one
   command, `app_info`, which Settings → About shows. File Mode adds folder access and the
-  file watcher here.
+  file watcher here. `open_url` opens the site's approval page in the system browser for
+  _Sign in with browser_ (http and https addresses only), and `credential_*` keep the sync
+  token in the OS keychain.
 - **Log file:** `log_error` (`src-tauri/src/log.rs`) appends the errors the interface hides
   ([UI: errors](ui.md#errors)) to `konspecter.log` in the platform's log directory (macOS:
   `~/Library/Logs/app.konspecter.desktop/`, shown by Console.app). Not next to the binary:
@@ -87,6 +89,9 @@ apps/mobile/
 - **Sync:** the app's origin is `https://localhost`, so the server needs
   `KONSPECTER_ALLOWED_ORIGINS=https://localhost` (plus the web origin). Cleartext HTTP is not
   allowed, so use an `https://` server URL.
+  _Sign in with browser_ opens the site's approval page in the system browser (Capacitor
+  hands `window.open` to it); unlocking with the passphrase runs in the app's WebView
+  (WebCrypto).
 - **Layout:** the viewport uses `viewport-fit=cover`, and the page keeps clear of notches and
   rounded corners with `env(safe-area-inset-*)`.
 - **Building:** `pnpm --filter @konspecter/mobile android:debug` produces

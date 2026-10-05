@@ -3,11 +3,14 @@
 Local-first: every read and write goes to IndexedDB, and a background engine exchanges
 changes with the server whenever it can ([ADR-003](decisions/ADR-003-local-first.md)).
 Sync is document- and revision-oriented. **The later edit wins**
-([ADR-011](decisions/ADR-011-last-write-wins.md)), and the server tells clients when to sync
-([ADR-012](decisions/ADR-012-change-events.md)).
+([ADR-011](decisions/ADR-011-last-write-wins.md)), the server tells clients when to sync
+([ADR-012](decisions/ADR-012-change-events.md)), apps connect through the browser
+([ADR-016](decisions/ADR-016-device-authorization.md)), and **notes are encrypted on the
+device**: the server only ever holds ciphertext
+([ADR-017](decisions/ADR-017-end-to-end-encryption.md)).
 
 ```text
-UI → NoteStore (IndexedDB) ⇄ SyncEngine ⇄ HTTP/JSON API ⇄ PostgreSQL
+UI → NoteStore (IndexedDB) ⇄ SyncEngine ⇄ ApiClient (encrypts, decrypts) ⇄ HTTP/JSON API ⇄ PostgreSQL
 ```
 
 ## Server side
@@ -20,7 +23,10 @@ UI → NoteStore (IndexedDB) ⇄ SyncEngine ⇄ HTTP/JSON API ⇄ PostgreSQL
   logs every change (`seq`, `note_id`, `revision`, `operation`).
 - `GET /api/sync?since=<cursor>&limit=<n>` returns the notes changed after the cursor, in
   sequence order and in their current state. Deleted notes are included as tombstones
-  (`deleted_at`). It also returns the next `cursor` and whether there is `more`.
+  (`deleted_at`). It also returns the next `cursor`, whether there is `more`, and the
+  account's current `key_id`.
+- Notes arrive and leave as envelopes (`content`); a write under any key but the current
+  one is refused (`409 encryption_required` / `key_mismatch`).
 - Pushes use the note endpoints with `base_revision`. A stale base gets `409` with the
   current version, and so does creating an id that exists (see [server](server.md)). An
   update at a deleted note's revision restores it.
@@ -48,7 +54,27 @@ One entry per note (`domain/sync/sync-state.ts`):
   forgotten.
 - **The offline queue is the set of dirty entries.** Ten offline edits to a note produce one
   upload of its latest text. There is no operation log that can grow or replay out of order.
-- The sync cursor and the connection (server URL, token, account) live in `meta`.
+- The sync cursor and the connection (server URL, token, account) live in `meta`, and so
+  does the content key (`syncKey`: its id and a non-extractable `CryptoKey`). The desktop
+  app keeps the token in the OS keychain instead.
+
+### Encryption (`infrastructure/http/api-client.ts`, `packages/crypto`)
+
+`ApiClient` is the only place notes are encrypted: with the unlocked key it sends every note
+as `ksp1.<key_id>.<base64url>` (AES-256-GCM, the note id as additional data) and decrypts
+every note it receives, deleted ones aside. Everything above it (the engine, conflict
+resolution, the note store) works with plain Markdown, exactly as before.
+
+- **Locked:** without the key nothing is sent or read, and the engine's state is `locked`:
+  `lock: "setup"` (no key on the server: set encryption up on the site) or `"unlock"`
+  (enter the passphrase). `unlock(passphrase)` fetches the wrapped key (`GET /api/keys`),
+  unwraps it and stores it.
+- **A new key** (the first one, or one set up after a reset) means the server's notes were
+  made without this device: unlocking it runs `resetSync()`, and every local note is
+  uploaded again under it. Unlocking the key the device held before carries on.
+- **The key changed:** a pull whose `key_id` differs from the device's, or a push answered
+  `key_mismatch` / `encryption_required`, drops the key (its id is kept) and locks. Nothing
+  is held back as rejected, and the cursor does not move.
 
 ### A sync cycle (`infrastructure/sync/sync-engine.ts`)
 
@@ -71,12 +97,14 @@ One entry per note (`domain/sync/sync-state.ts`):
 
 ### Failures
 
-| Situation                                           | Result                                                                |
-| --------------------------------------------------- | --------------------------------------------------------------------- |
-| `409` on push (stale base, or id exists)            | a conflict, settled at the end of the cycle                           |
-| `4xx` the server will never accept (e.g. too large) | entry blocked as rejected, with the message; other notes keep syncing |
-| offline (`navigator.onLine`, or fetch fails)        | state `offline`; the `online` event triggers a cycle                  |
-| `5xx`, `401`, `429`, timeouts                       | state `error`, retry with backoff                                     |
+| Situation                                                | Result                                                                                |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `409` on push (stale base, or id exists)                 | a conflict, settled at the end of the cycle                                           |
+| `4xx` the server will never accept (e.g. too large)      | entry blocked as rejected, with the message; other notes keep syncing                 |
+| offline (`navigator.onLine`, or fetch fails)             | state `offline`; the `online` event triggers a cycle                                  |
+| `409 key_mismatch` / `encryption_required`, new `key_id` | state `locked` until the passphrase unlocks the current key                           |
+| `401` (disconnected on the site, account deleted)        | state `disconnected`: token and key forgotten, **every note and pending change kept** |
+| `5xx`, `429`, timeouts, a note that fails to decrypt     | state `error`, retry with backoff                                                     |
 
 Retries back off exponentially with jitter: about 2 s, 4 s, 8 s … up to 5 minutes.
 A success resets the backoff.
@@ -143,22 +171,38 @@ they sync with file-level tools ([ADR-009](decisions/ADR-009-file-mode-and-sync.
 
 ## UI
 
-Settings → **Sync**: connect with a server URL and an access token (from
-`server create-user` / `create-token`). The token is checked with `GET /api/me`. Then the
-status, last sync, waiting and held-back counts, _Sync now_ and _Disconnect_ are shown.
+Settings → **Sync**:
+
+1. **Sign in with browser** (the server URL defaults to the build's
+   `VITE_KONSPECTER_SERVER_URL`): the app shows a code and opens the site's `/activate`
+   page in the browser (a tab on the web, the system browser on desktop and mobile). Once
+   the code is approved there, it connects. A token from `server create-token` can still
+   be entered under **Advanced**.
+2. **Unlock**: the passphrase prompt, or, while the account has no encryption, a button to
+   the site's encryption settings.
+3. Then the status, last sync, waiting and held-back counts, _Sync now_ and _Disconnect_.
+
 Connecting to a different account queues every local note for upload to it. Disconnecting
-keeps all notes. The top bar shows "Sync failed" or "N not synced" when sync needs
-attention, and its antenna transmits while a sync cycle runs.
+signs the device out on the server and keeps all notes. A device disconnected on the site
+(or whose account was deleted) shows so, keeps everything, and offers _Sign in again_
+(which carries on where it stopped) or _Stop syncing_. The top bar shows "Sync failed",
+"Sync locked", "Sync stopped" or "N not synced" when sync needs attention, and its antenna
+transmits while a sync cycle runs.
 
 ## Testing
 
-- `fake-server.ts` implements the server's rules in memory behind `fetch`, change events
-  included (off by default, like an older server). The engine tests run two or three
-  simulated devices against it: create, edit, delete in both directions, offline queue and
-  coalescing, edits during a push, the later edit winning, rejected notes, backoff,
-  reconnecting, and the change stream (events, polling while it is down, reconnecting).
+- `fake-server.ts` implements the server's rules in memory behind `fetch`: change events
+  (off by default, like an older server), the device flow, revoked devices and encryption.
+  It makes a real key (passphrase `TEST_PASSPHRASE`) and, knowing it, keeps each note's text
+  beside its envelope for tests to look at. The engine tests run two or three simulated
+  devices against it: create, edit, delete in both directions, offline queue and coalescing,
+  edits during a push, the later edit winning, rejected notes, backoff, reconnecting, the
+  change stream, signing in with the browser, a disconnected device keeping its notes,
+  ciphertext-only traffic, locking and unlocking, a wrong passphrase, and a reset or a new
+  key re-uploading everything.
 - `real-server.e2e.test.ts` runs the two-device flow and the change stream against a real
-  server:
+  server. It sets encryption up when the account has none (`KONSPECTER_E2E_PASSPHRASE`,
+  with a default) and unlocks:
 
   ```sh
   cd apps/server && KONSPECTER_DATABASE_URL=… go run ./cmd/server create-user -email e2e@example.com
@@ -170,4 +214,5 @@ attention, and its antenna transmits while a sync cycle runs.
 
 - The PWA syncs while the app is open. There is no service-worker Background Sync, which only
   Chromium supports and which would need the token in the service worker.
-- The token is stored in IndexedDB. Secure credential storage belongs to the Security phase.
+- Metadata (note ids, sizes, timing) is visible to the server, and a rollback to an older
+  ciphertext of a note is not detected ([ADR-017](decisions/ADR-017-end-to-end-encryption.md)).

@@ -33,6 +33,29 @@ jobs:
           draft: true
           files: konspecter-web-*.zip
 
+  site:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # As apps/site/Dockerfile: the build plus its production dependencies.
+      - run: |
+          name="konspecter-site-${GITHUB_REF_NAME}"
+          pnpm --filter @konspecter/site build
+          pnpm --filter @konspecter/site deploy --legacy --prod "out/${name}"
+          cp -r apps/site/build "out/${name}/build"
+          tar -czf "${name}.tar.gz" -C out "${name}"
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: konspecter-site-*.tar.gz
+
   server:
     needs: check
     runs-on: ubuntu-latest

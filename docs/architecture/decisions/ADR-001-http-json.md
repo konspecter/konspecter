@@ -1,6 +1,8 @@
 # ADR-001: HTTP/JSON API
 
-Status: accepted (2026-09-28)
+Status: accepted (2026-09-28). Amended by [ADR-015](ADR-015-accounts-and-sessions.md)
+(browsers also authenticate, with a session cookie) and
+[ADR-017](ADR-017-end-to-end-encryption.md) (notes travel encrypted, as `content`).
 
 ## Context
 

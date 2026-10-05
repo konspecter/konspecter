@@ -63,10 +63,13 @@ All planned phases are done. New work needs a new plan in `.claude/plans/`.
 | Mode place | Switching modes keeps the caret and the text on screen where they were      | Done   |
 | Mobile     | Island buttons, full-screen sidebar, details button, top toolbar, sizes     | Done   |
 | Updates 4  | Code highlighting, swipes, back/forward, task lists, folders = tags, lists  | Done   |
+| Sync site  | Account site, email and social sign-in, devices, end-to-end encrypted sync  | Done   |
 
 Specs and notes: `.claude/plans/updates-1.md` (+ `updates-1-implementation.md`), `updates-2.md`
-(+ `updates-2-implementation.md`), `markdown-single-source.md`, `last-write-wins.md`, `tag-chains.md` (item 1 of `updates-3.md`), `note-find.md` (item 3), `friendly-errors.md` (item 5), `slug-file-names.md` (item 8), `mode-switch-place.md` (item 14), `mobile-view.md` (mobile view updates), `updates-4.md` (+ `updates-4-implementation.md`). UI architecture: `docs/architecture/ui.md`; languages:
-`docs/architecture/i18n.md`.
+(+ `updates-2-implementation.md`), `markdown-single-source.md`, `last-write-wins.md`, `tag-chains.md` (item 1 of `updates-3.md`), `note-find.md` (item 3), `friendly-errors.md` (item 5), `slug-file-names.md` (item 8), `mode-switch-place.md` (item 14), `mobile-view.md` (mobile view updates), `updates-4.md` (+ `updates-4-implementation.md`), `sync-app-site.md` (+
+`sync-app-site-implementation.md`; ADR-014 to ADR-017). UI architecture:
+`docs/architecture/ui.md`; languages: `docs/architecture/i18n.md`; server and API:
+`docs/architecture/server.md`.
 
 ## Working rules
 
@@ -104,24 +107,29 @@ apps/web/                 React + Vite web app (the shared UI for all clients)
   src/application/        NoteRepository port, note catalog, autosave (notes/), import and export (library/)
   src/domain/             pure domain rules (document/, note/, reading/, search/, settings/, sync/, tag/)
   src/infrastructure/     IndexedDB storage (storage/), search index (search/), API client
-                          (http/), sync engine (sync/), desktop bridge (desktop/), File Mode (folder/),
+                          (http/, the one place notes are encrypted), sync engine and device sign-in
+                          (sync/), desktop bridge (desktop/), File Mode (folder/),
                           mobile detection (mobile/),
                           browser files, ZIP, downloads (files/)
   src/presentation/       UI: app/ (routes, styles), components/, editors/, hooks/, i18n/ (en, ru),
                           markdown/, pages/
 apps/site/                Account site: React Router (framework mode) with server rendering in
-                          Node; landing page now, accounts next (sync-app-site plan); calls the Go API
+                          Node: landing, sign-in, settings (devices, encryption), /activate; calls the Go API
+  app/routes/             one module per page (loader, action, component)
 apps/mobile/              Capacitor 8 Android app around apps/web (android/: generated Gradle project)
 apps/desktop/             Tauri 2 desktop shell around apps/web
   src-tauri/src/          Rust: lib.rs (commands), folder.rs (File Mode file access)
 apps/server/              Go HTTP server (module konspecter/server)
   cmd/server/             entry point (serve, migrate, create-user, create-token, revoke-tokens)
-  internal/               config (env + .env), notes, auth, httpapi, storage/postgres
+  internal/               config (env + .env), notes, keys, auth, accounts, devices, oauth, mail,
+                          httpapi, storage/postgres
   migrations/             embedded SQL migrations
 packages/ui/              shared look of the app and the site: tokens, fonts, base, controls, icons
 packages/i18n/            shared message engine: translators, plurals, locale detection, rich text
+packages/crypto/          end-to-end encryption on WebCrypto: content key, wrapping, recovery key, envelopes
 deploy/                   docker compose: PostgreSQL, the API, the site and Caddy on one origin
-docs/architecture/        architecture overview, UI (ui.md) and ADRs
+docs/architecture/        architecture overview, UI (ui.md), server (server.md), sync (sync.md) and ADRs
+docs/release.md           releasing, and upgrading to end-to-end encryption
 docs/testing.md           test strategy and map
 docs/performance.md       measurements and optimizations
 docs/security.md          threat model and measures
@@ -153,7 +161,8 @@ pnpm build            # production build
 pnpm format           # Prettier (write); format:check to verify
 pnpm licenses:check   # npm dependency license policy
 pnpm check            # all of the above, as CI runs them
-pnpm e2e              # Playwright end-to-end tests in Chromium (see docs/testing.md)
+pnpm e2e              # Playwright end-to-end tests in Chromium (see docs/testing.md; the account
+                      # and sync flows need a live server: KONSPECTER_E2E_* variables)
 pnpm icons            # re-render every app icon from scripts/render-icons.mjs (needs e2e deps)
 pnpm --filter @konspecter/web coverage   # unit tests with coverage
 pnpm --filter @konspecter/web bench      # performance measurements (docs/performance.md)

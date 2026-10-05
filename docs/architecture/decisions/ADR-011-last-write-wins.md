@@ -3,7 +3,9 @@
 Status: accepted (2026-09-29). Supersedes the conflict rules of
 [ADR-003](ADR-003-local-first.md) ("never lose a document version"),
 [ADR-009](ADR-009-file-mode-and-sync.md) (conflict copies in File Mode) and
-[ADR-010](ADR-010-autosave-editor-first.md) §4 (conflict copies on save).
+[ADR-010](ADR-010-autosave-editor-first.md) §4 (conflict copies on save). Amended by
+[ADR-017](ADR-017-end-to-end-encryption.md): the server stores only ciphertext, so the rule
+runs on the devices, after decryption.
 
 ## Context
 

@@ -2,7 +2,8 @@
 
 The web app is the UI of every client (browser, desktop, Android). Updates packages 1 and 2
 (`.claude/plans/updates-1.md`, `updates-2.md`) define it; this is how it is built. The
-interface speaks English and Russian ([i18n](i18n.md)).
+interface speaks English and Russian ([i18n](i18n.md)). The account site shares its look
+(see [the account site](#the-account-site) below).
 
 ## Layout
 
@@ -227,9 +228,9 @@ desktop app and in the installed PWA, and `n` works everywhere.
 ## Visual rules
 
 - **Font:** Inter (variable, SIL OFL 1.1, `@fontsource-variable/inter`) for UI and text;
-  only its Latin and Cyrillic subsets are bundled (`app/fonts.css`) and precached. Code uses
+  only its Latin and Cyrillic subsets are bundled (`packages/ui/src/fonts.css`) and precached. Code uses
   the system monospace font.
-- **Colours** are soft tokens on `:root` with a dark set (`app/app.css`): no pure white,
+- **Colours** are soft tokens on `:root` with a dark set (`packages/ui/src/tokens.css`): no pure white,
   black, red, green or blue. The dark set is a dark grey with a slight yellow shade, not near
   black.
 - **Focus:** text fields, the search box and the editors show focus by their background or
@@ -237,3 +238,32 @@ desktop app and in the installed PWA, and `n` works everywhere.
 - The whole window is used at any size; the note column is at most 720px wide with room on
   its left for the toolbar. WCAG 2.1 AA is checked on every screen in both themes
   (`tests/e2e/accessibility.spec.ts`).
+
+## The account site
+
+`apps/site` ([ADR-014](decisions/ADR-014-account-site.md)) is the public face: the landing
+page, sign-in and sign-up, account settings and the page that approves an app. It is built
+from the same parts as the app, so the two cannot drift apart:
+
+- **`packages/ui`:** the colour tokens with their dark set (`tokens.css`), Inter
+  (`fonts.css`), base styles (`base.css`), buttons, fields and settings blocks
+  (`controls.css`) and the line icons (`icons.tsx`). The app imports them too.
+- **Pages render on the server** and work without JavaScript: forms post to route actions,
+  and the language and theme switches in the top bar are forms too. The theme (system,
+  light or dark, in a cookie) is rendered as `data-theme`, so the page never flashes the
+  wrong one. The one exception is the Encryption section of the settings, which needs the
+  browser's WebCrypto and says so without JavaScript.
+- **Layout:** a narrow column for sign-in pages; the settings are one left-aligned column of
+  sections split by hairlines (name, connected devices, encryption, delete account), no
+  cards. The single emphasised element of a page is the thing to check: the code to compare
+  on `/activate`, the recovery key shown once.
+- **Pages:** `/` (landing, download buttons from `KONSPECTER_DOWNLOAD_*_URL`), `/login`
+  (password, email code or a provider), `/register`, `/login/code`, `/forgot`, `/reset`,
+  `/complete` (an address for a provider that gave none), `/settings` and `/activate`.
+
+## Sync in the app
+
+Settings → **Sync** ([sync](sync.md#ui)): _Sign in with browser_ shows a code and opens
+the site's `/activate` page; then the passphrase unlocks the encryption key. A token from
+the command line can still be entered under _Advanced_. The top bar says "Sync locked"
+while the passphrase is needed and "Sync stopped" when the device was disconnected.

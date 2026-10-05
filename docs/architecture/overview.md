@@ -9,7 +9,10 @@ them ([ADR-002](decisions/ADR-002-markdown-source-of-truth.md)).
 ```text
 UI (React) ─→ application logic ─→ local storage (IndexedDB) ─→ indexes
                                           ↕
-                                     sync engine ─→ HTTP/JSON API (Go) ─→ PostgreSQL
+                                     sync engine ─→ encrypts ─→ HTTP/JSON API (Go) ─→ PostgreSQL
+                                                                     ↑
+browser ─→ account site (React Router, server-rendered in Node) ─────┘
+           sign-in, devices, encryption settings
 
 Desktop File Mode (separate backend):
   .md files on disk ↔ filesystem backend + watcher ↔ desktop app (Tauri)
@@ -20,7 +23,11 @@ Desktop File Mode (separate backend):
 - **One UI codebase**: `apps/web` is the React app. The desktop (Tauri) and mobile (Capacitor)
   clients will wrap the same UI rather than fork it.
 - **Server**: Go, domain-oriented packages
-  ([ADR-005](decisions/ADR-005-domain-oriented-packages.md)), HTTP/JSON, PostgreSQL.
+  ([ADR-005](decisions/ADR-005-domain-oriented-packages.md)), HTTP/JSON, PostgreSQL. It
+  stores only ciphertext ([ADR-017](decisions/ADR-017-end-to-end-encryption.md)) and owns
+  all account and security logic.
+- **Account site**: `apps/site` renders the landing page, sign-in, settings and device
+  approval on the server and calls the API ([ADR-014](decisions/ADR-014-account-site.md)).
 
 ## What exists today (phases 0–26)
 
@@ -50,9 +57,16 @@ apps/web/src/
     └── pages/               Notes (list + search), Note (editor + autosave), Settings, NotFound
 
 apps/server/
-├── cmd/server/              serve, migrate, create-user, create-token
-├── internal/                notes, auth, httpapi, storage/postgres
+├── cmd/server/              serve, migrate, create-user, create-token, revoke-tokens
+├── internal/                config, notes, keys, auth, accounts, devices, oauth, mail,
+│                            httpapi, storage/postgres
 └── migrations/              embedded SQL
+
+apps/site/                   account site (React Router framework mode, SSR)
+packages/ui/                 the shared look: tokens, fonts, controls, icons
+packages/i18n/               the shared message engine
+packages/crypto/             end-to-end encryption on WebCrypto
+deploy/                      PostgreSQL, the API, the site and Caddy on one origin
 ```
 
 `application/` holds the `NoteRepository` port that pages use, with two implementations: the
@@ -94,8 +108,14 @@ See [File Mode](filesystem-mode.md).
 
 ### Server
 
-Go HTTP/JSON API over PostgreSQL: users, bearer tokens, notes with revisions and
-optimistic concurrency. See [server](server.md).
+Go HTTP/JSON API over PostgreSQL: accounts and sessions, devices, the wrapped content key,
+and encrypted notes with revisions and optimistic concurrency. See [server](server.md).
+
+### Account site
+
+React Router in framework mode, server-rendered in Node, on the API's origin behind a
+proxy. See [user interface](ui.md#the-account-site) and
+[ADR-014](decisions/ADR-014-account-site.md) to [ADR-017](decisions/ADR-017-end-to-end-encryption.md).
 
 ## Planned frontend structure
 
@@ -108,7 +128,7 @@ shared with other clients moves into `packages/*` when a second consumer exists,
 
 | Concern   | Tool                                                                                     |
 | --------- | ---------------------------------------------------------------------------------------- |
-| Packages  | pnpm workspaces (`apps/*`)                                                               |
+| Packages  | pnpm workspaces (`apps/*`, `packages/*`, `tests`)                                        |
 | Build/dev | Vite                                                                                     |
 | Types     | TypeScript 6 in strict mode (typescript-eslint does not support 7 yet)                   |
 | Lint      | ESLint (typescript-eslint strict type-checked, react-hooks)                              |

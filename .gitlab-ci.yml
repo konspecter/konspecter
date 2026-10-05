@@ -187,6 +187,13 @@ e2e:
     KONSPECTER_ADDR: 127.0.0.1:8080
     KONSPECTER_ALLOWED_ORIGINS: http://localhost:4174
     KONSPECTER_E2E_URL: http://127.0.0.1:8080
+    # The account flow (tests/e2e/account.spec.ts): the site proxies /api to the server,
+    # and sign-in codes are read from the server's log.
+    KONSPECTER_PUBLIC_URL: http://localhost:5174
+    KONSPECTER_API_URL: http://127.0.0.1:8080
+    KONSPECTER_MAIL_TRANSPORT: log
+    KONSPECTER_E2E_SITE_URL: http://localhost:5174
+    KONSPECTER_E2E_MAIL_LOG: $CI_PROJECT_DIR/apps/server/server.log
   script:
     # Go from the version apps/server/go.mod names.
     - GO_VERSION="$(awk '/^go /{print $2}' apps/server/go.mod)"
@@ -197,11 +204,14 @@ e2e:
     - cd apps/server && go build -o bin/server ./cmd/server
     - export KONSPECTER_E2E_TOKEN="$(./bin/server create-user -email e2e@example.com | awk '/^token/{print $2}')"
     - (./bin/server serve > server.log 2>&1 &)
-    - cd "$CI_PROJECT_DIR" && pnpm e2e
+    - cd "$CI_PROJECT_DIR"
+    - (pnpm dev:site > site.log 2>&1 &)
+    - for _ in $(seq 60); do curl -sf http://localhost:5174/ > /dev/null && break; sleep 1; done
+    - pnpm e2e
   artifacts:
     when: on_failure
     name: playwright-traces
-    paths: [tests/test-results/, apps/server/server.log]
+    paths: [tests/test-results/, apps/server/server.log, site.log]
     expire_in: 2 weeks
 
 # --- Release (counterpart of .github/workflows/release.yml) ------------------------------
@@ -222,6 +232,21 @@ release-web:
     - pnpm --filter @konspecter/web build
     - mkdir -p release
     - cd apps/web/dist && zip -r "$CI_PROJECT_DIR/release/konspecter-web-${CI_COMMIT_TAG}.zip" .
+  artifacts:
+    paths: [release/]
+
+release-site:
+  stage: build
+  extends: [.pnpm, .release-rules]
+  needs: [release-check]
+  script:
+    # As apps/site/Dockerfile: the build plus its production dependencies.
+    - name="konspecter-site-${CI_COMMIT_TAG}"
+    - pnpm --filter @konspecter/site build
+    - pnpm --filter @konspecter/site deploy --legacy --prod "out/${name}"
+    - cp -r apps/site/build "out/${name}/build"
+    - mkdir -p release
+    - tar -czf "release/${name}.tar.gz" -C out "${name}"
   artifacts:
     paths: [release/]
 
@@ -328,6 +353,7 @@ publish:
   when: manual
   needs:
     - release-web
+    - release-site
     - release-server
     - job: release-desktop-linux
     - job: release-desktop-macos

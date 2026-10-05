@@ -6,6 +6,7 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf
 const versions = {
   "package.json": JSON.parse(read("package.json")).version,
   "apps/web/package.json": JSON.parse(read("apps/web/package.json")).version,
+  "apps/site/package.json": JSON.parse(read("apps/site/package.json")).version,
   "apps/desktop/package.json": JSON.parse(read("apps/desktop/package.json")).version,
   "apps/mobile/package.json": JSON.parse(read("apps/mobile/package.json")).version,
   "apps/desktop/src-tauri/tauri.conf.json": JSON.parse(

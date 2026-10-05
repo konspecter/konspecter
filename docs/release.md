@@ -9,6 +9,7 @@
    | Artifact                                                                    | Built by                               |
    | --------------------------------------------------------------------------- | -------------------------------------- |
    | `konspecter-web-vX.zip` (static PWA, host behind HTTPS)                     | `pnpm --filter @konspecter/web build`  |
+   | `konspecter-site-vX.tar.gz` (account site: SSR build and its dependencies)  | `pnpm --filter @konspecter/site build` |
    | `konspecter-server-vX-<os>-<arch>.tar.gz` (Linux, macOS, Windows)           | `go build` with the version stamped in |
    | desktop `.dmg` (Apple Silicon and Intel), `.msi`/`.exe`, `.AppImage`/`.deb` | `tauri-action`                         |
    | `konspecter-vX-debug.apk`                                                   | Gradle (debug build)                   |
@@ -34,6 +35,29 @@ Release that links them.
   (masked and protected, for protected tags).
 
 The server image: `docker build --build-arg VERSION=0.1.0 -t konspecter-server apps/server/`.
+The site image: `docker build -f apps/site/Dockerfile -t konspecter-site .` (from the
+repository root). The whole stack, with PostgreSQL and Caddy on one origin, is
+`deploy/compose.yaml`.
+
+The site tarball runs on Node 22 or later, behind the same origin as the API:
+
+```sh
+tar -xzf konspecter-site-v0.1.0.tar.gz && cd konspecter-site-v0.1.0
+KONSPECTER_API_URL=http://127.0.0.1:8080 KONSPECTER_PUBLIC_URL=https://notes.example.com \
+  node_modules/.bin/react-router-serve build/server/index.js   # PORT, default 3000
+```
+
+## Upgrading to end-to-end encryption
+
+The release with end-to-end encrypted sync (migration `006_e2e.sql`) **deletes the notes
+the server stored in plain text**. Every device keeps its own copy and uploads it again,
+encrypted, once its owner has set up encryption on the site and unlocked the app with the
+passphrase. So, before upgrading the server:
+
+1. Sync every device, so no device holds a change the others have not seen.
+2. Upgrade the server and the apps together: the notes API now sends `content` (an
+   encrypted envelope) instead of `markdown`, and older apps cannot sync with it.
+3. Set up encryption on the site's settings page, then unlock each app.
 
 ## Signing (secrets to add before a public release)
 

@@ -146,6 +146,11 @@ jobs:
       KONSPECTER_DATABASE_URL: postgres://konspecter:konspecter@localhost:5432/konspecter?sslmode=disable
       KONSPECTER_ADDR: 127.0.0.1:8080
       KONSPECTER_ALLOWED_ORIGINS: http://localhost:4174
+      # The account flow (tests/e2e/account.spec.ts): the site proxies /api to the server,
+      # and sign-in codes are read from the server's log.
+      KONSPECTER_PUBLIC_URL: http://localhost:5174
+      KONSPECTER_API_URL: http://127.0.0.1:8080
+      KONSPECTER_MAIL_TRANSPORT: log
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -164,12 +169,21 @@ jobs:
         run: |
           go build -o bin/server ./cmd/server
           echo "KONSPECTER_E2E_TOKEN=$(./bin/server create-user -email e2e@example.com | awk '/^token/{print $2}')" >> "$GITHUB_ENV"
-          ./bin/server serve &
+          ./bin/server serve > server.log 2>&1 &
+      - name: Start the account site
+        run: |
+          pnpm dev:site > site.log 2>&1 &
+          for _ in $(seq 60); do curl -sf http://localhost:5174/ > /dev/null && break; sleep 1; done
       - run: pnpm e2e
         env:
           KONSPECTER_E2E_URL: http://127.0.0.1:8080
+          KONSPECTER_E2E_SITE_URL: http://localhost:5174
+          KONSPECTER_E2E_MAIL_LOG: ${{ github.workspace }}/apps/server/server.log
       - uses: actions/upload-artifact@v5
         if: failure()
         with:
           name: playwright-traces
-          path: tests/test-results/
+          path: |
+            tests/test-results/
+            apps/server/server.log
+            site.log
