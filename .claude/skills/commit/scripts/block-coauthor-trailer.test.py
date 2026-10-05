@@ -19,8 +19,8 @@ TRAILER = "Co-" + "Authored-" + "By: Claude Opus 5 <noreply@anthropic.com>"
 BLOCK, ALLOW = 2, 0
 
 CASES = [
-    ("plain commit", 'git commit -m "feat: x, #1"', ALLOW),
-    ("heredoc with trailer", "git commit -F - <<'EOF'\nfeat: x, #1\n\n" + TRAILER + "\nEOF", BLOCK),
+    ("plain commit", 'git commit -m "feat: x"', ALLOW),
+    ("heredoc with trailer", "git commit -F - <<'EOF'\nfeat: x\n\n" + TRAILER + "\nEOF", BLOCK),
     ("-m with trailer", 'git commit -m "feat: x\n\n' + TRAILER + '"', BLOCK),
     ("--trailer flag", 'git commit -m "feat: x" --trailer "' + TRAILER + '"', BLOCK),
     ("--trailer= form", 'git commit --trailer="' + TRAILER + '" -m "feat: x"', BLOCK),

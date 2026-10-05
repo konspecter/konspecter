@@ -31,7 +31,7 @@ For a message with a body, pipe it in with a **quoted** heredoc so backticks, `*
 
 ```bash
 git commit -F - <<'EOF'
-type(scope): description, #321
+type(scope): description
 
 Body in **Markdown**, with `code`, lists and emoji 🚀.
 EOF
@@ -45,7 +45,7 @@ EOF
 <commit-message>
 	<type>feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert</type>
 	<scope>()</scope>
-	<description>A short, imperative summary of the change with trailed issue reference, #321</description>
+	<description>A short, imperative summary of the change</description>
 	<body>(optional: more detailed explanation; Markdown and emoji allowed)</body>
 	<footer>(optional: e.g. BREAKING CHANGE: details)</footer>
 	<!-- Never append a Co-Authored-By block. See the "Trailers" section -- it is a hard rule. -->
@@ -54,12 +54,12 @@ EOF
 
 ### Subject line length
 
-The subject (`type(scope): description, #321`) is what GitHub offers as the **default pull-request title**, and GitHub
+The subject (`type(scope): description`) is what GitHub offers as the **default pull-request title**, and GitHub
 truncates a commit subject at **72 characters**, appending an ellipsis. Anything past that is lost from the PR title
 and from every `git log --oneline` view.
 
-- **Hard limit: 72 characters** for the whole first line — type, scope, colon, description and the `, #321` reference
-  included. Count it before committing; do not let the issue reference be the part that falls off the end.
+- **Hard limit: 72 characters** for the whole first line — type, scope, colon and description included. Count it
+  before committing.
 - Aim for ~50 and keep 72 as the ceiling.
 - If the change does not fit, it is the **body** that grows, not the subject. Never wrap the subject onto a second
   line — the second line of a commit message must be blank.
@@ -69,7 +69,7 @@ and from every `git log --oneline` view.
 The body is rendered by GitHub (commit view, PR description, release notes), so write it as **Markdown** and use emoji
 where they earn their place:
 
-- Bullet lists (`- `), **bold**, `inline code`, fenced code blocks, links and `#123` issue references all render.
+- Bullet lists (`- `), **bold**, `inline code`, fenced code blocks and links all render.
 - Emoji are fine — literal characters (🐛 ✨ ♻️) or GitHub shortcodes (`:bug:`, `:sparkles:`). Keep them to a few that
   carry meaning; the subject line stays plain text, no emoji prefix.
 - Separate the subject from the body with a blank line, and wrap body lines at ~100 characters.
@@ -77,7 +77,7 @@ where they earn their place:
   (see Workflow step 5), not with a chain of `-m` flags.
 
 ```
-fix(statistics): count each ticket once in ticket statistics, #61658
+fix(statistics): count each ticket once in ticket statistics
 
 The `TicketStatisticsRepository` joined `ticket_user` before aggregating, so a ticket assigned to
 two users was counted **twice** in every breakdown. 🐛
@@ -85,11 +85,6 @@ two users was counted **twice** in every breakdown. 🐛
 - group by `t.id` before the aggregate
 - cover the double-assignment case in `TicketStatisticsAssigneeCountTest`
 ```
-
-The issue reference must be parsed from active branchname, all branched has
-`(feature|bugfix|hotfix)-(issue_reference)-*` format.
-
-If branch hasn't issue reference ask queestion: `What is the Issue ID (reference) for this commit?`
 
 ### Trailers
 
@@ -141,13 +136,13 @@ the message; never work around the hook. Its test suite is `scripts/block-coauth
 	<type>Must be one of the allowed types. See <reference>https://www.conventionalcommits.org/en/v1.0.0/#specification</reference></type>
 	<scope>Optional, but recommended for clarity.</scope>
 	<description>Required. Use the imperative mood (e.g., "add", not "added").</description>
-	<subject-length>The whole first line -- type, scope, description and issue reference -- must be at most 72
+	<subject-length>The whole first line -- type, scope and description -- must be at most 72
 		characters, the length GitHub keeps when it fills a pull-request title from a commit subject. Target ~50.
 		Overflow moves to the body; the subject is never wrapped.</subject-length>
-	<body>Optional. Use for additional context. Markdown (lists, **bold**, `code`, fences, links, `#123`) and emoji
+	<body>Optional. Use for additional context. Markdown (lists, **bold**, `code`, fences, links) and emoji
 		(literal or `:shortcode:`) are supported and rendered by GitHub -- keep emoji out of the subject. Commit it
 		with `git commit -F -` and a quoted heredoc so the markup survives the shell.</body>
-	<footer>Use for breaking changes or issue references.</footer>
+	<footer>Use for breaking changes.</footer>
 	<trailers>No `Co-Authored-By:` block -- a hard rule, not a default. See the "Trailers" section
 		above and the "Commit messages" section of AGENTS.md. A PreToolUse hook enforces it.</trailers>
 </validation>
@@ -157,7 +152,7 @@ the message; never work around the hook. Its test suite is `scripts/block-coauth
 
 ```xml
 <final-step>
-	<cmd>git commit -m "type(scope): description, #321"</cmd>
+	<cmd>git commit -m "type(scope): description"</cmd>
 	<cmd-with-body>git commit -F - &lt;&lt;'EOF' ... EOF</cmd-with-body>
 	<note>Replace with your constructed message. Include body and footer if needed.</note>
 	<note>Check the subject is <= 72 characters before running the command.</note>
