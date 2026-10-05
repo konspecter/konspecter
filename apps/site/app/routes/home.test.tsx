@@ -34,7 +34,7 @@ it("shows the landing page with the configured downloads", async () => {
   );
 
   expect(
-    await screen.findByRole("heading", { level: 1, name: "Technical conspects in plain Markdown" }),
+    await screen.findByRole("heading", { level: 1, name: "All your conspects in plain Markdown" }),
   ).toBeInTheDocument();
   for (const link of screen.getAllByRole("link", { name: "Download for macOS" })) {
     expect(link).toHaveAttribute("href", "https://example.com/k.dmg");
@@ -62,7 +62,7 @@ it("speaks Russian, with switches to English and the other theme", async () => {
   expect(
     await screen.findByRole("heading", {
       level: 1,
-      name: "Технические конспекты в обычном Markdown",
+      name: "Все ваши конспекты в обычном Markdown",
     }),
   ).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Скачать" })).toHaveAttribute("href", "#download");

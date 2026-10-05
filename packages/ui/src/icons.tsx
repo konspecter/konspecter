@@ -230,3 +230,13 @@ export function TrashIcon() {
     </Icon>
   );
 }
+
+/** A tick in a circle: done. Each stroke has a path length of 1, so CSS can draw it in. */
+export function CheckCircleIcon({ className }: { className?: string }) {
+  return (
+    <Icon {...(className ? { className } : {})}>
+      <circle className="check-circle" cx="12" cy="12" r="9" pathLength="1" />
+      <path className="check-tick" d="M8 12.3l2.7 2.7L16 9.5" pathLength="1" />
+    </Icon>
+  );
+}

@@ -1,6 +1,16 @@
 import { richText } from "@konspecter/i18n/rich";
-import { useRef, type ClipboardEvent, type InputEvent } from "react";
-import { data, Form, Link, redirect, useActionData, useLoaderData } from "react-router";
+import { CheckCircleIcon } from "@konspecter/ui/icons";
+import { useEffect, useRef, type ClipboardEvent, type InputEvent } from "react";
+import {
+  data,
+  Form,
+  Link,
+  redirect,
+  useActionData,
+  useLoaderData,
+  useNavigate,
+  type ShouldRevalidateFunctionArgs,
+} from "react-router";
 import { nextPath, redirectIfSignedIn } from "../account.server";
 import { callApi, withCookies } from "../api.server";
 import { AuthPage, Field, FormMessage, formError, Submit, textField } from "../auth-form";
@@ -30,10 +40,10 @@ export async function action({ request }: Route.ActionArgs) {
     });
     if (result.error)
       return data(
-        { error: formError(result.error.code, result.retryAfter), resent: false },
+        { error: formError(result.error.code, result.retryAfter), resent: false, next: null },
         result.status,
       );
-    return { error: null, resent: true };
+    return { error: null, resent: true, next: null };
   }
 
   const result = await callApi(request, "/api/auth/code/verify", {
@@ -42,14 +52,27 @@ export async function action({ request }: Route.ActionArgs) {
   });
   if (result.error) {
     return data(
-      { error: formError(result.error.code, result.retryAfter), resent: false },
+      { error: formError(result.error.code, result.retryAfter), resent: false, next: null },
       result.status,
     );
   }
-  return redirect(nextPath(request), {
-    headers: withCookies(result.cookies, [clearPendingCookie()]),
-  });
+  // Signed in: the page shows a tick for a moment, then goes on to `next`.
+  return data(
+    { error: null, resent: false, next: nextPath(request) },
+    { headers: withCookies(result.cookies, [clearPendingCookie()]) },
+  );
 }
+
+/** Once signed in, this loader would send the visitor on before the tick is seen. */
+export function shouldRevalidate({
+  actionResult,
+  defaultShouldRevalidate,
+}: ShouldRevalidateFunctionArgs): boolean {
+  return (actionResult as { next?: unknown } | undefined)?.next ? false : defaultShouldRevalidate;
+}
+
+/** How long the tick shows before the page goes on. */
+export const SIGNED_IN_PAUSE_MS = 2000;
 
 /** Digits in an email code (accounts.CodeLength on the server). */
 const CODE_LENGTH = 6;
@@ -70,6 +93,8 @@ export default function LoginCode() {
   const register = pending.mode === "register";
   const complete = pending.mode === "complete";
   const verify = useRef<HTMLButtonElement>(null);
+
+  if (result?.next) return <SignedIn next={result.next} />;
 
   // A pasted or autofilled code is sent at once; typed digits wait for Continue.
   function send(input: HTMLInputElement, code: string) {
@@ -139,6 +164,34 @@ export default function LoginCode() {
           {register ? t("code.startOver") : t("code.otherEmail")}
         </Link>
       </p>
+    </AuthPage>
+  );
+}
+
+/** The code was right: a green tick, then on to where the visitor was going. */
+function SignedIn({ next }: { next: string }) {
+  const { t } = useT();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void navigate(next, { replace: true });
+    }, SIGNED_IN_PAUSE_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [navigate, next]);
+
+  return (
+    <AuthPage title={t("code.signedInTitle")}>
+      <div className="signed-in" role="status">
+        <CheckCircleIcon className="signed-in-check" />
+        <p>{t("code.signedIn")}</p>
+      </div>
+      {/* Without JavaScript the browser goes on by itself. */}
+      <noscript>
+        <meta httpEquiv="refresh" content={`${String(SIGNED_IN_PAUSE_MS / 1000)};url=${next}`} />
+      </noscript>
     </AuthPage>
   );
 }

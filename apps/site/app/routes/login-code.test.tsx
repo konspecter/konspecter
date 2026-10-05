@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { createRoutesStub } from "react-router";
 import { vi } from "vitest";
 import App from "../root";
-import LoginCode from "./login-code";
+import LoginCode, { SIGNED_IN_PAUSE_MS } from "./login-code";
 
 function renderCode(action: (args: { request: Request }) => unknown) {
   const Stub = createRoutesStub([
@@ -19,6 +19,7 @@ function renderCode(action: (args: { request: Request }) => unknown) {
           loader: () => ({ email: "ann@example.com", mode: "login" }),
           action,
         },
+        { path: "settings", Component: () => <h1>Settings</h1> },
       ],
     },
   ]);
@@ -29,7 +30,7 @@ it("sends a pasted code at once", async () => {
   const sent = vi.fn<(form: FormData) => void>();
   renderCode(async ({ request }) => {
     sent(await request.formData());
-    return { error: { code: "invalid_code" }, resent: false };
+    return { error: { code: "invalid_code" }, resent: false, next: null };
   });
   const user = userEvent.setup();
   await user.click(await screen.findByRole("textbox", { name: "Code" }));
@@ -47,7 +48,7 @@ it("waits for Continue when the code is typed or only part of it is pasted", asy
   const sent = vi.fn();
   renderCode(() => {
     sent();
-    return { error: null, resent: false };
+    return { error: null, resent: false, next: null };
   });
   const user = userEvent.setup();
   const input = await screen.findByRole("textbox", { name: "Code" });
@@ -57,4 +58,25 @@ it("waits for Continue when the code is typed or only part of it is pasted", asy
 
   expect(input).toHaveValue("123456");
   expect(sent).not.toHaveBeenCalled();
+});
+
+it("shows a green tick for a moment, then goes on", async () => {
+  renderCode(() => ({ error: null, resent: false, next: "/settings" }));
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("textbox", { name: "Code" }));
+  await user.paste("123456");
+
+  expect(
+    await screen.findByRole("heading", { level: 1, name: "You are signed in" }),
+  ).toBeInTheDocument();
+  expect(screen.getByRole("status")).toHaveTextContent("One moment, taking you on…");
+  expect(screen.queryByRole("heading", { name: "Settings" })).not.toBeInTheDocument();
+
+  expect(
+    await screen.findByRole(
+      "heading",
+      { name: "Settings" },
+      { timeout: SIGNED_IN_PAUSE_MS + 1000 },
+    ),
+  ).toBeInTheDocument();
 });

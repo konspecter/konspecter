@@ -1,6 +1,6 @@
 # Architecture overview
 
-Konspecter stores technical notes as Markdown documents. The documents are the data;
+Konspecter stores notes as Markdown documents. The documents are the data;
 search indexes, tag indexes and reading state are derived and can always be rebuilt from
 them ([ADR-002](decisions/ADR-002-markdown-source-of-truth.md)).
 

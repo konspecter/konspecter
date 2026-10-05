@@ -54,7 +54,7 @@ export default defineConfig({
       manifest: {
         name: "Konspecter",
         short_name: "Konspecter",
-        description: "Local-first technical conspects in Markdown.",
+        description: "Local-first conspects in Markdown.",
         start_url: "/",
         scope: "/",
         display: "standalone",

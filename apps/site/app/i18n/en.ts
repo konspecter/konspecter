@@ -7,18 +7,18 @@
 export const en = {
   "site.title": "Konspecter",
   "site.description":
-    "A notebook for technical conspects: plain Markdown files, offline first, on desktop, mobile and the web.",
+    "A notebook for all your conspects: plain Markdown files, offline first, on desktop, mobile and the web.",
   "site.skipToContent": "Skip to content",
   "site.home": "Konspecter home",
   "site.otherLanguage": "Русский",
   "site.otherLanguageHint": "Читать по-русски",
   "site.toLight": "Switch to the light theme",
   "site.toDark": "Switch to the dark theme",
-  "site.footer": "Konspecter keeps technical conspects in Markdown.",
+  "site.footer": "Konspecter keeps your conspects in Markdown.",
 
-  "home.title": "Technical conspects in plain Markdown",
+  "home.title": "All your conspects in plain Markdown",
   "home.lead":
-    "Konspecter is a notebook for what you learn at work: commands, queries, decisions and the reasons behind them. Every conspect is a Markdown file, it opens instantly, and it works without a network.",
+    "Konspecter is a notebook for everything worth keeping: lectures and books, work and study, ideas, plans and recipes. Every conspect is a Markdown file, it opens instantly, and it works without a network.",
   "home.specimenLabel": "A conspect as Konspecter stores it",
   "home.download": "Download for {platform}",
   "home.openWeb": "Open in the browser",
@@ -215,6 +215,8 @@ export const en = {
   "code.resent": "A new code is on its way.",
   "code.otherEmail": "Use a different email",
   "code.startOver": "Start over",
+  "code.signedInTitle": "You are signed in",
+  "code.signedIn": "One moment, taking you on…",
 
   "complete.title": "Confirm your email",
   "complete.lead":

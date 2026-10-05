@@ -1,6 +1,6 @@
 # Konspecter
 
-A local-first knowledge base for technical conspects. **Every conspect is a plain Markdown
+A local-first knowledge base for conspects of every kind. **Every conspect is a plain Markdown
 document**, and everything else (tags, search, reading positions) is derived from it and can be
 rebuilt at any time. Your conspects work offline, sync in the background when you want them
 to, and export as ordinary `.md` files.

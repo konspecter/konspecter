@@ -42,7 +42,7 @@
     "active": true,
     "targets": ["app", "dmg"],
     "category": "Productivity",
-    "shortDescription": "Local-first technical conspects in Markdown",
+    "shortDescription": "Local-first conspects in Markdown",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

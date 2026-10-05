@@ -128,7 +128,7 @@ export const en = {
   "list.unreadableLink": "Settings → Backup & recovery",
   "welcome.title": "Welcome to Konspecter",
   "welcome.text":
-    "Technical conspects as plain Markdown, kept on this device and working offline. Tag them anywhere with {tags}, find them with full-text search, and sync them with a server when you want to.",
+    "Your conspects as plain Markdown, kept on this device and working offline. Tag them anywhere with {tags}, find them with full-text search, and sync them with a server when you want to.",
   "welcome.create": "Create your first conspect",
   "welcome.example": "Add an example conspect",
   "welcome.import":

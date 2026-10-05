@@ -122,11 +122,15 @@ it("verifies the code for the remembered address and forgets it", async () => {
       Response.json({ user: {} }, { headers: { "Set-Cookie": session } }),
   });
   const pending = "ksp_pending=login%3Aann%40example.com";
-  const response = (await loginCode(
+  const result = (await loginCode(
     args(post("/login/code", { code: "123 456", intent: "verify" }, pending)),
-  )) as Response;
-  expect(response.headers.get("Location")).toBe("/");
-  expect(response.headers.getSetCookie()).toEqual([
+  )) as {
+    data: unknown;
+    init: { headers: Headers };
+  };
+  // The page shows a tick, then goes on to `next` by itself.
+  expect(result.data).toEqual({ error: null, resent: false, next: "/" });
+  expect(result.init.headers.getSetCookie()).toEqual([
     session,
     expect.stringContaining("ksp_pending=; Path=/; Max-Age=0"),
   ]);
@@ -194,7 +198,7 @@ it("asks again for a code that finishes the provider sign-in", async () => {
   });
   const pending = "ksp_pending=complete%3Aann%40example.com";
   const result = await loginCode(args(post("/login/code", { intent: "resend" }, pending)));
-  expect(result).toEqual({ error: null, resent: true });
+  expect(result).toEqual({ error: null, resent: true, next: null });
   expect(calls[0]).toEqual({
     path: "/api/auth/complete",
     body: { email: "ann@example.com", locale: "ru" },

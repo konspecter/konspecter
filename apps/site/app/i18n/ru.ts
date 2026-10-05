@@ -4,18 +4,18 @@ import type { Dictionary } from "./i18n";
 export const ru: Dictionary = {
   "site.title": "Konspecter",
   "site.description":
-    "Блокнот для технических конспектов: обычные файлы Markdown, работа без сети, на компьютере, телефоне и в браузере.",
+    "Блокнот для любых конспектов: обычные файлы Markdown, работа без сети, на компьютере, телефоне и в браузере.",
   "site.skipToContent": "Перейти к содержимому",
   "site.home": "Главная Konspecter",
   "site.otherLanguage": "English",
   "site.otherLanguageHint": "Read in English",
   "site.toLight": "Включить светлую тему",
   "site.toDark": "Включить тёмную тему",
-  "site.footer": "Konspecter хранит технические конспекты в Markdown.",
+  "site.footer": "Konspecter хранит ваши конспекты в Markdown.",
 
-  "home.title": "Технические конспекты в обычном Markdown",
+  "home.title": "Все ваши конспекты в обычном Markdown",
   "home.lead":
-    "Konspecter — блокнот для того, что вы узнаёте в работе: команд, запросов, решений и их причин. Каждый конспект — файл Markdown: он открывается сразу и работает без сети.",
+    "Konspecter — блокнот для всего, что стоит сохранить: лекций и книг, работы и учёбы, идей, планов и рецептов. Каждый конспект — файл Markdown: он открывается сразу и работает без сети.",
   "home.specimenLabel": "Конспект в том виде, в каком его хранит Konspecter",
   "home.download": "Скачать для {platform}",
   "home.openWeb": "Открыть в браузере",
@@ -216,6 +216,8 @@ export const ru: Dictionary = {
   "code.resent": "Новый код уже в пути.",
   "code.otherEmail": "Указать другую почту",
   "code.startOver": "Начать заново",
+  "code.signedInTitle": "Вы вошли",
+  "code.signedIn": "Секунду, переходим дальше…",
 
   "complete.title": "Подтвердите почту",
   "complete.lead":
