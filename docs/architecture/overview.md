@@ -106,13 +106,13 @@ shared with other clients moves into `packages/*` when a second consumer exists,
 
 ## Tooling
 
-| Concern   | Tool                                                                   |
-| --------- | ---------------------------------------------------------------------- |
-| Packages  | pnpm workspaces (`apps/*`)                                             |
-| Build/dev | Vite                                                                   |
-| Types     | TypeScript 6 in strict mode (typescript-eslint does not support 7 yet) |
-| Lint      | ESLint (typescript-eslint strict type-checked, react-hooks)            |
-| Format    | Prettier; gofmt for Go                                                 |
-| Tests     | Vitest + Testing Library (jsdom); `go test`                            |
-| Licenses  | `scripts/check-licenses.mjs` + `license-policy.json`                   |
-| CI        | GitHub Actions (`.github/workflows/ci.yml`)                            |
+| Concern   | Tool                                                                                     |
+| --------- | ---------------------------------------------------------------------------------------- |
+| Packages  | pnpm workspaces (`apps/*`)                                                               |
+| Build/dev | Vite                                                                                     |
+| Types     | TypeScript 6 in strict mode (typescript-eslint does not support 7 yet)                   |
+| Lint      | ESLint (typescript-eslint strict type-checked, react-hooks)                              |
+| Format    | Prettier; gofmt for Go                                                                   |
+| Tests     | Vitest + Testing Library (jsdom); `go test`                                              |
+| Licenses  | `scripts/check-licenses.mjs` + `license-policy.json`                                     |
+| CI        | GitHub Actions (`.github/workflows/`) and GitLab CI/CD (`.gitlab-ci.yml`), the same jobs |

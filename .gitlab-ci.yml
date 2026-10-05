@@ -1,0 +1,351 @@
+# GitLab CI/CD: the same pipelines as .github/workflows/ci.yml and release.yml.
+#
+# - Merge requests and pushes to the default branch run the checks (stage "test").
+# - A tag like v0.1.0 builds every release artifact (stage "build"); the manual job
+#   "publish" then creates the GitLab Release with them (the counterpart of GitHub's draft).
+#
+# The macOS and Windows desktop builds need GitLab's hosted macOS/Windows runners (or your
+# own with the same tags); set KONSPECTER_SKIP_MACOS or KONSPECTER_SKIP_WINDOWS to "true" in
+# the project's CI/CD variables to leave them out. See docs/release.md.
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG =~ /^v/
+
+stages:
+  - check
+  - test
+  - build
+  - publish
+
+variables:
+  NODE_IMAGE: node:24-bookworm
+  GO_IMAGE: golang:1.27-bookworm
+  RUST_IMAGE: rust:1-bookworm
+  POSTGRES_USER: konspecter
+  POSTGRES_PASSWORD: konspecter
+  POSTGRES_DB: konspecter
+  TAURI_LINUX_LIBS: libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev
+
+# --- Shared setup ------------------------------------------------------------------------
+
+.ci-rules:
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - when: on_success
+
+.release-rules:
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v/
+
+# pnpm from package.json's packageManager (corepack), with its store cached per lockfile.
+.pnpm:
+  image: $NODE_IMAGE
+  variables:
+    COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  cache:
+    key:
+      files: [pnpm-lock.yaml]
+    paths: [.pnpm-store]
+  before_script:
+    - corepack enable
+    - pnpm config set store-dir .pnpm-store
+    - pnpm install --frozen-lockfile
+
+.go:
+  image: $GO_IMAGE
+  variables:
+    GOPATH: $CI_PROJECT_DIR/.go
+    GOFLAGS: -modcacherw
+  cache:
+    key:
+      files: [apps/server/go.sum]
+    paths: [.go/pkg/mod]
+
+.postgres:
+  services:
+    - name: postgres:17-alpine
+      alias: postgres
+
+# JDK 21 (Temurin) and the Android SDK command-line tools; Gradle fetches the SDK
+# platform and build tools the project asks for, once their licenses are accepted.
+.android-sdk:
+  variables:
+    ANDROID_HOME: $CI_PROJECT_DIR/.android-sdk
+    GRADLE_USER_HOME: $CI_PROJECT_DIR/.gradle
+    ANDROID_CMDLINE_TOOLS: https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip
+  cache:
+    - key:
+        files: [pnpm-lock.yaml]
+      paths: [.pnpm-store]
+    - key: android-sdk
+      paths: [.android-sdk, .gradle/caches, .gradle/wrapper]
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends unzip
+    - mkdir -p /opt/jdk
+    - curl -fsSL "https://api.adoptium.net/v3/binary/latest/21/ga/linux/x64/jdk/hotspot/normal/eclipse" | tar -xz -C /opt/jdk --strip-components=1
+    - export JAVA_HOME=/opt/jdk PATH="/opt/jdk/bin:$PATH"
+    - |
+      if [ ! -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+        curl -fsSL -o /tmp/cmdline-tools.zip "$ANDROID_CMDLINE_TOOLS"
+        mkdir -p "$ANDROID_HOME/cmdline-tools"
+        unzip -q /tmp/cmdline-tools.zip -d "$ANDROID_HOME/cmdline-tools"
+        mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest"
+      fi
+    - yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+    - corepack enable
+    - pnpm config set store-dir .pnpm-store
+    - pnpm install --frozen-lockfile
+
+# --- CI (counterpart of .github/workflows/ci.yml) ----------------------------------------
+
+web:
+  stage: test
+  extends: [.pnpm, .ci-rules]
+  script:
+    - pnpm versions:check
+    - pnpm format:check
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test
+    - pnpm build
+    - pnpm --filter @konspecter/web coverage
+    - pnpm licenses:check
+    # Known vulnerabilities (npm advisories)
+    - pnpm audit --audit-level moderate
+
+server:
+  stage: test
+  extends: [.go, .postgres, .ci-rules]
+  variables:
+    KONSPECTER_TEST_DATABASE_URL: postgres://konspecter:konspecter@postgres:5432/konspecter?sslmode=disable
+  script:
+    - cd apps/server
+    - |
+      unformatted="$(gofmt -l .)"
+      if [ -n "$unformatted" ]; then
+        echo "Files need gofmt:"; echo "$unformatted"; exit 1
+      fi
+    - go vet ./...
+    - go test -race ./...
+    # Known vulnerabilities
+    - go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+    # Dependency licenses
+    - >-
+      go run github.com/google/go-licenses/v2@v2.0.1 check ./...
+      --allowed_licenses=MIT,BSD-2-Clause,BSD-3-Clause,Apache-2.0,ISC
+      --ignore konspecter/server
+
+desktop:
+  stage: test
+  extends: .ci-rules
+  image: $RUST_IMAGE
+  variables:
+    CARGO_HOME: $CI_PROJECT_DIR/.cargo
+  cache:
+    key:
+      files: [apps/desktop/src-tauri/Cargo.lock]
+    paths: [.cargo/bin, .cargo/registry, .cargo/git, apps/desktop/src-tauri/target]
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends $TAURI_LINUX_LIBS
+    - rustup component add clippy rustfmt
+    - export PATH="$CARGO_HOME/bin:$PATH"
+    # Kept in the cache: a second run only checks that it is installed.
+    - cargo install cargo-deny --locked
+  script:
+    - cd apps/desktop/src-tauri
+    # Placeholder web build for tauri::generate_context
+    - mkdir -p ../../web/dist && echo '<!doctype html>' > ../../web/dist/index.html
+    - cargo fmt --check
+    - cargo clippy --all-targets -- -D warnings
+    - cargo test
+    - cargo deny check licenses advisories
+
+android:
+  stage: test
+  extends: [.android-sdk, .ci-rules]
+  image: $NODE_IMAGE
+  script:
+    # Build the web app and copy it into the Android project, then a debug APK.
+    - pnpm --filter @konspecter/mobile sync
+    - cd apps/mobile/android && ./gradlew assembleDebug
+  artifacts:
+    name: konspecter-debug-apk
+    paths: [apps/mobile/android/app/build/outputs/apk/debug/*.apk]
+    expire_in: 2 weeks
+
+e2e:
+  stage: test
+  extends: [.pnpm, .postgres, .ci-rules]
+  variables:
+    KONSPECTER_DATABASE_URL: postgres://konspecter:konspecter@postgres:5432/konspecter?sslmode=disable
+    KONSPECTER_ADDR: 127.0.0.1:8080
+    KONSPECTER_ALLOWED_ORIGINS: http://localhost:4174
+    KONSPECTER_E2E_URL: http://127.0.0.1:8080
+  script:
+    # Go from the version apps/server/go.mod names.
+    - GO_VERSION="$(awk '/^go /{print $2}' apps/server/go.mod)"
+    - curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xz -C /usr/local
+    - export PATH="/usr/local/go/bin:$PATH"
+    - pnpm --filter @konspecter/e2e exec playwright install --with-deps chromium
+    # Start the server and create a test account.
+    - cd apps/server && go build -o bin/server ./cmd/server
+    - export KONSPECTER_E2E_TOKEN="$(./bin/server create-user -email e2e@example.com | awk '/^token/{print $2}')"
+    - (./bin/server serve > server.log 2>&1 &)
+    - cd "$CI_PROJECT_DIR" && pnpm e2e
+  artifacts:
+    when: on_failure
+    name: playwright-traces
+    paths: [tests/test-results/, apps/server/server.log]
+    expire_in: 2 weeks
+
+# --- Release (counterpart of .github/workflows/release.yml) ------------------------------
+
+release-check:
+  stage: check
+  extends: .release-rules
+  image: $NODE_IMAGE
+  script:
+    - node scripts/check-versions.mjs "$CI_COMMIT_TAG"
+
+release-web:
+  stage: build
+  extends: [.pnpm, .release-rules]
+  needs: [release-check]
+  script:
+    - apt-get update && apt-get install -y --no-install-recommends zip
+    - pnpm --filter @konspecter/web build
+    - mkdir -p release
+    - cd apps/web/dist && zip -r "$CI_PROJECT_DIR/release/konspecter-web-${CI_COMMIT_TAG}.zip" .
+  artifacts:
+    paths: [release/]
+
+release-server:
+  stage: build
+  extends: [.go, .release-rules]
+  needs: [release-check]
+  parallel:
+    matrix:
+      - TARGET: [linux/amd64, linux/arm64, darwin/arm64, darwin/amd64, windows/amd64]
+  script:
+    - mkdir -p release
+    - cd apps/server
+    - >-
+      GOOS="${TARGET%/*}" GOARCH="${TARGET#*/}" CGO_ENABLED=0 go build -trimpath
+      -ldflags "-s -w -X main.version=${CI_COMMIT_TAG#v}" -o out/server ./cmd/server
+    - name="konspecter-server-${CI_COMMIT_TAG}-${TARGET%/*}-${TARGET#*/}"
+    - tar -czf "$CI_PROJECT_DIR/release/${name}.tar.gz" -C out server
+  artifacts:
+    paths: [release/]
+
+# Signing and notarization: set APPLE_* / TAURI_SIGNING_* as CI/CD variables (docs/release.md).
+release-desktop-linux:
+  stage: build
+  extends: .release-rules
+  needs: [release-check]
+  image: $RUST_IMAGE
+  variables:
+    # linuxdeploy (the AppImage bundler) is an AppImage itself; containers have no FUSE.
+    APPIMAGE_EXTRACT_AND_RUN: "1"
+    COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  script:
+    - apt-get update && apt-get install -y --no-install-recommends $TAURI_LINUX_LIBS file
+    - curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && apt-get install -y nodejs
+    - corepack enable && pnpm install --frozen-lockfile
+    - pnpm --filter @konspecter/desktop tauri build
+    - mkdir -p release
+    - cp apps/desktop/src-tauri/target/release/bundle/deb/*.deb apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage release/
+  artifacts:
+    paths: [release/]
+
+release-desktop-macos:
+  stage: build
+  needs: [release-check]
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v/ && $KONSPECTER_SKIP_MACOS != "true"
+  tags: [saas-macos-medium-m1]
+  image: macos-15-xcode-16
+  parallel:
+    matrix:
+      - TARGET: [aarch64-apple-darwin, x86_64-apple-darwin]
+  variables:
+    COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  script:
+    - curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --target "$TARGET"
+    - source "$HOME/.cargo/env"
+    - brew install node@24 && export PATH="$(brew --prefix node@24)/bin:$PATH"
+    - corepack enable && pnpm install --frozen-lockfile
+    - pnpm --filter @konspecter/desktop tauri build --target "$TARGET"
+    - mkdir -p release
+    - for dmg in apps/desktop/src-tauri/target/"$TARGET"/release/bundle/dmg/*.dmg; do cp "$dmg" "release/$(basename "${dmg%.dmg}")-${TARGET}.dmg"; done
+  artifacts:
+    paths: [release/]
+
+release-desktop-windows:
+  stage: build
+  needs: [release-check]
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v/ && $KONSPECTER_SKIP_WINDOWS != "true"
+  tags: [saas-windows-medium-amd64]
+  variables:
+    COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  script:
+    - choco install -y nodejs-lts rustup.install
+    - Import-Module "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"; refreshenv
+    - rustup default stable
+    - corepack enable; pnpm install --frozen-lockfile
+    - pnpm --filter @konspecter/desktop tauri build
+    - New-Item -ItemType Directory -Force release | Out-Null
+    - Copy-Item apps/desktop/src-tauri/target/release/bundle/msi/*.msi, apps/desktop/src-tauri/target/release/bundle/nsis/*.exe release/
+  artifacts:
+    paths: [release/]
+
+release-android:
+  stage: build
+  extends: [.android-sdk, .release-rules]
+  needs: [release-check]
+  image: $NODE_IMAGE
+  script:
+    - pnpm --filter @konspecter/mobile sync
+    # A store-ready release build needs a signing keystore (docs/release.md);
+    # the debug APK installs directly for testing.
+    - (cd apps/mobile/android && ./gradlew assembleDebug)
+    - mkdir -p release
+    - cp apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk "release/konspecter-${CI_COMMIT_TAG}-debug.apk"
+  artifacts:
+    paths: [release/]
+
+# Uploads every artifact to the project's generic package registry and creates the GitLab
+# Release linking them. Manual, so the build can be checked first (GitHub: a draft release).
+publish:
+  stage: publish
+  extends: .release-rules
+  when: manual
+  needs:
+    - release-web
+    - release-server
+    - job: release-desktop-linux
+    - job: release-desktop-macos
+      optional: true
+    - job: release-desktop-windows
+      optional: true
+    - release-android
+  image: registry.gitlab.com/gitlab-org/cli:latest
+  script:
+    - apk add --no-cache curl jq
+    - package="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/konspecter/${CI_COMMIT_TAG#v}"
+    - links="[]"
+    - |
+      for file in release/*; do
+        name="$(basename "$file")"
+        curl -fsS --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file "$file" "${package}/${name}"
+        links="$(echo "$links" | jq --arg name "$name" --arg url "${package}/${name}" \
+          '. + [{name: $name, url: $url, link_type: "package"}]')"
+      done
+    - glab auth login --job-token "$CI_JOB_TOKEN" --hostname "$CI_SERVER_HOST" --api-protocol "$CI_SERVER_PROTOCOL"
+    - glab release create "$CI_COMMIT_TAG" --name "Konspecter ${CI_COMMIT_TAG}" --assets-links "$links" --repo "$CI_PROJECT_PATH"
