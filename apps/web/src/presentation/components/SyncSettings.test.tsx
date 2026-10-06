@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { openNoteStore } from "../../infrastructure/storage/note-store";
 import { FakeServer, TEST_PASSPHRASE } from "../../infrastructure/sync/fake-server";
@@ -89,6 +89,32 @@ it("signs in with the browser: shows the code, opens the page, connects once app
   await user.type(screen.getByLabelText("Encryption passphrase"), TEST_PASSPHRASE);
   await user.click(screen.getByRole("button", { name: "Unlock" }));
   expect(await screen.findByText(/Up to date/)).toBeInTheDocument();
+});
+
+it("suggests the server the web app's host names, unless the owner typed one", async () => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(() =>
+    Promise.resolve(Response.json({ serverUrl: "https://notes.example.com" })),
+  );
+  await setup();
+  const field = screen.getByRole("textbox", { name: "Server URL" });
+  await waitFor(() => {
+    expect(field).toHaveValue("https://notes.example.com");
+  });
+  expect(globalThis.fetch).toHaveBeenCalledWith("/config.json");
+});
+
+it("leaves a server URL the owner typed before the suggestion came", async () => {
+  let answer: (response: Response) => void = () => undefined;
+  vi.spyOn(globalThis, "fetch").mockImplementation(
+    () => new Promise<Response>((resolve) => (answer = resolve)),
+  );
+  await setup();
+  const field = screen.getByRole("textbox", { name: "Server URL" });
+  await userEvent.setup().type(field, "https://mine.example.com");
+  answer(Response.json({ serverUrl: "https://notes.example.com" }));
+  // Let the suggestion arrive.
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(field).toHaveValue("https://mine.example.com");
 });
 
 it("sends the owner to the site when encryption is not set up", async () => {

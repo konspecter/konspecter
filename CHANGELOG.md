@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **Self-hosting from published images.** Each release pushes `konspecter-server`,
+  `konspecter-site` and `konspecter-web` for amd64 and arm64 (GHCR, and the GitLab
+  registry), plus a deploy bundle: `compose.yaml`, `Caddyfile` and `.env.example`. Download
+  it, fill in `.env`, `docker compose up -d` ([docs/self-hosting.md](docs/self-hosting.md),
+  [ADR-023](docs/architecture/decisions/ADR-023-published-images.md)). The web app now
+  learns the server it suggests from its host (`/config.json`) instead of its build.
+  `deploy/compose.yaml` pulls images; `compose.build.yaml` builds them from a checkout, and
+  `.env` needs `KONSPECTER_VERSION`.
 - **Connect an app by QR code.** Account settings on the site show a QR code (and its link);
   scanning it in the app (Settings → Sync → Scan QR code) or pasting the link connects the
   app with no server address or code to type. A code works once, for 5 minutes. The server

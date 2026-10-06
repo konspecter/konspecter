@@ -1,6 +1,7 @@
 # ADR-018: The hosted web app on an origin of its own
 
-Status: accepted (2026-10-06)
+Status: accepted (2026-10-06). Amended by [ADR-023](ADR-023-published-images.md): the web
+image reads its server URL when it starts.
 
 ## Context
 

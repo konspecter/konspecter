@@ -187,3 +187,27 @@ jobs:
             tests/test-results/
             apps/server/server.log
             site.log
+
+  images:
+    name: Images (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: server
+            context: apps/server
+          - name: site
+            context: .
+          - name: web
+            context: .
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      # Built as release.yml builds them, not pushed: a broken image shows before a tag.
+      - uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.context }}
+          file: apps/${{ matrix.name }}/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: false
+          cache-from: type=gha,scope=${{ matrix.name }}

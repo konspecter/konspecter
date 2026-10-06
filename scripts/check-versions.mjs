@@ -15,6 +15,8 @@ const versions = {
   "apps/desktop/src-tauri/Cargo.toml": /^version = "([^"]+)"/m.exec(
     read("apps/desktop/src-tauri/Cargo.toml"),
   )?.[1],
+  // The images deploy/compose.yaml runs.
+  "deploy/.env.example": /^KONSPECTER_VERSION=(.*)$/m.exec(read("deploy/.env.example"))?.[1],
 };
 const expected = process.argv[2]?.replace(/^v/, "") ?? versions["package.json"];
 const wrong = Object.entries(versions).filter(([, version]) => version !== expected);

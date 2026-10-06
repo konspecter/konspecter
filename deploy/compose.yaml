@@ -2,8 +2,11 @@
 # app and Caddy in front of them. Caddy serves the API and the site on one
 # origin (/api/* to the API, everything else to the site) and the web app on a
 # second address.
-# Settings come from deploy/.env (see .env.example):
-#   cp .env.example .env && docker compose up -d --build
+# Settings come from .env next to this file (see .env.example). With the
+# release's images (docs/self-hosting.md):
+#   cp .env.example .env && docker compose up -d
+# Built from this checkout instead:
+#   docker compose -f compose.yaml -f compose.build.yaml up -d --build
 name: konspecter
 
 services:
@@ -22,7 +25,7 @@ services:
       retries: 10
 
   server:
-    build: ../apps/server
+    image: ${KONSPECTER_REGISTRY:+${KONSPECTER_REGISTRY}/}konspecter-server:${KONSPECTER_VERSION:?set KONSPECTER_VERSION in .env}
     restart: unless-stopped
     env_file:
       - path: .env
@@ -35,9 +38,7 @@ services:
         condition: service_healthy
 
   site:
-    build:
-      context: ..
-      dockerfile: apps/site/Dockerfile
+    image: ${KONSPECTER_REGISTRY:+${KONSPECTER_REGISTRY}/}konspecter-site:${KONSPECTER_VERSION:?set KONSPECTER_VERSION in .env}
     restart: unless-stopped
     env_file:
       - path: .env
@@ -49,13 +50,11 @@ services:
       - server
 
   web:
-    build:
-      context: ..
-      dockerfile: apps/web/Dockerfile
-      args:
-        # The app suggests this server in its sync settings.
-        VITE_KONSPECTER_SERVER_URL: ${KONSPECTER_PUBLIC_URL:-https://localhost}
+    image: ${KONSPECTER_REGISTRY:+${KONSPECTER_REGISTRY}/}konspecter-web:${KONSPECTER_VERSION:?set KONSPECTER_VERSION in .env}
     restart: unless-stopped
+    environment:
+      # The app suggests this server in its sync settings (/config.json).
+      KONSPECTER_PUBLIC_URL: ${KONSPECTER_PUBLIC_URL:-https://localhost}
 
   proxy:
     image: caddy:2

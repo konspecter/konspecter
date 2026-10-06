@@ -1,12 +1,15 @@
 name: Release
 
-# Push a tag like v0.1.0 to build every artifact into a draft GitHub Release.
+# Push a tag like v0.1.0 to build every artifact into a draft GitHub Release, and the
+# server, site and web images to GHCR as 0.1.0 (images-latest.yml moves 0.1 and latest
+# once the release is published).
 on:
   push:
     tags: ["v*"]
 
 permissions:
   contents: write
+  packages: write
 
 jobs:
   check:
@@ -81,6 +84,66 @@ jobs:
         with:
           draft: true
           files: konspecter-server-*.tar.gz
+
+  images:
+    needs: check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: server
+            context: apps/server
+          - name: site
+            context: .
+          - name: web
+            context: .
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/konspecter-${{ matrix.name }}
+          tags: type=semver,pattern={{version}}
+          flavor: latest=false
+      # The build stages run on the runner and cross-compile, so arm64 needs no emulation.
+      - uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.context }}
+          file: apps/${{ matrix.name }}/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          build-args: VERSION=${{ steps.meta.outputs.version }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          push: true
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  # What a self-hoster downloads: compose.yaml, the Caddyfile and .env.example, with
+  # this release's version (checked above) and registry filled in.
+  deploy:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: |
+          name="konspecter-deploy-${GITHUB_REF_NAME}"
+          mkdir -p "out/${name}"
+          cp deploy/compose.yaml deploy/Caddyfile "out/${name}/"
+          sed "s#^KONSPECTER_REGISTRY=.*#KONSPECTER_REGISTRY=ghcr.io/${OWNER,,}#" deploy/.env.example \
+            > "out/${name}/.env.example"
+          tar -czf "${name}.tar.gz" -C out "${name}"
+        env:
+          OWNER: ${{ github.repository_owner }}
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: konspecter-deploy-*.tar.gz
 
   desktop:
     needs: check

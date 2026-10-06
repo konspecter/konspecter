@@ -73,6 +73,37 @@ export function defaultServerUrl(): string {
 }
 
 /**
+ * The server to suggest: the one the web app's host names in `/config.json`
+ * (its image writes it there when it starts, ADR-023), else the build's.
+ * The desktop and mobile apps have no host to ask. Offline, or with no such
+ * file (the dev server answers with `index.html`), the build's.
+ */
+export async function suggestedServerUrl(options: {
+  native: boolean;
+  fetch?: ((input: string) => Promise<Response>) | undefined;
+}): Promise<string> {
+  if (options.native) return defaultServerUrl();
+  try {
+    const response = await (options.fetch ?? fetch)("/config.json");
+    if (response.ok) {
+      const serverUrl = configServerUrl(await response.json());
+      if (serverUrl) return serverUrl;
+    }
+  } catch {
+    // Offline, or not JSON: the build's suggestion stands.
+  }
+  return defaultServerUrl();
+}
+
+function configServerUrl(config: unknown): string | null {
+  if (typeof config !== "object" || config === null || !("serverUrl" in config)) return null;
+  const { serverUrl } = config;
+  if (typeof serverUrl !== "string" || !URL.canParse(serverUrl)) return null;
+  const url = new URL(serverUrl);
+  return url.protocol === "https:" || url.protocol === "http:" ? url.origin : null;
+}
+
+/**
  * How this app introduces itself to the server: a name its owner recognises
  * in the site's device list ("Firefox on Linux", "Konspecter for macOS"),
  * the platform and the version.

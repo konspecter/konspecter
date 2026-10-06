@@ -2,7 +2,8 @@
 # Built from the repository root, since the site uses the workspace packages:
 #   docker build -f apps/site/Dockerfile -t konspecter-site .
 #   docker run -e KONSPECTER_API_URL=http://server:8080 -p 3000:3000 konspecter-site
-FROM node:22-slim AS build
+# The build runs on the build machine: the site is JavaScript, the same on every platform.
+FROM --platform=$BUILDPLATFORM node:22-slim AS build
 WORKDIR /src
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./

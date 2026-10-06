@@ -1,4 +1,4 @@
-import { describeDevice, deviceLogin, DeviceLoginError } from "./device-login";
+import { describeDevice, deviceLogin, DeviceLoginError, suggestedServerUrl } from "./device-login";
 
 const device = { name: "Firefox on Linux", platform: "web", clientVersion: "0.1.0" };
 
@@ -89,5 +89,59 @@ it("names the device so its owner recognises it on the site", () => {
   expect(describeDevice({ mobile: true, userAgent: firefox })).toMatchObject({
     name: "Konspecter for Android",
     platform: "android",
+  });
+});
+
+describe("the suggested server", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  /** A host that answers `/config.json` with this. */
+  const host = (answer: () => Response) => {
+    const asked: string[] = [];
+    const fetch = (input: string) => {
+      asked.push(input);
+      return Promise.resolve(answer());
+    };
+    return { fetch, asked };
+  };
+
+  it("is the one the web app's host names, as an origin", async () => {
+    const { fetch, asked } = host(() =>
+      Response.json({ serverUrl: "https://Notes.Example.com/ignored" }),
+    );
+    await expect(suggestedServerUrl({ native: false, fetch })).resolves.toBe(
+      "https://notes.example.com",
+    );
+    expect(asked).toEqual(["/config.json"]);
+  });
+
+  it("falls back to the build's when the host names none", async () => {
+    vi.stubEnv("VITE_KONSPECTER_SERVER_URL", "https://build.example.com");
+    const answers = [
+      () => Response.json({ serverUrl: "" }),
+      () => Response.json({ serverUrl: "ftp://notes.example.com" }),
+      () => Response.json(["https://notes.example.com"]),
+      () => new Response("<!doctype html><title>Konspecter</title>"),
+      () => new Response("", { status: 404 }),
+      () => {
+        throw new TypeError("Failed to fetch");
+      },
+    ];
+    for (const answer of answers) {
+      await expect(suggestedServerUrl({ native: false, ...host(answer) })).resolves.toBe(
+        "https://build.example.com",
+      );
+    }
+  });
+
+  it("is the build's in the desktop and mobile apps, without asking", async () => {
+    vi.stubEnv("VITE_KONSPECTER_SERVER_URL", "https://build.example.com");
+    const { fetch, asked } = host(() => Response.json({ serverUrl: "https://notes.example.com" }));
+    await expect(suggestedServerUrl({ native: true, fetch })).resolves.toBe(
+      "https://build.example.com",
+    );
+    expect(asked).toEqual([]);
   });
 });

@@ -1,8 +1,8 @@
 # Releasing
 
 1. Set the same version everywhere: `package.json`, `apps/*/package.json`,
-   `apps/desktop/src-tauri/tauri.conf.json` and `Cargo.toml`.
-   `pnpm versions:check` verifies it.
+   `apps/desktop/src-tauri/tauri.conf.json`, `Cargo.toml` and `KONSPECTER_VERSION` in
+   `deploy/.env.example`. `pnpm versions:check` verifies it.
 2. Update `CHANGELOG.md`, commit, then tag and push: `git tag v0.1.0 && git push --tags`.
 3. `.github/workflows/release.yml` builds everything into a **draft** GitHub Release:
 
@@ -13,8 +13,17 @@
    | `konspecter-server-vX-<os>-<arch>.tar.gz` (Linux, macOS, Windows)           | `go build` with the version stamped in |
    | desktop `.dmg` (Apple Silicon and Intel), `.msi`/`.exe`, `.AppImage`/`.deb` | `tauri-action`                         |
    | `konspecter-vX-debug.apk`                                                   | Gradle (debug build)                   |
+   | `konspecter-deploy-vX.tar.gz` (`compose.yaml`, `Caddyfile`, `.env.example`) | `deploy/`, registry and version set    |
 
-4. Check the draft, then publish it.
+   It also pushes the images `ghcr.io/<owner>/konspecter-{server,site,web}:X.Y.Z` for
+   `linux/amd64` and `linux/arm64` ([ADR-023](architecture/decisions/ADR-023-published-images.md)).
+
+4. Check the draft, then publish it. Publishing points the images' `X.Y` and `latest` tags
+   at `X.Y.Z` (`images-latest.yml`; not for a pre-release).
+
+The first release creates the three GHCR packages **private**. Make each public once
+(the package's settings → Change visibility) and link it to the repository, so anyone can
+pull it.
 
 ## GitLab
 
@@ -23,7 +32,10 @@ and on the default branch, and the release builds of `release.yml` on a `v*` tag
 no draft releases, so the last job, **publish**, is manual: once the build jobs have passed
 (their artifacts can be downloaded from the pipeline), running it uploads every artifact to
 the project's generic package registry (`konspecter/<version>`) and creates the GitLab
-Release that links them.
+Release that links them. The images go to the project's container registry
+(`$CI_REGISTRY_IMAGE/konspecter-{server,site,web}`, which must be enabled) from
+`release-images`, built with Docker in Docker (the runner must allow privileged
+containers); `publish-images` moves `X.Y` and `latest` once **publish** has run.
 
 - The desktop builds for macOS and Windows run on GitLab's hosted runners
   (`saas-macos-medium-m1`, `saas-windows-medium-amd64`; macOS needs a Premium or Ultimate
@@ -36,10 +48,11 @@ Release that links them.
 
 The server image: `docker build --build-arg VERSION=0.1.0 -t konspecter-server apps/server/`.
 The site image: `docker build -f apps/site/Dockerfile -t konspecter-site .` (from the
-repository root). The web app image, its static files served on `:8080`: `docker build -f apps/web/Dockerfile
---build-arg VITE_KONSPECTER_SERVER_URL=https://notes.example.com -t konspecter-web .`. The whole
-stack, with PostgreSQL and Caddy serving the site and API on one origin and the web app on
-another, is `deploy/compose.yaml`.
+repository root). The web app image, its static files served on `:8080`, suggesting the
+server in `KONSPECTER_PUBLIC_URL` when it runs: `docker build -f apps/web/Dockerfile -t
+konspecter-web .`. The whole stack, with PostgreSQL and Caddy serving the site and API on
+one origin and the web app on another, is `deploy/compose.yaml`
+([self-hosting.md](self-hosting.md)).
 
 The site tarball runs on Node 22 or later, behind the same origin as the API:
 

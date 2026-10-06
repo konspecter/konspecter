@@ -18,6 +18,7 @@ import {
   defaultServerUrl,
   describeDevice,
   DeviceLoginError,
+  suggestedServerUrl,
 } from "../../infrastructure/sync/device-login";
 import {
   NoKeyError,
@@ -286,6 +287,19 @@ function Locked({ sync, status }: { sync: SyncEngine; status: SyncStatus }) {
 function ConnectForm({ sync }: { sync: SyncEngine }) {
   const urlId = useId();
   const [serverUrl, setServerUrl] = useState(defaultServerUrl);
+  const touched = useRef(false);
+
+  // The host's suggestion fills the field unless the owner has typed in it.
+  useEffect(() => {
+    let current = true;
+    void suggestedServerUrl({ native: isDesktop() || isNativeMobile() }).then((suggested) => {
+      if (current && !touched.current && suggested !== "") setServerUrl(suggested);
+    });
+    return () => {
+      current = false;
+    };
+  }, []);
+
   return (
     <div className="connect-form">
       <p className="setting-hint">{t("sync.intro")}</p>
@@ -297,6 +311,7 @@ function ConnectForm({ sync }: { sync: SyncEngine }) {
         placeholder="https://notes.example.com"
         value={serverUrl}
         onChange={(event) => {
+          touched.current = true;
           setServerUrl(event.target.value);
         }}
       />

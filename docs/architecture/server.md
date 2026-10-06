@@ -241,7 +241,8 @@ KONSPECTER_DATABASE_URL=postgres://… ./server            # migrate + serve on 
 ```
 
 The whole stack (PostgreSQL, this server, the site and Caddy on one origin, plus the web app
-on its own address) is `deploy/compose.yaml`. The server shuts down gracefully on SIGINT/SIGTERM and has read,
+on its own address) is `deploy/compose.yaml`, from the images each release publishes
+([self-hosting.md](../self-hosting.md)). The server shuts down gracefully on SIGINT/SIGTERM and has read,
 write and idle timeouts.
 
 ## Tests

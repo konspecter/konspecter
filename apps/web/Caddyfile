@@ -15,6 +15,14 @@
 		X-Frame-Options DENY
 	}
 
+	# The server the app suggests in its sync settings: the public URL this
+	# container is given when it starts (ADR-023), so one image serves any host.
+	handle /config.json {
+		header Content-Type application/json
+		header Cache-Control no-cache
+		respond `{"serverUrl":"{env.KONSPECTER_PUBLIC_URL}"}`
+	}
+
 	# Hashed file names never change. A missing one stays a 404.
 	handle /assets/* {
 		@found file

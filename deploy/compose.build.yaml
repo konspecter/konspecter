@@ -1,0 +1,20 @@
+# Builds the images from this checkout instead of pulling the release's:
+#   docker compose -f compose.yaml -f compose.build.yaml up -d --build
+# They are tagged as compose.yaml names them, so with KONSPECTER_REGISTRY
+# empty (the default in .env.example) nothing is pulled.
+services:
+  server:
+    build:
+      context: ../apps/server
+      args:
+        VERSION: ${KONSPECTER_VERSION:?set KONSPECTER_VERSION in .env}
+
+  site:
+    build:
+      context: ..
+      dockerfile: apps/site/Dockerfile
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile

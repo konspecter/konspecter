@@ -68,11 +68,13 @@ All planned phases are done. New work needs a new plan in `.claude/plans/`.
 | Feedback 2 | Language dropdown, name in header, sign-in card, HTML emails, QR connect    | Done   |
 | Paid sync  | Optional: an external service decides on sync; 402 pause, terms, cookies    | Done   |
 | Ignore     | `.konspecterignore`: gitignore rules for folder import and File Mode        | Done   |
+| Self-host  | Published images (amd64, arm64), deploy bundle, run-time server URL         | Done   |
 
 Specs and notes: `.claude/plans/updates-1.md` (+ `updates-1-implementation.md`), `updates-2.md`
 (+ `updates-2-implementation.md`), `markdown-single-source.md`, `last-write-wins.md`, `tag-chains.md` (item 1 of `updates-3.md`), `note-find.md` (item 3), `friendly-errors.md` (item 5), `slug-file-names.md` (item 8), `mode-switch-place.md` (item 14), `mobile-view.md` (mobile view updates), `updates-4.md` (+ `updates-4-implementation.md`), `sync-app-site.md` (+
 `sync-app-site-implementation.md`; ADR-014 to ADR-017), `feedback-1.md`, `feedback.md` (+
-`feedback-implementation.md`; ADR-019), `ignore-file.md`. UI architecture:
+`feedback-implementation.md`; ADR-019), `ignore-file.md`, `self-hosted.md` (ADR-023;
+`docs/self-hosting.md`). UI architecture:
 `docs/architecture/ui.md`; languages: `docs/architecture/i18n.md`; server and API:
 `docs/architecture/server.md`.
 
@@ -135,9 +137,11 @@ packages/ui/              shared look of the app and the site: tokens, fonts, ba
 packages/i18n/            shared message engine: translators, plurals, locale detection, rich text
 packages/crypto/          end-to-end encryption on WebCrypto: content key, wrapping, recovery key, envelopes
 deploy/                   docker compose: PostgreSQL, the API, the site, the web app and Caddy in front
-                          (the site and API on one origin, the web app on its own)
+                          (the site and API on one origin, the web app on its own), from the
+                          release's images (compose.build.yaml builds them here instead)
 docs/architecture/        architecture overview, UI (ui.md), server (server.md), sync (sync.md) and ADRs
 docs/release.md           releasing, and upgrading to end-to-end encryption
+docs/self-hosting.md      running your own server from the published images
 docs/testing.md           test strategy and map
 docs/performance.md       measurements and optimizations
 docs/security.md          threat model and measures

@@ -88,6 +88,7 @@ adb shell am start -n app.konspecter.mobile/.MainActivity
 
 - [Architecture overview](docs/architecture/overview.md) and [decisions](docs/architecture/decisions/)
 - [Testing](docs/testing.md) · [Performance](docs/performance.md) · [Security](docs/security.md)
+- [Self-hosting](docs/self-hosting.md): your own server from the release's images
 - [Releasing](docs/release.md) · [License policy](docs/license-policy.md) · [Changelog](CHANGELOG.md)
 - [Agent instructions](AGENTS.md) and the [implementation plan](.claude/plans/konspecter-implementation-plan.md)
 
