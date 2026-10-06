@@ -51,6 +51,18 @@ it("shows the landing page with the configured downloads", async () => {
   expect(
     screen.getByRole("figure", { name: "A conspect as Konspecter stores it" }),
   ).toHaveTextContent("title: Grandma's apple pie");
+  const markdown = screen.getByRole("region", { name: "Konspecter speaks Markdown" });
+  expect(within(markdown).getByRole("link", { name: "Markdown cheatsheet" })).toHaveAttribute(
+    "href",
+    "/markdown",
+  );
+  expect(within(markdown).getByRole("link", { name: "Learn Markdown" })).toHaveAttribute(
+    "href",
+    "https://www.markdownguide.org/basic-syntax/",
+  );
+  expect(within(markdown).getByRole("list", { name: "Markdown marks" })).toHaveTextContent(
+    "**bold**",
+  );
 });
 
 it("leaves out the downloads when none are configured", async () => {
@@ -63,10 +75,7 @@ it("leaves out the downloads when none are configured", async () => {
 it("speaks Russian, with the language dropdown and the other theme", async () => {
   renderHome("ru", [{ platform: "linux", url: "https://example.com/k.AppImage" }]);
   expect(
-    await screen.findByRole("heading", {
-      level: 1,
-      name: "Блокнот для всего, что стоит сохранить",
-    }),
+    await screen.findByRole("heading", { level: 1, name: "Понял. Сохранил. Вернулся." }),
   ).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Скачать" })).toHaveAttribute("href", "#download");
   expect(screen.getByRole("combobox", { name: "Язык" })).toHaveValue("ru");

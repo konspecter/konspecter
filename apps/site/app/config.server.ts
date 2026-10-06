@@ -12,6 +12,19 @@ export interface SiteConfig {
   readonly apiUrl: string;
   /** Download links by platform (KONSPECTER_DOWNLOAD_<PLATFORM>_URL); unset platforms are left out. */
   readonly downloads: Readonly<Partial<Record<Platform, string>>>;
+  /** Who runs the site, as the terms and the privacy policy name them. */
+  readonly operator: Operator;
+}
+
+/**
+ * The site's operator (KONSPECTER_LEGAL_NAME, _ID, _ADDRESS, _EMAIL); ""
+ * where unset. The ID is a registration number (in Russia ИНН/ОГРН(ИП)).
+ */
+export interface Operator {
+  readonly name: string;
+  readonly id: string;
+  readonly address: string;
+  readonly email: string;
 }
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -56,6 +69,12 @@ export function readConfig(env: Env): SiteConfig {
       value("KONSPECTER_API_URL") ?? "http://localhost:8080",
     ).href.replace(/\/$/, ""),
     downloads,
+    operator: {
+      name: value("KONSPECTER_LEGAL_NAME") ?? "",
+      id: value("KONSPECTER_LEGAL_ID") ?? "",
+      address: value("KONSPECTER_LEGAL_ADDRESS") ?? "",
+      email: value("KONSPECTER_LEGAL_EMAIL") ?? "",
+    },
   };
 }
 

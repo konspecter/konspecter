@@ -9,6 +9,7 @@ describe("readConfig", () => {
       publicOrigin: null,
       apiUrl: "http://localhost:8080",
       downloads: {},
+      operator: { name: "", id: "", address: "", email: "" },
     });
   });
 
@@ -19,11 +20,21 @@ describe("readConfig", () => {
       KONSPECTER_DOWNLOAD_MACOS_URL: " https://example.com/k.dmg ",
       KONSPECTER_DOWNLOAD_WEB_URL: "https://app.example.com",
       KONSPECTER_DOWNLOAD_LINUX_URL: "",
+      KONSPECTER_LEGAL_NAME: " Ivan Petrov, sole proprietor ",
+      KONSPECTER_LEGAL_ID: "123456789012",
+      KONSPECTER_LEGAL_ADDRESS: "Moscow",
+      KONSPECTER_LEGAL_EMAIL: "support@example.com",
     });
     expect(config).toEqual({
       publicOrigin: "https://notes.example.com",
       apiUrl: "http://server:8080",
       downloads: { macos: "https://example.com/k.dmg", web: "https://app.example.com/" },
+      operator: {
+        name: "Ivan Petrov, sole proprietor",
+        id: "123456789012",
+        address: "Moscow",
+        email: "support@example.com",
+      },
     });
   });
 

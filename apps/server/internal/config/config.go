@@ -65,7 +65,26 @@ type Config struct {
 	// (KONSPECTER_LOGIN_PROVIDERS_EN, default "google,linkedin,x";
 	// KONSPECTER_LOGIN_PROVIDERS_RU, default "yandex,vk").
 	LoginProviders map[string][]string
+	// Billing makes sync paid; without it sync is free.
+	Billing Billing
 }
+
+// Billing is the billing service that sells sync. Without it
+// sync is free.
+type Billing struct {
+	// URL is the service as the server reaches it, e.g. "http://billing:8081"
+	// (KONSPECTER_BILLING_URL).
+	URL string
+	// Token is shared with the service (KONSPECTER_BILLING_TOKEN): each side
+	// sends it to the other, and takes nothing without it.
+	Token string
+}
+
+// Paid reports whether sync costs anything.
+func (b Billing) Paid() bool { return b.URL != "" }
+
+// minTokenLength keeps the shared token out of guessing range.
+const minTokenLength = 32
 
 // OAuthClient is the app registered with a sign-in provider.
 type OAuthClient struct {
@@ -148,6 +167,13 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.LoginProviders = map[string][]string{
 		"en": r.providers("KONSPECTER_LOGIN_PROVIDERS_EN", "google,linkedin,x"),
 		"ru": r.providers("KONSPECTER_LOGIN_PROVIDERS_RU", "yandex,vk"),
+	}
+	cfg.Billing = r.billing()
+	if cfg.Billing.Paid() && cfg.PublicURL == "" {
+		r.fail("paid sync (KONSPECTER_BILLING_URL) needs KONSPECTER_PUBLIC_URL: subscriptions are managed on the site")
+	}
+	if cfg.Billing.Paid() && !cfg.Mail.Enabled() {
+		r.fail("paid sync (KONSPECTER_BILLING_URL) needs email (KONSPECTER_SMTP_HOST): every payment is emailed")
 	}
 	if cfg.Mail.Transport == "smtp" && cfg.Mail.Host != "" && cfg.Mail.From == "" {
 		r.fail("KONSPECTER_SMTP_FROM is required with KONSPECTER_SMTP_HOST")
@@ -270,6 +296,22 @@ func (r *reader) providers(name, fallback string) []string {
 		}
 	}
 	return ids
+}
+
+func (r *reader) billing() Billing {
+	b := Billing{URL: strings.TrimSuffix(r.lookup("KONSPECTER_BILLING_URL"), "/"), Token: r.lookup("KONSPECTER_BILLING_TOKEN")}
+	switch {
+	case b.URL == "" && b.Token == "":
+		return b
+	case b.URL == "" || b.Token == "":
+		r.fail("KONSPECTER_BILLING_URL and KONSPECTER_BILLING_TOKEN must be set together")
+	case len(b.Token) < minTokenLength:
+		r.fail("KONSPECTER_BILLING_TOKEN must be at least %d characters", minTokenLength)
+	}
+	if u, err := url.Parse(b.URL); b.URL != "" && (err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.RawQuery != "") {
+		r.fail("KONSPECTER_BILLING_URL must be an http(s) URL such as http://billing:8081, not %q", b.URL)
+	}
+	return b
 }
 
 // withEnvFile returns a lookup that prefers getenv and falls back to the .env file.

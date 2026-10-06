@@ -31,6 +31,7 @@ type fakeAccounts struct {
 	sessions map[string]*auth.Session
 	links    map[string]string            // provider + "/" + subject → user email
 	pending  map[string]accounts.Identity // token hash → identity
+	locales  map[string]string            // user id → language of the emails
 	// deleted runs after an account is deleted (its devices go too).
 	deleted func(userID string)
 }
@@ -53,7 +54,7 @@ func newFakeAccounts() *fakeAccounts {
 	return &fakeAccounts{
 		users: map[string]*fakeUser{}, codes: map[string]*fakeCode{},
 		resets: map[string]string{}, sessions: map[string]*auth.Session{},
-		links: map[string]string{}, pending: map[string]accounts.Identity{},
+		links: map[string]string{}, pending: map[string]accounts.Identity{}, locales: map[string]string{},
 	}
 }
 
@@ -298,6 +299,19 @@ func (f *fakeAccounts) DeleteAccount(_ context.Context, userID string) error {
 		deleted(userID)
 	}
 	return nil
+}
+
+func (f *fakeAccounts) SetLocale(_ context.Context, userID, locale string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.locales[userID] = locale
+	return nil
+}
+
+func (f *fakeAccounts) locale(userID string) string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.locales[userID]
 }
 
 // fakeMailer keeps sent messages.

@@ -33,6 +33,8 @@ type AccountStore interface {
 	Account(ctx context.Context, userID string) (accounts.Account, error)
 	RenameAccount(ctx context.Context, userID, name string) (accounts.Account, error)
 	DeleteAccount(ctx context.Context, userID string) error
+	// SetLocale keeps the language of the user's emails.
+	SetLocale(ctx context.Context, userID, locale string) error
 }
 
 // DeviceStore is the storage for connecting apps to accounts.
@@ -253,6 +255,7 @@ func (a *api) startSession(w http.ResponseWriter, r *http.Request, user auth.Use
 		return err
 	}
 	a.setSessionCookie(w, id, expires)
+	a.setLocale(r, user.ID, requestLocale(r))
 	if _, err := r.Cookie(a.accounts.linkCookieName); err == nil {
 		a.clearCookie(w, a.accounts.linkCookieName, "/")
 	}

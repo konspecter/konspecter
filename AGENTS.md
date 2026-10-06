@@ -66,6 +66,7 @@ All planned phases are done. New work needs a new plan in `.claude/plans/`.
 | Sync site  | Account site, email and social sign-in, devices, end-to-end encrypted sync  | Done   |
 | Feedback 1 | Green tick before going on after the sign-in code; copy not only technical  | Done   |
 | Feedback 2 | Language dropdown, name in header, sign-in card, HTML emails, QR connect    | Done   |
+| Paid sync  | Optional: an external service decides on sync; 402 pause, terms, cookies    | Done   |
 
 Specs and notes: `.claude/plans/updates-1.md` (+ `updates-1-implementation.md`), `updates-2.md`
 (+ `updates-2-implementation.md`), `markdown-single-source.md`, `last-write-wins.md`, `tag-chains.md` (item 1 of `updates-3.md`), `note-find.md` (item 3), `friendly-errors.md` (item 5), `slug-file-names.md` (item 8), `mode-switch-place.md` (item 14), `mobile-view.md` (mobile view updates), `updates-4.md` (+ `updates-4-implementation.md`), `sync-app-site.md` (+
@@ -117,7 +118,8 @@ apps/web/                 React + Vite web app (the shared UI for all clients)
   src/presentation/       UI: app/ (routes, styles), components/, editors/, hooks/, i18n/ (en, ru),
                           markdown/, pages/
 apps/site/                Account site: React Router (framework mode) with server rendering in
-                          Node: landing, sign-in, settings (devices, encryption), /activate; calls the Go API
+                          Node: landing, Markdown cheatsheet, sign-in, settings (subscription, devices,
+                          encryption), /activate, terms and privacy, cookie notice; calls the Go API
   app/routes/             one module per page (loader, action, component)
 apps/mobile/              Capacitor 8 Android app around apps/web (android/: generated Gradle project)
 apps/desktop/             Tauri 2 desktop shell around apps/web
@@ -125,6 +127,7 @@ apps/desktop/             Tauri 2 desktop shell around apps/web
 apps/server/              Go HTTP server (module konspecter/server)
   cmd/server/             entry point (serve, migrate, create-user, create-token, revoke-tokens)
   internal/               config (env + .env), notes, keys, auth, accounts, devices, oauth, mail,
+                          entitlements (paid sync: whether an account may sync),
                           httpapi, storage/postgres
   migrations/             embedded SQL migrations
 packages/ui/              shared look of the app and the site: tokens, fonts, base, controls, icons

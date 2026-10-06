@@ -30,14 +30,20 @@ func minutes(d time.Duration) int {
 	return int(d.Round(time.Minute) / time.Minute)
 }
 
-// footer says why the email came, under every letter.
-func footer(locale Locale, siteURL string) string {
+// footer says why the email came, under every letter: the address was
+// entered on the site, or (account) it is an account's.
+func footer(locale Locale, siteURL string, account bool) string {
 	host := siteURL
 	if u, err := url.Parse(siteURL); err == nil && u.Host != "" {
 		host = u.Host
 	}
-	if locale == Russian {
+	switch {
+	case locale == Russian && account:
+		return fmt.Sprintf("Вы получили это письмо, потому что у вас есть аккаунт Konspecter на %s.", host)
+	case locale == Russian:
 		return fmt.Sprintf("Вы получили это письмо, потому что этот адрес ввели на %s.", host)
+	case account:
+		return fmt.Sprintf("You received this email because you have a Konspecter account on %s.", host)
 	}
 	return fmt.Sprintf("You received this email because this address was entered on %s.", host)
 }

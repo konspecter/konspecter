@@ -46,23 +46,40 @@ func (a *api) account(w http.ResponseWriter, r *http.Request, session auth.Sessi
 	writeJSON(w, http.StatusOK, toAccountJSON(account, session))
 }
 
+// renameAccount changes the account's name, or the language of its emails
+// (the site's language, when the owner picks another).
 func (a *api) renameAccount(w http.ResponseWriter, r *http.Request, session auth.Session) {
 	var body struct {
-		Name *string `json:"name"`
+		Name   *string `json:"name"`
+		Locale *string `json:"locale"`
 	}
 	if !a.decode(w, r, &body) {
 		return
 	}
+	if body.Name == nil && body.Locale == nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", `"name" or "locale" is required`)
+		return
+	}
+	if body.Locale != nil {
+		locale, ok := siteLocale(*body.Locale)
+		if !ok {
+			writeError(w, http.StatusBadRequest, "invalid_request", `"locale" must be "en" or "ru"`)
+			return
+		}
+		a.setLocale(r, session.User.ID, locale)
+	}
+	var account accounts.Account
+	var err error
 	if body.Name == nil {
-		writeError(w, http.StatusBadRequest, "invalid_request", `"name" is required`)
-		return
+		account, err = a.accounts.Store.Account(r.Context(), session.User.ID)
+	} else {
+		name, nameErr := accounts.NormalizeName(*body.Name)
+		if nameErr != nil {
+			writeError(w, http.StatusBadRequest, "invalid_name", nameErr.Error())
+			return
+		}
+		account, err = a.accounts.Store.RenameAccount(r.Context(), session.User.ID, name)
 	}
-	name, err := accounts.NormalizeName(*body.Name)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_name", err.Error())
-		return
-	}
-	account, err := a.accounts.Store.RenameAccount(r.Context(), session.User.ID, name)
 	if err != nil {
 		a.internalError(w, r, err)
 		return
@@ -72,8 +89,10 @@ func (a *api) renameAccount(w http.ResponseWriter, r *http.Request, session auth
 
 // deleteAccount deletes the account and everything in it. The browser must
 // have signed in recently and the owner must type the address: a session
-// left open, or a slip, is not enough. The apps' tokens stop working, their
-// streams end now, and they keep their notes.
+// left open, or a slip, is not enough. The billing service cancels a
+// renewing subscription at its gateway first, and forgets the account. The
+// apps' tokens stop working, their streams end now, and they keep their
+// notes.
 func (a *api) deleteAccount(w http.ResponseWriter, r *http.Request, session auth.Session) {
 	var body struct {
 		Email string `json:"email"`
@@ -87,6 +106,9 @@ func (a *api) deleteAccount(w http.ResponseWriter, r *http.Request, session auth
 	}
 	if email, err := auth.NormalizeEmail(body.Email); err != nil || email != session.User.Email {
 		writeError(w, http.StatusBadRequest, "email_mismatch", "type the account's email address to confirm")
+		return
+	}
+	if !a.forgetBilling(w, r, session.User.ID) {
 		return
 	}
 	if err := a.accounts.Store.DeleteAccount(r.Context(), session.User.ID); err != nil {

@@ -52,6 +52,7 @@ export const en = {
   "syncHint.failed": "Sync failed",
   "syncHint.disconnected": "Sync stopped",
   "syncHint.locked": "Sync locked",
+  "syncHint.unpaid": "Sync paused",
   "syncHint.blocked": { one: "{count} not synced", other: "{count} not synced" },
   "syncHint.label": "Sync: {text}",
 
@@ -326,6 +327,23 @@ source, or delete this conspect when you are done.
   "sync.state.error": "Sync failed; retrying",
   "sync.state.disconnected": "Disconnected",
   "sync.state.locked": "Locked",
+  "sync.state.unpaid": "Paused",
+  "sync.paused": "Sync is paused: the subscription has ended.",
+  "sync.unpaid": "Sync on this server needs a subscription.",
+  "sync.unpaidKept":
+    "Every conspect is safe, on this device and on the server. Sync carries on by itself once it is paid.",
+  "sync.unpaidPending": {
+    one: "Every conspect is safe, on this device and on the server; {count} change waits to be sent once sync is paid.",
+    other:
+      "Every conspect is safe, on this device and on the server; {count} changes wait to be sent once sync is paid.",
+  },
+  "sync.subscribe": "Subscribe",
+  "sync.checkAgain": "Check again",
+  "sync.manageSubscription": "Manage subscription",
+  "sync.access.trialing": "Free trial until {date}.",
+  "sync.access.active": "The subscription renews automatically.",
+  "sync.access.canceled": "The subscription does not renew. Sync works until {date}.",
+  "sync.access.past_due": "The last payment did not go through. Sync works until {date}.",
   "sync.lockedSetup":
     "Conspects are encrypted before they leave this device, and this account has no encryption set up yet. Set it up on the site, then come back here.",
   "sync.lockedUnlock":

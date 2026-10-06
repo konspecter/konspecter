@@ -50,6 +50,8 @@ export function SyncSettings({ sync }: { sync: SyncEngine }) {
         <Disconnected sync={sync} status={status} />
       ) : status.state === "locked" ? (
         <Locked sync={sync} status={status} />
+      ) : status.state === "unpaid" ? (
+        <Unpaid sync={sync} status={status} />
       ) : (
         <SyncState sync={sync} status={status} />
       )}
@@ -76,11 +78,83 @@ function SyncState({ sync, status }: { sync: SyncEngine; status: SyncStatus }) {
           </>
         )}
       </p>
+      <AccessNote status={status} />
       {errorText !== null && <p className="inline-error">{errorText}</p>}
       {status.blocked > 0 && <p className="setting-hint">{t("sync.heldBack")}</p>}
       <div className="actions">
         <button type="button" className="button" onClick={() => void sync.syncNow()}>
           {t("sync.now")}
+        </button>
+        {status.access && status.access.state !== "free" && (
+          <button
+            type="button"
+            className="button"
+            onClick={() => void openInBrowser(subscriptionPage(status))}
+          >
+            {t("sync.manageSubscription")}
+          </button>
+        )}
+        <button type="button" className="button" onClick={() => void sync.disconnect()}>
+          {t("sync.disconnect")}
+        </button>
+      </div>
+    </>
+  );
+}
+
+/** Where the account's subscription is managed: its settings on the site. */
+function subscriptionPage(status: SyncStatus): string {
+  return `${status.serverUrl ?? ""}/settings#subscription`;
+}
+
+/** Paid sync: how long the account's time lasts (nothing where sync is free). */
+function AccessNote({ status }: { status: SyncStatus }) {
+  const access = status.access;
+  if (access?.state === "active") return <p className="setting-hint">{t("sync.access.active")}</p>;
+  if (!access?.until) return null;
+  switch (access.state) {
+    case "trialing":
+    case "canceled":
+    case "past_due":
+      return (
+        <p className="setting-hint">
+          {rich(`sync.access.${access.state}`, { date: <NoteDate value={access.until} /> })}
+        </p>
+      );
+    default:
+      return null;
+  }
+}
+
+/**
+ * The server wants a subscription. Nothing is lost: the conspects are here
+ * and on the server, and changes wait to be sent.
+ */
+function Unpaid({ sync, status }: { sync: SyncEngine; status: SyncStatus }) {
+  return (
+    <>
+      <p className="setting-hint">
+        {rich("sync.connectedTo", {
+          server: <strong>{status.serverUrl}</strong>,
+          account: <strong>{status.account?.email}</strong>,
+        })}
+      </p>
+      <p role="status" className="sync-status">
+        {status.access?.until ? t("sync.paused") : t("sync.unpaid")}
+      </p>
+      <p className="setting-hint">
+        {status.pending > 0 ? tn("sync.unpaidPending", status.pending) : t("sync.unpaidKept")}
+      </p>
+      <div className="actions">
+        <button
+          type="button"
+          className="button button-primary"
+          onClick={() => void openInBrowser(subscriptionPage(status))}
+        >
+          {t("sync.subscribe")}
+        </button>
+        <button type="button" className="button" onClick={() => void sync.syncNow()}>
+          {t("sync.checkAgain")}
         </button>
         <button type="button" className="button" onClick={() => void sync.disconnect()}>
           {t("sync.disconnect")}

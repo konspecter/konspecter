@@ -21,6 +21,9 @@ type letter struct {
 	code  string
 	link  *button
 	outro []string
+	// account: sent to an account's owner about the account (not because
+	// the address was typed somewhere).
+	account bool
 }
 
 type button struct {
@@ -75,7 +78,7 @@ func (l letter) html() string {
 		"Link":     l.link,
 		"LinkHint": linkHint,
 		"Outro":    l.outro,
-		"Footer":   footer(l.locale, l.siteURL),
+		"Footer":   footer(l.locale, l.siteURL, l.account),
 		"SiteURL":  l.siteURL,
 	})
 	if err != nil {

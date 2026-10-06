@@ -7,12 +7,16 @@ import { ConnectApp, parseConnectCode, type ConnectCode } from "../connect-app";
 import { parseDevices, timeAgo, type Device } from "../devices";
 import { Encryption } from "../encryption";
 import { useLocale, useT } from "../i18n/i18n";
+import { readPreferences } from "../preferences.server";
+import { parseBilling, parsePlans } from "../subscription";
+import { SubscriptionSection } from "../subscription-section";
 import type { Route } from "./+types/settings";
 
 /**
- * The account's settings: its name, connecting an app by QR code, the
- * connected devices (each can be disconnected: it stops syncing and keeps
- * its conspects), encryption, and deleting the account. Plain forms, so the page works without JavaScript,
+ * The account's settings: its name, the subscription (where sync is paid),
+ * connecting an app by QR code, the connected devices (each can be
+ * disconnected: it stops syncing and keeps its conspects), encryption, and
+ * deleting the account. Plain forms, so the page works without JavaScript,
  * except the encryption, which runs in the browser (encryption.tsx).
  */
 
@@ -36,22 +40,29 @@ function signInAgainOn401(request: Request, result: ApiResult<unknown>): void {
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   requireUser(request, context);
-  const [account, devices] = await Promise.all([
+  const { locale } = readPreferences(request);
+  const [account, devices, billing, plans] = await Promise.all([
     callApi(request, "/api/account"),
     callApi(request, "/api/devices"),
+    callApi(request, `/api/subscription?locale=${locale}`),
+    callApi(request, `/api/billing/plans?locale=${locale}`),
   ]);
   signInAgainOn401(request, account);
   const parsed = parseAccount(account.data);
   if (!parsed) throw data("The account could not be loaded", { status: 503 });
+  const subscription = parseBilling(billing.data);
   return {
     account: parsed,
     devices: parseDevices(devices.data),
     devicesFailed: devices.error !== null,
+    // Shown only where sync is paid.
+    billing: subscription?.paid ? subscription : null,
+    gateways: parsePlans(plans.data).gateways,
     now: Date.now(),
   };
 }
 
-type Intent = "rename" | "connect" | "disconnect" | "delete";
+type Intent = "rename" | "connect" | "disconnect" | "delete" | "subscribe" | "cancel" | "resume";
 
 interface ActionResult {
   readonly intent: Intent;
@@ -60,6 +71,8 @@ interface ActionResult {
   readonly disconnected?: string;
   /** The code to connect an app with. */
   readonly connect?: ConnectCode;
+  /** Where to pay for the subscription just started. */
+  readonly redirectUrl?: string;
 }
 
 function failed(intent: Intent, result: ApiResult<unknown>) {
@@ -107,6 +120,32 @@ export async function action({ request }: Route.ActionArgs) {
     } satisfies ActionResult;
   }
 
+  if (intent === "subscribe") {
+    const [gateway = "", period = ""] = textField(form, "plan").split(":");
+    const result = await callApi<{ redirect_url?: unknown }>(request, "/api/subscription", {
+      method: "POST",
+      body: {
+        gateway,
+        period,
+        locale: readPreferences(request).locale,
+        accept: textField(form, "accept") === "yes",
+      },
+    });
+    signInAgainOn401(request, result);
+    const redirectUrl = result.data?.redirect_url;
+    if (result.error || typeof redirectUrl !== "string" || !/^https:\/\//.test(redirectUrl)) {
+      return failed("subscribe", result);
+    }
+    return { intent: "subscribe", error: null, redirectUrl } satisfies ActionResult;
+  }
+
+  if (intent === "cancel" || intent === "resume") {
+    const result = await callApi(request, `/api/subscription/${intent}`, { method: "POST" });
+    signInAgainOn401(request, result);
+    if (result.error) return failed(intent, result);
+    return { intent, error: null } satisfies ActionResult;
+  }
+
   if (intent === "delete") {
     const result = await callApi(request, "/api/account", {
       method: "DELETE",
@@ -122,9 +161,12 @@ export async function action({ request }: Route.ActionArgs) {
 
 export default function Settings() {
   const { t } = useT();
-  const { account, devices, devicesFailed, now } = useLoaderData<typeof loader>();
+  const { account, devices, devicesFailed, billing, gateways, now } =
+    useLoaderData<typeof loader>();
   const result = useActionData<ActionResult>();
   const errorOf = (intent: Intent) => (result?.intent === intent ? result.error : null);
+  const billingIntent =
+    result?.intent === "subscribe" || result?.intent === "cancel" || result?.intent === "resume";
 
   return (
     <section className="settings-page site-frame" aria-labelledby="settings-title">
@@ -159,6 +201,24 @@ export default function Settings() {
           </div>
         </Form>
       </section>
+
+      {billing && (
+        <SubscriptionSection
+          billing={billing}
+          gateways={gateways}
+          error={billingIntent ? result.error : null}
+          notice={
+            result?.error
+              ? null
+              : result?.intent === "cancel"
+                ? t("subscription.done.cancel")
+                : result?.intent === "resume"
+                  ? t("subscription.done.resume")
+                  : null
+          }
+          redirectUrl={result?.redirectUrl ?? null}
+        />
+      )}
 
       <section className="settings-section" id="connect" aria-labelledby="connect-heading">
         <h2 id="connect-heading">{t("settings.connect.title")}</h2>

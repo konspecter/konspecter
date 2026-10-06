@@ -39,6 +39,14 @@ const KNOWN = new Set([
   "email_mismatch",
   "reauthentication_required",
   "invalid_user_code",
+  "consent_required",
+  "already_subscribed",
+  "gateway_failed",
+  "unknown_price",
+  "unknown_gateway",
+  "not_subscribed",
+  "not_resumable",
+  "billing_off",
 ]);
 
 export function errorText(t: SiteTranslator["t"], error: FormError): string {

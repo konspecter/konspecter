@@ -268,3 +268,66 @@ func TestLogTransportLogs(t *testing.T) {
 		t.Errorf("log = %q", out.String())
 	}
 }
+
+func TestSubscriptionLetters(t *testing.T) {
+	const site = "https://notes.example.com"
+	until := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
+	charge := Charge{Amount: "299.00", Currency: "RUB", Period: "3m", Until: until}
+	for _, locale := range []Locale{English, Russian} {
+		letters := []Message{
+			TrialStarted(locale, site, "a@example.com", until), TrialEnded(locale, site, "a@example.com"),
+			Subscribed(locale, site, "a@example.com", charge), Renewed(locale, site, "a@example.com", charge),
+			PaymentFailed(locale, site, "a@example.com", charge), Canceled(locale, site, "a@example.com", until),
+			Canceled(locale, site, "a@example.com", time.Time{}), Resumed(locale, site, "a@example.com", charge),
+			GraceStarted(locale, site, "a@example.com", until), Paused(locale, site, "a@example.com"),
+			Refunded(locale, site, "a@example.com", charge),
+		}
+		for _, m := range letters {
+			if m.Subject == "" || m.HTML == "" || strings.Contains(m.HTML, "<no value>") || !strings.Contains(m.Text, site+"/settings#subscription") {
+				t.Errorf("%s letter %q: %q", locale, m.Subject, m.Text)
+			}
+			if !strings.Contains(m.HTML, "Konspecter account on notes.example.com") && !strings.Contains(m.HTML, "аккаунт Konspecter на notes.example.com") {
+				t.Errorf("%s letter %q lacks the account footer", locale, m.Subject)
+			}
+		}
+	}
+	en := Subscribed(English, site, "a@example.com", charge)
+	if !strings.Contains(en.Text, "We received 299 ₽. Sync is paid until 6 November 2026.") || !strings.Contains(en.Text, "every 3 months") {
+		t.Errorf("english = %q", en.Text)
+	}
+	ru := Subscribed(Russian, site, "a@example.com", Charge{Amount: "3.00", Currency: "USD", Period: "1m", Until: until})
+	if !strings.Contains(ru.Text, "Оплата $3 прошла. Синхронизация оплачена до 6 ноября 2026 г.") || !strings.Contains(ru.Text, "раз в месяц") {
+		t.Errorf("russian = %q", ru.Text)
+	}
+	if got := period(Russian, "5d"); got != "5 дней" {
+		t.Errorf("5d = %q", got)
+	}
+	if got := period(Russian, "2y"); got != "2 года" {
+		t.Errorf("2y = %q", got)
+	}
+	if !strings.Contains(Paused(English, site, "a@example.com").Text, "Your conspects are safe") {
+		t.Error("the paused email does not say the notes are safe")
+	}
+}
+
+func TestBillingNotices(t *testing.T) {
+	const site = "https://notes.example.com"
+	until := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
+	subjects := map[string]bool{}
+	for _, kind := range NoticeKinds {
+		m, ok := BillingNotice(English, site, "a@example.com", Notice{Kind: kind, Amount: "3.00", Currency: "USD", Period: "1m", Until: &until})
+		if !ok || m.To != "a@example.com" || m.Subject == "" {
+			t.Errorf("%s: %v %+v", kind, ok, m)
+		}
+		subjects[m.Subject] = true
+	}
+	if len(subjects) != len(NoticeKinds) {
+		t.Errorf("subjects = %v", subjects)
+	}
+	if m, _ := BillingNotice(Russian, site, "a@example.com", Notice{Kind: "paused"}); m.Subject != Paused(Russian, site, "a@example.com").Subject {
+		t.Errorf("russian = %q", m.Subject)
+	}
+	if _, ok := BillingNotice(English, site, "a@example.com", Notice{Kind: "cancelled"}); ok {
+		t.Error("an unknown kind was written")
+	}
+}

@@ -179,3 +179,59 @@ it("explains a disconnected device and offers to sign in again or stop", async (
   await userEvent.setup().click(screen.getByRole("button", { name: "Stop syncing" }));
   expect(await screen.findByRole("button", { name: "Sign in with browser" })).toBeInTheDocument();
 });
+
+it("says when the trial ends, and links to the subscription", async () => {
+  const server = new FakeServer();
+  server.access = { state: "trialing", until: "2026-10-20T12:00:00Z" };
+  const { engine, opened } = await setup(server);
+  await engine.connect({ serverUrl: "https://sync.example.com", token: "ksp_ada" });
+  await engine.unlock(TEST_PASSPHRASE);
+  expect(await screen.findByText(/Free trial until/)).toBeInTheDocument();
+  await userEvent.setup().click(screen.getByRole("button", { name: "Manage subscription" }));
+  expect(opened).toEqual(["https://sync.example.com/settings#subscription"]);
+});
+
+it("pauses when the subscription ends, keeps everything and checks again on request", async () => {
+  const { server, engine, opened } = await setup();
+  await engine.connect({ serverUrl: "https://sync.example.com", token: "ksp_ada" });
+  await engine.unlock(TEST_PASSPHRASE);
+  server.access = { state: "expired", until: "2026-10-01T12:00:00Z" };
+  await engine.syncNow();
+
+  expect(await screen.findByRole("status")).toHaveTextContent(
+    "Sync is paused: the subscription has ended.",
+  );
+  expect(
+    screen.getByText(/Every conspect is safe, on this device and on the server/),
+  ).toBeInTheDocument();
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Subscribe" }));
+  expect(opened).toEqual(["https://sync.example.com/settings#subscription"]);
+
+  server.access = { state: "active", until: "2026-11-01T12:00:00Z" };
+  await user.click(screen.getByRole("button", { name: "Check again" }));
+  expect(await screen.findByText(/Up to date/)).toBeInTheDocument();
+  expect(screen.getByText(/renews automatically/)).toBeInTheDocument();
+});
+
+it("says until when a canceled subscription keeps sync working", async () => {
+  const server = new FakeServer();
+  server.access = { state: "canceled", until: "2026-11-09T12:00:00Z" };
+  const { engine } = await setup(server);
+  await engine.connect({ serverUrl: "https://sync.example.com", token: "ksp_ada" });
+  await engine.unlock(TEST_PASSPHRASE);
+  expect(
+    await screen.findByText(/The subscription does not renew. Sync works until/),
+  ).toBeInTheDocument();
+});
+
+it("asks for a subscription where the account never had one", async () => {
+  const { server, engine } = await setup();
+  await engine.connect({ serverUrl: "https://sync.example.com", token: "ksp_ada" });
+  await engine.unlock(TEST_PASSPHRASE);
+  server.access = { state: "expired", until: null };
+  await engine.syncNow();
+  expect(await screen.findByRole("status")).toHaveTextContent(
+    "Sync on this server needs a subscription.",
+  );
+});

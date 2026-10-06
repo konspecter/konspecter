@@ -15,6 +15,8 @@ export interface Preferences {
 
 const LANG_COOKIE = "lang";
 const THEME_COOKIE = "theme";
+/** Set once the visitor has seen the cookie notice. */
+const NOTICE_COOKIE = "cookies";
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
 export function isLocale(value: unknown): value is Locale {
@@ -71,10 +73,21 @@ export function readPreferences(request: Request): Preferences {
   };
 }
 
+/** Whether the visitor has seen the cookie notice. */
+export function cookieNoticeSeen(request: Request): boolean {
+  return readCookies(request.headers.get("Cookie")).get(NOTICE_COOKIE) === "ok";
+}
+
+const COOKIE_NAMES = { lang: LANG_COOKIE, theme: THEME_COOKIE, cookies: NOTICE_COOKIE } as const;
+
 /** A Set-Cookie value remembering one preference for a year. */
-export function preferenceCookie(name: "lang" | "theme", value: string, secure: boolean): string {
+export function preferenceCookie(
+  name: keyof typeof COOKIE_NAMES,
+  value: string,
+  secure: boolean,
+): string {
   return [
-    `${name === "lang" ? LANG_COOKIE : THEME_COOKIE}=${encodeURIComponent(value)}`,
+    `${COOKIE_NAMES[name]}=${encodeURIComponent(value)}`,
     "Path=/",
     `Max-Age=${String(ONE_YEAR)}`,
     "SameSite=Lax",

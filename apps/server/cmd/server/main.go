@@ -17,6 +17,7 @@
 //	KONSPECTER_PUBLIC_URL    the account site's origin; turns sign-in on
 //	KONSPECTER_MAIL_TRANSPORT, KONSPECTER_SMTP_*  how emails are sent
 //	KONSPECTER_OAUTH_*, KONSPECTER_LOGIN_PROVIDERS_*  sign-in with other services
+//	KONSPECTER_BILLING_URL, KONSPECTER_BILLING_TOKEN  paid sync (empty: free)
 package main
 
 import (
@@ -87,6 +88,10 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout 
 				AllowedOrigins: cfg.AllowedOrigins,
 				TrustedProxies: cfg.TrustedProxies,
 				Accounts:       accounts,
+			}
+			if cfg.Billing.Paid() {
+				options.Billing = &httpapi.Billing{URL: cfg.Billing.URL, Token: cfg.Billing.Token, Store: db}
+				slog.Info("sync is paid", "billing", cfg.Billing.URL)
 			}
 			handler := httpapi.NewHandler(db, db, slog.Default(), options)
 			return serve(ctx, cfg.Addr, handler, handler.CloseStreams)

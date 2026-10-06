@@ -13,6 +13,7 @@ import {
   type DeviceAuthorization,
   type DeviceDescription,
   type ServerConfig,
+  type SyncAccess,
 } from "../http/api-client";
 import type { NoteStore } from "../storage/note-store";
 import { ChangeStream } from "./change-stream";
@@ -26,9 +27,13 @@ import { deviceLogin } from "./device-login";
  * "locked": connected, but without the account's content key, so no note
  * can be sent or read: encryption must be set up on the site first, or the
  * passphrase entered (see SyncStatus.lock).
+ *
+ * "unpaid": connected, but the server wants a subscription (paid sync).
+ * Nothing is lost or held back: local changes wait, and sync carries on by
+ * itself once the account is paid again.
  */
 export type SyncState =
-  "disabled" | "idle" | "syncing" | "offline" | "error" | "disconnected" | "locked";
+  "disabled" | "idle" | "syncing" | "offline" | "error" | "disconnected" | "locked" | "unpaid";
 
 /** Why sync is locked: no key on the server yet ("setup"), or one to unlock ("unlock"). */
 export type SyncLock = "setup" | "unlock";
@@ -47,6 +52,8 @@ export type SyncStatus = {
   readonly error: Error | null;
   /** Set while the state is "locked". */
   readonly lock: SyncLock | null;
+  /** Whether the account may sync and until when, as the server last said. */
+  readonly access: SyncAccess | null;
 };
 
 /** There is no key to unlock: encryption is not set up on the server. */
@@ -114,6 +121,10 @@ const POLL_MS = 10_000;
 const LOCAL_CHANGE_DELAY_MS = 100;
 const FIRST_RETRY_MS = 2_000;
 const MAX_RETRY_MS = 5 * 60_000;
+/** Between checks whether the account was paid again, while sync waits for it. */
+const UNPAID_CHECK_MS = 10 * 60_000;
+/** How old the account's sync state may get before it is asked again. */
+const ACCESS_TTL_MS = 60 * 60_000;
 
 const browserScheduler: Scheduler = {
   set: (callback, delayMs) => setTimeout(callback, delayMs),
@@ -157,7 +168,10 @@ export class SyncEngine {
     blocked: 0,
     error: null,
     lock: null,
+    access: null,
   };
+  /** When the account's sync state was last asked (ms). */
+  #accessAt = 0;
   readonly #listeners = new Set<() => void>();
   #timer: unknown = null;
   #running: Promise<void> | null = null;
@@ -347,6 +361,7 @@ export class SyncEngine {
       serverUrl: null,
       error: null,
       lock: null,
+      access: null,
     });
   }
 
@@ -447,7 +462,8 @@ export class SyncEngine {
 
   #openStream(): void {
     const config = this.#config;
-    if (!config || !this.#isVisible()) return;
+    // While unpaid the stream is refused; a cycle that goes through opens it.
+    if (!config || !this.#isVisible() || this.#status.state === "unpaid") return;
     this.#stream ??= new ChangeStream(
       this.#client(config),
       {
@@ -521,6 +537,7 @@ export class SyncEngine {
       await this.#refreshCounts({ state: "offline", error: null });
       return; // The "online" event starts the next cycle.
     }
+    const wasUnpaid = this.#status.state === "unpaid";
     this.#setStatus({ state: "syncing" });
     const client = this.#client(config);
     try {
@@ -536,12 +553,15 @@ export class SyncEngine {
         await this.#push(client); // Upload the local versions that won right away.
       }
       this.#failures = 0;
+      const access = await this.#currentAccess(client, wasUnpaid);
       await this.#refreshCounts({
         state: "idle",
         lastSyncedAt: this.#now().toISOString(),
         error: null,
         lock: null,
+        access,
       });
+      if (wasUnpaid) this.#openStream();
       this.#schedule(this.#streaming ? INTERVAL_MS : POLL_MS);
     } catch (error) {
       if (error instanceof KeyChangedError) {
@@ -553,6 +573,10 @@ export class SyncEngine {
         await this.#becomeDisconnected(config, error);
         return;
       }
+      if (isSubscriptionRequired(error)) {
+        await this.#becomeUnpaid(client);
+        return;
+      }
       this.#failures += 1;
       const offline = error instanceof NetworkError;
       await this.#refreshCounts({
@@ -560,6 +584,34 @@ export class SyncEngine {
         error: offline ? null : error instanceof Error ? error : new Error(String(error)),
       });
       this.#schedule(this.#retryDelay());
+    }
+  }
+
+  /**
+   * The server wants a subscription. Keep the connection, the key and every
+   * pending change; stop the change stream and look again now and then (and
+   * whenever the window comes back, or the owner asks).
+   */
+  async #becomeUnpaid(client: ApiClient): Promise<void> {
+    this.#closeStream();
+    this.#failures = 0;
+    const access = await this.#currentAccess(client, true);
+    await this.#refreshCounts({ state: "unpaid", error: null, lock: null, access });
+    this.#schedule(UNPAID_CHECK_MS);
+  }
+
+  /** The account's sync state: asked again when stale (or `fresh`), else as last known. */
+  async #currentAccess(client: ApiClient, fresh: boolean): Promise<SyncAccess | null> {
+    const at = this.#now().getTime();
+    if (!fresh && this.#status.access && at - this.#accessAt < ACCESS_TTL_MS) {
+      return this.#status.access;
+    }
+    try {
+      const access = await client.access();
+      this.#accessAt = at;
+      return access;
+    } catch {
+      return this.#status.access; // Not worth failing a cycle over.
     }
   }
 
@@ -622,13 +674,16 @@ export class SyncEngine {
         error.status >= 400 &&
         error.status < 500 &&
         error.status !== 401 &&
+        error.status !== 402 &&
         error.status !== 429
       ) {
         // The server will never accept this version (e.g. too large); hold it
         // back instead of retrying forever, and keep syncing the rest.
         await this.#store.blockSync(noteId, { reason: "rejected", message: error.message });
       } else {
-        throw error; // Offline, server error, bad credentials: retry the cycle later.
+        // Offline, server error, bad credentials, no subscription: the cycle
+        // deals with it, and this note is sent later.
+        throw error;
       }
     }
   }
@@ -673,6 +728,11 @@ export class SyncEngine {
   #client(config: ServerConfig): ApiClient {
     return new ApiClient(config, this.#fetch, this.#cipher);
   }
+}
+
+/** The server wants a subscription before it syncs (paid sync). */
+export function isSubscriptionRequired(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 402;
 }
 
 /** The stored content key; a key that is not a CryptoKey (or is missing) reads as null. */

@@ -291,3 +291,54 @@ func TestParseEnvRejectsBrokenLines(t *testing.T) {
 		}
 	}
 }
+
+const billingToken = "a-token-the-server-and-the-service-share"
+
+func paidSettings(extra map[string]string) map[string]string {
+	values := map[string]string{
+		"KONSPECTER_PUBLIC_URL":     "https://notes.example.com",
+		"KONSPECTER_MAIL_TRANSPORT": "log",
+		"KONSPECTER_BILLING_URL":    "http://billing:8081/",
+		"KONSPECTER_BILLING_TOKEN":  billingToken,
+	}
+	for key, value := range extra {
+		values[key] = value
+	}
+	return values
+}
+
+func TestLoadReadsTheBillingService(t *testing.T) {
+	t.Chdir(t.TempDir())
+	cfg, err := Load(env(paidSettings(nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Billing != (Billing{URL: "http://billing:8081", Token: billingToken}) || !cfg.Billing.Paid() {
+		t.Errorf("billing = %+v", cfg.Billing)
+	}
+}
+
+func TestSyncIsFreeWithoutABillingService(t *testing.T) {
+	t.Chdir(t.TempDir())
+	cfg, err := Load(env(nil))
+	if err != nil || cfg.Billing.Paid() {
+		t.Errorf("Load = %+v, %v", cfg.Billing, err)
+	}
+}
+
+func TestLoadReportsBadBillingSettings(t *testing.T) {
+	t.Chdir(t.TempDir())
+	for name, settings := range map[string]map[string]string{
+		"KONSPECTER_PUBLIC_URL":    paidSettings(map[string]string{"KONSPECTER_PUBLIC_URL": ""}),
+		"email":                    paidSettings(map[string]string{"KONSPECTER_MAIL_TRANSPORT": "smtp"}),
+		"set together":             {"KONSPECTER_BILLING_URL": "http://billing:8081"},
+		"at least 32":              paidSettings(map[string]string{"KONSPECTER_BILLING_TOKEN": "short"}),
+		"must be an http(s) URL":   paidSettings(map[string]string{"KONSPECTER_BILLING_URL": "billing:8081"}),
+		"KONSPECTER_BILLING_TOKEN": {"KONSPECTER_BILLING_TOKEN": billingToken},
+	} {
+		_, err := Load(env(settings))
+		if err == nil || !strings.Contains(err.Error(), name) {
+			t.Errorf("%v: error %v does not mention %q", settings, err, name)
+		}
+	}
+}

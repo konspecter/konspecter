@@ -19,7 +19,7 @@ import { accountContext, loadAccount } from "./account.server";
 import { siteConfig } from "./config.server";
 import { LOCALE_NAMES, LOCALES, translator, useT, type Locale } from "./i18n/i18n";
 import { isSameOriginRequest } from "./origin.server";
-import { readPreferences, type Theme } from "./preferences.server";
+import { cookieNoticeSeen, readPreferences, type Theme } from "./preferences.server";
 import type { Route } from "./+types/root";
 import "./site.css";
 
@@ -45,6 +45,7 @@ export function loader({ request, context }: Route.LoaderArgs) {
     email: user?.email ?? null,
     name: user?.name ?? "",
     accounts: enabled,
+    cookieNotice: !cookieNoticeSeen(request),
   };
 }
 
@@ -55,6 +56,8 @@ interface RootData {
   /** The account's name; "" when it has none. */
   readonly name: string;
   readonly accounts: boolean;
+  /** Whether to show the cookie notice (not seen yet). */
+  readonly cookieNotice?: boolean;
 }
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -209,10 +212,37 @@ function Footer() {
   const { t } = useT();
   return (
     <footer className="site-footer">
-      <div className="site-frame">
+      <div className="site-frame site-footer-row">
         <p>{t("site.footer")}</p>
+        <nav aria-label={t("site.footerLinks")} className="site-footer-links">
+          <Link to="/markdown">{t("site.markdown")}</Link>
+          <Link to="/terms">{t("site.terms")}</Link>
+          <Link to="/privacy">{t("site.privacy")}</Link>
+        </nav>
       </div>
     </footer>
+  );
+}
+
+/**
+ * Says which cookies the site sets (only those it needs) until the visitor
+ * says OK: a plain form, so it works without JavaScript.
+ */
+function CookieNotice() {
+  const { t } = useT();
+  const location = useLocation();
+  return (
+    <aside className="cookie-notice" aria-label={t("cookies.label")}>
+      <form method="post" action="/preferences" className="cookie-notice-body">
+        <p>
+          {t("cookies.notice")} <Link to="/privacy#cookies">{t("cookies.more")}</Link>
+        </p>
+        <input type="hidden" name="back" value={`${location.pathname}${location.search}`} />
+        <button type="submit" name="cookies" value="ok" className="button button-primary">
+          {t("cookies.ok")}
+        </button>
+      </form>
+    </aside>
   );
 }
 
@@ -228,6 +258,7 @@ export default function App({ loaderData }: Route.ComponentProps) {
         <Outlet />
       </main>
       <Footer />
+      {loaderData.cookieNotice && <CookieNotice />}
     </>
   );
 }

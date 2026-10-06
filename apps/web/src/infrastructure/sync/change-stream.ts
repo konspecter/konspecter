@@ -17,8 +17,8 @@ const MAX_RETRY_MS = 60_000;
  * next poll. The events carry no data; the sync cycle fetches the changes.
  *
  * After a failure it reconnects with backoff. It gives up for good when the
- * server has no event stream (404, an older server) or refuses the token
- * (401: the sync cycle reports that).
+ * server has no event stream (404, an older server), refuses the token
+ * (401) or wants a subscription (402): the sync cycle reports those.
  */
 export class ChangeStream {
   readonly #client: ApiClient;
@@ -64,7 +64,7 @@ export class ChangeStream {
         if (name === "changes") this.#events.onChange();
       });
     } catch (error) {
-      retry = !(error instanceof ApiError && (error.status === 404 || error.status === 401));
+      retry = !(error instanceof ApiError && [401, 402, 404].includes(error.status));
     }
     if (controller.signal.aborted) return;
     this.#controller = null;

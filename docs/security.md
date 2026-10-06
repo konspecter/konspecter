@@ -157,6 +157,17 @@ forbidden_origin`); the site's server forwards the browser's `Origin` and itself
 
 Disconnecting deletes the stored token and the content key.
 
+### Paid sync
+
+Where sync is paid for, payments are handled by a separate service. The server keeps no card
+data, prices or payments, only whether each account may sync and until when, and it
+enforces that time itself. It talks to the service with a shared token
+(`KONSPECTER_BILLING_TOKEN`, compared in constant time) on `/internal/*` routes that Caddy
+never routes. Requests it passes on name the signed-in user in headers it sets itself,
+after dropping any such header a client sent, and never carry cookies. An account out of
+paid time keeps every note on the server and on its devices. The site sets only strictly
+necessary cookies, lists them on `/privacy#cookies`, and says so in a cookie notice.
+
 ### Dependencies
 
 - Licenses: npm (`pnpm licenses:check`), Go (`go-licenses`), Rust (`cargo deny`) — see

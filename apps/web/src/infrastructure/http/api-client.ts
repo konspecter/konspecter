@@ -9,6 +9,26 @@ export type ServerConfig = {
 
 export type Account = { readonly id: string; readonly email: string };
 
+/**
+ * Whether the account may sync (paid sync): "free" where sync costs
+ * nothing, else the account's entitlement; "expired" waits for a payment.
+ * `until` is when sync stops by itself (an ISO 8601 time); an expired
+ * account that never had any time has none.
+ */
+export type SyncAccess = {
+  readonly state: "free" | "trialing" | "active" | "past_due" | "canceled" | "expired";
+  readonly until: string | null;
+};
+
+const ACCESS_STATES: readonly SyncAccess["state"][] = [
+  "free",
+  "trialing",
+  "active",
+  "past_due",
+  "canceled",
+  "expired",
+];
+
 export type ChangesPage = {
   readonly notes: readonly RemoteNote[];
   readonly cursor: number;
@@ -133,6 +153,14 @@ export class ApiClient {
     const { id, email } = asRecord(body);
     if (typeof id !== "string" || typeof email !== "string") throw invalid("account");
     return { id, email };
+  }
+
+  /** Whether the account may sync; a server without paid sync says nothing: free. */
+  async access(): Promise<SyncAccess> {
+    const { sync } = asRecord(await this.#request("GET", "api/me"));
+    const { state, until } = asRecord(sync);
+    const known = ACCESS_STATES.find((value) => value === state);
+    return { state: known ?? "free", until: typeof until === "string" ? until : null };
   }
 
   /** The server's version of a note, or null if it has none (or deleted it). */

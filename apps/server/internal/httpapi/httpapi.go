@@ -60,6 +60,7 @@ type api struct {
 	limiter   *windowLimiter
 	trusted   []netip.Prefix
 	accounts  *accountAPI
+	billing   *billingAPI
 	hub       *hub
 	heartbeat time.Duration
 }
@@ -74,6 +75,10 @@ type Options struct {
 	TrustedProxies []netip.Prefix
 	// Accounts turns on sign-in for the account site; nil leaves it off.
 	Accounts *Accounts
+	// Billing makes sync paid; nil leaves it free. It needs Accounts.
+	Billing *Billing
+	// now overrides the clock of paid sync (tests).
+	now func() time.Time
 	// heartbeat overrides defaultHeartbeat (tests).
 	heartbeat time.Duration
 }
@@ -104,6 +109,17 @@ func NewHandler(repository NoteRepository, authenticator Authenticator, logger *
 	if options.Accounts != nil {
 		a.accounts = newAccountAPI(*options.Accounts, time.Now)
 	}
+	if options.Billing != nil && a.accounts != nil {
+		now := options.now
+		if now == nil {
+			now = time.Now
+		}
+		billing, err := newBillingAPI(*options.Billing, now)
+		if err != nil {
+			panic(fmt.Sprintf("httpapi: the billing service's URL: %v", err)) // config checked it
+		}
+		a.billing = billing
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -111,14 +127,15 @@ func NewHandler(repository NoteRepository, authenticator Authenticator, logger *
 	})
 	mux.Handle("GET /api/me", a.withTokenOrSession(a.me))
 	a.registerAccountRoutes(mux)
-	mux.Handle("GET /api/notes", a.authenticated(a.listNotes))
-	mux.Handle("POST /api/notes", a.authenticated(a.createNote))
-	mux.Handle("GET /api/notes/{id}", a.authenticated(a.getNote))
-	mux.Handle("PUT /api/notes/{id}", a.authenticated(a.updateNote))
-	mux.Handle("DELETE /api/notes/{id}", a.authenticated(a.deleteNote))
-	mux.Handle("GET /api/sync", a.withDevice(a.changes))
-	mux.Handle("GET /api/events", a.withDevice(a.events))
+	mux.Handle("GET /api/notes", a.authenticated(a.entitled(a.listNotes)))
+	mux.Handle("POST /api/notes", a.authenticated(a.entitled(a.createNote)))
+	mux.Handle("GET /api/notes/{id}", a.authenticated(a.entitled(a.getNote)))
+	mux.Handle("PUT /api/notes/{id}", a.authenticated(a.entitled(a.updateNote)))
+	mux.Handle("DELETE /api/notes/{id}", a.authenticated(a.entitled(a.deleteNote)))
+	mux.Handle("GET /api/sync", a.withDevice(a.entitledDevice(a.changes)))
+	mux.Handle("GET /api/events", a.withDevice(a.entitledDevice(a.events)))
 	a.registerKeyRoutes(mux)
+	a.registerBillingRoutes(mux)
 	mux.Handle("DELETE /api/tokens/current", a.authenticated(a.revokeCurrentToken))
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, _ *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "no such endpoint")
@@ -304,8 +321,11 @@ func utc(t *time.Time) *time.Time {
 	return &u
 }
 
-func (a *api) me(w http.ResponseWriter, _ *http.Request, user auth.User) {
-	writeJSON(w, http.StatusOK, map[string]string{"id": user.ID, "email": user.Email, "name": user.Name})
+// me is the signed-in user, and whether the account may sync.
+func (a *api) me(w http.ResponseWriter, r *http.Request, user auth.User) {
+	writeJSON(w, http.StatusOK, map[string]any{
+		"id": user.ID, "email": user.Email, "name": user.Name, "sync": a.access(r, user.ID),
+	})
 }
 
 func (a *api) listNotes(w http.ResponseWriter, r *http.Request, user auth.User) {

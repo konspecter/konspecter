@@ -97,14 +97,15 @@ resolution, the note store) works with plain Markdown, exactly as before.
 
 ### Failures
 
-| Situation                                                | Result                                                                                |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `409` on push (stale base, or id exists)                 | a conflict, settled at the end of the cycle                                           |
-| `4xx` the server will never accept (e.g. too large)      | entry blocked as rejected, with the message; other notes keep syncing                 |
-| offline (`navigator.onLine`, or fetch fails)             | state `offline`; the `online` event triggers a cycle                                  |
-| `409 key_mismatch` / `encryption_required`, new `key_id` | state `locked` until the passphrase unlocks the current key                           |
-| `401` (disconnected on the site, account deleted)        | state `disconnected`: token and key forgotten, **every note and pending change kept** |
-| `5xx`, `429`, timeouts, a note that fails to decrypt     | state `error`, retry with backoff                                                     |
+| Situation                                                | Result                                                                                                                                                        |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `409` on push (stale base, or id exists)                 | a conflict, settled at the end of the cycle                                                                                                                   |
+| `4xx` the server will never accept (e.g. too large)      | entry blocked as rejected, with the message; other notes keep syncing                                                                                         |
+| offline (`navigator.onLine`, or fetch fails)             | state `offline`; the `online` event triggers a cycle                                                                                                          |
+| `409 key_mismatch` / `encryption_required`, new `key_id` | state `locked` until the passphrase unlocks the current key                                                                                                   |
+| `401` (disconnected on the site, account deleted)        | state `disconnected`: token and key forgotten, **every note and pending change kept**                                                                         |
+| `402 subscription_required` (paid sync, no time left)    | state `unpaid`: token, key and **every pending change kept**, nothing held back; the stream stops, a check every 10 min, and sync resumes by itself once paid |
+| `5xx`, `429`, timeouts, a note that fails to decrypt     | state `error`, retry with backoff                                                                                                                             |
 
 Retries back off exponentially with jitter: about 2 s, 4 s, 8 s … up to 5 minutes.
 A success resets the backoff.
@@ -189,9 +190,12 @@ Settings → **Sync**:
 Connecting to a different account queues every local note for upload to it. Disconnecting
 signs the device out on the server and keeps all notes. A device disconnected on the site
 (or whose account was deleted) shows so, keeps everything, and offers _Sign in again_
-(which carries on where it stopped) or _Stop syncing_. The top bar shows "Sync failed",
-"Sync locked", "Sync stopped" or "N not synced" when sync needs attention, and its antenna
-transmits while a sync cycle runs.
+(which carries on where it stopped) or _Stop syncing_. Where sync is paid, the status says
+how long the account's time lasts (trial, paid until, cancelled, grace), from `/api/me`, with
+_Manage subscription_ to the site; when the time is over, sync shows as paused, says every
+conspect is safe, and offers _Subscribe_ (the site's `/settings#subscription`) and _Check
+again_. The top bar shows "Sync failed", "Sync locked", "Sync stopped", "Sync paused" or "N
+not synced" when sync needs attention, and its antenna transmits while a sync cycle runs.
 
 ## Testing
 

@@ -8,7 +8,8 @@ API ([ADR-001](decisions/ADR-001-http-json.md),
   ([ADR-017](decisions/ADR-017-end-to-end-encryption.md));
 - sign people in on the account site ([ADR-014](decisions/ADR-014-account-site.md),
   [ADR-015](decisions/ADR-015-accounts-and-sessions.md));
-- connect their apps as devices ([ADR-016](decisions/ADR-016-device-authorization.md)).
+- connect their apps as devices ([ADR-016](decisions/ADR-016-device-authorization.md));
+- where sync is paid for, decide whether an account may sync (see Paid sync below).
 
 All security logic lives here. The site (`apps/site`) only renders pages and calls this API
 on the visitor's behalf.
@@ -25,6 +26,7 @@ apps/server/
 ├── internal/accounts/      passwords (argon2id), email codes, reset tokens, identities, names
 ├── internal/devices/       device codes and user codes (RFC 8628), connect codes, app descriptions
 ├── internal/oauth/         sign-in providers (Google, LinkedIn, X, Yandex ID, VK ID)
+├── internal/entitlements/  paid sync: whether an account may sync
 ├── internal/mail/          the mailer (SMTP or log) and the emails in English and Russian:
 │                            plain text and HTML (letter.html, the logo inline by Content-ID)
 ├── internal/httpapi/       HTTP/JSON handlers, sessions, rate limits, event streams;
@@ -34,8 +36,9 @@ apps/server/
 ```
 
 `httpapi` defines the interfaces it consumes: `NoteRepository` (notes and keys),
-`Authenticator` (bearer tokens to devices), `AccountStore`, `DeviceStore` and `Mailer`. The
-PostgreSQL `DB` satisfies all the storage ones, and handler tests use in-memory fakes.
+`Authenticator` (bearer tokens to devices), `AccountStore`, `DeviceStore`, `EntitlementStore`
+and `Mailer`. The PostgreSQL `DB` satisfies all the storage ones, and handler tests use
+in-memory fakes.
 
 ## Data model
 
@@ -53,6 +56,9 @@ PostgreSQL `DB` satisfies all the storage ones, and handler tests use in-memory 
 | `encryption_keys`       | the account's content key, wrapped: `key_id`, `kdf`, `kdf_params`, `salt`, `wrapped_key`, `recovery_…` |
 | `notes`                 | `(user_id, id)`, `content` (envelope), `key_id`, `revision`, timestamps, `deleted_at`, `change_seq`    |
 | `sync_changes`          | the change log: `(user_id, seq)`, `note_id`, `revision`, `operation`                                   |
+| `entitlements`          | paid sync: whether each account may sync, and until when                                               |
+
+`users` also keeps `locale`, the language of its emails.
 
 Every secret (session ids, codes, reset tokens, API tokens, device, user and connect codes) is stored
 as a SHA-256 hash only.
@@ -145,6 +151,18 @@ needs a reset (`DELETE`) first. See [ADR-017](decisions/ADR-017-end-to-end-encry
 
 Answers never reveal whether an account exists.
 
+`PATCH /api/account` also takes `{locale}`. The site sends the language the owner picks,
+sign-in keeps the site's language, and emails use it.
+
+### Paid sync
+
+Optional. With `KONSPECTER_BILLING_URL` set, a separate service decides whether an account
+may sync: the sync routes answer `402 subscription_required` when it may not, `GET /api/me`
+adds `sync: {state, until}`, and the site's `/api/billing/*` and `/api/subscription*`
+requests are passed on to it. Deleting an account then waits for that service to forget it
+(`502` keeps the account). With it empty, sync is free: the sync routes never answer 402,
+and `/api/billing/plans` says `paid: false`.
+
 ### Devices
 
 | Method & path                         | Auth    | Purpose                                                                                                           |
@@ -214,6 +232,7 @@ lists them all:
 | `KONSPECTER_LOGIN_PROVIDERS_EN`, `_RU`                                                    | the providers shown per language                 |
 | `KONSPECTER_TRUSTED_PROXIES`                                                              | proxies whose `X-Forwarded-For` names the client |
 | `KONSPECTER_RATE_LOGIN_PER_IP/_PER_EMAIL`, `_EMAIL_PER_ADDRESS/_PER_IP`, `_DEVICE_PER_IP` | abuse limits                                     |
+| `KONSPECTER_BILLING_URL`, `KONSPECTER_BILLING_TOKEN`                                      | paid sync (empty: free)                          |
 
 ```sh
 KONSPECTER_DATABASE_URL=postgres://… ./server            # migrate + serve on :8080

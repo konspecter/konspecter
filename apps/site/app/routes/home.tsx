@@ -1,15 +1,34 @@
-import { DocumentIcon } from "@konspecter/ui/icons";
-import { Fragment, type ReactNode } from "react";
+import { Link } from "react-router";
+import { callApi } from "../api.server";
+import { firstMarks, MARKDOWN_GUIDE } from "../cheatsheet";
 import { siteConfig } from "../config.server";
-import { useLocale, useT, type Locale } from "../i18n/i18n";
+import { useLocale, useT } from "../i18n/i18n";
 import { guessPlatform, PLATFORMS, type Platform } from "../platform";
-import { SPECIMENS, type SpecimenLine } from "../specimen";
+import { readPreferences } from "../preferences.server";
+import { durationText, money, parsePlans, periodText } from "../subscription";
+import { SPECIMENS } from "../specimen";
+import { SpecimenSlider } from "../specimen-slider";
 import type { Route } from "./+types/home";
 
-export function loader({ request }: Route.LoaderArgs) {
+export async function loader({ request }: Route.LoaderArgs) {
   const { downloads } = siteConfig();
   const guess = guessPlatform(request.headers.get("User-Agent"));
+  const plans = parsePlans(
+    (await callApi(request, `/api/billing/plans?locale=${readPreferences(request).locale}`)).data,
+  );
+  // Where sync is paid: its first price, and the trial.
+  const gateway = plans.gateways[0];
+  const price = gateway?.prices[0];
   return {
+    pricing:
+      gateway && price
+        ? {
+            amount: price.amount,
+            currency: gateway.currency,
+            period: price.period,
+            trial: plans.trial,
+          }
+        : null,
     downloads: PLATFORMS.flatMap((platform) => {
       const url = downloads[platform];
       return url ? [{ platform, url }] : [];
@@ -20,78 +39,12 @@ export function loader({ request }: Route.LoaderArgs) {
 
 const FEATURES = ["write", "find", "tags", "offline", "devices", "private"] as const;
 
-/** Inline `code` spans and #tags of a source line, coloured as the Markdown editor does. */
-function sourceText(text: string): ReactNode {
-  return text.split(/(`[^`]+`)/).map((piece, index) =>
-    piece.startsWith("`") ? (
-      <span key={index} className="md-code">
-        {piece}
-      </span>
-    ) : (
-      <Fragment key={index}>{piece}</Fragment>
-    ),
-  );
-}
-
-function Line({ line }: { line: SpecimenLine }) {
-  switch (line.kind) {
-    case "fence":
-      return <span className="md-fence">---</span>;
-    case "blank":
-      return null;
-    case "meta":
-      return (
-        <>
-          <span className="md-key">{line.key}:</span> {line.value}
-        </>
-      );
-    case "heading":
-      return <span className="md-heading">{line.text}</span>;
-    case "codeFence":
-      return <span className="md-fence">{line.text}</span>;
-    case "code":
-      return <span className="md-block">{line.text}</span>;
-    case "tags":
-      return line.text.split(" ").map((tag, index) => (
-        <Fragment key={tag}>
-          {index > 0 && " "}
-          <span className="md-tag">{tag}</span>
-        </Fragment>
-      ));
-    case "text":
-      return sourceText(line.text);
-  }
-}
-
-/** The landing page's one picture: a conspect as the file Konspecter keeps. */
-function Specimen({ locale, label }: { locale: Locale; label: string }) {
-  const specimen = SPECIMENS[locale];
-  const last = specimen.lines.length - 1;
-  return (
-    <figure className="specimen" aria-label={label}>
-      <figcaption className="specimen-file">
-        <DocumentIcon />
-        {specimen.file}
-      </figcaption>
-      <pre className="specimen-source">
-        <code>
-          {specimen.lines.map((line, index) => (
-            <span key={index} className={line.kind === "code" ? "md-line md-code-line" : "md-line"}>
-              <Line line={line} />
-              {index === last && <span className="caret" aria-hidden="true" />}
-              {"\n"}
-            </span>
-          ))}
-        </code>
-      </pre>
-    </figure>
-  );
-}
-
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { t } = useT();
+  const translate = useT();
+  const { t } = translate;
   const locale = useLocale();
   const { downloads, suggested } = loaderData;
+  const pricing = loaderData.pricing;
   const platformName = (platform: Platform) => t(`home.platform.${platform}`);
   const web = downloads.find((download) => download.platform === "web");
   const apps = downloads.filter((download) => download.platform !== "web");
@@ -125,7 +78,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             </div>
           )}
         </div>
-        <Specimen locale={locale} label={t("home.specimenLabel")} />
+        <SpecimenSlider specimens={SPECIMENS[locale]} />
       </section>
 
       <section className="features site-frame" aria-labelledby="features-title">
@@ -138,6 +91,39 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             </div>
           ))}
         </dl>
+        {pricing && (
+          <p className="section-lead pricing-note">
+            {t("home.pricing", {
+              price: money(pricing.amount, pricing.currency, locale),
+              period: periodText(translate, pricing.period),
+            })}
+            {pricing.trial &&
+              ` ${t("home.pricingTrial", { trial: durationText(translate, pricing.trial) })}`}{" "}
+            <Link to="/terms">{t("home.pricingTerms")}</Link>
+          </p>
+        )}
+      </section>
+
+      <section className="markdown site-frame" aria-labelledby="markdown-title">
+        <div className="markdown-text">
+          <h2 id="markdown-title">{t("home.markdown.title")}</h2>
+          <p className="section-lead">{t("home.markdown.text")}</p>
+          <div className="actions">
+            <Link className="button button-primary" to="/markdown">
+              {t("home.markdown.cheatsheet")}
+            </Link>
+            <a className="button" href={MARKDOWN_GUIDE[locale]}>
+              {t("home.markdown.guide")}
+            </a>
+          </div>
+        </div>
+        <ul className="markdown-marks" aria-label={t("home.markdown.marks")}>
+          {firstMarks(locale).map((mark) => (
+            <li key={mark}>
+              <code>{mark}</code>
+            </li>
+          ))}
+        </ul>
       </section>
 
       {downloads.length > 0 && (

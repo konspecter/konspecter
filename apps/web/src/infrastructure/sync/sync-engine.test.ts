@@ -624,6 +624,97 @@ describe("SyncEngine and the account's devices", () => {
   });
 });
 
+describe("SyncEngine and paid sync", () => {
+  it("shows the account's sync state, such as the trial's end", async () => {
+    const server = new FakeServer();
+    server.access = { state: "trialing", until: "2026-10-12T10:00:00Z" };
+    const a = await device(server);
+    await connected(a.engine, config);
+    expect(a.engine.getStatus().access).toEqual({
+      state: "trialing",
+      until: "2026-10-12T10:00:00Z",
+    });
+  });
+
+  it("waits without holding notes back while unpaid, and carries on once paid", async () => {
+    const server = new FakeServer();
+    server.eventStreams = true;
+    const a = await device(server);
+    await a.store.put(createNote("# Before", date, "n1"));
+    await connected(a.engine, config);
+    await vi.waitFor(() => {
+      expect(server.openStreams).toBe(1);
+    });
+
+    // The paid time runs out: the server ends the stream and refuses sync.
+    server.access = { state: "expired", until: "2026-09-28T09:00:00Z" };
+    server.dropStreams();
+    await edit(a, "n1", "# Before\n\nedited while paused", minutesLater(1));
+    await a.store.put(createNote("# Written while paused", minutesLater(2), "n2"));
+    await a.engine.syncNow();
+
+    expect(a.engine.getStatus()).toMatchObject({
+      state: "unpaid",
+      pending: 2,
+      blocked: 0,
+      error: null,
+      access: { state: "expired", until: "2026-09-28T09:00:00Z" },
+    });
+    expect(server.notes.has("n2")).toBe(false);
+    expect(await a.store.syncEntry("n1")).toMatchObject({ dirty: true, blocked: null });
+    expect(a.scheduler.nextDelay).toBe(600_000);
+    // Neither the stream nor the cycle keeps knocking.
+    await vi.waitFor(() => {
+      expect(server.openStreams).toBe(0);
+    });
+    const knocks = server.requests.length;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(server.requests.length).toBe(knocks);
+
+    // Paid again: the next check syncs everything that waited.
+    server.access = { state: "active", until: "2026-10-28T10:00:00Z" };
+    a.scheduler.pending.find((task) => task.delayMs === 600_000)?.callback();
+    await vi.waitFor(() => {
+      expect(a.engine.getStatus()).toMatchObject({
+        state: "idle",
+        pending: 0,
+        blocked: 0,
+        access: { state: "active" },
+      });
+    });
+    expect(server.notes.get("n1")?.markdown).toContain("edited while paused");
+    expect(server.notes.get("n2")?.markdown).toContain("Written while paused");
+    await vi.waitFor(() => {
+      expect(server.openStreams).toBe(1);
+    });
+    a.engine.stop();
+  });
+
+  it("keeps the connection while unpaid, across restarts", async () => {
+    const server = new FakeServer();
+    const a = await device(server);
+    await connected(a.engine, config);
+    server.access = { state: "expired", until: null };
+    await a.engine.syncNow();
+    expect(a.engine.getStatus().state).toBe("unpaid");
+
+    a.engine.stop();
+    const again = new SyncEngine(a.store, {
+      fetch: server.fetch,
+      scheduler: a.scheduler,
+      isOnline: () => true,
+      now: () => date,
+      isVisible: () => true,
+    });
+    await again.start();
+    expect(again.getStatus()).toMatchObject({
+      state: "unpaid",
+      account: { email: "ada@example.com" },
+    });
+    again.stop();
+  });
+});
+
 describe("SyncEngine and end-to-end encryption", () => {
   it("sends and receives only ciphertext", async () => {
     const server = new FakeServer();

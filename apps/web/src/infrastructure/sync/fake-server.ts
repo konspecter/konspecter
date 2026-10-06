@@ -59,6 +59,11 @@ export class FakeServer {
   maxMarkdownLength = 1000;
   /** Serves `GET /api/events`; off by default, like an older server (404). */
   eventStreams = false;
+  /**
+   * Paid sync: the account's state as `GET /api/me` reports it. Expired, the
+   * sync routes answer 402.
+   */
+  access: { state: string; until: string | null } = { state: "free", until: null };
   readonly #streams = new Set<ReadableStreamDefaultController<Uint8Array>>();
 
   /** `encrypted: false` starts without a key: encryption not set up yet. */
@@ -114,7 +119,16 @@ export class FakeServer {
 
     const noteId = /^\/api\/notes\/([^/]+)$/.exec(url.pathname)?.[1];
 
-    if (method === "GET" && url.pathname === "/api/me") return json(200, user);
+    if (method === "GET" && url.pathname === "/api/me") {
+      return json(200, { ...user, sync: this.access });
+    }
+    const paidRoute =
+      url.pathname === "/api/sync" ||
+      url.pathname === "/api/events" ||
+      url.pathname.startsWith("/api/notes");
+    if (paidRoute && this.access.state === "expired") {
+      return json(402, error("subscription_required", "sync needs a subscription"));
+    }
     if (method === "GET" && url.pathname === "/api/events" && this.eventStreams) {
       return this.#events(init?.signal ?? null);
     }
