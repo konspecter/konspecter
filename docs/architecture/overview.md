@@ -66,7 +66,7 @@ apps/site/                   account site (React Router framework mode, SSR)
 packages/ui/                 the shared look: tokens, fonts, controls, icons
 packages/i18n/               the shared message engine
 packages/crypto/             end-to-end encryption on WebCrypto
-deploy/                      PostgreSQL, the API, the site and Caddy on one origin
+deploy/                      PostgreSQL, the API, the site, the web app and Caddy in front
 ```
 
 `application/` holds the `NoteRepository` port that pages use, with two implementations: the
@@ -116,6 +116,7 @@ and encrypted notes with revisions and optimistic concurrency. See [server](serv
 React Router in framework mode, server-rendered in Node, on the API's origin behind a
 proxy. See [user interface](ui.md#the-account-site) and
 [ADR-014](decisions/ADR-014-account-site.md) to [ADR-017](decisions/ADR-017-end-to-end-encryption.md).
+The hosted web app is on an origin of its own: [ADR-018](decisions/ADR-018-web-app-origin.md).
 
 ## Planned frontend structure
 

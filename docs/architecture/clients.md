@@ -31,6 +31,11 @@ The web app is an installable Progressive Web App (`vite-plugin-pwa`, Workbox, M
 
 - **Updates:** a new service worker waits. The app shows "A new version is available" with
   _Reload_ / _Later_. It never reloads by itself, because that could interrupt an edit.
+- **Hosting:** `apps/web/Dockerfile` builds an image that serves the app on `:8080`
+  (`apps/web/Caddyfile`), with the server's public URL as the suggested sync server. In
+  `deploy/` it is the `web` service, and Caddy in front serves it on its own address
+  (`KONSPECTER_APP_ADDRESS`), apart from the site's origin. Hashed assets are cached for good,
+  everything else is revalidated on each load. See [ADR-018](decisions/ADR-018-web-app-origin.md).
 - The PWA does not pretend to be a filesystem app. Working on real `.md` folders is the
   desktop client's File Mode.
 

@@ -128,7 +128,8 @@ apps/server/              Go HTTP server (module konspecter/server)
 packages/ui/              shared look of the app and the site: tokens, fonts, base, controls, icons
 packages/i18n/            shared message engine: translators, plurals, locale detection, rich text
 packages/crypto/          end-to-end encryption on WebCrypto: content key, wrapping, recovery key, envelopes
-deploy/                   docker compose: PostgreSQL, the API, the site and Caddy on one origin
+deploy/                   docker compose: PostgreSQL, the API, the site, the web app and Caddy in front
+                          (the site and API on one origin, the web app on its own)
 docs/architecture/        architecture overview, UI (ui.md), server (server.md), sync (sync.md) and ADRs
 docs/release.md           releasing, and upgrading to end-to-end encryption
 docs/testing.md           test strategy and map

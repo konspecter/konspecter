@@ -36,8 +36,10 @@ Release that links them.
 
 The server image: `docker build --build-arg VERSION=0.1.0 -t konspecter-server apps/server/`.
 The site image: `docker build -f apps/site/Dockerfile -t konspecter-site .` (from the
-repository root). The whole stack, with PostgreSQL and Caddy on one origin, is
-`deploy/compose.yaml`.
+repository root). The web app image, its static files served on `:8080`: `docker build -f apps/web/Dockerfile
+--build-arg VITE_KONSPECTER_SERVER_URL=https://notes.example.com -t konspecter-web .`. The whole
+stack, with PostgreSQL and Caddy serving the site and API on one origin and the web app on
+another, is `deploy/compose.yaml`.
 
 The site tarball runs on Node 22 or later, behind the same origin as the API:
 

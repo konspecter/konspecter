@@ -1,5 +1,7 @@
-# One origin for the API and the site. Caddy gets a certificate for the
-# address on its own (a domain name), or a local one for "localhost".
+# Two addresses. Caddy gets a certificate for each on its own (a domain
+# name), or a local one for "localhost" and its subdomains.
+
+# The API and the site, on one origin.
 {$KONSPECTER_SITE_ADDRESS:localhost} {
 	encode zstd gzip
 
@@ -13,4 +15,13 @@
 	handle {
 		reverse_proxy site:3000
 	}
+}
+
+# The web app, on an origin of its own: the app is made for "/", and its
+# service worker and notes stay apart from the site. It calls the API above
+# (KONSPECTER_ALLOWED_ORIGINS). Its container serves the files and sets their
+# caching (apps/web/Caddyfile).
+{$KONSPECTER_APP_ADDRESS:app.localhost} {
+	encode zstd gzip
+	reverse_proxy web:8080
 }

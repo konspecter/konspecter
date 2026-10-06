@@ -1,6 +1,8 @@
-# Konspecter on one host: PostgreSQL, the Go API, the account site and Caddy
-# in front of both, on one origin (/api/* to the API, everything else to the
-# site). Settings come from deploy/.env (see .env.example):
+# Konspecter on one host: PostgreSQL, the Go API, the account site, the web
+# app and Caddy in front of them. Caddy serves the API and the site on one
+# origin (/api/* to the API, everything else to the site) and the web app on a
+# second address.
+# Settings come from deploy/.env (see .env.example):
 #   cp .env.example .env && docker compose up -d --build
 name: konspecter
 
@@ -46,6 +48,15 @@ services:
     depends_on:
       - server
 
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+      args:
+        # The app suggests this server in its sync settings.
+        VITE_KONSPECTER_SERVER_URL: ${KONSPECTER_PUBLIC_URL:-https://localhost}
+    restart: unless-stopped
+
   proxy:
     image: caddy:2
     restart: unless-stopped
@@ -54,12 +65,14 @@ services:
       - "443:443"
     environment:
       KONSPECTER_SITE_ADDRESS: ${KONSPECTER_SITE_ADDRESS:-localhost}
+      KONSPECTER_APP_ADDRESS: ${KONSPECTER_APP_ADDRESS:-app.localhost}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
     depends_on:
       - server
       - site
+      - web
 
 volumes:
   db:

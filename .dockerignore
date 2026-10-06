@@ -1,0 +1,15 @@
+# Docker build context of the images built from the repository root
+# (apps/site/Dockerfile, apps/web/Dockerfile): sources only. Dependencies are
+# installed and builds made inside the image; local settings stay out of it.
+.git
+.pnpm-store
+**/node_modules
+**/dist
+**/build
+**/coverage
+**/.react-router
+apps/desktop/src-tauri/target
+apps/mobile/android
+**/.env
+**/.env.*
+!**/.env.example

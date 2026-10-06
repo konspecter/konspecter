@@ -1,0 +1,34 @@
+# The web app's own server in its image (apps/web/Dockerfile): the PWA build
+# as static files on :8080, plain HTTP. The proxy in front of it (TLS, the
+# host name, compression) is deploy/Caddyfile.
+{
+	admin off
+	auto_https off
+}
+
+:8080 {
+	root * /srv
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		X-Frame-Options DENY
+	}
+
+	# Hashed file names never change. A missing one stays a 404.
+	handle /assets/* {
+		@found file
+		header @found Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	# Everything else (index.html, the service worker, the manifest) is
+	# checked on every load, so an update reaches the app at once. A path
+	# that is not a file is an app route: index.html (the app routes in the
+	# browser).
+	handle {
+		header Cache-Control no-cache
+		try_files {path} /index.html
+		file_server
+	}
+}

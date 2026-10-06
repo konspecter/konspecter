@@ -114,6 +114,10 @@ What Konspecter protects, from whom, and how. Every item below has tests unless 
   images and sync may use any server.
 - Server responses: `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src
 'none'`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store`.
+- The hosted web app (`apps/web/Caddyfile`, [ADR-018](architecture/decisions/ADR-018-web-app-origin.md)):
+  `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` and
+  `X-Frame-Options: DENY` (a `<meta>` CSP cannot forbid framing). Its own origin keeps its
+  IndexedDB and service worker apart from the site's session cookie.
 
 ### CSRF
 

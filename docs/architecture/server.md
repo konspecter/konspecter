@@ -217,8 +217,8 @@ KONSPECTER_DATABASE_URL=postgres://… ./server            # migrate + serve on 
 ./server revoke-tokens -email ada@example.com             # disconnect every device of a user
 ```
 
-The whole stack (PostgreSQL, this server, the site and Caddy on one origin) is
-`deploy/compose.yaml`. The server shuts down gracefully on SIGINT/SIGTERM and has read,
+The whole stack (PostgreSQL, this server, the site and Caddy on one origin, plus the web app
+on its own address) is `deploy/compose.yaml`. The server shuts down gracefully on SIGINT/SIGTERM and has read,
 write and idle timeouts.
 
 ## Tests

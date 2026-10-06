@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **The server hosts the web app too.** `deploy/compose.yaml` runs it as a `web` service
+  (`apps/web/Dockerfile`, with the server already filled in for sync), and Caddy serves it on
+  a second address (`KONSPECTER_APP_ADDRESS`, e.g. `app.notes.example.com`). Add its URL to
+  `KONSPECTER_ALLOWED_ORIGINS` (and `KONSPECTER_DOWNLOAD_WEB_URL` for the landing page link).
 - **A new logo and app icon: the Konspecter bookmark.** A slanted, woven # (the tags and
   Markdown headings conspects are made of) with one stroke turned into a red bookmark ribbon
   (the app remembers where you stopped), white on a graphite plate. It replaces the owl on
