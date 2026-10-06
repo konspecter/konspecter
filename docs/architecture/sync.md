@@ -178,6 +178,10 @@ Settings → **Sync**:
    page in the browser (a tab on the web, the system browser on desktop and mobile). Once
    the code is approved there, it connects. A token from `server create-token` can still
    be entered under **Advanced**.
+   Or **Scan QR code** (not in the desktop app): the camera reads the code the site's
+   settings show, `<site>/connect#ksc_…`, and the app trades it for its token at once; the
+   site's address is the server ([ADR-019](decisions/ADR-019-connect-by-qr-code.md)). An
+   app without a camera pastes the same link under **Connect with a link from the site**.
 2. **Unlock**: the passphrase prompt, or, while the account has no encryption, a button to
    the site's encryption settings.
 3. Then the status, last sync, waiting and held-back counts, _Sync now_ and _Disconnect_.

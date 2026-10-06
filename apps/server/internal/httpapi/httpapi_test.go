@@ -243,7 +243,13 @@ type fakeDevices struct {
 	mu             sync.Mutex
 	byToken        map[string]*fakeDevice
 	authorizations map[string]*fakeAuthorization // by device code hash
+	connectCodes   map[string]fakeConnectCode    // by code hash
 	next           int
+}
+
+type fakeConnectCode struct {
+	userID    string
+	expiresAt time.Time
 }
 
 type fakeDevice struct {
@@ -262,7 +268,11 @@ type fakeAuthorization struct {
 }
 
 func newFakeDevices() *fakeDevices {
-	return &fakeDevices{byToken: map[string]*fakeDevice{}, authorizations: map[string]*fakeAuthorization{}}
+	return &fakeDevices{
+		byToken:        map[string]*fakeDevice{},
+		authorizations: map[string]*fakeAuthorization{},
+		connectCodes:   map[string]fakeConnectCode{},
+	}
 }
 
 // add connects a device for user under token.
@@ -382,7 +392,41 @@ func (f *fakeDevices) ExchangeDeviceCode(_ context.Context, deviceCodeHash, toke
 	return f.addLocked("hash:"+string(tokenHash), user, a.client), user, nil
 }
 
-// connectToken moves a device added by ExchangeDeviceCode to its token.
+func (f *fakeDevices) CreateConnectCode(_ context.Context, userID string, codeHash []byte, expiresAt time.Time) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for hash, c := range f.connectCodes {
+		if c.userID == userID {
+			delete(f.connectCodes, hash)
+		}
+	}
+	f.connectCodes[string(codeHash)] = fakeConnectCode{userID: userID, expiresAt: expiresAt}
+	return nil
+}
+
+func (f *fakeDevices) RedeemConnectCode(_ context.Context, codeHash, tokenHash []byte, client devices.Client) (devices.Device, auth.User, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	c, ok := f.connectCodes[string(codeHash)]
+	delete(f.connectCodes, string(codeHash))
+	if !ok || time.Now().After(c.expiresAt) {
+		return devices.Device{}, auth.User{}, devices.ErrInvalidConnectCode
+	}
+	user := auth.User{ID: c.userID, Email: strings.TrimPrefix(c.userID, "user-")}
+	return f.addLocked("hash:"+string(tokenHash), user, client), user, nil
+}
+
+// expireConnectCodes makes every connect code run out.
+func (f *fakeDevices) expireConnectCodes() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for hash, c := range f.connectCodes {
+		c.expiresAt = time.Now().Add(-time.Second)
+		f.connectCodes[hash] = c
+	}
+}
+
+// connectToken moves a device added by ExchangeDeviceCode or RedeemConnectCode to its token.
 func (f *fakeDevices) connectToken(token string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

@@ -13,6 +13,7 @@
 //   apps/web/public/                favicon.svg, PWA icons (any + maskable), Apple touch icon
 //   apps/site/public/               favicon.svg and the header's logo.svg / logo-dark.svg
 //                                   (no plate), Apple touch icon
+//   apps/server/internal/mail/      logo.png: the emails' logo (rounded square, 48 px at 2x)
 //   apps/mobile/android/.../res/    adaptive icon (foreground; the graphite background is
 //                                   drawable/ic_launcher_background.xml), themed-icon
 //                                   monochrome layer, legacy square and round icons, splashes
@@ -182,6 +183,9 @@ try {
   writeFileSync(join(site, "logo.svg"), `${VARIANTS.siteLogo}\n`);
   writeFileSync(join(site, "logo-dark.svg"), `${VARIANTS.siteLogoDark}\n`);
   copyFileSync(join(web, "apple-touch-icon.png"), join(site, "apple-touch-icon.png"));
+
+  // The server's emails: a small PNG, since mail apps show no SVG.
+  await png(VARIANTS.windows, join(root, "apps/server/internal/mail/logo.png"), 96);
 
   // Android.
   const res = join(root, "apps/mobile/android/app/src/main/res");

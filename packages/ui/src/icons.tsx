@@ -240,3 +240,13 @@ export function CheckCircleIcon({ className }: { className?: string }) {
     </Icon>
   );
 }
+
+/** A globe: the language. */
+export function GlobeIcon() {
+  return (
+    <Icon>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M3.5 12h17M12 3.5c2.3 2.4 3.4 5.2 3.4 8.5s-1.1 6.1-3.4 8.5c-2.3-2.4-3.4-5.2-3.4-8.5s1.1-6.1 3.4-8.5z" />
+    </Icon>
+  );
+}

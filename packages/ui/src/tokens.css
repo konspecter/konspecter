@@ -19,6 +19,10 @@
   --color-active: #e3e3df;
   --color-field: #efefec;
   --color-field-focus: #e7e7e3;
+  /* A card raised off the page (the site's sign-in pages), and the fields on it. */
+  --color-raised: #fdfdfc;
+  --color-raised-field: #f0f0ed;
+  --color-raised-field-focus: #e8e8e4;
   --color-accent: #2d6aa6;
   --color-danger: #a8322a;
   --color-success: #2e7a4b;
@@ -46,6 +50,9 @@
     --color-active: #43423e;
     --color-field: #3b3a37;
     --color-field-focus: #43423e;
+    --color-raised: #3a3936;
+    --color-raised-field: #45443f;
+    --color-raised-field-focus: #4d4c47;
     --color-accent: #a6c8e8;
     --color-danger: #f5c3ba;
     --color-success: #a9dbb8;
@@ -69,6 +76,9 @@
   --color-active: #43423e;
   --color-field: #3b3a37;
   --color-field-focus: #43423e;
+  --color-raised: #3a3936;
+  --color-raised-field: #45443f;
+  --color-raised-field-focus: #4d4c47;
   --color-accent: #a6c8e8;
   --color-danger: #f5c3ba;
   --color-success: #a9dbb8;

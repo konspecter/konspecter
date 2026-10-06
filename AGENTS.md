@@ -65,10 +65,12 @@ All planned phases are done. New work needs a new plan in `.claude/plans/`.
 | Updates 4  | Code highlighting, swipes, back/forward, task lists, folders = tags, lists  | Done   |
 | Sync site  | Account site, email and social sign-in, devices, end-to-end encrypted sync  | Done   |
 | Feedback 1 | Green tick before going on after the sign-in code; copy not only technical  | Done   |
+| Feedback 2 | Language dropdown, name in header, sign-in card, HTML emails, QR connect    | Done   |
 
 Specs and notes: `.claude/plans/updates-1.md` (+ `updates-1-implementation.md`), `updates-2.md`
 (+ `updates-2-implementation.md`), `markdown-single-source.md`, `last-write-wins.md`, `tag-chains.md` (item 1 of `updates-3.md`), `note-find.md` (item 3), `friendly-errors.md` (item 5), `slug-file-names.md` (item 8), `mode-switch-place.md` (item 14), `mobile-view.md` (mobile view updates), `updates-4.md` (+ `updates-4-implementation.md`), `sync-app-site.md` (+
-`sync-app-site-implementation.md`; ADR-014 to ADR-017), `feedback-1.md`. UI architecture:
+`sync-app-site-implementation.md`; ADR-014 to ADR-017), `feedback-1.md`, `feedback.md` (+
+`feedback-implementation.md`; ADR-019). UI architecture:
 `docs/architecture/ui.md`; languages: `docs/architecture/i18n.md`; server and API:
 `docs/architecture/server.md`.
 

@@ -217,10 +217,10 @@ func (db *DB) CreateSession(ctx context.Context, userID string, idHash []byte, u
 func (db *DB) SessionByID(ctx context.Context, idHash []byte) (auth.Session, error) {
 	var s auth.Session
 	err := db.pool.QueryRow(ctx, `
-		SELECT u.id::text, u.email, s.created_at, s.last_seen_at, s.expires_at
+		SELECT u.id::text, u.email, u.display_name, s.created_at, s.last_seen_at, s.expires_at
 		FROM sessions s JOIN users u ON u.id = s.user_id
 		WHERE s.id_hash = $1 AND s.expires_at > now()`, idHash,
-	).Scan(&s.User.ID, &s.User.Email, &s.CreatedAt, &s.LastSeenAt, &s.ExpiresAt)
+	).Scan(&s.User.ID, &s.User.Email, &s.User.Name, &s.CreatedAt, &s.LastSeenAt, &s.ExpiresAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return auth.Session{}, auth.ErrUnauthorized
 	}

@@ -15,6 +15,10 @@ import (
 // user code on the site's /activate page, signed in. The owner sees the
 // connected devices on the site and can disconnect any of them: its token
 // stops working and its event streams end at once.
+//
+// The other way round, the site asks for a connect code for its signed-in
+// owner and shows it as a QR code; an app scans it and trades it for its
+// token (connect) without waiting for anyone.
 
 func (a *api) registerDeviceRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /api/devices/authorize", a.deviceFlow(a.authorizeDevice))
@@ -22,6 +26,8 @@ func (a *api) registerDeviceRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /api/devices/pending", a.withSession(a.pendingDevice))
 	mux.Handle("POST /api/devices/approve", a.withSession(a.decideDevice(true)))
 	mux.Handle("POST /api/devices/deny", a.withSession(a.decideDevice(false)))
+	mux.Handle("POST /api/devices/connect-codes", a.withSession(a.createConnectCode))
+	mux.Handle("POST /api/devices/connect", a.deviceFlow(a.connectDevice))
 	mux.Handle("GET /api/devices", a.withSession(a.listDevices))
 	mux.Handle("DELETE /api/devices/{id}", a.withSession(a.revokeDevice))
 }
@@ -123,6 +129,68 @@ func (a *api) deviceToken(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "access_denied", "the owner denied the device")
 	case errors.Is(err, devices.ErrExpiredToken):
 		writeError(w, http.StatusBadRequest, "expired_token", "the code has expired; start again")
+	case err != nil:
+		a.internalError(w, r, err)
+	default:
+		writeJSON(w, http.StatusOK, map[string]any{"token": token, "device": toDeviceJSON(device), "user": userJSON(user)})
+	}
+}
+
+// createConnectCode gives the signed-in owner a code to show as a QR code,
+// replacing the one they had. The link carries the code in its fragment: a
+// phone camera that opens it sends no secret to the server.
+func (a *api) createConnectCode(w http.ResponseWriter, r *http.Request, user auth.User) {
+	code, err := devices.NewConnectCode()
+	if err != nil {
+		a.internalError(w, r, err)
+		return
+	}
+	if err := a.accounts.Devices.CreateConnectCode(r.Context(), user.ID, devices.HashCode(code), time.Now().Add(devices.ConnectCodeTTL)); err != nil {
+		a.internalError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"code":       code,
+		"url":        a.accounts.PublicURL + "/connect#" + code,
+		"expires_in": int(devices.ConnectCodeTTL.Seconds()),
+	})
+}
+
+// connectDevice trades a scanned connect code for the app's token, as an
+// approved device-flow poll does. A wrong code counts against the client's
+// address.
+func (a *api) connectDevice(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Code          string `json:"code"`
+		Name          string `json:"name"`
+		Platform      string `json:"platform"`
+		ClientVersion string `json:"client_version"`
+	}
+	if !a.decode(w, r, &body) {
+		return
+	}
+	client := clientAddress(r, a.trusted)
+	if rateLimited(w, limitCheck{a.accounts.deviceIP, client}) {
+		return
+	}
+	invalid := func() {
+		a.accounts.deviceIP.record(client)
+		writeError(w, http.StatusBadRequest, "invalid_connect_code", "this code is wrong, used or expired; show a new one on the site")
+	}
+	if !devices.ValidConnectCode(body.Code) {
+		invalid()
+		return
+	}
+	token, tokenHash, err := auth.NewToken()
+	if err != nil {
+		a.internalError(w, r, err)
+		return
+	}
+	info := devices.NormalizeClient(devices.Client{Name: body.Name, Platform: body.Platform, ClientVersion: body.ClientVersion})
+	device, user, err := a.accounts.Devices.RedeemConnectCode(r.Context(), devices.HashCode(body.Code), tokenHash, info)
+	switch {
+	case errors.Is(err, devices.ErrInvalidConnectCode):
+		invalid()
 	case err != nil:
 		a.internalError(w, r, err)
 	default:

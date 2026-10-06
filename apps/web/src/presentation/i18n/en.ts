@@ -357,6 +357,25 @@ source, or delete this conspect when you are done.
   "sync.browserExpired": "The code expired before it was approved. Sign in again for a new one.",
   "sync.browserUnavailable":
     "This server does not offer signing in with the browser. Use an access token under Advanced.",
+  "sync.scanQr": "Scan QR code",
+  "sync.scanTitle": "Scan the QR code",
+  "sync.scanHint":
+    "On the Konspecter site, open Account settings and choose Show QR code, then point the camera at it.",
+  "sync.scanOther":
+    "That is not a Konspecter connect code. Use the one in your account settings on the site.",
+  "sync.cameraDenied":
+    "Konspecter may not use the camera. Allow it in the system settings, or paste the link from the site instead.",
+  "sync.cameraUnavailable":
+    "The camera could not be started. Paste the link from the site instead.",
+  "sync.connecting": "Connecting…",
+  "sync.scanAgain": "Scan again",
+  "sync.linkSummary": "Connect with a link from the site",
+  "sync.linkHint":
+    "On the Konspecter site, open Account settings, choose Show QR code and copy the link under it.",
+  "sync.link": "Connect link",
+  "sync.linkConnect": "Connect with the link",
+  "sync.linkInvalid": "This is not a connect link. Copy it again from the site.",
+  "sync.invalidConnectCode": "This code is wrong, used or expired. Show a new one on the site.",
   "sync.advanced": "Advanced: connect with an access token",
   "sync.tokenHint": "A token issued by the server's administrator (server create-token).",
   "sync.disconnectedBySite":

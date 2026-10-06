@@ -76,6 +76,11 @@ What Konspecter protects, from whom, and how. Every item below has tests unless 
   owner approves it on the site, signed in. Both are stored as hashes and expire after
   10 minutes. The approval page shows the device's name, platform and version and warns
   against approving codes one did not start.
+- **Connecting by QR code** ([ADR-019](architecture/decisions/ADR-019-connect-by-qr-code.md)):
+  the site shows a connect code (192-bit) only when its signed-in owner asks; it works once,
+  for 5 minutes, one per account, stored as a hash. It travels in the link's fragment, so a
+  camera opening the link sends it nowhere, and is never logged. Wrong codes count against
+  the client address. An app connected with it still needs the passphrase to read notes.
 - **Revocation**: the site disconnects a device (its token stops working and its open event
   streams end at once; its app hears `401 device_revoked` and keeps its notes).
   `DELETE /api/tokens/current` signs the calling device out;

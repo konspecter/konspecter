@@ -18,6 +18,8 @@ import (
 type User struct {
 	ID    string
 	Email string
+	// Name is what the owner wants to be called; "" when unset.
+	Name string
 }
 
 // Device is an app signed in with an API token: the device it was issued to

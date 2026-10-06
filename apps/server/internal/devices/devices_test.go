@@ -66,3 +66,19 @@ func TestHashCodeSeparatesCodes(t *testing.T) {
 		t.Error("HashCode")
 	}
 }
+
+func TestConnectCodes(t *testing.T) {
+	a, err := NewConnectCode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := NewConnectCode()
+	if a == b || !ValidConnectCode(a) || !strings.HasPrefix(a, "ksc_") {
+		t.Errorf("codes = %q, %q", a, b)
+	}
+	for _, bad := range []string{"", "ksc_short", "ksd_" + a[4:], a + "x", "ksc_" + strings.Repeat("!", 32)} {
+		if ValidConnectCode(bad) {
+			t.Errorf("ValidConnectCode(%q) = true", bad)
+		}
+	}
+}

@@ -224,3 +224,42 @@ func TestAccountNameAndDeletion(t *testing.T) {
 		t.Errorf("bob's note = %v", err)
 	}
 }
+
+func TestConnectingADeviceByCode(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	user := createUser(t, db, "ann@example.com")
+	if _, err := db.RenameAccount(ctx, user.ID, "Ann"); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.CreateConnectCode(ctx, user.ID, []byte("first"), time.Now().Add(5*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	// A new code replaces the account's old one.
+	if err := db.CreateConnectCode(ctx, user.ID, []byte("second"), time.Now().Add(5*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := db.RedeemConnectCode(ctx, []byte("first"), []byte("t1"), laptop); !errors.Is(err, devices.ErrInvalidConnectCode) {
+		t.Errorf("the replaced code = %v", err)
+	}
+
+	token, hash, _ := auth.NewToken()
+	device, owner, err := db.RedeemConnectCode(ctx, []byte("second"), hash, laptop)
+	if err != nil || owner.ID != user.ID || owner.Email != "ann@example.com" || owner.Name != "Ann" || device.Name != laptop.Name {
+		t.Fatalf("redeem = %+v, %+v, %v", device, owner, err)
+	}
+	if d, err := db.DeviceByToken(ctx, token); err != nil || d.ID != device.ID {
+		t.Errorf("the new device's token = %+v, %v", d, err)
+	}
+	if _, _, err := db.RedeemConnectCode(ctx, []byte("second"), []byte("t2"), laptop); !errors.Is(err, devices.ErrInvalidConnectCode) {
+		t.Errorf("a used code = %v", err)
+	}
+
+	if err := db.CreateConnectCode(ctx, user.ID, []byte("old"), time.Now().Add(-time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := db.RedeemConnectCode(ctx, []byte("old"), []byte("t3"), laptop); !errors.Is(err, devices.ErrInvalidConnectCode) {
+		t.Errorf("an expired code = %v", err)
+	}
+}

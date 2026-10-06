@@ -34,7 +34,7 @@ afterEach(() => {
 function args(request: Request, signedIn = true) {
   const context = new RouterContextProvider();
   context.set(accountContext, {
-    user: signedIn ? { id: "u1", email: "ann@example.com" } : null,
+    user: signedIn ? { id: "u1", email: "ann@example.com", name: "" } : null,
     enabled: true,
   });
   return { request, params: {}, context } as never;
@@ -124,6 +124,20 @@ describe("settings", () => {
     )) as { data: unknown; init: { status: number } };
     expect(result.data).toEqual({ intent: "delete", error: { code: "reauthentication_required" } });
     expect(result.init.status).toBe(403);
+  });
+
+  it("asks the API for a code to connect an app", async () => {
+    const calls = stubApi({
+      "POST /api/devices/connect-codes": () =>
+        Response.json({ code: "ksc_x", url: "https://site.test/connect#ksc_x", expires_in: 300 }),
+    });
+    const result = await settingsAction(args(post("/settings", { intent: "connect" })));
+    expect(result).toEqual({
+      intent: "connect",
+      error: null,
+      connect: { url: "https://site.test/connect#ksc_x", expiresIn: 300 },
+    });
+    expect(calls.map((c) => c.call)).toEqual(["POST /api/devices/connect-codes"]);
   });
 
   function renderSettings(account: { name: string; recentSignIn: boolean }, devices: unknown[]) {

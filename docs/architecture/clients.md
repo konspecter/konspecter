@@ -96,7 +96,8 @@ apps/mobile/
   allowed, so use an `https://` server URL.
   _Sign in with browser_ opens the site's approval page in the system browser (Capacitor
   hands `window.open` to it); unlocking with the passphrase runs in the app's WebView
-  (WebCrypto).
+  (WebCrypto). _Scan QR code_ uses the camera through the WebView (`getUserMedia`; the
+  manifest declares `CAMERA`, not required to install), which Android asks for on first use.
 - **Layout:** the viewport uses `viewport-fit=cover`, and the page keeps clear of notches and
   rounded corners with `env(safe-area-inset-*)`.
 - **Building:** `pnpm --filter @konspecter/mobile android:debug` produces

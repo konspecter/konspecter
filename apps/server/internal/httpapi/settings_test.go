@@ -22,6 +22,10 @@ func TestTheAccountAndItsName(t *testing.T) {
 	if res.status != http.StatusOK || res.body["name"] != "Ann Lee" {
 		t.Errorf("rename = %d %v", res.status, res.body)
 	}
+	// The site's header greets the account by the name.
+	if res := siteCall(t, s.server.URL, http.MethodGet, "/api/me", session, nil); res.body["name"] != "Ann Lee" {
+		t.Errorf("me after rename = %d %v", res.status, res.body)
+	}
 	for _, bad := range []map[string]any{{"name": strings.Repeat("a", accounts.MaxNameLength+1)}, {"name": "Ann\nLee"}} {
 		if res := siteCall(t, s.server.URL, http.MethodPatch, "/api/account", session, bad); res.status != http.StatusBadRequest || errorCode(res) != "invalid_name" {
 			t.Errorf("rename to %q = %d %v", bad["name"], res.status, res.body)

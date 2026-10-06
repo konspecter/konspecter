@@ -41,6 +41,8 @@ type DeviceStore interface {
 	PendingDeviceAuthorization(ctx context.Context, userCodeHash []byte) (devices.Client, error)
 	DecideDeviceAuthorization(ctx context.Context, userCodeHash []byte, userID string, approve bool) (devices.Client, error)
 	ExchangeDeviceCode(ctx context.Context, deviceCodeHash, tokenHash []byte) (devices.Device, auth.User, error)
+	CreateConnectCode(ctx context.Context, userID string, codeHash []byte, expiresAt time.Time) error
+	RedeemConnectCode(ctx context.Context, codeHash, tokenHash []byte, client devices.Client) (devices.Device, auth.User, error)
 	ListDevices(ctx context.Context, userID string) ([]devices.Device, error)
 	RevokeDevice(ctx context.Context, userID, deviceID string) error
 }
@@ -353,7 +355,7 @@ func (a *api) emailCode(w http.ResponseWriter, r *http.Request, request codeRequ
 		return
 	}
 	if !exists && !a.accounts.RegistrationOpen {
-		if a.send(w, r, mail.RegistrationClosed(locale, email)) {
+		if a.send(w, r, mail.RegistrationClosed(locale, a.accounts.PublicURL, email)) {
 			writeJSON(w, http.StatusAccepted, map[string]any{"expires_in": int(a.accounts.EmailCodeTTL.Seconds())})
 		}
 		return
@@ -368,7 +370,7 @@ func (a *api) emailCode(w http.ResponseWriter, r *http.Request, request codeRequ
 		a.internalError(w, r, err)
 		return
 	}
-	if a.send(w, r, mail.SignInCode(locale, email, code, a.accounts.EmailCodeTTL, !exists)) {
+	if a.send(w, r, mail.SignInCode(locale, a.accounts.PublicURL, email, code, a.accounts.EmailCodeTTL, !exists)) {
 		writeJSON(w, http.StatusAccepted, map[string]any{"expires_in": int(a.accounts.EmailCodeTTL.Seconds())})
 	}
 }
@@ -476,7 +478,7 @@ func (a *api) forgotPassword(w http.ResponseWriter, r *http.Request) {
 	var message mail.Message
 	switch {
 	case errors.Is(err, auth.ErrUserNotFound):
-		message = mail.NoAccount(locale, email, a.accounts.PublicURL)
+		message = mail.NoAccount(locale, a.accounts.PublicURL, email)
 	case err != nil:
 		a.internalError(w, r, err)
 		return
@@ -491,7 +493,7 @@ func (a *api) forgotPassword(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		link := a.accounts.PublicURL + "/reset?token=" + url.QueryEscape(token)
-		message = mail.PasswordReset(locale, email, link, a.accounts.PasswordResetTTL)
+		message = mail.PasswordReset(locale, a.accounts.PublicURL, email, link, a.accounts.PasswordResetTTL)
 	}
 	if a.send(w, r, message) {
 		w.WriteHeader(http.StatusAccepted)

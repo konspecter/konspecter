@@ -1,3 +1,4 @@
+import { ChevronIcon } from "@konspecter/ui/icons";
 import { useCallback, useId, useState } from "react";
 import type { ReadingPositionMode } from "../../domain/reading/reading";
 import {
@@ -118,8 +119,8 @@ export function SettingsPage({ settings, onChange, sync, library, store }: Setti
             update("theme", value);
           }}
         />
-        <Choice
-          legend={t("settings.language")}
+        <Dropdown
+          label={t("settings.language")}
           options={choices.languages}
           value={settings.language}
           onChange={(value) => {
@@ -237,6 +238,40 @@ function Choice<T extends string | number>({
         ))}
       </div>
     </fieldset>
+  );
+}
+
+/** A setting with a longer list of choices (the language), as a dropdown. */
+function Dropdown<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: Omit<ChoiceProps<T>, "legend" | "hint"> & { label: string }) {
+  const id = useId();
+  return (
+    <div className="setting">
+      <label htmlFor={id} className="setting-label">
+        {label}
+      </label>
+      <span className="select">
+        <select
+          id={id}
+          value={value}
+          onChange={(event) => {
+            const chosen = options.find((option) => option.value === event.target.value);
+            if (chosen) onChange(chosen.value);
+          }}
+        >
+          {options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <ChevronIcon />
+      </span>
+    </div>
   );
 }
 

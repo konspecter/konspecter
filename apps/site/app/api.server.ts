@@ -101,6 +101,8 @@ export function withCookies(cookies: readonly string[], extra: readonly string[]
 export interface SignedInUser {
   readonly id: string;
   readonly email: string;
+  /** The account's name; "" when it has none. */
+  readonly name: string;
 }
 
 /** The visitor's account (from their session cookie), or null; `enabled` is false when the server has sign-in off. */
@@ -109,7 +111,8 @@ export async function currentUser(
 ): Promise<{ user: SignedInUser | null; enabled: boolean }> {
   const result = await callApi<SignedInUser>(request, "/api/me");
   if (result.data && typeof result.data.email === "string") {
-    return { user: { id: result.data.id, email: result.data.email }, enabled: true };
+    const { id, email, name } = result.data;
+    return { user: { id, email, name: typeof name === "string" ? name : "" }, enabled: true };
   }
   return { user: null, enabled: result.error?.code !== "not_configured" };
 }

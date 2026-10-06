@@ -516,6 +516,34 @@ describe("SyncEngine and the account's devices", () => {
     expect(a.engine.getStatus()).toMatchObject({ state: "idle", serverUrl: config.serverUrl });
   });
 
+  it("connects with a link scanned from the site, then asks for the passphrase", async () => {
+    const server = new FakeServer();
+    const code = "ksc_abcdefghijklmnopqrstuvwxyz012345";
+    server.connectCodes.set(code, "ksp_ada");
+    const a = await device(server);
+    await a.store.put(createNote("# Local", date, "n1"));
+
+    const account = await a.engine.connectWithLink(
+      { serverUrl: "https://sync.example.com", code },
+      laptop,
+    );
+
+    expect(account.email).toBe("ada@example.com");
+    expect(server.connected).toEqual([
+      { code, name: "Firefox on Linux", platform: "web", client_version: "0.1.0" },
+    ]);
+    expect(a.engine.getStatus()).toMatchObject({
+      state: "locked",
+      lock: "unlock",
+      serverUrl: "https://sync.example.com",
+    });
+    expect(server.notes.has("n1")).toBe(false);
+    // The code is used up.
+    await expect(
+      a.engine.connectWithLink({ serverUrl: "https://sync.example.com", code }, laptop),
+    ).rejects.toMatchObject({ code: "invalid_connect_code" });
+  });
+
   it("tells when the owner denies the device", async () => {
     const server = new FakeServer();
     const a = await device(server);

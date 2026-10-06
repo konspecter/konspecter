@@ -305,7 +305,7 @@ func utc(t *time.Time) *time.Time {
 }
 
 func (a *api) me(w http.ResponseWriter, _ *http.Request, user auth.User) {
-	writeJSON(w, http.StatusOK, map[string]string{"id": user.ID, "email": user.Email})
+	writeJSON(w, http.StatusOK, map[string]string{"id": user.ID, "email": user.Email, "name": user.Name})
 }
 
 func (a *api) listNotes(w http.ResponseWriter, r *http.Request, user auth.User) {

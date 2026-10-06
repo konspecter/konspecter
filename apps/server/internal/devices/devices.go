@@ -4,7 +4,11 @@
 //
 // An app asks for a pair of codes. It keeps the device code and polls with
 // it; its owner approves the user code on the site, signed in. The next poll
-// then gets the device's API token. Storage and HTTP live elsewhere.
+// then gets the device's API token.
+//
+// The other way round, the site shows its signed-in owner a connect code
+// (as a QR code); an app that scans it trades it for its token at once.
+// Storage and HTTP live elsewhere.
 package devices
 
 import (
@@ -35,6 +39,10 @@ var (
 
 // ErrInvalidUserCode means no pending authorization has that user code.
 var ErrInvalidUserCode = errors.New("invalid user code")
+
+// ErrInvalidConnectCode means no live connect code has that value (unknown,
+// used or expired).
+var ErrInvalidConnectCode = errors.New("invalid connect code")
 
 // ErrNotFound means the account has no such (connected) device.
 var ErrNotFound = errors.New("device not found")
@@ -137,6 +145,27 @@ func NewCodes() (deviceCode, userCode string, err error) {
 	return deviceCode, FormatUserCode(string(letters)), nil
 }
 
+// ConnectCodeTTL is how long a connect code works: long enough to pick up
+// a phone and scan it, short for a code shown on a screen.
+const ConnectCodeTTL = 5 * time.Minute
+
+// connectCodePrefix starts every connect code, so an app tells one apart.
+const connectCodePrefix = "ksc_"
+
+// NewConnectCode returns a connect code: 192 random bits, "ksc_…".
+func NewConnectCode() (string, error) {
+	raw := make([]byte, 24)
+	if _, err := rand.Read(raw); err != nil {
+		return "", fmt.Errorf("generate connect code: %w", err)
+	}
+	return connectCodePrefix + base64.RawURLEncoding.EncodeToString(raw), nil
+}
+
+// ValidConnectCode reports whether code has the form of a connect code.
+func ValidConnectCode(code string) bool { return connectCodePattern.MatchString(code) }
+
+var connectCodePattern = regexp.MustCompile(`^ksc_[A-Za-z0-9_-]{32}$`)
+
 // FormatUserCode writes a normalized user code as "BCDF-GHJK".
 func FormatUserCode(code string) string {
 	if len(code) != UserCodeLength {
@@ -163,7 +192,8 @@ func NormalizeUserCode(input string) string {
 	return b.String()
 }
 
-// HashCode returns the stored form of a device code or a (normalized) user code.
+// HashCode returns the stored form of a device code, a (normalized) user
+// code or a connect code.
 func HashCode(code string) []byte {
 	sum := sha256.Sum256([]byte("konspecter/device\x00" + code))
 	return sum[:]

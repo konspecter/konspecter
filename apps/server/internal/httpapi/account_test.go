@@ -212,7 +212,11 @@ func (f *fakeAccounts) SessionByID(_ context.Context, idHash []byte) (auth.Sessi
 	if !ok || time.Now().After(s.ExpiresAt) {
 		return auth.Session{}, auth.ErrUnauthorized
 	}
-	return *s, nil
+	session := *s
+	if u, err := f.byID(s.User.ID); err == nil {
+		session.User.Name = u.name
+	}
+	return session, nil
 }
 
 func (f *fakeAccounts) ExtendSession(_ context.Context, idHash []byte, expiresAt time.Time) error {

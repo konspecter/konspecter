@@ -18,7 +18,7 @@ export function loader({ request }: Route.LoaderArgs) {
   };
 }
 
-const FEATURES = ["markdown", "editors", "tags", "search", "folders", "sync"] as const;
+const FEATURES = ["write", "find", "tags", "offline", "devices", "private"] as const;
 
 /** Inline `code` spans and #tags of a source line, coloured as the Markdown editor does. */
 function sourceText(text: string): ReactNode {

@@ -84,7 +84,7 @@ function ProviderMark({ id }: { id: ProviderId }) {
   );
 }
 
-/** The provider buttons and the line that leads on to the email form; nothing without providers. */
+/** A button for each provider; nothing without providers (AuthWays places them). */
 export function ProviderButtons({
   providers,
   next,
@@ -96,18 +96,15 @@ export function ProviderButtons({
   if (providers.length === 0) return null;
   const query = next === "/" ? "" : `?next=${encodeURIComponent(next)}`;
   return (
-    <>
-      <ul className="providers" aria-label={t("providers.label")}>
-        {providers.map((id) => (
-          <li key={id}>
-            <a className="button provider-button" href={`/api/auth/${id}/start${query}`}>
-              <ProviderMark id={id} />
-              {t(`provider.${id}`)}
-            </a>
-          </li>
-        ))}
-      </ul>
-      <p className="providers-or">{t("providers.or")}</p>
-    </>
+    <ul className="providers" aria-label={t("providers.label")}>
+      {providers.map((id) => (
+        <li key={id}>
+          <a className="button provider-button" href={`/api/auth/${id}/start${query}`}>
+            <ProviderMark id={id} />
+            {t(`provider.${id}`)}
+          </a>
+        </li>
+      ))}
+    </ul>
   );
 }

@@ -69,6 +69,9 @@ importers:
       react-router:
         specifier: ^8.4.0
         version: 8.4.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      uqr:
+        specifier: ^0.1.3
+        version: 0.1.3
     devDependencies:
       '@konspecter/crypto':
         specifier: workspace:*
@@ -163,6 +166,9 @@ importers:
       idb:
         specifier: ^8.0.3
         version: 8.0.3
+      jsqr:
+        specifier: ^1.4.0
+        version: 1.4.0
       markdown-it:
         specifier: ^14.3.2
         version: 14.3.2
@@ -2890,6 +2896,9 @@ packages:
     resolution: {integrity: sha512-p/nXbhSEcu3pZRdkW1OfJhpsVtW1gd4Wa1fnQc9YLiTfAjn0312eMKimbdIQzuZl9aa9xUGaRlP9T/CJE/ditQ==}
     engines: {node: '>=0.10.0'}
 
+  jsqr@1.4.0:
+    resolution: {integrity: sha512-dxLob7q65Xg2DvstYkRpkYtmKm2sPJ9oFhrhmudT1dZvNFFTlroai3AWSpLey/w5vMcLBXRgOJsbXpdN9HzU/A==}
+
   keyv@5.6.0:
     resolution: {integrity: sha512-CYDD3SOtsHtyXeEORYRx2qBtpDJFjRTGXUtmNEMGyzYOKj1TE3tycdlho7kA1Ufx9OYWZzg52QFBGALTirzDSw==}
 
@@ -3973,6 +3982,9 @@ packages:
     hasBin: true
     peerDependencies:
       browserslist: '>= 4.21.0'
+
+  uqr@0.1.3:
+    resolution: {integrity: sha512-0rjE8iEJe4YmT9TOhwsZtqCMRLc5DXZUI2UEYUUg63ikBkqqE5EYWaI0etFe/5KUcmcYwLih2RND1kq+hrUJXA==}
 
   uri-js@4.4.1:
     resolution: {integrity: sha512-7rKUyy33Q1yc98pQ1DAmLtwX109F7TIfWlW1Ydo8Wl1ii1SeHieeh0HHfPeL2fMXK6z0s8ecKs9frCuLJvndBg==}
@@ -7240,6 +7252,8 @@ snapshots:
 
   jsonpointer@5.0.1: {}
 
+  jsqr@1.4.0: {}
+
   keyv@5.6.0:
     dependencies:
       '@keyv/serialize': 1.1.1
@@ -8695,6 +8709,8 @@ snapshots:
       browserslist: 4.29.2
       escalade: 3.2.0
       picocolors: 1.1.1
+
+  uqr@0.1.3: {}
 
   uri-js@4.4.1:
     dependencies:

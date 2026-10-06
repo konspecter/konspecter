@@ -38,4 +38,8 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Scanning the account site's QR code to connect sync (asked for when the scanner opens). -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- The app installs without a camera too: it then pastes the link instead. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 </manifest>

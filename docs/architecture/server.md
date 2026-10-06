@@ -23,9 +23,10 @@ apps/server/
 ├── internal/keys/          an account's wrapped content key and its validation
 ├── internal/auth/          User, Device, Session; API tokens and bearer header parsing
 ├── internal/accounts/      passwords (argon2id), email codes, reset tokens, identities, names
-├── internal/devices/       device codes and user codes (RFC 8628), app descriptions
+├── internal/devices/       device codes and user codes (RFC 8628), connect codes, app descriptions
 ├── internal/oauth/         sign-in providers (Google, LinkedIn, X, Yandex ID, VK ID)
-├── internal/mail/          the mailer (SMTP or log) and the emails in English and Russian
+├── internal/mail/          the mailer (SMTP or log) and the emails in English and Russian:
+│                            plain text and HTML (letter.html, the logo inline by Content-ID)
 ├── internal/httpapi/       HTTP/JSON handlers, sessions, rate limits, event streams;
 │                           declares the interfaces it consumes
 ├── internal/storage/postgres/  users, sessions, devices, keys, notes, migration runner
@@ -48,11 +49,12 @@ PostgreSQL `DB` satisfies all the storage ones, and handler tests use in-memory 
 | `pending_identities`    | a provider sign-in waiting for its owner to prove an address (30 minutes)                              |
 | `devices`               | a connected app: `id`, `token_hash` (unique), name, platform, version, last use and sync, `revoked_at` |
 | `device_authorizations` | an app waiting for approval: both codes' hashes, its description, status, expiry, last poll            |
+| `device_connect_codes`  | a code the site shows as a QR code: `code_hash`, `user_id` (unique: one per account), expiry           |
 | `encryption_keys`       | the account's content key, wrapped: `key_id`, `kdf`, `kdf_params`, `salt`, `wrapped_key`, `recovery_…` |
 | `notes`                 | `(user_id, id)`, `content` (envelope), `key_id`, `revision`, timestamps, `deleted_at`, `change_seq`    |
 | `sync_changes`          | the change log: `(user_id, seq)`, `note_id`, `revision`, `operation`                                   |
 
-Every secret (session ids, codes, reset tokens, API tokens, device and user codes) is stored
+Every secret (session ids, codes, reset tokens, API tokens, device, user and connect codes) is stored
 as a SHA-256 hash only.
 
 - **Note ids are chosen by clients** (UUIDs), because local-first clients create notes
@@ -138,7 +140,7 @@ needs a reset (`DELETE`) first. See [ADR-017](decisions/ADR-017-end-to-end-encry
 | `GET /api/auth/{provider}/start`      | redirect to the provider (state and PKCE in a short-lived cookie)           |
 | `GET /api/auth/{provider}/callback`   | back from the provider: signs in, or redirects to `/complete`               |
 | `GET`, `POST /api/auth/complete`      | the pending provider sign-in; email a code that links it                    |
-| `GET /api/me`                         | `{id, email}` (also with a bearer token)                                    |
+| `GET /api/me`                         | `{id, email, name}` (also with a bearer token)                              |
 | `GET`, `PATCH`, `DELETE /api/account` | the account (`recent_sign_in`), rename, delete (recent sign-in + address)   |
 
 Answers never reveal whether an account exists.
@@ -151,6 +153,8 @@ Answers never reveal whether an account exists.
 | `POST /api/devices/token`             | none    | the app polls: `authorization_pending`, `slow_down`, `access_denied`, `expired_token`, or `{token, device, user}` |
 | `GET /api/devices/pending?user_code=` | session | the app waiting under a code, for `/activate`                                                                     |
 | `POST /api/devices/approve`, `/deny`  | session | decide                                                                                                            |
+| `POST /api/devices/connect-codes`     | session | a code to show as a QR code ([ADR-019](decisions/ADR-019-connect-by-qr-code.md)): `{code, url, expires_in}`       |
+| `POST /api/devices/connect`           | none    | an app trades a scanned code for `{token, device, user}`; else `400 invalid_connect_code`                         |
 | `GET /api/devices`                    | session | the connected devices, most recently active first                                                                 |
 | `DELETE /api/devices/{id}`            | session | disconnect: the token stops working and its streams end at once                                                   |
 

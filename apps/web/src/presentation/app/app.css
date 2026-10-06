@@ -1849,3 +1849,18 @@ kbd {
     transition: none;
   }
 }
+
+/* Scanning the account site's QR code: the camera's view, square, above the hint. */
+.scan-dialog {
+  width: min(26rem, 100%);
+}
+
+.scan-video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  margin-bottom: 0.75rem;
+  border-radius: 10px;
+  background: var(--color-field);
+  object-fit: cover;
+}

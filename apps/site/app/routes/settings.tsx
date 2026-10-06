@@ -3,15 +3,16 @@ import { data, Form, redirect, useActionData, useLoaderData, useNavigation } fro
 import { requireUser, signInPath } from "../account.server";
 import { callApi, withCookies, type ApiResult } from "../api.server";
 import { Field, FormMessage, formError, Submit, textField, type FormError } from "../auth-form";
+import { ConnectApp, parseConnectCode, type ConnectCode } from "../connect-app";
 import { parseDevices, timeAgo, type Device } from "../devices";
 import { Encryption } from "../encryption";
 import { useLocale, useT } from "../i18n/i18n";
 import type { Route } from "./+types/settings";
 
 /**
- * The account's settings: its name, the connected devices (each can be
- * disconnected: it stops syncing and keeps its conspects), encryption, and
- * deleting the account. Plain forms, so the page works without JavaScript,
+ * The account's settings: its name, connecting an app by QR code, the
+ * connected devices (each can be disconnected: it stops syncing and keeps
+ * its conspects), encryption, and deleting the account. Plain forms, so the page works without JavaScript,
  * except the encryption, which runs in the browser (encryption.tsx).
  */
 
@@ -50,13 +51,15 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   };
 }
 
-type Intent = "rename" | "disconnect" | "delete";
+type Intent = "rename" | "connect" | "disconnect" | "delete";
 
 interface ActionResult {
   readonly intent: Intent;
   readonly error: FormError | null;
   /** The disconnected device's name, for the notice. */
   readonly disconnected?: string;
+  /** The code to connect an app with. */
+  readonly connect?: ConnectCode;
 }
 
 function failed(intent: Intent, result: ApiResult<unknown>) {
@@ -79,6 +82,14 @@ export async function action({ request }: Route.ActionArgs) {
     signInAgainOn401(request, result);
     if (result.error) return failed("rename", result);
     return { intent: "rename", error: null } satisfies ActionResult;
+  }
+
+  if (intent === "connect") {
+    const result = await callApi(request, "/api/devices/connect-codes", { method: "POST" });
+    signInAgainOn401(request, result);
+    const code = parseConnectCode(result.data);
+    if (result.error || !code) return failed("connect", result);
+    return { intent: "connect", error: null, connect: code } satisfies ActionResult;
   }
 
   if (intent === "disconnect") {
@@ -147,6 +158,12 @@ export default function Settings() {
             </Submit>
           </div>
         </Form>
+      </section>
+
+      <section className="settings-section" id="connect" aria-labelledby="connect-heading">
+        <h2 id="connect-heading">{t("settings.connect.title")}</h2>
+        <p className="settings-text">{t("settings.connect.lead")}</p>
+        <ConnectApp code={result?.connect ?? null} error={errorOf("connect")} devices={devices} />
       </section>
 
       <section className="settings-section" aria-labelledby="devices-heading">

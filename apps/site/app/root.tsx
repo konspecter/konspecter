@@ -1,4 +1,4 @@
-import { MoonIcon, SunIcon } from "@konspecter/ui/icons";
+import { ChevronIcon, GlobeIcon, MoonIcon, SunIcon } from "@konspecter/ui/icons";
 import "@konspecter/ui/fonts.css";
 import "@konspecter/ui/tokens.css";
 import "@konspecter/ui/base.css";
@@ -17,7 +17,7 @@ import {
 } from "react-router";
 import { accountContext, loadAccount } from "./account.server";
 import { siteConfig } from "./config.server";
-import { translator, useT, type Locale } from "./i18n/i18n";
+import { LOCALE_NAMES, LOCALES, translator, useT, type Locale } from "./i18n/i18n";
 import { isSameOriginRequest } from "./origin.server";
 import { readPreferences, type Theme } from "./preferences.server";
 import type { Route } from "./+types/root";
@@ -40,13 +40,20 @@ export const middleware: Route.MiddlewareFunction[] = [
 
 export function loader({ request, context }: Route.LoaderArgs) {
   const { user, enabled } = context.get(accountContext);
-  return { ...readPreferences(request), email: user?.email ?? null, accounts: enabled };
+  return {
+    ...readPreferences(request),
+    email: user?.email ?? null,
+    name: user?.name ?? "",
+    accounts: enabled,
+  };
 }
 
 interface RootData {
   readonly locale: Locale;
   readonly theme: Theme;
   readonly email: string | null;
+  /** The account's name; "" when it has none. */
+  readonly name: string;
   readonly accounts: boolean;
 }
 
@@ -75,25 +82,43 @@ export function Layout({ children }: { children: ReactNode }) {
   );
 }
 
-/** The switches post to /preferences and come back here; plain forms, so no script is needed. */
+/**
+ * The switches post to /preferences and come back here; plain forms, so no
+ * script is needed. The language is a dropdown that sends itself once the
+ * page's script runs; without it, a button next to it does.
+ */
 function Preferences({ locale }: { locale: Locale }) {
   const { t } = useT();
   const location = useLocation();
   const back = `${location.pathname}${location.search}`;
   return (
     <div className="site-preferences">
-      <form method="post" action="/preferences">
+      <form method="post" action="/preferences" className="language-form">
         <input type="hidden" name="back" value={back} />
-        <button
-          type="submit"
-          name="lang"
-          value={locale === "en" ? "ru" : "en"}
-          className="language-switch"
-          lang={locale === "en" ? "ru" : "en"}
-          title={t("site.otherLanguageHint")}
-        >
-          {t("site.otherLanguage")}
-        </button>
+        <span className="select language-select">
+          <GlobeIcon />
+          <select
+            name="lang"
+            defaultValue={locale}
+            aria-label={t("site.language")}
+            title={t("site.language")}
+            onChange={(event) => {
+              event.currentTarget.form?.requestSubmit();
+            }}
+          >
+            {LOCALES.map((option) => (
+              <option key={option} value={option} lang={option}>
+                {LOCALE_NAMES[option]}
+              </option>
+            ))}
+          </select>
+          <ChevronIcon />
+        </span>
+        <noscript>
+          <button type="submit" className="link-button">
+            {t("site.languageApply")}
+          </button>
+        </noscript>
       </form>
       {/* Both buttons are rendered; CSS shows the one that leads away from the current scheme. */}
       <form method="post" action="/preferences" className="theme-switch">
@@ -123,14 +148,29 @@ function Preferences({ locale }: { locale: Locale }) {
   );
 }
 
-/** Sign in, or the signed-in address (a link to the settings) and Sign out. */
-function AccountLinks({ email, accounts }: { email: string | null; accounts: boolean }) {
+/**
+ * Sign in, or who is signed in (the name if the account has one, else the
+ * address; a link to the settings) and Sign out.
+ */
+function AccountLinks({
+  email,
+  name,
+  accounts,
+}: {
+  email: string | null;
+  name: string;
+  accounts: boolean;
+}) {
   const { t } = useT();
   if (email) {
     return (
       <form method="post" action="/logout" className="site-account">
-        <Link to="/settings" className="site-account-email" title={t("site.settings")}>
-          {email}
+        <Link
+          to="/settings"
+          className="site-account-email"
+          title={name ? `${t("site.settings")} (${email})` : t("site.settings")}
+        >
+          {name || email}
         </Link>
         <button type="submit" className="link-button">
           {t("site.signOut")}
@@ -158,7 +198,7 @@ function Header({ data }: { data: RootData }) {
         </Link>
         <div className="site-header-end">
           <Preferences locale={data.locale} />
-          <AccountLinks email={data.email} accounts={data.accounts} />
+          <AccountLinks email={data.email} name={data.name} accounts={data.accounts} />
         </div>
       </div>
     </header>

@@ -11,6 +11,8 @@ import { ru } from "./ru";
 export const LOCALES = ["en", "ru"] as const;
 export type Locale = (typeof LOCALES)[number];
 export const DEFAULT_LOCALE: Locale = "en";
+/** Each language by its own name, as the language dropdown lists them. */
+export const LOCALE_NAMES: Record<Locale, string> = { en: "English", ru: "Русский" };
 
 type Messages = typeof en;
 /** A translation: every English key, each as text or as plural forms. */

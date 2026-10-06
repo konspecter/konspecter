@@ -1,5 +1,6 @@
 // Package mail sends the server's emails (sign-in codes, password resets)
-// over SMTP, or writes them to the log for development and tests.
+// over SMTP, or writes them to the log for development and tests. Each is
+// sent as plain text and as HTML with the logo.
 package mail
 
 import (
@@ -7,25 +8,31 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"mime"
+	"mime/multipart"
 	"mime/quotedprintable"
 	"net"
 	netmail "net/mail"
 	"net/smtp"
+	"net/textproto"
 	"strconv"
 	"strings"
 	"time"
 )
 
-// Message is one plain-text email to one address.
+// Message is one email to one address: plain text, and optionally the same
+// as HTML (which shows the logo, sent along by Content-ID).
 type Message struct {
 	To      string
 	Subject string
 	Text    string
+	HTML    string
 }
 
 // Security is how the SMTP connection is protected.
@@ -152,8 +159,9 @@ func (s *SMTP) dial(ctx context.Context) (net.Conn, error) {
 	return conn, nil
 }
 
-// Compose renders m as an RFC 5322 message: UTF-8 text, quoted-printable,
-// CRLF line endings.
+// Compose renders m as an RFC 5322 message with CRLF line endings: UTF-8
+// text in quoted-printable or, with HTML, multipart/alternative of the text
+// and a multipart/related of the HTML and the logo.
 func Compose(from *netmail.Address, to string, m Message, now time.Time) ([]byte, error) {
 	id := make([]byte, 16)
 	if _, err := rand.Read(id); err != nil {
@@ -171,19 +179,95 @@ func Compose(from *netmail.Address, to string, m Message, now time.Time) ([]byte
 	header("Date", now.Format(time.RFC1123Z))
 	header("Message-ID", "<"+hex.EncodeToString(id)+"@"+domain+">")
 	header("MIME-Version", "1.0")
-	header("Content-Type", "text/plain; charset=utf-8")
-	header("Content-Transfer-Encoding", "quoted-printable")
-	b.WriteString("\r\n")
 
-	qp := quotedprintable.NewWriter(&b)
-	text := strings.ReplaceAll(strings.ReplaceAll(m.Text, "\r\n", "\n"), "\n", "\r\n")
-	if _, err := qp.Write([]byte(text)); err != nil {
+	if m.HTML == "" {
+		header("Content-Type", "text/plain; charset=utf-8")
+		header("Content-Transfer-Encoding", "quoted-printable")
+		b.WriteString("\r\n")
+		if err := writeQuotedPrintable(&b, m.Text); err != nil {
+			return nil, err
+		}
+		return b.Bytes(), nil
+	}
+
+	alternative := multipart.NewWriter(&b)
+	header("Content-Type", "multipart/alternative; boundary="+alternative.Boundary())
+	b.WriteString("\r\n")
+	if err := writeTextPart(alternative, "text/plain", m.Text); err != nil {
+		return nil, err
+	}
+	// The related part names its boundary in its header, before its writer exists.
+	boundary := multipart.NewWriter(io.Discard).Boundary()
+	part, err := alternative.CreatePart(textproto.MIMEHeader{
+		"Content-Type": {"multipart/related; boundary=" + boundary},
+	})
+	if err != nil {
 		return nil, fmt.Errorf("encode message: %w", err)
 	}
-	if err := qp.Close(); err != nil {
+	related := multipart.NewWriter(part)
+	if err := related.SetBoundary(boundary); err != nil {
+		return nil, fmt.Errorf("encode message: %w", err)
+	}
+	if err := writeTextPart(related, "text/html", m.HTML); err != nil {
+		return nil, err
+	}
+	logo, err := related.CreatePart(textproto.MIMEHeader{
+		"Content-Type":              {"image/png"},
+		"Content-Transfer-Encoding": {"base64"},
+		"Content-ID":                {"<" + logoID + ">"},
+		"Content-Disposition":       {`inline; filename="konspecter.png"`},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("encode message: %w", err)
+	}
+	if err := writeBase64(logo, logoPNG); err != nil {
+		return nil, err
+	}
+	if err := related.Close(); err != nil {
+		return nil, fmt.Errorf("encode message: %w", err)
+	}
+	if err := alternative.Close(); err != nil {
 		return nil, fmt.Errorf("encode message: %w", err)
 	}
 	return b.Bytes(), nil
+}
+
+// writeTextPart adds a UTF-8 text part (text/plain or text/html) in quoted-printable.
+func writeTextPart(w *multipart.Writer, contentType, text string) error {
+	part, err := w.CreatePart(textproto.MIMEHeader{
+		"Content-Type":              {contentType + "; charset=utf-8"},
+		"Content-Transfer-Encoding": {"quoted-printable"},
+	})
+	if err != nil {
+		return fmt.Errorf("encode message: %w", err)
+	}
+	return writeQuotedPrintable(part, text)
+}
+
+// writeQuotedPrintable writes text with CRLF line endings in quoted-printable.
+func writeQuotedPrintable(w io.Writer, text string) error {
+	qp := quotedprintable.NewWriter(w)
+	text = strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\n", "\r\n")
+	if _, err := qp.Write([]byte(text)); err != nil {
+		return fmt.Errorf("encode message: %w", err)
+	}
+	if err := qp.Close(); err != nil {
+		return fmt.Errorf("encode message: %w", err)
+	}
+	return nil
+}
+
+// writeBase64 writes data in base64, in lines of 76 characters (RFC 2045).
+func writeBase64(w io.Writer, data []byte) error {
+	encoded := base64.StdEncoding.EncodeToString(data)
+	for len(encoded) > 0 {
+		n := min(76, len(encoded))
+		if _, err := io.WriteString(w, encoded[:n]+"\r\n"); err != nil {
+			return fmt.Errorf("encode message: %w", err)
+		}
+		encoded = encoded[n:]
+	}
+	return nil
 }
 
 // Log writes messages to the log instead of sending them. For development

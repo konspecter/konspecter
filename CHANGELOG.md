@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- **Connect an app by QR code.** Account settings on the site show a QR code (and its link);
+  scanning it in the app (Settings → Sync → Scan QR code) or pasting the link connects the
+  app with no server address or code to type. A code works once, for 5 minutes. The server
+  gains migration `007_connect_codes.sql`; Android asks for the camera on first use
+  ([ADR-019](docs/architecture/decisions/ADR-019-connect-by-qr-code.md)).
+- **Sign-in page:** a card with the email form and the other services side by side (one
+  column on phones). A one-time code by email comes first; the password field shows on
+  _Use password_.
+- **HTML emails** with the logo, a large code or a button, and a footer; the plain text is
+  still sent alongside.
+- **Language as a dropdown** on the site and in the app's settings; the site's header
+  greets an account by its name when it has one.
+- **The landing page speaks to everyone:** new copy, a recipe instead of SQL in the picture,
+  and larger hero text.
 - **The server hosts the web app too.** `deploy/compose.yaml` runs it as a `web` service
   (`apps/web/Dockerfile`, with the server already filled in for sync), and Caddy serves it on
   a second address (`KONSPECTER_APP_ADDRESS`, e.g. `app.notes.example.com`). Add its URL to

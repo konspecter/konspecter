@@ -78,10 +78,10 @@ func (db *DB) DeviceByToken(ctx context.Context, token string) (auth.Device, err
 			WHERE token_hash = $1 AND revoked_at IS NULL
 				AND (last_used_at IS NULL OR last_used_at < now() - interval '1 minute')
 		)
-		SELECT d.id::text, d.revoked_at IS NOT NULL, u.id::text, u.email
+		SELECT d.id::text, d.revoked_at IS NOT NULL, u.id::text, u.email, u.display_name
 		FROM devices d JOIN users u ON u.id = d.user_id
 		WHERE d.token_hash = $1`, auth.HashToken(token),
-	).Scan(&d.ID, &revoked, &d.User.ID, &d.User.Email)
+	).Scan(&d.ID, &revoked, &d.User.ID, &d.User.Email, &d.User.Name)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		return auth.Device{}, auth.ErrUnauthorized
@@ -255,7 +255,7 @@ func (db *DB) ExchangeDeviceCode(ctx context.Context, deviceCodeHash, tokenHash 
 			outcome = devices.ErrAuthorizationPending
 			return nil
 		}
-		if err := tx.QueryRow(ctx, `SELECT id::text, email FROM users WHERE id = $1`, *userID).Scan(&user.ID, &user.Email); err != nil {
+		if err := tx.QueryRow(ctx, `SELECT id::text, email, display_name FROM users WHERE id = $1`, *userID).Scan(&user.ID, &user.Email, &user.Name); err != nil {
 			return fmt.Errorf("find user: %w", err)
 		}
 		if device, err = insertDevice(ctx, tx, user.ID, tokenHash, client); err != nil {
@@ -268,6 +268,56 @@ func (db *DB) ExchangeDeviceCode(ctx context.Context, deviceCodeHash, tokenHash 
 	}
 	if outcome != nil {
 		return devices.Device{}, auth.User{}, outcome
+	}
+	return device, user, nil
+}
+
+// CreateConnectCode stores the account's connect code, replacing the one it
+// had, and drops expired codes.
+func (db *DB) CreateConnectCode(ctx context.Context, userID string, codeHash []byte, expiresAt time.Time) error {
+	return pgx.BeginFunc(ctx, db.pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `DELETE FROM device_connect_codes WHERE expires_at <= now()`); err != nil {
+			return fmt.Errorf("prune connect codes: %w", err)
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO device_connect_codes (code_hash, user_id, expires_at) VALUES ($1, $2, $3)
+			ON CONFLICT (user_id) DO UPDATE SET code_hash = $1, created_at = now(), expires_at = $3`,
+			codeHash, userID, expiresAt,
+		); err != nil {
+			return fmt.Errorf("store connect code: %w", err)
+		}
+		return nil
+	})
+}
+
+// RedeemConnectCode uses up a live connect code: it connects the app as a
+// device of the code's account under tokenHash and returns the device and
+// the user. devices.ErrInvalidConnectCode if no live code has that hash.
+func (db *DB) RedeemConnectCode(ctx context.Context, codeHash, tokenHash []byte, client devices.Client) (devices.Device, auth.User, error) {
+	var device devices.Device
+	var user auth.User
+	err := pgx.BeginFunc(ctx, db.pool, func(tx pgx.Tx) error {
+		err := tx.QueryRow(ctx, `
+			WITH used AS (
+				DELETE FROM device_connect_codes WHERE code_hash = $1 AND expires_at > now()
+				RETURNING user_id
+			)
+			SELECT u.id::text, u.email, u.display_name FROM used JOIN users u ON u.id = used.user_id`, codeHash,
+		).Scan(&user.ID, &user.Email, &user.Name)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return devices.ErrInvalidConnectCode
+		}
+		if err != nil {
+			return fmt.Errorf("find connect code: %w", err)
+		}
+		device, err = insertDevice(ctx, tx, user.ID, tokenHash, client)
+		return err
+	})
+	if errors.Is(err, devices.ErrInvalidConnectCode) {
+		return devices.Device{}, auth.User{}, err
+	}
+	if err != nil {
+		return devices.Device{}, auth.User{}, fmt.Errorf("redeem connect code: %w", err)
 	}
 	return device, user, nil
 }

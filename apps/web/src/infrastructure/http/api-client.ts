@@ -364,6 +364,30 @@ export async function pollDeviceToken(
   return { status: "approved", token };
 }
 
+/**
+ * Trades a connect code (scanned from the account site's QR code) for this
+ * app's token: no one has to approve anything. ApiError
+ * `invalid_connect_code` when the code is wrong, used or expired.
+ */
+export async function connectDevice(
+  serverUrl: string,
+  code: string,
+  device: DeviceDescription,
+  fetchFn: Fetch = (input, init) => fetch(input, init),
+): Promise<string> {
+  const { token } = asRecord(
+    await send(
+      fetchFn,
+      apiUrl(serverUrl, "api/devices/connect"),
+      "POST",
+      { code, name: device.name, platform: device.platform, client_version: device.clientVersion },
+      null,
+    ),
+  );
+  if (typeof token !== "string") throw invalid("device token");
+  return token;
+}
+
 /** Throws the error a failed response describes. */
 async function failure(response: Response): Promise<never> {
   let json: unknown = null;

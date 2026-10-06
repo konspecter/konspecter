@@ -1229,19 +1229,19 @@ describe("settings and the top bar", () => {
     const store = await newStore();
     renderWithSettings(store, "/settings");
 
-    await userEvent.click(screen.getByRole("radio", { name: "Русский" }));
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Language" }), "Русский");
 
     expect(screen.getByRole("heading", { level: 1, name: "Настройки" })).toBeInTheDocument();
     const russianSidebar = screen.getByRole("complementary", { name: "Боковая панель" });
     expect(within(russianSidebar).getByRole("link", { name: "Настройки" })).toBeInTheDocument();
     expect(document.documentElement.lang).toBe("ru");
-    expect(screen.getByRole("radio", { name: "Русский" })).toBeChecked();
+    const language = screen.getByRole("combobox", { name: "Язык" });
+    expect(language).toHaveValue("ru");
     await waitFor(async () => {
       expect(await store.loadSettings()).toMatchObject({ language: "ru" });
     });
 
-    const language = screen.getByRole("group", { name: "Язык" });
-    await userEvent.click(within(language).getByRole("radio", { name: "Как в системе" }));
+    await userEvent.selectOptions(language, "Как в системе");
     expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument();
     expect(document.documentElement.lang).toBe("en");
   });

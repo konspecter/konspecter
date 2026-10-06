@@ -2,7 +2,7 @@ import { richText } from "@konspecter/i18n/rich";
 import { data, Form, Link, redirect, useActionData, useLoaderData } from "react-router";
 import { redirectIfSignedIn } from "../account.server";
 import { callApi, withCookies } from "../api.server";
-import { AuthPage, Field, FormMessage, formError, Submit, textField } from "../auth-form";
+import { AuthPage, AuthWays, Field, FormMessage, formError, Submit, textField } from "../auth-form";
 import { useT } from "../i18n/i18n";
 import { pendingCookie } from "../pending.server";
 import { readPreferences } from "../preferences.server";
@@ -37,39 +37,40 @@ export default function Register() {
   const { providers } = useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
   return (
-    <AuthPage title={t("register.title")} lead={t("register.lead")}>
-      <ProviderButtons providers={providers} next="/" />
-      <Form method="post" className="form">
-        <Field
-          label={t("auth.email")}
-          name="email"
-          type="email"
-          autoComplete="email"
-          required
-          defaultValue={result?.email ?? ""}
-        />
-        <Field
-          label={t("auth.password")}
-          hint={t("auth.passwordHint")}
-          name="password"
-          type="password"
-          autoComplete="new-password"
-          minLength={8}
-          required
-        />
-        <FormMessage error={result?.error ?? null} />
-        <div className="actions">
-          <Submit>{t("register.submit")}</Submit>
-        </div>
-      </Form>
-      <p className="auth-links">
-        {richText(t("register.noPassword"), {
-          link: <Link to="/login">{t("register.codeLink")}</Link>,
-        })}
-      </p>
-      <p className="auth-links">
-        {t("register.haveAccount")} <Link to="/login">{t("register.signIn")}</Link>
-      </p>
+    <AuthPage title={t("register.title")} lead={t("register.lead")} wide={providers.length > 0}>
+      <AuthWays others={providers.length > 0 && <ProviderButtons providers={providers} next="/" />}>
+        <Form method="post" className="form">
+          <Field
+            label={t("auth.email")}
+            name="email"
+            type="email"
+            autoComplete="email"
+            required
+            defaultValue={result?.email ?? ""}
+          />
+          <Field
+            label={t("auth.password")}
+            hint={t("auth.passwordHint")}
+            name="password"
+            type="password"
+            autoComplete="new-password"
+            minLength={8}
+            required
+          />
+          <FormMessage error={result?.error ?? null} />
+          <div className="actions">
+            <Submit>{t("register.submit")}</Submit>
+          </div>
+        </Form>
+        <p className="auth-links">
+          {richText(t("register.noPassword"), {
+            link: <Link to="/login">{t("register.codeLink")}</Link>,
+          })}
+        </p>
+        <p className="auth-links">
+          {t("register.haveAccount")} <Link to="/login">{t("register.signIn")}</Link>
+        </p>
+      </AuthWays>
     </AuthPage>
   );
 }

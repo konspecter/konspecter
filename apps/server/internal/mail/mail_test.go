@@ -4,9 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"io"
 	"log/slog"
 	"mime"
+	"mime/multipart"
 	"mime/quotedprintable"
 	"net"
 	netmail "net/mail"
@@ -147,23 +149,112 @@ func TestParseSecurity(t *testing.T) {
 }
 
 func TestTextsSpeakTheRequestedLanguage(t *testing.T) {
-	en := SignInCode(ParseLocale("de"), "a@example.com", "123456", 10*time.Minute, false)
-	ru := SignInCode(ParseLocale("ru"), "a@example.com", "123456", 10*time.Minute, true)
+	const site = "https://notes.example.com"
+	en := SignInCode(ParseLocale("de"), site, "a@example.com", "123456", 10*time.Minute, false)
+	ru := SignInCode(ParseLocale("ru"), site, "a@example.com", "123456", 10*time.Minute, true)
 	if !strings.Contains(en.Subject, "sign-in code: 123456") || !strings.Contains(en.Text, "10 minutes") {
 		t.Errorf("english = %+v", en)
 	}
 	if !strings.Contains(ru.Subject, "регистрации") || !strings.Contains(ru.Text, "10 мин") {
 		t.Errorf("russian = %+v", ru)
 	}
-	reset := PasswordReset(English, "a@example.com", "https://notes.example.com/reset?token=x", 30*time.Minute)
+	if want := "Your code to sign in to Konspecter:\n\n    123456\n\nEnter it"; !strings.HasPrefix(en.Text, want) {
+		t.Errorf("english text = %q", en.Text)
+	}
+	reset := PasswordReset(English, site, "a@example.com", "https://notes.example.com/reset?token=x", 30*time.Minute)
 	if reset.To != "a@example.com" || !strings.Contains(reset.Text, "https://notes.example.com/reset?token=x") {
 		t.Errorf("reset = %+v", reset)
 	}
-	if !strings.Contains(NoAccount(Russian, "a@example.com", "https://n.example").Text, "https://n.example/register") {
+	if !strings.Contains(NoAccount(Russian, "https://n.example", "a@example.com").Text, "https://n.example/register") {
 		t.Error("the no-account email lacks the sign-up link")
 	}
-	if RegistrationClosed(English, "a@example.com").Subject == "" {
+	if RegistrationClosed(English, site, "a@example.com").Subject == "" {
 		t.Error("empty subject")
+	}
+}
+
+func TestLettersHaveAnHTMLVersion(t *testing.T) {
+	const site = "https://notes.example.com"
+	code := SignInCode(Russian, site, "a@example.com", "123456", 10*time.Minute, false)
+	for _, want := range []string{`lang="ru"`, "Код для входа", "123456", `src="cid:` + logoID + `"`, "notes.example.com"} {
+		if !strings.Contains(code.HTML, want) {
+			t.Errorf("code HTML lacks %q", want)
+		}
+	}
+	// The link is a button and, for mail apps that drop it, written out; & is escaped.
+	reset := PasswordReset(English, site, "a@example.com", site+"/reset?token=x&y=1", 30*time.Minute)
+	if strings.Count(reset.HTML, `href="https://notes.example.com/reset?token=x&amp;y=1"`) != 2 || !strings.Contains(reset.HTML, "Set a new password") {
+		t.Errorf("reset HTML = %s", reset.HTML)
+	}
+	for _, m := range []Message{RegistrationClosed(English, site, "a@example.com"), NoAccount(Russian, site, "a@example.com")} {
+		if m.HTML == "" || strings.Contains(m.HTML, "<no value>") {
+			t.Errorf("HTML of %q = %q", m.Subject, m.HTML)
+		}
+	}
+}
+
+func TestComposeSendsTextAndHTMLWithTheLogo(t *testing.T) {
+	from := &netmail.Address{Name: "Konspecter", Address: "noreply@example.com"}
+	m := SignInCode(English, "https://notes.example.com", "ann@example.com", "123456", 10*time.Minute, false)
+	raw, err := Compose(from, m.To, m, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	message, err := netmail.ReadMessage(bytes.NewReader(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mediaType, params, err := mime.ParseMediaType(message.Header.Get("Content-Type"))
+	if err != nil || mediaType != "multipart/alternative" {
+		t.Fatalf("content type = %q, %v", mediaType, err)
+	}
+	parts := multipart.NewReader(message.Body, params["boundary"])
+	text, err := parts.NextPart()
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(text) // multipart decodes quoted-printable itself
+	if text.Header.Get("Content-Type") != "text/plain; charset=utf-8" || strings.ReplaceAll(string(body), "\r\n", "\n") != m.Text {
+		t.Errorf("text part = %q %q", text.Header, body)
+	}
+	related, err := parts.NextPart()
+	if err != nil {
+		t.Fatal(err)
+	}
+	mediaType, params, _ = mime.ParseMediaType(related.Header.Get("Content-Type"))
+	if mediaType != "multipart/related" {
+		t.Fatalf("second part = %q", mediaType)
+	}
+	inner := multipart.NewReader(related, params["boundary"])
+	html, err := inner.NextPart()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if body, _ := io.ReadAll(html); strings.ReplaceAll(string(body), "\r\n", "\n") != m.HTML {
+		t.Errorf("html part differs: %q", body)
+	}
+	logo, err := inner.NextPart()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if logo.Header.Get("Content-ID") != "<"+logoID+">" || logo.Header.Get("Content-Type") != "image/png" {
+		t.Errorf("logo headers = %v", logo.Header)
+	}
+	encoded, _ := io.ReadAll(logo)
+	decoded, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(string(encoded), "\r\n", ""))
+	if err != nil || !bytes.Equal(decoded, logoPNG) {
+		t.Errorf("logo = %d bytes, %v", len(decoded), err)
+	}
+	if _, err := inner.NextPart(); err != io.EOF {
+		t.Errorf("more related parts: %v", err)
+	}
+	if _, err := parts.NextPart(); err != io.EOF {
+		t.Errorf("more alternative parts: %v", err)
+	}
+	for line := range strings.SplitSeq(string(raw), "\r\n") {
+		if len(line) > 998 {
+			t.Fatalf("a line of %d characters", len(line))
+		}
 	}
 }
 

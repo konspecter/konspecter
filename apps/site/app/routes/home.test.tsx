@@ -34,7 +34,10 @@ it("shows the landing page with the configured downloads", async () => {
   );
 
   expect(
-    await screen.findByRole("heading", { level: 1, name: "All your conspects in plain Markdown" }),
+    await screen.findByRole("heading", {
+      level: 1,
+      name: "A notebook for everything worth keeping",
+    }),
   ).toBeInTheDocument();
   for (const link of screen.getAllByRole("link", { name: "Download for macOS" })) {
     expect(link).toHaveAttribute("href", "https://example.com/k.dmg");
@@ -47,7 +50,7 @@ it("shows the landing page with the configured downloads", async () => {
   expect(within(downloads).getAllByRole("listitem")).toHaveLength(2);
   expect(
     screen.getByRole("figure", { name: "A conspect as Konspecter stores it" }),
-  ).toHaveTextContent("title: Reading EXPLAIN ANALYZE");
+  ).toHaveTextContent("title: Grandma's apple pie");
 });
 
 it("leaves out the downloads when none are configured", async () => {
@@ -57,16 +60,16 @@ it("leaves out the downloads when none are configured", async () => {
   expect(screen.queryByRole("link", { name: /Download/ })).not.toBeInTheDocument();
 });
 
-it("speaks Russian, with switches to English and the other theme", async () => {
+it("speaks Russian, with the language dropdown and the other theme", async () => {
   renderHome("ru", [{ platform: "linux", url: "https://example.com/k.AppImage" }]);
   expect(
     await screen.findByRole("heading", {
       level: 1,
-      name: "Все ваши конспекты в обычном Markdown",
+      name: "Блокнот для всего, что стоит сохранить",
     }),
   ).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Скачать" })).toHaveAttribute("href", "#download");
-  expect(screen.getByRole("button", { name: "English" })).toHaveAttribute("value", "en");
+  expect(screen.getByRole("combobox", { name: "Язык" })).toHaveValue("ru");
   expect(screen.getByRole("button", { name: "Включить тёмную тему" })).toHaveAttribute(
     "value",
     "dark",

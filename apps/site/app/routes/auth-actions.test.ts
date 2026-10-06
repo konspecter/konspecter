@@ -70,8 +70,25 @@ it("asks for a password before calling the API", async () => {
     data: unknown;
     init: { status: number };
   };
-  expect(result.data).toEqual({ email: "ann@example.com", error: { code: "password_required" } });
+  expect(result.data).toEqual({
+    email: "ann@example.com",
+    mode: "password",
+    error: { code: "password_required" },
+  });
   expect(result.init.status).toBe(400);
+  expect(calls).toHaveLength(0);
+});
+
+it("switches between the code and the password without JavaScript", async () => {
+  const calls = stubApi({});
+  expect(
+    await login(args(post("/login", { email: " ann@example.com ", intent: "use-password" }))),
+  ).toEqual({ email: "ann@example.com", mode: "password", error: null });
+  expect(await login(args(post("/login", { email: "", intent: "use-code" })))).toEqual({
+    email: "",
+    mode: "code",
+    error: null,
+  });
   expect(calls).toHaveLength(0);
 });
 

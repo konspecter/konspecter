@@ -1,9 +1,30 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { openNoteStore } from "../../infrastructure/storage/note-store";
 import { FakeServer, TEST_PASSPHRASE } from "../../infrastructure/sync/fake-server";
 import { SyncEngine, type Scheduler } from "../../infrastructure/sync/sync-engine";
 import { SyncSettings } from "./SyncSettings";
+
+// The camera: what it "sees" (a QR code's text) or why it does not start.
+const camera = vi.hoisted(() => ({ text: null as string | null, error: null as Error | null }));
+vi.mock("../../infrastructure/camera/qr-scanner", () => ({
+  cameraAvailable: () => true,
+  cameraDenied: (error: unknown) =>
+    error instanceof DOMException && error.name === "NotAllowedError",
+  scanQrCodes: (_video: unknown, onCode: (text: string) => boolean) => {
+    if (camera.error) return Promise.reject(camera.error);
+    if (camera.text !== null) onCode(camera.text);
+    return Promise.resolve();
+  },
+}));
+
+afterEach(() => {
+  camera.text = null;
+  camera.error = null;
+});
+
+const code = "ksc_abcdefghijklmnopqrstuvwxyz012345";
+const link = `https://sync.example.com/connect#${code}`;
 
 let databases = 0;
 
@@ -80,9 +101,68 @@ it("sends the owner to the site when encryption is not set up", async () => {
 
 it("keeps the token form under Advanced", async () => {
   await setup();
-  await userEvent.setup().click(screen.getByText("Advanced: connect with an access token"));
+  const advanced = screen.getByText("Advanced: connect with an access token");
+  await userEvent.setup().click(advanced);
   expect(screen.getByLabelText("Access token")).toBeVisible();
-  expect(screen.getByRole("button", { name: "Connect" })).toBeDisabled(); // No server yet.
+  const form = advanced.closest("details");
+  expect(within(form as HTMLElement).getByRole("button", { name: "Connect" })).toBeDisabled(); // No server yet.
+});
+
+it("scans the site's QR code and connects to its server", async () => {
+  const { server } = await setup();
+  server.connectCodes.set(code, "ksp_ada");
+  camera.text = link;
+  await userEvent.setup().click(screen.getByRole("button", { name: "Scan QR code" }));
+
+  expect(await screen.findByText(/Connected to/)).toHaveTextContent(
+    "Connected to https://sync.example.com as ada@example.com.",
+  );
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(server.connected[0]).toMatchObject({ code, platform: "web" });
+});
+
+it("says when the camera may not be used", async () => {
+  await setup();
+  camera.error = new DOMException("Permission denied", "NotAllowedError");
+  await userEvent.setup().click(screen.getByRole("button", { name: "Scan QR code" }));
+  const dialog = screen.getByRole("dialog", { name: "Scan the QR code" });
+  expect(await within(dialog).findByText(/may not use the camera/)).toBeInTheDocument();
+});
+
+it("says when a scanned code is used up, and scans again", async () => {
+  const { server } = await setup();
+  camera.text = link;
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Scan QR code" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "This code is wrong, used or expired. Show a new one on the site.",
+  );
+
+  server.connectCodes.set(code, "ksp_ada");
+  await user.click(screen.getByRole("button", { name: "Scan again" }));
+  expect(await screen.findByText(/Connected to/)).toHaveTextContent(
+    "Connected to https://sync.example.com as ada@example.com.",
+  );
+});
+
+it("connects with a link pasted from the site", async () => {
+  const { server } = await setup();
+  server.connectCodes.set(code, "ksp_ada");
+  const user = userEvent.setup();
+  const summary = screen.getByText("Connect with a link from the site");
+  await user.click(summary);
+  const form = within(summary.closest("details") as HTMLElement);
+
+  await user.type(form.getByLabelText("Connect link"), "https://sync.example.com/activate");
+  await user.click(form.getByRole("button", { name: "Connect with the link" }));
+  expect(form.getByRole("alert")).toHaveTextContent("This is not a connect link.");
+
+  await user.clear(form.getByLabelText("Connect link"));
+  await user.type(form.getByLabelText("Connect link"), link);
+  await user.click(form.getByRole("button", { name: "Connect with the link" }));
+  expect(await screen.findByText(/Connected to/)).toHaveTextContent(
+    "Connected to https://sync.example.com as ada@example.com.",
+  );
 });
 
 it("explains a disconnected device and offers to sign in again or stop", async () => {

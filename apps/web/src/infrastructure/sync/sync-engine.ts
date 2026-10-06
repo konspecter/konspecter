@@ -1,9 +1,11 @@
 import { unlock } from "@konspecter/crypto";
 import { planResolution } from "../../domain/sync/conflicts";
+import type { ConnectLink } from "../../domain/sync/connect-link";
 import type { RemoteNote, SyncEntry } from "../../domain/sync/sync-state";
 import {
   ApiClient,
   ApiError,
+  connectDevice,
   NetworkError,
   RevisionConflictError,
   type Account,
@@ -291,6 +293,15 @@ export class SyncEngine {
     });
     signal?.throwIfAborted();
     return this.connect({ serverUrl: url, token });
+  }
+
+  /**
+   * Connects with a link from the account site (scanned as a QR code, or
+   * pasted): the server trades its one-time code for this device's token.
+   */
+  async connectWithLink(link: ConnectLink, device: DeviceDescription): Promise<Account> {
+    const token = await connectDevice(link.serverUrl, link.code, device, this.#fetch);
+    return this.connect({ serverUrl: link.serverUrl, token });
   }
 
   #sleep(ms: number, signal: AbortSignal | undefined): Promise<void> {

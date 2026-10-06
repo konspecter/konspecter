@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useId,
   useRef,
@@ -8,6 +9,8 @@ import {
   type SubmitEvent,
 } from "react";
 import { WrongSecretError } from "@konspecter/crypto";
+import { parseConnectLink, type ConnectLink } from "../../domain/sync/connect-link";
+import { cameraAvailable } from "../../infrastructure/camera/qr-scanner";
 import { appInfo, isDesktop, openInBrowser } from "../../infrastructure/desktop/desktop";
 import { ApiError, type DeviceAuthorization } from "../../infrastructure/http/api-client";
 import { isNativeMobile } from "../../infrastructure/mobile/mobile";
@@ -23,6 +26,7 @@ import {
 } from "../../infrastructure/sync/sync-engine";
 import { useErrorMessage } from "../hooks/use-error-message";
 import { NoteDate } from "./NoteDate";
+import { QrScanDialog } from "./QrScanDialog";
 import { t, tn } from "../i18n/i18n";
 import { rich } from "../i18n/rich";
 
@@ -103,6 +107,7 @@ function Disconnected({ sync, status }: { sync: SyncEngine; status: SyncStatus }
           : t("sync.disconnectedKept")}
       </p>
       <BrowserSignIn sync={sync} serverUrl={status.serverUrl ?? ""} label={t("sync.signInAgain")}>
+        <ScanQrButton sync={sync} />
         <button type="button" className="button" onClick={() => void sync.disconnect()}>
           {t("sync.forget")}
         </button>
@@ -221,7 +226,13 @@ function ConnectForm({ sync }: { sync: SyncEngine }) {
           setServerUrl(event.target.value);
         }}
       />
-      <BrowserSignIn sync={sync} serverUrl={serverUrl} label={t("sync.signInWithBrowser")} />
+      <BrowserSignIn sync={sync} serverUrl={serverUrl} label={t("sync.signInWithBrowser")}>
+        <ScanQrButton sync={sync} />
+      </BrowserSignIn>
+      <details className="connect-advanced">
+        <summary>{t("sync.linkSummary")}</summary>
+        <LinkForm sync={sync} />
+      </details>
       <details className="connect-advanced">
         <summary>{t("sync.advanced")}</summary>
         <TokenForm sync={sync} serverUrl={serverUrl} />
@@ -337,6 +348,117 @@ function BrowserSignIn({
         {children}
       </div>
     </>
+  );
+}
+
+/**
+ * Connecting with a link from the account site: its QR code scanned, or the
+ * link pasted. On success the sync status moves on and this unmounts.
+ */
+function useLinkSignIn(sync: SyncEngine) {
+  const [connecting, setConnecting] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const generic = useErrorMessage(error);
+  const errorText =
+    error === null
+      ? null
+      : error instanceof ApiError && error.code === "invalid_connect_code"
+        ? t("sync.invalidConnectCode")
+        : error instanceof ApiError && error.code === "not_configured"
+          ? t("sync.browserUnavailable")
+          : t("sync.connectFailed", { error: generic ?? "" });
+
+  async function connectWith(link: ConnectLink) {
+    setConnecting(true);
+    setError(null);
+    try {
+      await sync.connectWithLink(link, await thisDevice());
+    } catch (connectError) {
+      setError(connectError);
+      setConnecting(false);
+    }
+  }
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+  return { connecting, errorText, connectWith, clearError };
+}
+
+/** The camera, for the site's QR code; not in the desktop app, which pastes the link. */
+function ScanQrButton({ sync }: { sync: SyncEngine }) {
+  const [open, setOpen] = useState(false);
+  const { connecting, errorText, connectWith, clearError } = useLinkSignIn(sync);
+  const close = useCallback(() => {
+    setOpen(false);
+  }, []);
+  if (isDesktop() || !cameraAvailable()) return null;
+  return (
+    <>
+      <button
+        type="button"
+        className="button"
+        onClick={() => {
+          clearError();
+          setOpen(true);
+        }}
+      >
+        {t("sync.scanQr")}
+      </button>
+      {open && (
+        <QrScanDialog
+          onLink={(link) => void connectWith(link)}
+          onRetry={clearError}
+          onClose={close}
+          connecting={connecting}
+          error={errorText}
+        />
+      )}
+    </>
+  );
+}
+
+/** The site's connect link, pasted (an app without a camera). */
+function LinkForm({ sync }: { sync: SyncEngine }) {
+  const linkId = useId();
+  const [text, setText] = useState("");
+  const [invalid, setInvalid] = useState(false);
+  const { connecting, errorText, connectWith } = useLinkSignIn(sync);
+
+  function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const link = parseConnectLink(text);
+    setInvalid(link === null);
+    if (link) void connectWith(link);
+  }
+
+  const problem = invalid ? t("sync.linkInvalid") : errorText;
+  return (
+    <form className="connect-form" onSubmit={handleSubmit}>
+      <p className="setting-hint">{t("sync.linkHint")}</p>
+      <label htmlFor={linkId}>{t("sync.link")}</label>
+      <input
+        id={linkId}
+        type="url"
+        required
+        autoComplete="off"
+        spellCheck={false}
+        placeholder="https://notes.example.com/connect#ksc_…"
+        value={text}
+        onChange={(event) => {
+          setText(event.target.value);
+        }}
+      />
+      {problem !== null && (
+        <p role="alert" className="inline-error">
+          {problem}
+        </p>
+      )}
+      <div className="actions">
+        <button type="submit" className="button" disabled={connecting}>
+          {connecting ? t("sync.connecting") : t("sync.linkConnect")}
+        </button>
+      </div>
+    </form>
   );
 }
 

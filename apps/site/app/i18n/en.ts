@@ -7,42 +7,42 @@
 export const en = {
   "site.title": "Konspecter",
   "site.description":
-    "A notebook for all your conspects: plain Markdown files, offline first, on desktop, mobile and the web.",
+    "A notebook for everything worth keeping: write, find in a moment, use it offline on your computer, phone and in the browser.",
   "site.skipToContent": "Skip to content",
   "site.home": "Konspecter home",
-  "site.otherLanguage": "Русский",
-  "site.otherLanguageHint": "Читать по-русски",
+  "site.language": "Language",
+  "site.languageApply": "Change",
   "site.toLight": "Switch to the light theme",
   "site.toDark": "Switch to the dark theme",
-  "site.footer": "Konspecter keeps your conspects in Markdown.",
+  "site.footer": "Konspecter: a notebook for everything worth keeping.",
 
-  "home.title": "All your conspects in plain Markdown",
+  "home.title": "A notebook for everything worth keeping",
   "home.lead":
-    "Konspecter is a notebook for everything worth keeping: lectures and books, work and study, ideas, plans and recipes. Every conspect is a Markdown file, it opens instantly, and it works without a network.",
+    "Lectures and books, recipes and trips, work and ideas: write them down in Konspecter and find them again in a second. It works without the internet, on your computer, your phone and in the browser, and your notes stay yours.",
   "home.specimenLabel": "A conspect as Konspecter stores it",
   "home.download": "Download for {platform}",
   "home.openWeb": "Open in the browser",
-  "home.featuresTitle": "What it does",
-  "home.feature.markdown.title": "The file is the conspect",
-  "home.feature.markdown.text":
-    "Title, dates and tags live in a short header at the top of the Markdown. Nothing is kept anywhere else, so any editor can read your notes.",
-  "home.feature.editors.title": "Text or source, one key apart",
-  "home.feature.editors.text":
-    "Write in a clean text editor, or switch to the Markdown source when you want it. The caret stays where you left it.",
-  "home.feature.tags.title": "Tags that nest",
+  "home.featuresTitle": "Why Konspecter",
+  "home.feature.write.title": "Just start writing",
+  "home.feature.write.text":
+    "A calm page with headings, lists and checklists. Nothing to learn: type, and it looks right.",
+  "home.feature.find.title": "Find anything in a moment",
+  "home.feature.find.text":
+    "Type a word you remember and the conspect appears while you type, among everything you have ever written.",
+  "home.feature.tags.title": "Tags instead of folders",
   "home.feature.tags.text":
-    "Write #databases#postgres in the text and the conspect sits under both in the tag tree. No folders to keep in order.",
-  "home.feature.search.title": "Search that keeps up",
-  "home.feature.search.text":
-    "Full-text search with tag filters answers as you type, over every conspect on the device, online or not.",
-  "home.feature.folders.title": "A folder of .md files",
-  "home.feature.folders.text":
-    "The desktop app can work in any folder of Markdown files, so Git, Obsidian or your editor keep working alongside it.",
-  "home.feature.sync.title": "Sync the server cannot read",
-  "home.feature.sync.text":
-    "Connect your devices to an account and conspects are encrypted on each device before they are sent. The server stores only ciphertext.",
+    "Write #recipes or #work#meetings anywhere in the text and the conspect files itself under that topic. One conspect can sit under several at once.",
+  "home.feature.offline.title": "No internet? No problem",
+  "home.feature.offline.text":
+    "Everything is kept on your device, so Konspecter opens at once and works on a plane or underground. It catches up when you are back online.",
+  "home.feature.devices.title": "On all your devices",
+  "home.feature.devices.text":
+    "Connect your computer, phone and browser to one account, by scanning a QR code, and a conspect written on one shows up on the others.",
+  "home.feature.private.title": "Private and yours",
+  "home.feature.private.text":
+    "Conspects are locked with a passphrase only you know before they leave your device: nobody else can read them, not even the server that keeps them. And each one is an ordinary text file you can open anywhere.",
   "home.downloadsTitle": "Get Konspecter",
-  "home.downloadsLead": "The same app on every platform, with the same files.",
+  "home.downloadsLead": "The same app on your computer, your phone and in the browser.",
   "home.platform.macos": "macOS",
   "home.platform.windows": "Windows",
   "home.platform.linux": "Linux",
@@ -69,11 +69,24 @@ export const en = {
   "settings.name.hint": "Used to greet you on this page. Leave it empty to see your email instead.",
   "settings.name.save": "Save name",
   "settings.name.saved": "Name saved.",
+  "settings.connect.title": "Connect an app",
+  "settings.connect.lead":
+    "Show a QR code and scan it with Konspecter on your phone (Settings → Sync → Scan QR code). It connects the app to this account; no code to type.",
+  "settings.connect.show": "Show QR code",
+  "settings.connect.again": "Show a new code",
+  "settings.connect.done": "Done",
+  "settings.connect.qrLabel": "QR code that connects an app to this account",
+  "settings.connect.scan":
+    "Scan it only with your own devices: whoever scans it connects an app to your account. The app still needs your passphrase to open your conspects.",
+  "settings.connect.expires": "The code works once, for {minutes} min.",
+  "settings.connect.link": "No camera? Paste this link into the app instead",
+  "settings.connect.connected": "{name} is connected. Unlock sync in the app with your passphrase.",
+  "settings.connect.expired": "The code has expired. Show a new one to connect an app.",
   "settings.devices.title": "Connected devices",
   "settings.devices.lead":
     "Apps that sync with this account. A disconnected device stops syncing and keeps its conspects.",
   "settings.devices.empty":
-    "No devices yet. In the app, open Settings, then Sync, and choose Sign in with browser.",
+    "No devices yet. Connect one with a QR code above, or in the app open Settings, then Sync, and choose Sign in with browser.",
   "settings.devices.failed": "The devices could not be loaded. Reload the page to try again.",
   "settings.devices.platformVersion": "{platform}, version {version}",
   "settings.devices.lastSynced": "Last synced {when}",
@@ -167,6 +180,12 @@ export const en = {
   "activate.denied":
     "Nothing was connected. If you did not start this, you can ignore it: the code expires soon.",
 
+  "connect.title": "Open this in the app",
+  "connect.lead":
+    "This QR code connects the Konspecter app to an account. Open Konspecter on this device, go to Settings → Sync and choose Scan QR code, then scan the code again.",
+  "connect.noApp": "No Konspecter on this device yet?",
+  "connect.get": "Get the app",
+
   "auth.email": "Email",
   "auth.password": "Password",
   "auth.newPassword": "New password",
@@ -175,6 +194,7 @@ export const en = {
 
   "providers.label": "Sign in with another service",
   "providers.or": "or with your email",
+  "providers.orShort": "or",
   "provider.google": "Continue with Google",
   "provider.linkedin": "Continue with LinkedIn",
   "provider.x": "Continue with X",
@@ -188,9 +208,11 @@ export const en = {
 
   "login.title": "Sign in",
   "login.lead":
-    "Use your password, or get a one-time code by email. A code also creates your account if you have none yet.",
+    "We will email you a one-time code to sign in. It also creates your account if you have none yet.",
   "login.submit": "Sign in",
   "login.sendCode": "Email me a code",
+  "login.usePassword": "Use password",
+  "login.withoutPassword": "Without password",
   "login.forgot": "Forgot your password?",
   "login.noAccount": "No account yet?",
   "login.register": "Create one",

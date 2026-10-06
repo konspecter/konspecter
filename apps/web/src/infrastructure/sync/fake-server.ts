@@ -99,6 +99,7 @@ export class FakeServer {
     if (method === "POST" && url.pathname === "/api/devices/authorize")
       return this.#authorize(body);
     if (method === "POST" && url.pathname === "/api/devices/token") return this.#deviceToken(body);
+    if (method === "POST" && url.pathname === "/api/devices/connect") return this.#connect(body);
 
     const token = (new Headers(init?.headers).get("Authorization") ?? "").replace(/^Bearer /, "");
     if (this.revoked.has(token)) {
@@ -155,6 +156,21 @@ export class FakeServer {
       }
     }
   }
+
+  /** Connect codes the site handed out, and the token each one gives. */
+  readonly connectCodes = new Map<string, string>();
+
+  #connect(body: Json): Response {
+    const code = String(body.code);
+    const token = this.connectCodes.get(code);
+    this.connectCodes.delete(code);
+    if (!token) return json(400, error("invalid_connect_code", "wrong, used or expired"));
+    this.connected.push(body);
+    return json(200, { token, device: { id: "d1" }, user: {} });
+  }
+
+  /** What each app that connected by code said about itself. */
+  readonly connected: Json[] = [];
 
   #authorize(body: Json): Response {
     this.#codes += 1;

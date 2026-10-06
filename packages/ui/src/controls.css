@@ -86,6 +86,41 @@
   opacity: 0.6;
 }
 
+/* A native dropdown in the buttons' look: <span class="select"><select/><ChevronIcon/></span>.
+   The chevron (icons.tsx) is drawn over the select, turned to point down. */
+.select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.select select {
+  appearance: none;
+  padding: 0.4rem 2rem 0.4rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.select select:hover {
+  background: var(--color-hover);
+}
+
+.select .icon-chevron {
+  position: absolute;
+  right: 0.55rem;
+  width: 16px;
+  height: 16px;
+  color: var(--color-muted);
+  transform: rotate(90deg);
+  pointer-events: none;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
@@ -115,9 +150,14 @@
   border: 0;
 }
 
-.setting legend {
+.setting legend,
+.setting-label {
   margin-bottom: 0.4rem;
   font-weight: 600;
+}
+
+.setting-label {
+  display: block;
 }
 
 .setting-hint {

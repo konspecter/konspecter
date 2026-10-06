@@ -281,3 +281,68 @@ func openStreamWithHeartbeat(t *testing.T, s accountSetup, token string) *eventS
 	stream.next(t)
 	return stream
 }
+
+func TestConnectingAnAppByQRCode(t *testing.T) {
+	s := newAccountServer(t, nil)
+	session := signedIn(t, s, "ann@example.com")
+
+	res := siteCall(t, s.server.URL, http.MethodPost, "/api/devices/connect-codes", session, nil)
+	code, _ := res.body["code"].(string)
+	if res.status != http.StatusOK || !strings.HasPrefix(code, "ksc_") || res.body["url"] != site+"/connect#"+code || res.body["expires_in"] != float64(300) {
+		t.Fatalf("connect code = %d %v", res.status, res.body)
+	}
+
+	res = appCall(t, s.server.URL, http.MethodPost, "/api/devices/connect", "", map[string]any{
+		"code": code, "name": "Konspecter for Android", "platform": "android", "client_version": "0.3.0",
+	})
+	token, _ := res.body["token"].(string)
+	user, _ := res.body["user"].(map[string]any)
+	device, _ := res.body["device"].(map[string]any)
+	if res.status != http.StatusOK || !strings.HasPrefix(token, "ksp_") || user["email"] != "ann@example.com" || device["platform"] != "android" {
+		t.Fatalf("connect = %d %v", res.status, res.body)
+	}
+	if res.header.Get("Access-Control-Allow-Origin") != "https://app.example.com" {
+		t.Errorf("CORS = %q", res.header.Get("Access-Control-Allow-Origin"))
+	}
+	s.devices.connectToken(token)
+	if res := call(t, s.server, http.MethodGet, "/api/me", token, ""); res.status != http.StatusOK || res.body["email"] != "ann@example.com" {
+		t.Errorf("me with the new token = %d %v", res.status, res.body)
+	}
+
+	// A code works once.
+	res = appCall(t, s.server.URL, http.MethodPost, "/api/devices/connect", "", map[string]any{"code": code})
+	if res.status != http.StatusBadRequest || errorCode(res) != "invalid_connect_code" {
+		t.Errorf("the code again = %d %v", res.status, res.body)
+	}
+}
+
+func TestANewConnectCodeReplacesTheOldAndCodesExpire(t *testing.T) {
+	s := newAccountServer(t, nil)
+	session := signedIn(t, s, "ann@example.com")
+	first, _ := siteCall(t, s.server.URL, http.MethodPost, "/api/devices/connect-codes", session, nil).body["code"].(string)
+	second, _ := siteCall(t, s.server.URL, http.MethodPost, "/api/devices/connect-codes", session, nil).body["code"].(string)
+	if res := appCall(t, s.server.URL, http.MethodPost, "/api/devices/connect", "", map[string]any{"code": first}); errorCode(res) != "invalid_connect_code" {
+		t.Errorf("the replaced code = %v", res.body)
+	}
+	s.devices.expireConnectCodes()
+	if res := appCall(t, s.server.URL, http.MethodPost, "/api/devices/connect", "", map[string]any{"code": second}); errorCode(res) != "invalid_connect_code" {
+		t.Errorf("an expired code = %v", res.body)
+	}
+}
+
+func TestConnectCodesNeedASessionAndGuessesAreLimited(t *testing.T) {
+	s := newAccountServer(t, func(a *Accounts) { a.Rates.DeviceRequestsPerIP = 2 })
+	if res := siteCall(t, s.server.URL, http.MethodPost, "/api/devices/connect-codes", nil, nil); res.status != http.StatusUnauthorized {
+		t.Errorf("without a session = %d", res.status)
+	}
+	for _, code := range []string{"ksc_" + strings.Repeat("a", 32), "not a code"} {
+		if res := appCall(t, s.server.URL, http.MethodPost, "/api/devices/connect", "", map[string]any{"code": code}); errorCode(res) != "invalid_connect_code" {
+			t.Fatalf("guess %q = %v", code, res.body)
+		}
+	}
+	session := signedIn(t, s, "ann@example.com")
+	code, _ := siteCall(t, s.server.URL, http.MethodPost, "/api/devices/connect-codes", session, nil).body["code"].(string)
+	if res := appCall(t, s.server.URL, http.MethodPost, "/api/devices/connect", "", map[string]any{"code": code}); res.status != http.StatusTooManyRequests {
+		t.Errorf("after two wrong codes = %d %v", res.status, res.body)
+	}
+}

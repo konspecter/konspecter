@@ -3,9 +3,10 @@ import { useNavigation } from "react-router";
 import { useT, type SiteTranslator } from "./i18n/i18n";
 
 /**
- * Pieces of the sign-in pages: a narrow page, labelled fields and a submit
- * button that shows it is working. Forms are plain posts to the route's
- * action, so they work before JavaScript loads.
+ * Pieces of the sign-in pages: a card on the page, the email form beside
+ * the other services, labelled fields and a submit button that shows it is
+ * working. Forms are plain posts to the route's action, so they work before
+ * JavaScript loads.
  */
 
 /** A text field of a posted form; "" when it is missing (or, oddly, a file). */
@@ -54,22 +55,50 @@ export function formError(code: string, retryAfter: number | null = null): FormE
   return retryAfter === null ? { code } : { code, minutes: Math.ceil(retryAfter / 60) };
 }
 
+/** A sign-in page: its title, lead and form on a card. `wide` makes room for two columns. */
 export function AuthPage({
   title,
   lead,
+  wide = false,
   children,
 }: {
   title: string;
   lead?: ReactNode;
+  wide?: boolean;
   children: ReactNode;
 }) {
   return (
-    <section className="auth site-frame" aria-labelledby="auth-title">
+    <section
+      className={wide ? "auth auth-wide site-frame" : "auth site-frame"}
+      aria-labelledby="auth-title"
+    >
       <title>{`${title} · Konspecter`}</title>
-      <h1 id="auth-title">{title}</h1>
-      {lead && <p className="auth-lead">{lead}</p>}
-      {children}
+      <div className="auth-card">
+        <h1 id="auth-title">{title}</h1>
+        {lead && <p className="auth-lead">{lead}</p>}
+        {children}
+      </div>
     </section>
+  );
+}
+
+/**
+ * The two ways in: the email form (children) and, when the server offers
+ * any, the other services. Side by side on wide screens, the services on
+ * the right; on narrow ones the services come first, as in the markup.
+ */
+export function AuthWays({ others, children }: { others: ReactNode; children: ReactNode }) {
+  const { t } = useT();
+  if (!others) return children;
+  return (
+    <div className="auth-ways">
+      <div className="auth-others">{others}</div>
+      <p className="auth-or">
+        <span className="auth-or-long">{t("providers.or")}</span>
+        <span className="auth-or-short">{t("providers.orShort")}</span>
+      </p>
+      <div className="auth-email-way">{children}</div>
+    </div>
   );
 }
 

@@ -85,6 +85,7 @@ main {
 
 .site-sign-in {
   padding: 0.3rem 0.85rem;
+  white-space: nowrap;
 }
 
 .site-account {
@@ -121,20 +122,38 @@ main {
   margin: 0;
 }
 
-.language-switch {
-  padding: 0.3rem 0.6rem;
-  border: 0;
-  border-radius: 8px;
-  background: none;
+/* The language dropdown: as quiet as the theme button, a globe before the name. */
+.language-select .icon:not(.icon-chevron) {
+  position: absolute;
+  left: 0.45rem;
+  width: 16px;
+  height: 16px;
   color: var(--color-muted);
-  font: inherit;
-  font-size: 14px;
-  cursor: pointer;
+  pointer-events: none;
 }
 
-.language-switch:hover {
+.language-select select {
+  padding: 0.3rem 1.75rem 0.3rem 1.85rem;
+  border-color: transparent;
+  background: none;
+  color: var(--color-muted);
+}
+
+.language-select select:hover,
+.language-select select:focus-visible {
   background: var(--color-hover);
   color: var(--color-fg);
+}
+
+.language-select .icon-chevron {
+  right: 0.4rem;
+  width: 14px;
+  height: 14px;
+}
+
+.language-form .link-button {
+  margin-left: 0.35rem;
+  font-size: 14px;
 }
 
 /* Light shows the way to dark, dark the way to light; "system" follows the scheme. */
@@ -191,21 +210,22 @@ main {
   text-wrap: balance;
 }
 
+/* The hero's text reads larger than the page's; the heading keeps its size. */
 .hero-lead {
-  max-width: 34rem;
-  margin: 1.4rem 0 0;
+  max-width: 36rem;
+  margin: 1.5rem 0 0;
   color: var(--color-muted);
-  font-size: 1.12rem;
-  line-height: 1.6;
+  font-size: clamp(1.15rem, 1rem + 0.55vw, 1.4rem);
+  line-height: 1.55;
 }
 
 .hero-actions {
-  margin-top: 2rem;
+  margin-top: 2.25rem;
 }
 
 .hero-actions .button {
-  padding: 0.6rem 1.1rem;
-  font-size: 15px;
+  padding: 0.7rem 1.3rem;
+  font-size: 17px;
 }
 
 /* The conspect, as its Markdown source in the editor's monospace. */
@@ -361,9 +381,30 @@ main {
 
 /* --- Sign-in pages ------------------------------------------------------- */
 
+/* A sign-in page is a card raised off the page, with the hero specimen's
+   corners and shadow. Two columns (the email form, the other services)
+   when the server offers other services and the screen is wide. */
 .auth {
-  max-width: calc(27rem + 2 * var(--site-gutter));
-  padding-block: clamp(2.5rem, 7vw, 5rem) 1rem;
+  max-width: calc(31rem + 2 * var(--site-gutter));
+  padding-block: clamp(2rem, 6vw, 4.5rem) 1rem;
+}
+
+.auth-wide {
+  max-width: calc(54rem + 2 * var(--site-gutter));
+}
+
+.auth-card {
+  /* On the card, buttons and fields take the card's surface. */
+  --color-bg: var(--color-raised);
+  --color-hover: var(--color-raised-field);
+  --color-field: var(--color-raised-field);
+  --color-field-focus: var(--color-raised-field-focus);
+
+  padding: clamp(1.5rem, 5vw, 2.5rem);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-raised);
+  box-shadow: 0 18px 50px -24px var(--color-shadow);
 }
 
 .auth h1 {
@@ -540,7 +581,9 @@ main {
   height: 100%;
 }
 
-.providers-or {
+/* "or" between the two ways in: a rule across on narrow screens, down the
+   middle on wide ones. */
+.auth-or {
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -549,15 +592,83 @@ main {
   font-size: 14px;
 }
 
-.providers-or::before,
-.providers-or::after {
+.auth-or::before,
+.auth-or::after {
   flex: 1;
   border-top: 1px solid var(--color-border);
   content: "";
 }
 
-.providers-or + .form {
+.auth-or-short {
+  display: none;
+}
+
+.auth-email-way > .form {
   margin-top: 1.25rem;
+}
+
+/* One column: the actions and links under the form are centred. */
+.auth-card .actions {
+  justify-content: center;
+}
+
+.auth-card .auth-links {
+  text-align: center;
+}
+
+@media (min-width: 720px) {
+  .auth-ways {
+    display: grid;
+    grid-template-areas: "email or others";
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 0 2.25rem;
+    margin-top: 1.75rem;
+  }
+
+  .auth-email-way {
+    grid-area: email;
+  }
+
+  .auth-email-way > .form {
+    margin-top: 0;
+  }
+
+  .auth-others {
+    grid-area: others;
+  }
+
+  .auth-others .providers {
+    margin-top: 0;
+  }
+
+  .auth-or {
+    grid-area: or;
+    flex-direction: column;
+    margin: 0;
+  }
+
+  .auth-or::before,
+  .auth-or::after {
+    border-top: 0;
+    border-left: 1px solid var(--color-border);
+  }
+
+  .auth-or-long {
+    display: none;
+  }
+
+  .auth-or-short {
+    display: inline;
+  }
+
+  /* Two columns: the actions and links align right. */
+  .auth-ways .actions {
+    justify-content: flex-end;
+  }
+
+  .auth-ways .auth-links {
+    text-align: right;
+  }
 }
 
 /* An error a provider sign-in came back with, above the choices. */
@@ -569,7 +680,7 @@ main {
   margin: 0;
 }
 
-.auth-returned + .providers {
+.auth-returned + .auth-ways {
   margin-top: 1rem;
 }
 
@@ -798,6 +909,13 @@ main {
   }
 }
 
+/* A phone: the logo alone leads home, so the language, theme and account fit. */
+@media (max-width: 440px) {
+  .site-brand span {
+    display: none;
+  }
+}
+
 @media (max-width: 640px) {
   .device {
     align-items: flex-start;
@@ -833,4 +951,51 @@ main {
   .specimen-source {
     font-size: 12.5px;
   }
+}
+
+/* --- Connecting an app by QR code ---------------------------------------- */
+
+.connect-code {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1rem 1.5rem;
+  margin-top: 1.1rem;
+}
+
+/* Light whatever the theme (scanners expect dark on light), framed like a card. */
+.qr-code {
+  flex: none;
+  width: 13.5rem;
+  height: 13.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: 0 18px 50px -24px var(--color-shadow);
+}
+
+.connect-code-about {
+  display: grid;
+  flex: 1 1 16rem;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.connect-code-about .settings-text {
+  margin: 0;
+}
+
+.connect-link-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.connect-link-row input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.connect-link-row .button {
+  flex: none;
 }
