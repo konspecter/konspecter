@@ -220,6 +220,10 @@ Every new dependency needs a license check covering its transitive tree. See
 BSD-3-Clause, Apache-2.0 and ISC. Anything else needs an explicit, recorded decision in
 `license-policy.json`. `pnpm licenses:check` enforces this in CI.
 
+Konspecter's own code: the apps and `packages/` are MIT, the server is AGPL-3.0-only. Each
+carries a `LICENSE` file and the SPDX id in its manifest (`package.json`, `Cargo.toml`); a new
+app or package does the same.
+
 ## Billing
 
 Sync can be paid for through a private service, `konspecter-billing`, next to this one.

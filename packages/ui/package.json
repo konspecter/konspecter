@@ -2,6 +2,7 @@
   "name": "@konspecter/ui",
   "private": true,
   "version": "0.1.0",
+  "license": "MIT",
   "type": "module",
   "description": "The shared look of the app and the account site: palette, fonts, base rules, controls and icons.",
   "exports": {

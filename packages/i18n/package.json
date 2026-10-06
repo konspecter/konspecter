@@ -2,6 +2,7 @@
   "name": "@konspecter/i18n",
   "private": true,
   "version": "0.1.0",
+  "license": "MIT",
   "type": "module",
   "description": "Message lookup, plurals and locale detection shared by the app and the site.",
   "exports": {

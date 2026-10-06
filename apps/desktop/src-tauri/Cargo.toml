@@ -3,7 +3,7 @@ name = "konspecter-desktop"
 version = "0.1.0"
 description = "Konspecter desktop app"
 edition = "2024"
-license = "UNLICENSED"
+license = "MIT"
 publish = false
 
 [lib]

@@ -14,6 +14,7 @@ RUN pnpm --filter @konspecter/site build \
   && cp -r apps/site/build /out/build
 
 FROM node:22-slim
+LABEL org.opencontainers.image.licenses="MIT"
 WORKDIR /app
 COPY --from=build /out/ ./
 ENV NODE_ENV=production PORT=3000

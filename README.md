@@ -90,3 +90,11 @@ adb shell am start -n app.konspecter.mobile/.MainActivity
 - [Testing](docs/testing.md) · [Performance](docs/performance.md) · [Security](docs/security.md)
 - [Releasing](docs/release.md) · [License policy](docs/license-policy.md) · [Changelog](CHANGELOG.md)
 - [Agent instructions](AGENTS.md) and the [implementation plan](.claude/plans/konspecter-implementation-plan.md)
+
+## License
+
+Each part carries its own license, in a `LICENSE` file next to it:
+
+- The apps — web (`apps/web`), account site (`apps/site`), desktop (`apps/desktop`), mobile
+  (`apps/mobile`) — and the shared packages (`packages/`): [MIT](apps/web/LICENSE).
+- The server (`apps/server`): [GNU AGPL v3](apps/server/LICENSE) (`AGPL-3.0-only`).

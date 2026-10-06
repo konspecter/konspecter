@@ -17,6 +17,7 @@ ENV VITE_KONSPECTER_SERVER_URL=${VITE_KONSPECTER_SERVER_URL}
 RUN pnpm --filter @konspecter/web build
 
 FROM caddy:2
+LABEL org.opencontainers.image.licenses="MIT"
 COPY apps/web/Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /src/apps/web/dist /srv
 EXPOSE 8080
