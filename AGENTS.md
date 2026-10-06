@@ -141,6 +141,7 @@ docs/testing.md           test strategy and map
 docs/performance.md       measurements and optimizations
 docs/security.md          threat model and measures
 tests/e2e/                Playwright end-to-end tests
+.claude/skills/           commit, konspecter-go (shared with konspecter-billing)
 logo/                     master logo artwork (SVG: black, white, colour, app tile)
 docs/license-policy.md    dependency license policy
 license-policy.json       machine-readable license policy used by CI
@@ -200,6 +201,8 @@ KONSPECTER_DATABASE_URL=postgres://… go run ./cmd/server   # migrate + serve o
 
 ## Go
 
+The `konspecter-go` skill holds the full style. In short:
+
 - Idiomatic Go with domain-oriented packages (`notes`, `tags`, `search`, `sync`,
   `reading`). No `utils`, `common`, `helpers`, `types`, `interfaces` packages.
 - Interfaces are defined by the consumer, only at meaningful boundaries.
@@ -215,6 +218,34 @@ Every new dependency needs a license check covering its transitive tree. See
 [`docs/license-policy.md`](docs/license-policy.md). Preferred licenses are MIT, BSD-2-Clause,
 BSD-3-Clause, Apache-2.0 and ISC. Anything else needs an explicit, recorded decision in
 `license-policy.json`. `pnpm licenses:check` enforces this in CI.
+
+## Billing
+
+Sync can be paid for through a private service, `konspecter-billing`, next to this one.
+**Its documentation lives only there**: the contract, the ADRs, the plans and the
+`billing-contract` skill. Do not add billing docs, plans, ADRs or skills here, and keep
+what this repository says to `KONSPECTER_BILLING_URL`, the `402 subscription_required` pause
+and `sync` in `/api/me`. Changes to the paid sync code (`internal/entitlements`,
+`internal/httpapi/billing.go`, `internal/mail/subscription.go`, the site's subscription
+section) are made from that repository. Without the service, sync is free, and nothing here
+may come to depend on it.
+
+## Commit messages
+
+Use the `commit` skill: Conventional Commits, a subject of at most 72 characters, and a
+Markdown body when it helps. **No `Co-Authored-By:` trailer, ever.** The skill's
+`PreToolUse` hook, registered in `.claude/settings.json`, blocks such commits.
+
+## Skills
+
+| Skill           | Use it for                                                                   |
+| --------------- | ---------------------------------------------------------------------------- |
+| `commit`        | every commit                                                                 |
+| `konspecter-go` | writing or reviewing Go: the style this server and the billing service share |
+
+These two are **the same in `konspecter-billing`**. Change them in both repositories
+together. From there, `diff -r -x billing-contract .claude/skills ../konspecter/.claude/skills`
+must print nothing.
 
 ## Definition of done
 
