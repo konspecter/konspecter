@@ -8,7 +8,7 @@ import { parseDevices, timeAgo, type Device } from "../devices";
 import { Encryption } from "../encryption";
 import { useLocale, useT } from "../i18n/i18n";
 import { readPreferences } from "../preferences.server";
-import { parseBilling, parsePlans } from "../subscription";
+import { parseBilling, parsePlans, type Billing } from "../subscription";
 import { SubscriptionSection } from "../subscription-section";
 import type { Route } from "./+types/settings";
 
@@ -171,123 +171,200 @@ export default function Settings() {
   return (
     <section className="settings-page site-frame" aria-labelledby="settings-title">
       <title>{`${t("settings.title")} · Konspecter`}</title>
-      <h1 id="settings-title">{t("settings.title")}</h1>
-      <p className="settings-lead">
-        {richText(t(account.name ? "settings.leadNamed" : "settings.lead"), {
-          name: account.name,
-          email: <strong className="auth-email">{account.email}</strong>,
-        })}
-      </p>
-
-      <section className="settings-section" aria-labelledby="name-heading">
-        <h2 id="name-heading">{t("settings.name.title")}</h2>
-        <Form method="post" className="settings-form">
-          <Field
-            label={t("settings.name.label")}
-            hint={t("settings.name.hint")}
-            name="name"
-            autoComplete="name"
-            maxLength={100}
-            defaultValue={account.name}
+      <header className="settings-head">
+        <h1 id="settings-title">{t("settings.title")}</h1>
+        <p className="settings-lead">
+          {richText(t(account.name ? "settings.leadNamed" : "settings.lead"), {
+            name: account.name,
+            email: <strong className="auth-email">{account.email}</strong>,
+          })}
+        </p>
+      </header>
+      <SectionNav billing={billing} devices={devicesFailed ? null : devices.length} />
+      <div className="settings-body">
+        {billing && (
+          <SubscriptionSection
+            billing={billing}
+            gateways={gateways}
+            error={billingIntent ? result.error : null}
+            notice={
+              result?.error
+                ? null
+                : result?.intent === "cancel"
+                  ? t("subscription.done.cancel")
+                  : result?.intent === "resume"
+                    ? t("subscription.done.resume")
+                    : null
+            }
+            redirectUrl={result?.redirectUrl ?? null}
           />
-          <FormMessage
-            error={errorOf("rename")}
-            notice={result?.intent === "rename" && !result.error ? t("settings.name.saved") : null}
-          />
-          <div className="actions">
-            <Submit intent="rename" primary={false}>
-              {t("settings.name.save")}
-            </Submit>
-          </div>
-        </Form>
-      </section>
-
-      {billing && (
-        <SubscriptionSection
-          billing={billing}
-          gateways={gateways}
-          error={billingIntent ? result.error : null}
-          notice={
-            result?.error
-              ? null
-              : result?.intent === "cancel"
-                ? t("subscription.done.cancel")
-                : result?.intent === "resume"
-                  ? t("subscription.done.resume")
-                  : null
-          }
-          redirectUrl={result?.redirectUrl ?? null}
-        />
-      )}
-
-      <section className="settings-section" id="connect" aria-labelledby="connect-heading">
-        <h2 id="connect-heading">{t("settings.connect.title")}</h2>
-        <p className="settings-text">{t("settings.connect.lead")}</p>
-        <ConnectApp code={result?.connect ?? null} error={errorOf("connect")} devices={devices} />
-      </section>
-
-      <section className="settings-section" aria-labelledby="devices-heading">
-        <h2 id="devices-heading">{t("settings.devices.title")}</h2>
-        <p className="settings-text">{t("settings.devices.lead")}</p>
-        <FormMessage
-          error={errorOf("disconnect")}
-          notice={
-            result?.disconnected !== undefined
-              ? t("settings.devices.disconnected", { name: result.disconnected })
-              : null
-          }
-        />
-        {devicesFailed ? (
-          <p className="inline-error">{t("settings.devices.failed")}</p>
-        ) : devices.length === 0 ? (
-          <p className="settings-empty">{t("settings.devices.empty")}</p>
-        ) : (
-          <ul className="device-list" aria-labelledby="devices-heading">
-            {devices.map((device) => (
-              <DeviceRow key={device.id} device={device} now={now} />
-            ))}
-          </ul>
         )}
-      </section>
 
-      <section className="settings-section" id="encryption" aria-labelledby="encryption-heading">
-        <h2 id="encryption-heading">{t("encryption.title")}</h2>
-        <p className="settings-text">{t("encryption.lead")}</p>
-        <Encryption />
-      </section>
+        <section className="settings-section" id="encryption" aria-labelledby="encryption-heading">
+          <h2 id="encryption-heading">{t("encryption.title")}</h2>
+          <p className="settings-text">{t("encryption.lead")}</p>
+          <Encryption />
+        </section>
 
-      <section className="settings-section" id="delete" aria-labelledby="delete-heading">
-        <h2 id="delete-heading">{t("settings.delete.title")}</h2>
-        <p className="settings-text">{t("settings.delete.lead")}</p>
-        {account.recentSignIn ? (
+        <section className="settings-section" id="connect" aria-labelledby="connect-heading">
+          <h2 id="connect-heading">{t("settings.connect.title")}</h2>
+          <p className="settings-text">{t("settings.connect.lead")}</p>
+          <ConnectApp code={result?.connect ?? null} error={errorOf("connect")} devices={devices} />
+        </section>
+
+        <section className="settings-section" id="devices" aria-labelledby="devices-heading">
+          <h2 id="devices-heading">{t("settings.devices.title")}</h2>
+          <p className="settings-text">{t("settings.devices.lead")}</p>
+          <FormMessage
+            error={errorOf("disconnect")}
+            notice={
+              result?.disconnected !== undefined
+                ? t("settings.devices.disconnected", { name: result.disconnected })
+                : null
+            }
+          />
+          {devicesFailed ? (
+            <p className="inline-error">{t("settings.devices.failed")}</p>
+          ) : devices.length === 0 ? (
+            <p className="settings-empty">{t("settings.devices.empty")}</p>
+          ) : (
+            <ul className="device-list" aria-labelledby="devices-heading">
+              {devices.map((device) => (
+                <DeviceRow key={device.id} device={device} now={now} />
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="settings-section" id="name" aria-labelledby="name-heading">
+          <h2 id="name-heading">{t("settings.name.title")}</h2>
           <Form method="post" className="settings-form">
             <Field
-              label={t("settings.delete.label", { email: account.email })}
-              name="email"
-              type="email"
-              autoComplete="off"
-              required
+              label={t("settings.name.label")}
+              hint={t("settings.name.hint")}
+              name="name"
+              autoComplete="name"
+              maxLength={100}
+              defaultValue={account.name}
             />
-            <FormMessage error={errorOf("delete")} />
+            <FormMessage
+              error={errorOf("rename")}
+              notice={
+                result?.intent === "rename" && !result.error ? t("settings.name.saved") : null
+              }
+            />
             <div className="actions">
-              <DangerSubmit>{t("settings.delete.submit")}</DangerSubmit>
+              <Submit intent="rename" primary={false}>
+                {t("settings.name.save")}
+              </Submit>
             </div>
           </Form>
-        ) : (
-          // Signing in again starts a fresh session, which may delete the account.
-          <form method="post" action="/logout" className="settings-form">
-            <input type="hidden" name="next" value="/login?next=%2Fsettings%23delete" />
-            <p className="settings-text">{t("settings.delete.signInAgain")}</p>
-            <div className="actions">
-              <button type="submit" className="button">
-                {t("settings.delete.signInAgainButton")}
-              </button>
-            </div>
-          </form>
-        )}
-      </section>
+        </section>
+
+        <section
+          className="settings-section settings-danger"
+          id="delete"
+          aria-labelledby="delete-heading"
+        >
+          <h2 id="delete-heading">{t("settings.delete.title")}</h2>
+          <p className="settings-text">{t("settings.delete.lead")}</p>
+          {account.recentSignIn ? (
+            <Form method="post" className="settings-form">
+              <Field
+                label={t("settings.delete.label", { email: account.email })}
+                name="email"
+                type="email"
+                autoComplete="off"
+                required
+              />
+              <FormMessage error={errorOf("delete")} />
+              <div className="actions">
+                <DangerSubmit>{t("settings.delete.submit")}</DangerSubmit>
+              </div>
+            </Form>
+          ) : (
+            // Signing in again starts a fresh session, which may delete the account.
+            <form method="post" action="/logout" className="settings-form">
+              <input type="hidden" name="next" value="/login?next=%2Fsettings%23delete" />
+              <p className="settings-text">{t("settings.delete.signInAgain")}</p>
+              <div className="actions">
+                <button type="submit" className="button">
+                  {t("settings.delete.signInAgainButton")}
+                </button>
+              </div>
+            </form>
+          )}
+        </section>
+      </div>
     </section>
   );
+}
+
+/**
+ * The sections, to jump to, beside them on a wide screen: each with how it
+ * stands where that says something (the sync's state, how many devices).
+ */
+function SectionNav({ billing, devices }: { billing: Billing | null; devices: number | null }) {
+  const { t } = useT();
+  const locale = useLocale();
+  const access = billing?.access;
+  const until = access?.until ? shortDay(access.until, locale) : "";
+  const subscription =
+    access && access.state !== "free"
+      ? access.state === "trialing" || access.state === "canceled"
+        ? t(`settings.status.${access.state}`, { date: until })
+        : t(`settings.status.${access.state}`)
+      : null;
+  const items: { id: string; label: string; status?: string | null; tone?: string }[] = [
+    ...(billing
+      ? [
+          {
+            id: "subscription",
+            label: t("subscription.title"),
+            status: subscription,
+            tone: access?.state === "past_due" || access?.state === "expired" ? "warn" : "ok",
+          },
+        ]
+      : []),
+    { id: "encryption", label: t("encryption.title") },
+    { id: "connect", label: t("settings.connect.title") },
+    {
+      id: "devices",
+      label: t("settings.devices.title"),
+      status: devices === null ? null : String(devices),
+    },
+    { id: "name", label: t("settings.name.title") },
+    { id: "delete", label: t("settings.delete.title"), tone: "danger" },
+  ];
+  return (
+    <nav className="settings-nav" aria-label={t("settings.sections")}>
+      <ul>
+        {items.map((item) => (
+          <li key={item.id}>
+            <a href={`#${item.id}`} className={item.tone === "danger" ? "is-danger" : undefined}>
+              <span>{item.label}</span>
+              {item.status && (
+                <span className={`settings-nav-status is-${item.tone ?? "plain"}`}>
+                  {item.status}
+                </span>
+              )}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
+/** A date as "Oct 15", in UTC as the server renders it. */
+function shortDay(value: string, locale: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(locale, {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(date);
 }
 
 function DeviceRow({ device, now }: { device: Device; now: number }) {

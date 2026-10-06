@@ -77,6 +77,15 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               )}
             </div>
           )}
+          <p className="hero-note">
+            {t("home.free")}
+            {downloads.length > 1 && (
+              <>
+                {" "}
+                <a href="#download">{t("home.allPlatforms")}</a>
+              </>
+            )}
+          </p>
         </div>
         <SpecimenSlider specimens={SPECIMENS[locale]} />
       </section>
@@ -91,17 +100,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             </div>
           ))}
         </dl>
-        {pricing && (
-          <p className="section-lead pricing-note">
-            {t("home.pricing", {
-              price: money(pricing.amount, pricing.currency, locale),
-              period: periodText(translate, pricing.period),
-            })}
-            {pricing.trial &&
-              ` ${t("home.pricingTrial", { trial: durationText(translate, pricing.trial) })}`}{" "}
-            <Link to="/terms">{t("home.pricingTerms")}</Link>
-          </p>
-        )}
       </section>
 
       <section className="markdown site-frame" aria-labelledby="markdown-title">
@@ -109,7 +107,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           <h2 id="markdown-title">{t("home.markdown.title")}</h2>
           <p className="section-lead">{t("home.markdown.text")}</p>
           <div className="actions">
-            <Link className="button button-primary" to="/markdown">
+            <Link className="button" to="/markdown">
               {t("home.markdown.cheatsheet")}
             </Link>
             <a className="button" href={MARKDOWN_GUIDE[locale]}>
@@ -125,6 +123,41 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           ))}
         </ul>
       </section>
+
+      {pricing && (
+        <section className="pricing site-frame" aria-labelledby="pricing-title">
+          <h2 id="pricing-title">{t("home.price.title")}</h2>
+          <div className="price-table">
+            <div className="price-plan">
+              <h3>{t("home.price.appsTitle")}</h3>
+              <p className="price-amount">{t("home.price.free")}</p>
+              <p className="price-text">{t("home.price.appsText")}</p>
+            </div>
+            <div className="price-plan">
+              <h3>{t("home.price.syncTitle")}</h3>
+              <p className="price-amount">
+                {money(pricing.amount, pricing.currency, locale)}{" "}
+                <span className="price-period">
+                  {t("home.price.every", { period: periodText(translate, pricing.period) })}
+                </span>
+              </p>
+              <p className="price-text">
+                {t("home.price.syncText")}
+                {pricing.trial &&
+                  ` ${t("home.pricingTrial", { trial: durationText(translate, pricing.trial) })}`}
+              </p>
+              <div className="actions">
+                <Link className="button button-primary" to="/settings">
+                  {pricing.trial ? t("home.price.try") : t("home.price.get")}
+                </Link>
+                <Link className="price-terms" to="/terms">
+                  {t("home.pricingTerms")}
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {downloads.length > 0 && (
         <section id="download" className="downloads site-frame" aria-labelledby="download-title">

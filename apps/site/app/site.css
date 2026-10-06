@@ -273,11 +273,11 @@ main {
 
 /* The hero's text reads larger than the page's; the heading keeps its size. */
 .hero-lead {
-  max-width: 36rem;
+  max-width: 33rem;
   margin: 1.5rem 0 0;
   color: var(--color-muted);
-  font-size: clamp(1.15rem, 1rem + 0.55vw, 1.4rem);
-  line-height: 1.55;
+  font-size: clamp(1.1rem, 1rem + 0.4vw, 1.27rem);
+  line-height: 1.6;
 }
 
 .hero-actions {
@@ -287,6 +287,22 @@ main {
 .hero-actions .button {
   padding: 0.7rem 1.3rem;
   font-size: 17px;
+}
+
+/* What the buttons cost (nothing), and the way to the other platforms. */
+.hero-note {
+  margin: 1rem 0 0;
+  color: var(--color-muted);
+  font-size: 15px;
+}
+
+.hero-note a {
+  color: inherit;
+  text-underline-offset: 0.2em;
+}
+
+.hero-note a:hover {
+  color: var(--color-fg);
 }
 
 /* The conspect, as its Markdown source in the editor's monospace. */
@@ -473,17 +489,19 @@ main {
 
 .features,
 .markdown,
+.pricing,
 .downloads {
   padding-block: clamp(2.5rem, 5vw, 4rem);
 }
 
 .features h2,
 .markdown h2,
+.pricing h2,
 .downloads h2,
 .cheatsheet h2,
 .message-page h1 {
   margin: 0;
-  font-size: 1.6rem;
+  font-size: clamp(1.6rem, 1.35rem + 0.8vw, 1.95rem);
   font-weight: 680;
   line-height: 1.2;
   letter-spacing: -0.015em;
@@ -492,20 +510,34 @@ main {
 .feature-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2rem clamp(2rem, 5vw, 4.5rem);
+  gap: 2.25rem clamp(2rem, 4vw, 3.5rem);
   margin: 2rem 0 0;
 }
 
+@media (min-width: 1000px) {
+  .feature-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.feature {
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--color-border);
+}
+
 .feature dt {
-  font-weight: 620;
+  font-size: 18px;
+  font-weight: 640;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
 }
 
 .feature dd {
   max-width: 32rem;
-  margin: 0.35rem 0 0;
+  margin: 0.5rem 0 0;
   color: var(--color-muted);
-  font-size: 15.5px;
-  line-height: 1.6;
+  font-size: 16px;
+  line-height: 1.62;
 }
 
 .section-lead {
@@ -552,6 +584,84 @@ main {
   background: var(--color-bg);
   font-family: var(--font-mono);
   font-size: 14px;
+}
+
+/* Where sync is paid: the free apps beside the sync, which is raised off the
+   page as the specimen is: the one thing here to buy. */
+.price-table {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin-top: 1.75rem;
+}
+
+.price-plan {
+  display: flex;
+  flex-direction: column;
+  padding: clamp(1.4rem, 3vw, 2rem);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.price-plan + .price-plan {
+  background: var(--color-raised);
+  box-shadow: 0 18px 50px -24px var(--color-shadow);
+}
+
+.price-plan h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 620;
+}
+
+.price-amount {
+  margin: 0.6rem 0 0;
+  font-size: clamp(1.9rem, 1.6rem + 1vw, 2.35rem);
+  font-weight: 720;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+}
+
+.price-period {
+  color: var(--color-muted);
+  font-size: 17px;
+  font-weight: 450;
+  letter-spacing: 0;
+}
+
+.price-text {
+  max-width: 30rem;
+  margin: 0.9rem 0 0;
+  color: var(--color-muted);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.price-plan .actions {
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  margin-top: auto;
+  padding-top: 1.5rem;
+}
+
+.price-plan .button {
+  padding: 0.6rem 1.15rem;
+  font-size: 15px;
+}
+
+.price-terms {
+  color: var(--color-muted);
+  font-size: 15px;
+}
+
+.price-terms:hover {
+  color: var(--color-fg);
+}
+
+@media (max-width: 720px) {
+  .price-table {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .platform-list {
@@ -1143,10 +1253,89 @@ main {
 
 /* --- Settings ----------------------------------------------------------- */
 
-/* One column of sections split by hairlines, as the platform list; no cards. */
+/* One column of sections split by hairlines, as the platform list; no cards.
+   On a wide screen the sections are listed beside them, to jump to, with how
+   each stands. */
 .settings-page {
   max-width: calc(40rem + 2 * var(--site-gutter));
   padding-block: clamp(2.5rem, 7vw, 5rem) 1rem;
+}
+
+.settings-nav {
+  display: none;
+}
+
+@media (min-width: 960px) {
+  .settings-page {
+    display: grid;
+    grid-template-areas:
+      ". head"
+      "nav body";
+    grid-template-columns: 13rem minmax(0, 40rem);
+    column-gap: 3.5rem;
+    max-width: calc(56.5rem + 2 * var(--site-gutter));
+  }
+
+  .settings-head {
+    grid-area: head;
+  }
+
+  .settings-body {
+    grid-area: body;
+  }
+
+  .settings-nav {
+    position: sticky;
+    top: 1.5rem;
+    display: block;
+    grid-area: nav;
+    align-self: start;
+    margin-top: 2.25rem;
+  }
+}
+
+.settings-nav ul {
+  display: grid;
+  gap: 0.1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settings-nav a {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0 0.6rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 8px;
+  color: var(--color-muted);
+  font-size: 15px;
+  line-height: 1.35;
+  text-decoration: none;
+}
+
+.settings-nav a:hover {
+  background: var(--color-hover);
+  color: var(--color-fg);
+}
+
+.settings-nav a.is-danger:hover {
+  color: var(--color-danger);
+}
+
+.settings-nav-status {
+  align-self: center;
+  color: var(--color-faint);
+  font-size: 13px;
+}
+
+.settings-nav-status.is-ok {
+  color: var(--color-success);
+}
+
+.settings-nav-status.is-warn {
+  color: var(--color-danger);
 }
 
 .settings-page h1 {
@@ -1168,21 +1357,56 @@ main {
   margin-top: 2.25rem;
   padding-top: 1.75rem;
   border-top: 1px solid var(--color-border);
+  scroll-margin-top: 1rem;
 }
 
 .settings-section h2 {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: 1.25rem;
   font-weight: 650;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.012em;
 }
 
 .settings-text {
-  max-width: 34rem;
-  margin: 0.45rem 0 0;
+  max-width: 36rem;
+  margin: 0.5rem 0 0;
   color: var(--color-muted);
+  font-size: 15.5px;
+  line-height: 1.6;
+}
+
+/* A section's main buttons, as large as the sign-in pages'. */
+.settings-page .actions .button {
+  padding: 0.5rem 1rem;
   font-size: 15px;
-  line-height: 1.55;
+}
+
+/* Something to do before the rest works (encryption not set up yet). */
+.settings-callout {
+  max-width: 36rem;
+  margin: 1rem 0 0;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-accent) 9%, var(--color-bg));
+  font-size: 15.5px;
+  line-height: 1.6;
+}
+
+/* Deleting the account: set apart, in the danger colour's tint. */
+.settings-section.settings-danger {
+  margin-top: 2.75rem;
+  padding: 1.5rem;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 30%, var(--color-border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-danger) 3%, var(--color-bg));
+}
+
+.settings-danger h2 {
+  color: var(--color-danger);
+}
+
+.settings-danger {
+  --color-field: color-mix(in srgb, var(--color-danger) 5%, var(--color-raised-field));
 }
 
 .settings-form {
@@ -1245,6 +1469,7 @@ main {
 
 .device-name {
   margin: 0;
+  font-size: 16.5px;
   font-weight: 620;
   overflow-wrap: anywhere;
 }
@@ -1571,9 +1796,4 @@ main {
 
 .connect-link-row .button {
   flex: none;
-}
-
-/* Where sync is paid: what it costs, under the features. */
-.pricing-note {
-  margin-top: 1.75rem;
 }

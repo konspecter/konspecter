@@ -140,7 +140,11 @@ describe("settings", () => {
     expect(calls.map((c) => c.call)).toEqual(["POST /api/devices/connect-codes"]);
   });
 
-  function renderSettings(account: { name: string; recentSignIn: boolean }, devices: unknown[]) {
+  function renderSettings(
+    account: { name: string; recentSignIn: boolean },
+    devices: unknown[],
+    billing: unknown = null,
+  ) {
     const Stub = createRoutesStub([
       {
         id: "root",
@@ -155,6 +159,8 @@ describe("settings", () => {
               account: { email: "ann@example.com", ...account },
               devices,
               devicesFailed: false,
+              billing,
+              gateways: [],
               now: Date.parse("2026-10-05T12:00:00Z"),
             }),
             action: () => ({ intent: "disconnect", error: null, disconnected: "Firefox on Linux" }),
@@ -191,6 +197,34 @@ describe("settings", () => {
       "Firefox on Linux is disconnected.",
     );
     expect(screen.getByRole("textbox", { name: "Type ann@example.com to confirm" })).toBeRequired();
+  });
+
+  it("lists the sections to jump to, with the trial's end and the device count", async () => {
+    renderSettings({ name: "Ann", recentSignIn: true }, [], {
+      paid: true,
+      access: { state: "trialing", until: "2026-10-15T00:00:00Z" },
+      trial: "14d",
+      grace: "",
+      paidUntil: null,
+      subscription: null,
+      checkout: null,
+      payments: [],
+    });
+    const nav = await screen.findByRole("navigation", { name: "Settings sections" });
+    const links = within(nav).getAllByRole("link");
+    expect(links.map((link) => link.getAttribute("href"))).toEqual([
+      "#subscription",
+      "#encryption",
+      "#connect",
+      "#devices",
+      "#name",
+      "#delete",
+    ]);
+    expect(links[0]).toHaveTextContent("SubscriptionTrial until Oct 15");
+    expect(links[3]).toHaveTextContent("Connected devices0");
+    for (const link of links) {
+      expect(document.querySelector(link.getAttribute("href") ?? "")).not.toBeNull();
+    }
   });
 
   it("asks to sign in again before deleting after an old sign-in", async () => {

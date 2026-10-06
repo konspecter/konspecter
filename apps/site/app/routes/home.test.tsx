@@ -8,6 +8,7 @@ function renderHome(
   locale: "en" | "ru",
   downloads: { platform: Platform; url: string }[],
   suggested: Platform | null = null,
+  pricing: { amount: number; currency: string; period: string; trial: string } | null = null,
 ) {
   const Stub = createRoutesStub([
     {
@@ -16,7 +17,11 @@ function renderHome(
       Component: App as never,
       loader: () => ({ locale, theme: "system" }),
       children: [
-        { index: true, Component: Home as never, loader: () => ({ downloads, suggested }) },
+        {
+          index: true,
+          Component: Home as never,
+          loader: () => ({ downloads, suggested, pricing }),
+        },
       ],
     },
   ]);
@@ -65,11 +70,29 @@ it("shows the landing page with the configured downloads", async () => {
   );
 });
 
+it("shows what sync costs where it is paid, with a way to try it", async () => {
+  renderHome("en", [{ platform: "web", url: "https://app.example.com/" }], null, {
+    amount: 3,
+    currency: "USD",
+    period: "1m",
+    trial: "14d",
+  });
+  const pricing = await screen.findByRole("region", { name: "What it costs" });
+  expect(pricing).toHaveTextContent("The appsFree");
+  expect(pricing).toHaveTextContent("$3 every month");
+  expect(pricing).toHaveTextContent("The first 14 days are free.");
+  expect(within(pricing).getByRole("link", { name: "Try sync for free" })).toHaveAttribute(
+    "href",
+    "/settings",
+  );
+});
+
 it("leaves out the downloads when none are configured", async () => {
   renderHome("en", []);
   await screen.findByRole("heading", { level: 1 });
   expect(screen.queryByRole("region", { name: "Get Konspecter" })).not.toBeInTheDocument();
   expect(screen.queryByRole("link", { name: /Download/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole("region", { name: "What it costs" })).not.toBeInTheDocument();
 });
 
 it("speaks Russian, with the language dropdown and the other theme", async () => {

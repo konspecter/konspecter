@@ -251,7 +251,7 @@ function SetUp({ onCreated }: { onCreated: (record: KeyRecord, recoveryKey: stri
   const { t } = useT();
   return (
     <>
-      <p className="settings-text">{t("encryption.offLead")}</p>
+      <p className="settings-callout">{t("encryption.offLead")}</p>
       <ActionForm
         submit={t("encryption.setUp")}
         action={async (form) => {
