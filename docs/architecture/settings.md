@@ -3,16 +3,17 @@
 Local, per-device preferences (`domain/settings/settings.ts`, page at `/settings`). Changes
 apply and are saved immediately.
 
-| Setting          | Values                                              | Default              |
-| ---------------- | --------------------------------------------------- | -------------------- |
-| Theme            | System, Light, Dark                                 | System               |
-| Language         | System, English, Русский (see [i18n](i18n.md))      | System               |
-| Default editor   | Text, Markdown                                      | Text                 |
-| Text size        | Small (0.9×), Default, Large (1.15×), Larger (1.3×) | Default              |
-| Reading position | restore, ask, off (see [reading](reading.md))       | restore              |
-| Editing area     | Highlighted, Plain (see [editors](editors.md))      | Highlighted          |
-| Tag names        | Capital first letter, As written in notes           | Capital first letter |
-| File names       | Keep when the title changes, Rename after the title | Keep                 |
+| Setting          | Values                                               | Default                                        |
+| ---------------- | ---------------------------------------------------- | ---------------------------------------------- |
+| Theme            | System, Light, Dark                                  | System                                         |
+| Language         | System, English, Русский (see [i18n](i18n.md))       | System                                         |
+| Default editor   | Text, Markdown                                       | Text                                           |
+| Text size        | Small (0.9×), Default, Large (1.15×), Larger (1.3×)  | Default                                        |
+| Reading position | restore, ask, off (see [reading](reading.md))        | restore                                        |
+| Editing area     | Highlighted, Plain (see [editors](editors.md))       | Highlighted                                    |
+| Tag names        | Capital first letter, As written in notes            | Capital first letter                           |
+| File names       | Keep when the title changes, Rename after the title  | Keep                                           |
+| Ignored files    | `.konspecterignore` rules, written like `.gitignore` | `.*`, `node_modules`, `vendors`, `dist`, `bin` |
 
 ## Storage
 
@@ -46,5 +47,11 @@ are not synced. A separate strategy can be added with sync if needed.
 - **File names** (shown only while a Markdown folder is open): `main.tsx` passes it to
   `FolderStore.followTitles`, at start and on every change. See
   [File Mode](filesystem-mode.md#file-names).
+
+- **Ignored files:** a text box with Save and Restore default, not saved per keystroke. In
+  the app library the rules are this setting, and a folder import skips what they match
+  ([import](import-export.md)). With a Markdown folder open they are the folder's own
+  `.konspecterignore` file instead, read and written through `FolderStore`
+  ([File Mode](filesystem-mode.md#ignored-files)).
 
 If saving fails, the change still applies for the session and the page says so.

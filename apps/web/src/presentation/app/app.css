@@ -1360,6 +1360,31 @@ kbd {
   font-family: var(--font-ui);
 }
 
+/* The .konspecterignore rules: plain text in a field, a line per pattern. */
+.ignore-label {
+  font-size: 14px;
+}
+
+.ignore-rules {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 36rem;
+  padding: 0.5rem 0.6rem;
+  border: 0;
+  border-radius: 8px;
+  background: var(--color-field);
+  color: var(--color-fg);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.ignore-rules:focus {
+  background: var(--color-field-focus);
+}
+
 .connect-form {
   display: grid;
   gap: 0.35rem;

@@ -21,6 +21,7 @@ import type { SyncEngine } from "../../infrastructure/sync/sync-engine";
 import { useErrorMessage } from "../hooks/use-error-message";
 import { SyncSettings } from "../components/SyncSettings";
 import { ImportExport } from "../components/ImportExport";
+import { FolderIgnoreSettings, IgnoreSettings } from "../components/IgnoreSettings";
 import { ReformatDialog } from "../components/ReformatPrompt";
 import { BackupRecovery } from "../components/BackupRecovery";
 import { ShortcutList } from "../components/ShortcutsDialog";
@@ -184,7 +185,16 @@ export function SettingsPage({ settings, onChange, sync, library, store }: Setti
       </form>
       {isDesktop() ? <DesktopAbout /> : <OfflineStorage />}
       {library && <LibrarySettings library={library} />}
-      {store && library?.folder == null && <ImportExport store={store} />}
+      {library?.ignore ? (
+        <FolderIgnoreSettings ignore={library.ignore} />
+      ) : (
+        <IgnoreSettings
+          saved={settings.ignore}
+          inFolder={false}
+          onSave={(ignore) => onChange({ ...settings, ignore })}
+        />
+      )}
+      {store && library?.folder == null && <ImportExport store={store} ignore={settings.ignore} />}
       {store && library?.folder == null && <BackupRecovery store={store} />}
       {sync && library?.folder == null && <SyncSettings sync={sync} />}
       <section className="setting offline-storage" aria-labelledby="shortcuts-heading">

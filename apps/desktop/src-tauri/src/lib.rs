@@ -224,6 +224,18 @@ fn folder_list(state: State<'_, FolderState>) -> Result<Vec<FileEntry>, CommandE
     state.with(Folder::list)
 }
 
+/// The folder's ignore rules (`.konspecterignore`, or the default).
+#[tauri::command]
+fn folder_ignore_read(state: State<'_, FolderState>) -> Result<String, CommandError> {
+    state.with(Folder::ignore_text)
+}
+
+/// Writes the folder's `.konspecterignore`; listing and watching follow it at once.
+#[tauri::command]
+fn folder_ignore_write(state: State<'_, FolderState>, text: String) -> Result<(), CommandError> {
+    state.with(|f| f.write_ignore(&text))
+}
+
 #[tauri::command]
 fn folder_read(state: State<'_, FolderState>, path: String) -> Result<FileContents, CommandError> {
     state.with(|f| f.read(&path))
@@ -415,6 +427,8 @@ pub fn run() {
             folder_pick,
             folder_close,
             folder_list,
+            folder_ignore_read,
+            folder_ignore_write,
             folder_read,
             folder_write,
             folder_create_at,

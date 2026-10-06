@@ -1,6 +1,7 @@
 import type { NoteChange, NoteRepository } from "../../application/notes/note-repository";
 import { documentTitle, parseDocument } from "../../domain/document/document";
 import { slugFileNames, slugFor, stemFitsSlug } from "../../domain/note/file-name";
+import { ignoreRules, type IgnoreRules } from "../../domain/note/ignore";
 import {
   chainFolder,
   foldersOf,
@@ -46,12 +47,17 @@ type CachedFile = {
  * chain. Files found without tags in folders get their folders' chain, a new
  * note is made in its chain's folder, and a save that changes the chain moves
  * the file there.
+ *
+ * The folder's `.konspecterignore` names what is not a note: such files are
+ * not listed (the native side does not even walk into them), and no note is
+ * made or moved into a folder it skips.
  */
 export class FolderStore implements NoteRepository {
   readonly #folder: FolderBridge;
   readonly #reading: ReadingStateStore;
   readonly #files = new Map<string, CachedFile>();
   #loaded: Promise<void> | null = null;
+  #rules: IgnoreRules = ignoreRules("");
   #search: SearchIndex | null = null;
   readonly #listeners = new Set<(change: NoteChange) => void>();
   /** Paths being renamed by this app: the watcher's reports of them are its own. */
@@ -86,10 +92,34 @@ export class FolderStore implements NoteRepository {
     this.#followTitles = follow;
   }
 
-  /** Reads every file again and reports what changed. */
+  /** The folder's ignore rules, as written (the default when it has none). */
+  ignoreText(): Promise<string> {
+    return this.#folder.readIgnore();
+  }
+
+  /**
+   * Writes the folder's `.konspecterignore` and reads the folder again:
+   * files the new rules skip go, files they no longer skip come.
+   */
+  async setIgnore(text: string): Promise<void> {
+    await this.#folder.writeIgnore(text);
+    await this.refresh();
+  }
+
+  async #loadRules(): Promise<void> {
+    try {
+      this.#rules = ignoreRules(await this.#folder.readIgnore());
+    } catch {
+      // Rules that cannot be read skip nothing, as on the native side.
+      this.#rules = ignoreRules("");
+    }
+  }
+
+  /** Reads the rules and every file again, and reports what changed. */
   async refresh(): Promise<void> {
     await this.#ensureLoaded();
-    const entries = await this.#folder.list();
+    await this.#loadRules();
+    const entries = await this.#listed();
     const current = new Set(entries.map((entry) => entry.path));
     const gone = [...this.#files.keys()].filter((path) => !current.has(path));
     await this.#apply([...current, ...gone]);
@@ -122,7 +152,12 @@ export class FolderStore implements NoteRepository {
   async #apply(reported: readonly string[]): Promise<void> {
     await this.#ensureLoaded();
     const paths = reported.filter((path) => !this.#moving.has(path));
-    const reads = await Promise.all(paths.map((path) => this.#readIfPresent(path)));
+    // A file the rules skip is no note, whether it is there or not.
+    const reads = await Promise.all(
+      paths.map((path) =>
+        this.#rules.ignores(path) ? Promise.resolve(null) : this.#readIfPresent(path),
+      ),
+    );
     const removed: string[] = [];
     const added: FileContents[] = [];
     const changed: FileContents[] = [];
@@ -226,8 +261,14 @@ export class FolderStore implements NoteRepository {
     }
   }
 
+  /** The files that are notes: listed, and not skipped by the rules. */
+  async #listed(): Promise<FileEntry[]> {
+    return (await this.#folder.list()).filter((entry) => !this.#rules.ignores(entry.path));
+  }
+
   async #readAll(): Promise<void> {
-    const entries = await this.#folder.list();
+    await this.#loadRules();
+    const entries = await this.#listed();
     const contents = await Promise.all(
       entries.map(async (entry) => this.#adopt(await this.#folder.read(entry.path))),
     );
@@ -268,12 +309,16 @@ export class FolderStore implements NoteRepository {
 
   /**
    * Creates a new file named after the note's title, in the folder of its
-   * first tag chain (the top level without tags).
+   * first tag chain (the top level without tags, or when the rules skip that
+   * folder).
    */
   async create(markdown: string, now: Date): Promise<Note> {
     await this.#ensureLoaded();
     const note = createNote(markdown, now);
-    const folder = chainFolder(placingChain(readNote(note)), foldersOf(this.#files.keys()));
+    const folder = this.#notIgnored(
+      chainFolder(placingChain(readNote(note)), foldersOf(this.#files.keys())),
+      "",
+    );
     const entry = await this.#claimName(folder, slugFor(titleOf(note.markdown)), null, (path) =>
       this.#folder.createAt(path, note.markdown),
     );
@@ -324,7 +369,7 @@ export class FolderStore implements NoteRepository {
     const folder =
       sameChain(before, chain) || inChainFolder(path, read)
         ? here
-        : chainFolder(chain, foldersOf(this.#files.keys()));
+        : this.#notIgnored(chainFolder(chain, foldersOf(this.#files.keys())), here);
     const slug = this.#followTitles ? slugFor(titleOf(file.markdown)) : stem;
     const name = stemFitsSlug(stem, slug) ? stem : slug;
     if (folder === here && name === stem) return null;
@@ -369,13 +414,23 @@ export class FolderStore implements NoteRepository {
     }
   }
 
-  /** The files with tags that are not in their first chain's folder (see `reformat`). */
+  /** `folder`, unless the rules skip it: a note put there would vanish. */
+  #notIgnored(folder: string, instead: string): string {
+    return this.#rules.ignoresFolder(folder) ? instead : folder;
+  }
+
+  /**
+   * The files with tags that are not in their first chain's folder (see
+   * `reformat`), unless the rules skip that folder.
+   */
   async misplaced(): Promise<string[]> {
     await this.#ensureLoaded();
+    const folders = foldersOf(this.#files.keys());
     return [...this.#files]
       .filter(([path, file]) => {
         const read = readNote({ id: path, markdown: file.markdown });
-        return read.valid && placingChain(read) !== "" && !inChainFolder(path, read);
+        if (!read.valid || placingChain(read) === "" || inChainFolder(path, read)) return false;
+        return !this.#rules.ignoresFolder(chainFolder(placingChain(read), folders));
       })
       .map(([path]) => path)
       .sort();

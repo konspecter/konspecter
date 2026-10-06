@@ -1,4 +1,5 @@
 import { strFromU8, unzipSync } from "fflate";
+import { DEFAULT_IGNORE, ignoreRules } from "../../domain/note/ignore";
 import { createNote } from "../../domain/note/note";
 import { readMarkdownFiles, zipFiles } from "../../infrastructure/files/files";
 import { openNoteStore } from "../../infrastructure/storage/note-store";
@@ -103,6 +104,30 @@ describe("reading files to import", () => {
 
     expect(sources).toEqual([{ name: "Notes/note.md", text: "n" }]);
     expect(rejected).toEqual([]);
+  });
+
+  it("skips what the ignore rules match, relative to the chosen folder", async () => {
+    const { sources, rejected } = await readMarkdownFiles(
+      [
+        file("note.md", "n", "Notes/note.md"),
+        file("README.md", "r", "Notes/node_modules/pkg/README.md"),
+        file("x.md", "x", "Notes/.git/x.md"),
+        file("draft.md", "d", "Notes/drafts/draft.md"),
+      ],
+      ignoreRules(`${DEFAULT_IGNORE}\n/drafts\n`),
+    );
+
+    expect(sources.map((source) => source.name)).toEqual(["Notes/note.md"]);
+    expect(rejected).toEqual([]);
+  });
+
+  it("reads files chosen one by one even if the rules match them", async () => {
+    const { sources } = await readMarkdownFiles(
+      [file(".hidden.md", "h")],
+      ignoreRules(DEFAULT_IGNORE),
+    );
+
+    expect(sources).toEqual([{ name: ".hidden.md", text: "h" }]);
   });
 });
 

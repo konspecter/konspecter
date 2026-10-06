@@ -296,6 +296,17 @@ source, or delete this conspect when you are done.
   "backup.downloadFirst": "Download them first",
   "backup.removed": "Unreadable records removed.",
 
+  "ignore.title": "Ignored files",
+  "ignore.app": "What a folder import skips. Files chosen one by one are imported as chosen.",
+  "ignore.folder":
+    "What Konspecter skips in this folder: it neither reads nor watches it, and makes no conspect there. Kept in the folder as {file}, so other programs see it too.",
+  "ignore.syntax":
+    "Written like .gitignore: one pattern per line, {hidden} for hidden files and folders, {negate} to bring a file back, {comment} for a comment.",
+  "ignore.label": "Rules ({file})",
+  "ignore.save": "Save",
+  "ignore.default": "Restore default",
+  "ignore.saved": "Saved.",
+
   "transfer.title": "Import & export",
   "transfer.hint":
     "Conspects are plain Markdown: imports keep files as written, and exports are the same {md} files, readable without Konspecter.",

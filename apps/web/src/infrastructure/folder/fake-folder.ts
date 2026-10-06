@@ -1,3 +1,4 @@
+import { DEFAULT_IGNORE, ignoreRules } from "../../domain/note/ignore";
 import {
   FolderError,
   type FileEntry,
@@ -17,6 +18,21 @@ export class FakeFolder implements FolderBridge {
   readonly revealed: string[] = [];
   /** Folders removed because they were left empty. Folders are only implied by paths here. */
   readonly removedFolders: string[] = [];
+  /** The `.konspecterignore` file's text, or null when there is none. */
+  ignoreFile: string | null = null;
+
+  #ignores(path: string): boolean {
+    return ignoreRules(this.ignoreFile ?? DEFAULT_IGNORE).ignores(path);
+  }
+
+  readIgnore() {
+    return Promise.resolve(this.ignoreFile ?? DEFAULT_IGNORE);
+  }
+
+  writeIgnore(text: string) {
+    this.ignoreFile = text;
+    return Promise.resolve();
+  }
 
   openExternally(path: string) {
     this.opened.push(path);
@@ -62,7 +78,12 @@ export class FakeFolder implements FolderBridge {
   }
 
   list(): Promise<FileEntry[]> {
-    return Promise.resolve([...this.files.keys()].sort().map((path) => this.#entry(path)));
+    return Promise.resolve(
+      [...this.files.keys()]
+        .filter((path) => !this.#ignores(path))
+        .sort()
+        .map((path) => this.#entry(path)),
+    );
   }
 
   read(path: string) {
@@ -82,6 +103,9 @@ export class FakeFolder implements FolderBridge {
   }
 
   createAt(path: string, contents: string) {
+    if (this.#ignores(path)) {
+      return Promise.reject(new FolderError("invalid_path", `${path} is ignored`));
+    }
     if (this.#taken(path) !== undefined) {
       return Promise.reject(new FolderError("exists", `${path} already exists`));
     }
@@ -92,6 +116,9 @@ export class FakeFolder implements FolderBridge {
   rename(from: string, to: string) {
     const file = this.files.get(from);
     if (!file) return Promise.reject(new FolderError("not_found", `${from} does not exist`));
+    if (this.#ignores(to)) {
+      return Promise.reject(new FolderError("invalid_path", `${to} is ignored`));
+    }
     const taken = this.#taken(to);
     if (taken !== undefined && taken !== from) {
       return Promise.reject(new FolderError("exists", `${to} already exists`));

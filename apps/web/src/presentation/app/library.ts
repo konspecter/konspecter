@@ -7,6 +7,13 @@ export type FolderReformat = {
   apply(): Promise<number>;
 };
 
+/** File Mode: the open folder's `.konspecterignore` (its rules, or the default without one). */
+export type FolderIgnore = {
+  read(): Promise<string>;
+  /** Writes the file; the folder is read again by the new rules. */
+  save(text: string): Promise<void>;
+};
+
 /** Choosing where notes live, on the desktop (see docs/architecture/filesystem-mode.md). */
 export type LibraryControls = {
   /** The open Markdown folder's path, or null for the app library. */
@@ -19,4 +26,6 @@ export type LibraryControls = {
   importFolder: () => Promise<ImportReport>;
   /** File Mode: reformats the folder so its files are in their tags' folders. */
   reformat?: FolderReformat | undefined;
+  /** File Mode: the folder's ignore rules. */
+  ignore?: FolderIgnore | undefined;
 };

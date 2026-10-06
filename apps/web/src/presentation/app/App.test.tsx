@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router";
 import { parseDocument } from "../../domain/document/document";
 import { parseQuery } from "../../domain/search/query";
 import { DEFAULT_SETTINGS, type Settings } from "../../domain/settings/settings";
+import { DEFAULT_IGNORE } from "../../domain/note/ignore";
 import { createNote, type Note } from "../../domain/note/note";
 import { openNoteStore, type NoteStore } from "../../infrastructure/storage/note-store";
 import { setSourceValue, sourceValue } from "../editors/test-helpers";
@@ -1211,6 +1212,27 @@ describe("settings and the top bar", () => {
     );
   }
 
+  it("edits the app's .konspecterignore in a text box and keeps it", async () => {
+    const store = await newStore();
+    renderWithSettings(store, "/settings");
+
+    const rules = screen.getByRole("textbox", { name: "Rules (.konspecterignore)" });
+    expect(rules).toHaveValue(DEFAULT_IGNORE);
+    const save = screen.getByRole("button", { name: "Save" });
+    expect(save).toBeDisabled();
+
+    await userEvent.clear(rules);
+    await userEvent.type(rules, "drafts/{Enter}");
+    await userEvent.click(save);
+    expect(await screen.findByText("Saved.")).toBeInTheDocument();
+    expect(save).toBeDisabled();
+    expect(await store.loadSettings()).toMatchObject({ ignore: "drafts/\n" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Restore default" }));
+    expect(rules).toHaveValue(DEFAULT_IGNORE);
+    expect(save).toBeEnabled();
+  });
+
   it("names tags with a capital first letter, or as written", async () => {
     const store = await newStore();
     await store.put(createNote("# N\n\n#новые_технологии", new Date(), "n"));
@@ -1831,6 +1853,42 @@ describe("file mode", () => {
         await screen.findByText("Every conspect with tags is in its tags' folder already."),
       ).toBeInTheDocument();
     });
+  });
+
+  it("edits the folder's .konspecterignore, and the list follows it", async () => {
+    const folder = new FakeFolder();
+    folder.edit("note.md", "# Note");
+    folder.edit("drafts/draft.md", "# Draft");
+    folder.edit(".hidden/secret.md", "# Secret");
+    const store = new FolderStore(folder, await newStore(), { graceMs: 5 });
+    render(
+      <MemoryRouter initialEntries={["/settings"]}>
+        <App
+          store={store}
+          library={{
+            folder: "/Users/ada/Notes",
+            chooseFolder: () => Promise.resolve(),
+            closeFolder: () => Promise.resolve(),
+            importFolder: () => Promise.resolve({ imported: 0, duplicates: 0, rejected: [] }),
+            ignore: { read: () => store.ignoreText(), save: (text) => store.setIgnore(text) },
+          }}
+        />
+      </MemoryRouter>,
+    );
+
+    const rules = await screen.findByRole("textbox", { name: "Rules (.konspecterignore)" });
+    expect(rules).toHaveValue(DEFAULT_IGNORE);
+    expect(screen.getByText(/Kept in the folder as/)).toBeInTheDocument();
+
+    await userEvent.clear(rules);
+    await userEvent.type(rules, "drafts/");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("Saved.")).toBeInTheDocument();
+    expect(folder.ignoreFile).toBe("drafts/");
+    expect((await store.list()).map((note) => note.id).sort()).toEqual([
+      ".hidden/secret.md",
+      "note.md",
+    ]);
   });
 
   it("shows the library choice in settings", async () => {

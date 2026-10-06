@@ -1,3 +1,4 @@
+import { DEFAULT_IGNORE } from "../note/ignore";
 import type { ReadingPositionMode } from "../reading/reading";
 
 export type Theme = "system" | "light" | "dark";
@@ -25,6 +26,11 @@ export type Settings = {
   readonly editingArea: EditingArea;
   readonly language: Language;
   readonly fileNames: FileNames;
+  /**
+   * The app library's `.konspecterignore`: what a folder import skips, written
+   * like `.gitignore`. A Markdown folder (File Mode) keeps its own file instead.
+   */
+  readonly ignore: string;
 };
 
 export const FONT_SCALES = [0.9, 1, 1.15, 1.3] as const;
@@ -38,7 +44,11 @@ export const DEFAULT_SETTINGS: Settings = {
   editingArea: "highlighted",
   language: "system",
   fileNames: "kept",
+  ignore: DEFAULT_IGNORE,
 };
+
+/** Longer rules are not kept (the same limit as a folder's file). */
+export const MAX_IGNORE_LENGTH = 64 * 1024;
 
 function oneOf<T extends string | number>(value: unknown, options: readonly T[], fallback: T): T {
   return options.includes(value as T) ? (value as T) : fallback;
@@ -68,5 +78,9 @@ export function parseSettings(value: unknown): Settings {
     editingArea: oneOf(record.editingArea, ["highlighted", "plain"], DEFAULT_SETTINGS.editingArea),
     language: oneOf(record.language, ["system", "en", "ru"], DEFAULT_SETTINGS.language),
     fileNames: oneOf(record.fileNames, ["kept", "title"], DEFAULT_SETTINGS.fileNames),
+    ignore:
+      typeof record.ignore === "string" && record.ignore.length <= MAX_IGNORE_LENGTH
+        ? record.ignore
+        : DEFAULT_SETTINGS.ignore,
   };
 }

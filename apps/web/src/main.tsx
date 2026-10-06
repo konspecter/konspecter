@@ -97,6 +97,9 @@ try {
         reformat: folderStore
           ? { misplaced: () => folderStore.misplaced(), apply: () => folderStore.reformat() }
           : undefined,
+        ignore: folderStore
+          ? { read: () => folderStore.ignoreText(), save: (text) => folderStore.setIgnore(text) }
+          : undefined,
       }
     : undefined;
 

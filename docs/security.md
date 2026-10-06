@@ -138,8 +138,9 @@ forbidden_origin`); the site's server forwards the browser's `Origin` and itself
 
 - Only the native folder picker can choose the File Mode folder or an export target; the
   web view passes relative paths only, so even injected script cannot reach other files.
-- Paths are validated: no `..`, absolute or drive paths, backslashes, hidden files; `.md`
-  only; the **real** path (symlinks resolved) must stay inside the folder.
+- Paths are validated: no `..`, absolute or drive paths, backslashes; `.md` only; the
+  **real** path (symlinks resolved) must stay inside the folder. Hidden files are skipped by
+  the folder's `.konspecterignore` (by default), not refused: the rules are the user's.
 - Writes are atomic and refuse to overwrite files changed on disk; deletes go to the trash.
 - Tauri capabilities grant the window only `core:default`; there is no generic shell or
   filesystem plugin, and no user-configurable command (which would turn XSS into code

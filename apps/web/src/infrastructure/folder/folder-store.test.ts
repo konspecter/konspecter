@@ -1,5 +1,6 @@
 import { importFolder } from "../../application/library/import-folder";
 import { frontmatterTags, parseDocument } from "../../domain/document/document";
+import { DEFAULT_IGNORE } from "../../domain/note/ignore";
 import { readNotes, updateNote } from "../../domain/note/note";
 import { parseQuery } from "../../domain/search/query";
 import { openNoteStore } from "../storage/note-store";
@@ -334,6 +335,66 @@ describe("FolderStore with folders following tags", () => {
     ]);
     expect(changes).toEqual(["old/y.md→go/web/y.md", "x.md→java/x-2.md"]);
     expect(folder.removedFolders).toEqual(["old"]);
+    expect(await store.misplaced()).toEqual([]);
+  });
+});
+
+describe("FolderStore with ignore rules", () => {
+  const ids = async (store: FolderStore) => (await store.list()).map((note) => note.id).sort();
+
+  it("skips hidden files and the default folders", async () => {
+    const { folder, store } = await setup();
+    folder.edit("note.md", "# Note");
+    folder.edit(".obsidian/x.md", "hidden");
+    folder.edit("node_modules/pkg/README.md", "# Package");
+    folder.edit("project/dist/out.md", "built");
+
+    expect(await ids(store)).toEqual(["note.md"]);
+    expect(await store.ignoreText()).toBe(DEFAULT_IGNORE);
+  });
+
+  it("writes the folder's file and reads the folder again by the new rules", async () => {
+    const { folder, store } = await setup();
+    const changes: string[] = [];
+    store.onChange((change) => changes.push(change.noteId));
+    folder.edit("note.md", "# Note");
+    folder.edit(".notes/hidden.md", "# Hidden");
+    folder.edit("drafts/draft.md", "# Draft");
+    expect(await ids(store)).toEqual(["drafts/draft.md", "note.md"]);
+
+    await store.setIgnore("drafts/\n");
+
+    expect(folder.ignoreFile).toBe("drafts/\n");
+    expect(await store.ignoreText()).toBe("drafts/\n");
+    expect(await ids(store)).toEqual([".notes/hidden.md", "note.md"]);
+    expect(changes.sort()).toEqual([".notes/hidden.md", "drafts/draft.md"]);
+    expect(folder.files.has("drafts/draft.md")).toBe(true);
+  });
+
+  it("ignores watcher reports of skipped files", async () => {
+    const { folder, store } = await setup();
+    await store.watch();
+    folder.edit("note.md", "# Note");
+    await store.list();
+
+    folder.edit("dist/out.md", "built");
+    folder.notify({ paths: ["dist/out.md"], rescan: false });
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    expect(await ids(store)).toEqual(["note.md"]);
+  });
+
+  it("puts no note into a folder the rules skip", async () => {
+    const { folder, store } = await setup();
+    folder.edit("notes/a.md", "# A\n\n#notes");
+    await store.list();
+
+    const created = await store.create("# Built\n\n#dist", now);
+    expect(created.id).toBe("built.md");
+
+    const note = await mustGet(store, "notes/a.md");
+    const saved = await store.put({ ...note, markdown: "# A\n\n#bin" });
+    expect(saved.id).toBe("notes/a.md");
     expect(await store.misplaced()).toEqual([]);
   });
 });

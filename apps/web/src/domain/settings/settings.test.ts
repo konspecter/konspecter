@@ -1,4 +1,5 @@
-import { DEFAULT_SETTINGS, parseSettings } from "./settings";
+import { DEFAULT_IGNORE } from "../note/ignore";
+import { DEFAULT_SETTINGS, MAX_IGNORE_LENGTH, parseSettings } from "./settings";
 
 describe("parseSettings", () => {
   it("accepts valid settings", () => {
@@ -11,6 +12,7 @@ describe("parseSettings", () => {
       editingArea: "plain",
       language: "ru",
       fileNames: "title",
+      ignore: "drafts/\n",
     };
     expect(parseSettings(settings)).toEqual(settings);
   });
@@ -22,6 +24,15 @@ describe("parseSettings", () => {
   it("keeps file names when titles change by default", () => {
     expect(DEFAULT_SETTINGS.fileNames).toBe("kept");
     expect(parseSettings({ fileNames: "slug" }).fileNames).toBe("kept");
+  });
+
+  it("skips the default folders on import until the rules are changed, even to none", () => {
+    expect(DEFAULT_SETTINGS.ignore).toBe(DEFAULT_IGNORE);
+    expect(parseSettings({ ignore: "" }).ignore).toBe("");
+    expect(parseSettings({ ignore: 7 }).ignore).toBe(DEFAULT_IGNORE);
+    expect(parseSettings({ ignore: "x".repeat(MAX_IGNORE_LENGTH + 1) }).ignore).toBe(
+      DEFAULT_IGNORE,
+    );
   });
 
   it("follows the system's language by default, and ignores languages it does not speak", () => {

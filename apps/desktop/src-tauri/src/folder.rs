@@ -2,14 +2,20 @@
 //!
 //! The web app never names absolute paths. It works with paths relative to the
 //! folder the user picked, and every one is checked here: no `..`, no absolute
-//! paths, no hidden files, `.md` only, and no symlink may lead outside the
-//! folder. Writes are atomic; deleted files go to the system trash.
+//! paths, `.md` only, and no symlink may lead outside the folder. Writes are
+//! atomic; deleted files go to the system trash.
+//!
+//! The folder's `.konspecterignore`, written like `.gitignore`, names what the
+//! app skips: the walk does not enter it, the watcher does not report it, and
+//! no file is made or moved into it.
 
+use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use serde::Serialize;
 use std::fmt;
 use std::fs;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
+use std::sync::{Arc, RwLock};
 use std::time::UNIX_EPOCH;
 
 /// Guards against runaway walks (e.g. a picked home directory).
@@ -17,6 +23,15 @@ const MAX_FILES: usize = 20_000;
 const MAX_DEPTH: usize = 24;
 /// Same limit as the server's.
 const MAX_FILE_BYTES: u64 = 5 << 20;
+
+/// The rules' file at the folder's root (the web app's `IGNORE_FILE`).
+pub const IGNORE_FILE: &str = ".konspecterignore";
+/// What a folder without the file skips: hidden files and folders and the
+/// usual build and dependency folders. The same as the web app's
+/// `DEFAULT_IGNORE` (src/domain/note/ignore.ts).
+pub const DEFAULT_IGNORE: &str = ".*\nnode_modules\nvendors\ndist\nbin\n";
+/// The same limit as the web app's settings.
+const MAX_IGNORE_BYTES: u64 = 64 << 10;
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -71,10 +86,12 @@ fn io(context: &str, error: std::io::Error) -> FolderError {
     FolderError::Io(format!("{context}: {error}"))
 }
 
-/// A picked folder. The root is canonical (symlinks resolved).
+/// A picked folder. The root is canonical (symlinks resolved). Clones share
+/// the ignore rules, so the watcher follows changes to them.
 #[derive(Debug, Clone)]
 pub struct Folder {
     root: PathBuf,
+    rules: Arc<RwLock<Gitignore>>,
 }
 
 impl Folder {
@@ -83,11 +100,70 @@ impl Folder {
         if !root.is_dir() {
             return Err(FolderError::InvalidPath(path.display().to_string()));
         }
-        Ok(Folder { root })
+        let rules = Arc::new(RwLock::new(Gitignore::empty()));
+        let folder = Folder { root, rules };
+        folder.reload_ignore();
+        Ok(folder)
     }
 
     pub fn root(&self) -> &Path {
         &self.root
+    }
+
+    /// The text of the folder's ignore rules: its `.konspecterignore`, or the
+    /// default when there is none.
+    pub fn ignore_text(&self) -> Result<String, FolderError> {
+        let path = self.root.join(IGNORE_FILE);
+        match fs::metadata(&path) {
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(DEFAULT_IGNORE.to_string());
+            }
+            Err(e) => return Err(io("read ignore rules", e)),
+            Ok(meta) if meta.len() > MAX_IGNORE_BYTES => {
+                return Err(FolderError::TooLarge(IGNORE_FILE.to_string()));
+            }
+            Ok(_) => {}
+        }
+        let bytes = fs::read(&path).map_err(|e| io("read ignore rules", e))?;
+        Ok(String::from_utf8_lossy(&bytes).into_owned())
+    }
+
+    /// Writes the folder's `.konspecterignore` (atomically) and follows it.
+    pub fn write_ignore(&self, text: &str) -> Result<(), FolderError> {
+        if text.len() as u64 > MAX_IGNORE_BYTES {
+            return Err(FolderError::TooLarge(IGNORE_FILE.to_string()));
+        }
+        write_atomically(&self.root.join(IGNORE_FILE), text)
+            .map_err(|e| io("write ignore rules", e))?;
+        self.reload_ignore();
+        Ok(())
+    }
+
+    /// Reads the rules again. Rules that cannot be read skip nothing; a line
+    /// that is not a valid pattern is left out.
+    pub fn reload_ignore(&self) {
+        let text = self.ignore_text().unwrap_or_default();
+        let mut builder = GitignoreBuilder::new(&self.root);
+        for line in text.lines() {
+            let _ = builder.add_line(None, line);
+        }
+        let rules = builder.build().unwrap_or_else(|_| Gitignore::empty());
+        if let Ok(mut current) = self.rules.write() {
+            *current = rules;
+        }
+    }
+
+    /// Whether the rules skip a path relative to the folder: it matches, or a
+    /// folder it is in does.
+    fn ignores(&self, relative: &Path, is_dir: bool) -> bool {
+        if relative.as_os_str().is_empty() {
+            return false;
+        }
+        self.rules.read().is_ok_and(|rules| {
+            rules
+                .matched_path_or_any_parents(relative, is_dir)
+                .is_ignore()
+        })
     }
 
     /// The absolute path for a relative one, if it is a safe Markdown path
@@ -118,7 +194,7 @@ impl Folder {
     }
 
     /// Every Markdown file in the folder and its subfolders, sorted by path.
-    /// Hidden files and folders and symlinks are skipped.
+    /// What the ignore rules match and symlinks are skipped.
     pub fn list(&self) -> Result<Vec<FileEntry>, FolderError> {
         let mut entries = Vec::new();
         self.walk(&self.root, 0, &mut entries)?;
@@ -133,13 +209,13 @@ impl Folder {
         let read = fs::read_dir(dir).map_err(|e| io("list folder", e))?;
         for item in read {
             let item = item.map_err(|e| io("list folder", e))?;
-            let name = item.file_name();
-            if name.to_string_lossy().starts_with('.') {
-                continue;
-            }
             let path = item.path();
             let meta = fs::symlink_metadata(&path).map_err(|e| io("list folder", e))?;
             if meta.file_type().is_symlink() {
+                continue;
+            }
+            let relative = path.strip_prefix(&self.root).unwrap_or(&path);
+            if self.ignores(relative, meta.is_dir()) {
                 continue;
             }
             if meta.is_dir() {
@@ -191,24 +267,7 @@ impl Folder {
         if contents.len() as u64 > MAX_FILE_BYTES {
             return Err(FolderError::TooLarge(relative.to_string()));
         }
-        let dir = path
-            .parent()
-            .ok_or_else(|| FolderError::InvalidPath(relative.to_string()))?;
-        let name = path
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_default();
-        let temp = dir.join(format!(".{name}.konspecter-tmp"));
-        let result = (|| {
-            let mut file = fs::File::create(&temp)?;
-            file.write_all(contents.as_bytes())?;
-            file.sync_all()?;
-            fs::rename(&temp, &path)
-        })();
-        if let Err(error) = result {
-            let _ = fs::remove_file(&temp);
-            return Err(io("write file", error));
-        }
+        write_atomically(&path, contents).map_err(|e| io("write file", e))?;
         let meta = fs::metadata(&path).map_err(|e| io("write file", e))?;
         self.entry(&path, &meta)
     }
@@ -233,7 +292,7 @@ impl Folder {
     }
 
     /// The names a relative path is made of, checked: plain names (no `..`,
-    /// no absolute or drive paths, no backslashes), none hidden.
+    /// no absolute or drive paths, no backslashes).
     fn parts<'a>(&self, relative: &'a str) -> Result<Vec<&'a str>, FolderError> {
         let invalid = || FolderError::InvalidPath(relative.to_string());
         if relative.is_empty() || relative.contains('\\') || relative.contains('\0') {
@@ -244,7 +303,7 @@ impl Folder {
             match component {
                 Component::Normal(part) => {
                     let part = part.to_str().ok_or_else(invalid)?;
-                    if part.starts_with('.') || part.contains(':') {
+                    if part.contains(':') {
                         return Err(invalid());
                     }
                     names.push(part);
@@ -256,9 +315,13 @@ impl Folder {
     }
 
     /// Makes the folders a new file's path needs. Each one that exists must
-    /// really be a folder inside this one (no symlink out of it).
+    /// really be a folder inside this one (no symlink out of it), and none of
+    /// it may be skipped by the ignore rules: the file would vanish.
     fn make_folders_for(&self, relative: &str) -> Result<(), FolderError> {
         let names = self.parts(relative)?;
+        if self.ignores(Path::new(relative), false) {
+            return Err(FolderError::InvalidPath(relative.to_string()));
+        }
         let mut dir = self.root.clone();
         for name in names.iter().take(names.len().saturating_sub(1)) {
             dir.push(name);
@@ -276,9 +339,13 @@ impl Folder {
 
     /// Removes a folder (a relative path, not a file) if nothing is left in it
     /// but a Finder `.DS_Store`, then each parent left empty the same way, up to
-    /// this folder. A folder with anything else in it stays.
+    /// this folder. A folder with anything else in it stays, and one the
+    /// ignore rules skip is not the app's to remove.
     pub fn remove_empty_dir(&self, relative: &str) -> Result<(), FolderError> {
         let names = self.parts(relative)?;
+        if self.ignores(Path::new(relative), true) {
+            return Err(FolderError::InvalidPath(relative.to_string()));
+        }
         let mut depth = names.len();
         while depth > 0 {
             let dir = names[..depth]
@@ -411,12 +478,15 @@ pub enum Changed {
     /// Something else that may affect many files (e.g. a folder renamed):
     /// the whole folder should be read again.
     Rescan,
-    /// Not relevant: hidden files (including our temporary files), other
-    /// file types, paths outside the folder.
+    /// Not relevant: what the ignore rules skip, hidden files other than
+    /// Markdown (our temporary files, `.DS_Store`), other file types, paths
+    /// outside the folder.
     Ignored,
 }
 
 impl Folder {
+    /// A change to the ignore rules themselves is followed here, and asks for
+    /// a rescan: files may have come in or gone out.
     pub fn classify(&self, absolute: &Path) -> Changed {
         let Ok(relative) = absolute.strip_prefix(&self.root) else {
             return Changed::Ignored;
@@ -426,25 +496,51 @@ impl Folder {
             let Component::Normal(part) = component else {
                 return Changed::Ignored;
             };
-            let part = part.to_string_lossy();
-            if part.starts_with('.') {
-                return Changed::Ignored;
-            }
-            parts.push(part.into_owned());
+            parts.push(part.to_string_lossy().into_owned());
         }
         if parts.is_empty() {
             return Changed::Rescan;
         }
+        if parts == [IGNORE_FILE] {
+            self.reload_ignore();
+            return Changed::Rescan;
+        }
+        let is_dir = absolute.is_dir();
+        if self.ignores(relative, is_dir) {
+            return Changed::Ignored;
+        }
         if is_markdown(absolute) {
             return Changed::File(parts.join("/"));
         }
+        let hidden = parts.last().is_some_and(|name| name.starts_with('.'));
         // A directory, or something that is no longer there to inspect.
-        if absolute.is_dir() || absolute.extension().is_none() {
+        if is_dir || (!hidden && absolute.extension().is_none()) {
             Changed::Rescan
         } else {
             Changed::Ignored
         }
     }
+}
+
+/// Writes through a temporary file renamed over the target, so readers see
+/// the old contents or the new, never a part.
+fn write_atomically(path: &Path, contents: &str) -> std::io::Result<()> {
+    let dir = path.parent().unwrap_or(Path::new("."));
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let temp = dir.join(format!(".{name}.konspecter-tmp"));
+    let result = (|| {
+        let mut file = fs::File::create(&temp)?;
+        file.write_all(contents.as_bytes())?;
+        file.sync_all()?;
+        fs::rename(&temp, path)
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temp);
+    }
+    result
 }
 
 fn is_markdown(path: &Path) -> bool {
@@ -521,13 +617,16 @@ mod tests {
         fs::create_dir(folder.root().join("sub")).unwrap();
         assert!(folder.resolve("note.md").is_ok());
         assert!(folder.resolve("sub/Note.MD").is_ok());
+        assert!(
+            folder.resolve(".hidden.md").is_ok(),
+            "the ignore rules decide"
+        );
         for bad in [
             "",
             "../escape.md",
             "sub/../../x.md",
             "/etc/passwd.md",
             "note.txt",
-            ".hidden.md",
             "sub/.git/x.md",
             "a\\b.md",
             "c:x.md",
@@ -567,6 +666,92 @@ mod tests {
 
         let paths: Vec<String> = folder.list().unwrap().into_iter().map(|e| e.path).collect();
         assert_eq!(paths, ["b.md", "java/a.md", "java/collections/maps.md"]);
+    }
+
+    fn listed(folder: &Folder) -> Vec<String> {
+        folder.list().unwrap().into_iter().map(|e| e.path).collect()
+    }
+
+    #[test]
+    fn skips_what_the_default_rules_name() {
+        let (_dir, folder) = folder();
+        let root = folder.root();
+        for dir in [
+            "node_modules/pkg",
+            "vendors",
+            "dist",
+            "bin",
+            "work/dist",
+            ".obsidian",
+        ] {
+            fs::create_dir_all(root.join(dir)).unwrap();
+            fs::write(root.join(dir).join("x.md"), "x").unwrap();
+        }
+        fs::write(root.join("bin.md"), "kept").unwrap();
+        fs::create_dir(root.join("binary")).unwrap();
+        fs::write(root.join("binary/x.md"), "kept").unwrap();
+
+        assert_eq!(folder.ignore_text().unwrap(), DEFAULT_IGNORE);
+        assert_eq!(listed(&folder), ["bin.md", "binary/x.md"]);
+    }
+
+    #[test]
+    fn follows_the_folders_own_rules() {
+        let (_dir, folder) = folder();
+        let root = folder.root();
+        fs::create_dir_all(root.join(".notes")).unwrap();
+        fs::create_dir_all(root.join("drafts")).unwrap();
+        fs::write(root.join(".notes/a.md"), "a").unwrap();
+        fs::write(root.join("drafts/b.md"), "b").unwrap();
+        fs::write(root.join("c.md"), "c").unwrap();
+        fs::write(root.join("keep.tmp.md"), "k").unwrap();
+        fs::write(root.join("x.tmp.md"), "x").unwrap();
+        assert_eq!(
+            listed(&folder),
+            ["c.md", "drafts/b.md", "keep.tmp.md", "x.tmp.md"]
+        );
+
+        // Hidden files are read once the rule for them is gone.
+        folder
+            .write_ignore("# mine\ndrafts/\n*.tmp.md\n!keep.tmp.md\n")
+            .unwrap();
+        assert_eq!(
+            fs::read_to_string(root.join(IGNORE_FILE)).unwrap(),
+            "# mine\ndrafts/\n*.tmp.md\n!keep.tmp.md\n"
+        );
+        assert_eq!(listed(&folder), [".notes/a.md", "c.md", "keep.tmp.md"]);
+        assert_eq!(folder.read(".notes/a.md").unwrap().text, "a");
+
+        // A folder opened later reads the same file.
+        let again = Folder::open(root).unwrap();
+        assert_eq!(listed(&again), [".notes/a.md", "c.md", "keep.tmp.md"]);
+        assert!(matches!(
+            folder.write_ignore(&"x".repeat(MAX_IGNORE_BYTES as usize + 1)),
+            Err(FolderError::TooLarge(_))
+        ));
+    }
+
+    #[test]
+    fn makes_and_removes_nothing_the_rules_skip() {
+        let (dir, folder) = folder();
+        assert!(matches!(
+            folder.create_at("dist/x.md", "x"),
+            Err(FolderError::InvalidPath(_))
+        ));
+        folder.write("a.md", "a").unwrap();
+        assert!(matches!(
+            folder.rename("a.md", "node_modules/a.md"),
+            Err(FolderError::InvalidPath(_))
+        ));
+        assert!(!dir.path().join("dist").exists());
+        assert!(!dir.path().join("node_modules").exists());
+
+        fs::create_dir(dir.path().join("bin")).unwrap();
+        assert!(matches!(
+            folder.remove_empty_dir("bin"),
+            Err(FolderError::InvalidPath(_))
+        ));
+        assert!(dir.path().join("bin").exists());
     }
 
     #[test]
@@ -742,11 +927,41 @@ mod tests {
             Changed::Ignored
         );
         assert_eq!(folder.classify(&root.join(".git/HEAD")), Changed::Ignored);
+        assert_eq!(
+            folder.classify(&root.join("node_modules/pkg/README.md")),
+            Changed::Ignored
+        );
         assert_eq!(folder.classify(&root.join("image.png")), Changed::Ignored);
         assert_eq!(
             folder.classify(Path::new("/elsewhere/a.md")),
             Changed::Ignored
         );
+    }
+
+    #[test]
+    fn follows_changes_to_the_rules_seen_by_the_watcher() {
+        let (_dir, folder) = folder();
+        let root = folder.root();
+        let watched = folder.clone();
+        assert_eq!(watched.classify(&root.join(".a/b.md")), Changed::Ignored);
+
+        // Another program edits the rules: the watcher rescans with the new ones.
+        fs::write(root.join(IGNORE_FILE), "dist\n").unwrap();
+        assert_eq!(watched.classify(&root.join(IGNORE_FILE)), Changed::Rescan);
+        assert_eq!(
+            folder.classify(&root.join(".a/b.md")),
+            Changed::File(".a/b.md".into())
+        );
+        // Hidden files other than Markdown still mean nothing.
+        assert_eq!(folder.classify(&root.join(".DS_Store")), Changed::Ignored);
+        assert_eq!(
+            folder.classify(&root.join(".b.md.konspecter-tmp")),
+            Changed::Ignored
+        );
+
+        // The app writes them: every clone (the watcher's) follows.
+        folder.write_ignore(".*\n").unwrap();
+        assert_eq!(watched.classify(&root.join(".a/b.md")), Changed::Ignored);
     }
 
     #[test]

@@ -49,6 +49,35 @@ pages ─→ NoteRepository ─┬─ NoteStore    (IndexedDB, synced)       —
   modification time. Saving from the app stamps `created`/`updated` into the frontmatter,
   as it does everywhere.
 
+## Ignored files
+
+The folder's **`.konspecterignore`**, at its root and written like `.gitignore`, names what is
+not a note ([plan](../../.claude/plans/ignore-file.md)). Settings → **Ignored files** edits it
+in a text box; Save writes the file and reads the folder again by the new rules. A folder
+without the file uses the default (`domain/note/ignore.ts` `DEFAULT_IGNORE`, the same in
+`folder.rs`):
+
+```gitignore
+.*
+node_modules
+vendors
+dist
+bin
+```
+
+- **Hidden files follow the rules.** The default skips them with `.*`; without that line
+  hidden files and folders are read like any other. The app's own temporary files are not
+  `.md`, so they never are.
+- **Native side:** the walk does not enter what the rules skip, the watcher does not report
+  it, no file is created or renamed into it, and no folder in it is removed (`invalid_path`).
+  A change to the file, by the app or another program, reloads the rules (all clones of the
+  folder share them) and asks for a rescan. Semantics are gitignore's, from the `ignore`
+  crate: as in git, nothing inside a skipped folder can be included again.
+- **`FolderStore`** reads the rules on load and on every refresh, with the `ignore` npm
+  package. A skipped path is no note even when reported. A note whose tags lead into a
+  skipped folder (`#dist`) is made at the top level, a save stays where the file is, and the
+  reformat leaves it alone.
+
 ## Following changes on disk
 
 Other programs can change the folder at any time. The app follows:
@@ -60,8 +89,8 @@ file saved in Vim ─→ Rust watcher (notify, 300 ms debounce) ─→ event "fo
 ```
 
 - **Watcher:** `notify` watches the folder recursively, debounced so a burst of writes is one
-  event. It reports relative `.md` paths. It ignores hidden files, which includes the app's own
-  temporary files, and other file types. A folder rename or a watcher error asks for a
+  event. It reports relative `.md` paths. It skips what the ignore rules match, hidden files
+  other than `.md` (the app's own temporary files, `.DS_Store`), and other file types. A folder rename or a watcher error asks for a
   **rescan** instead, which re-reads the file list.
 - **Incremental update:** only the reported files are re-read. A new file is added, a
   missing file removed, and a changed file replaced, with its tags and search entry
@@ -160,7 +189,9 @@ Konspecter  ⇄  ~/Notes/java.md  ⇄  VS Code / Vim / Neovim / …
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `folder_pick`                    | system folder picker; opens and remembers the folder                                                                                                  |
 | `folder_current`, `folder_close` | the open folder, or none                                                                                                                              |
-| `folder_list`                    | every `.md` file, recursively, sorted by path                                                                                                         |
+| `folder_list`                    | every `.md` file the ignore rules do not skip, recursively, sorted by path                                                                            |
+| `folder_ignore_read`             | the folder's `.konspecterignore`, or the default without one                                                                                          |
+| `folder_ignore_write`            | writes `.konspecterignore` atomically; listing and watching follow it at once                                                                         |
 | `folder_read`                    | a file's text and entry (path, modification time, size)                                                                                               |
 | `folder_write`                   | atomic write (temporary file + rename); refuses with `changed_on_disk` if the file changed since `expectedModifiedMs`                                 |
 | `folder_create_at`               | a new file at exactly the given path, making its folders; `exists` if it is taken (never overwrites)                                                  |
@@ -172,10 +203,11 @@ Konspecter  ⇄  ~/Notes/java.md  ⇄  VS Code / Vim / Neovim / …
 
 - **Only the native folder picker can choose the folder.** The web app passes only relative
   paths, so it cannot aim file access anywhere else, even if script were injected.
-- Every path is validated: no `..`, no absolute or drive paths, no backslashes, no hidden
-  files or folders, `.md` only. Its **real** location (symlinks resolved) must be inside the
-  folder.
-- The listing skips hidden entries and symlinks, and stops after 20,000 files or 24 levels.
+- Every path is validated: no `..`, no absolute or drive paths, no backslashes, `.md` only.
+  Its **real** location (symlinks resolved) must be inside the folder. New files and renames
+  never land where the ignore rules skip.
+- The listing skips what the ignore rules match (hidden entries by default) and symlinks, and
+  stops after 20,000 files or 24 levels.
   Files over 5 MB are refused. Invalid UTF-8 is read with replacement characters instead of
   failing.
 - Writes are atomic, and deletes go to the **trash**, so no version is lost.
@@ -186,7 +218,9 @@ Konspecter  ⇄  ~/Notes/java.md  ⇄  VS Code / Vim / Neovim / …
   recursive listing, atomic write, the changed-on-disk refusal, unique names, exact-path
   creation and renames that never overwrite (a change of case included), folders made for
   new paths (never through a symlink out) and removed only when empty, invalid
-  UTF-8, size limits, watcher path classification, and a real watcher seeing an external write.
+  UTF-8, size limits, watcher path classification, the ignore rules (default, the folder's own,
+  changes seen by the watcher, nothing made or removed where they skip), and a real watcher
+  seeing an external write.
 - `FakeFolder` (TypeScript) mirrors those rules for `FolderStore`, import, and app-level tests:
   listing, editing, creating, trashing, tags, search, reading positions, external edits,
   deletions, renames, rescans, ignoring its own writes, and live pages. File names ignore

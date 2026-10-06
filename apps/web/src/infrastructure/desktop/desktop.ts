@@ -86,7 +86,12 @@ export class FolderError extends Error {
 
 /** The file operations FolderStore needs; tests supply an in-memory one. */
 export type FolderBridge = {
+  /** The Markdown files, without what the folder's ignore rules skip. */
   list(): Promise<FileEntry[]>;
+  /** The folder's ignore rules: its `.konspecterignore`, or the default without one. */
+  readIgnore(): Promise<string>;
+  /** Writes the folder's `.konspecterignore`; listing and watching follow it at once. */
+  writeIgnore(text: string): Promise<void>;
   read(path: string): Promise<FileContents>;
   /** Writes the file atomically, over whatever is there (the last write wins). */
   write(path: string, contents: string): Promise<FileEntry>;
@@ -151,6 +156,14 @@ export const folderBridge: FolderBridge = {
     const value = await folderCommand("folder_list");
     if (!Array.isArray(value)) throw new FolderError("invalid_response", "Invalid file list");
     return value.map(parseEntry);
+  },
+  async readIgnore() {
+    const value = await folderCommand("folder_ignore_read");
+    if (typeof value !== "string") throw new FolderError("invalid_response", "Invalid rules");
+    return value;
+  },
+  async writeIgnore(text) {
+    await folderCommand("folder_ignore_write", { text });
   },
   async read(path) {
     const value = (await folderCommand("folder_read", { path })) as Record<string, unknown> | null;

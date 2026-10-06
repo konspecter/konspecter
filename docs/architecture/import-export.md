@@ -18,7 +18,11 @@ Notes are plain Markdown, so moving them in and out is copying files, never a co
 - **Duplicates** (the same body already in the library) are skipped, so importing twice adds
   nothing.
 - **Validation** (`infrastructure/files/files.ts`): only `.md`/`.markdown` up to 5 MB are
-  read. When a folder is imported, other files are skipped silently. Invalid UTF-8 is
+  read. When a folder is imported, other files are skipped silently, and so is what the
+  app's `.konspecterignore` rules match (Settings → **Ignored files**, written like
+  `.gitignore`, paths relative to the chosen folder; by default hidden files and folders,
+  `node_modules`, `vendors`, `dist` and `bin`). Files chosen one by one are read as chosen.
+  The import from a File Mode folder follows that folder's own rules. Invalid UTF-8 is
   replaced with `�` rather than refused. A file with invalid frontmatter is still imported,
   with its leading `---` escaped, so no text is lost.
 - The result says how many were imported, skipped and not imported, with the reason for each.

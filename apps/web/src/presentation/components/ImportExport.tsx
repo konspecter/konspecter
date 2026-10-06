@@ -2,6 +2,7 @@ import { useId, useState, type ChangeEvent } from "react";
 import { exportFiles } from "../../application/library/export-notes";
 import { importMarkdown, type ImportReport } from "../../application/library/import-markdown";
 import type { NoteRepository } from "../../application/notes/note-repository";
+import { ignoreRules } from "../../domain/note/ignore";
 import { exportToFolder, isDesktop } from "../../infrastructure/desktop/desktop";
 import { downloadFile, readMarkdownFiles, zipFiles } from "../../infrastructure/files/files";
 import { errorMessage, reportError } from "../app/errors";
@@ -28,8 +29,11 @@ function describeImport(
   return { text: `${parts.join(", ")}.`, details: problems.map((p) => `${p.name}: ${p.reason}`) };
 }
 
-/** Markdown in, Markdown out: `.md` files or a folder in, `.md` files (ZIP or folder) out. */
-export function ImportExport({ store }: { store: NoteRepository }) {
+/**
+ * Markdown in, Markdown out: `.md` files or a folder in, `.md` files (ZIP or
+ * folder) out. A folder's import skips what `ignore` (`.konspecterignore`) matches.
+ */
+export function ImportExport({ store, ignore }: { store: NoteRepository; ignore: string }) {
   const filesId = useId();
   const folderId = useId();
   const [busy, setBusy] = useState(false);
@@ -58,7 +62,7 @@ export function ImportExport({ store }: { store: NoteRepository }) {
     event.target.value = "";
     if (files.length === 0) return;
     run(async () => {
-      const { sources, rejected } = await readMarkdownFiles(files);
+      const { sources, rejected } = await readMarkdownFiles(files, ignoreRules(ignore));
       return describeImport(await importMarkdown(sources, store), rejected);
     });
   }
