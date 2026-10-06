@@ -10,6 +10,10 @@ export default defineConfig({
   plugins: process.env.VITEST ? [] : [reactRouter()],
   server: {
     port: 5174,
+    // The API answers CORS for the apps' origins (KONSPECTER_ALLOWED_ORIGINS):
+    // Vite's own CORS would answer their preflights first, and refuse
+    // tauri://localhost and the like.
+    cors: false,
     proxy: { "/api": { target: apiUrl, changeOrigin: false } },
   },
   test: {
