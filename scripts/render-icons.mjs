@@ -7,9 +7,15 @@
 //
 //   pnpm icons
 //
+// macOS 26 draws an Icon Composer icon at whatever size it shows it, so it stays sharp
+// where a bitmap would be scaled (the app switcher). Compiling one takes Xcode 26's
+// actool, so the script runs on a Mac with Xcode 26 selected (xcode-select).
+//
 // Outputs (committed, so builds need none of this):
-//   apps/desktop/src-tauri/icons/   macOS: squircle with margin and shadow (PNGs, .icns);
-//                                   Windows: rounded square (.ico)
+//   apps/desktop/src-tauri/icons/   macOS 26: Icon.icon (Icon Composer: the plate as a fill,
+//                                   the mark as glass layers) and Assets.car, compiled
+//                                   from it; macOS 11–15: squircle with margin and shadow
+//                                   (PNGs, .icns); Windows: rounded square (.ico)
 //   apps/web/public/                favicon.svg, PWA icons (any + maskable), Apple touch icon
 //   apps/site/public/               favicon.svg and the header's logo.svg / logo-dark.svg
 //                                   (no plate), Apple touch icon
@@ -126,6 +132,64 @@ function splash(width, height) {
     ${markAt(scale, { x: width / 2, y: height / 2 })}</svg>`;
 }
 
+// macOS 26: an Icon Composer icon. The system draws the plate (the fill), its edge and
+// shadow, and lights the layers as glass; the mark keeps its size on the plate of the
+// .icns (0.62 of the 824 px squircle is 0.77 of the full canvas).
+const GLASS_SCALE = (0.62 * 1024) / 824;
+/** A path of absolute M/L points scaled about the centre of the #, the transform baked in. */
+const scaled = (d, scale) =>
+  d.replace(/(-?[\d.]+) (-?[\d.]+)/g, (_, x, y) =>
+    [x, y].map((v) => (512 + (Number(v) - 512) * scale).toFixed(1)).join(" "),
+  );
+const layer = (d, fill) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><path fill="${fill}" d="${scaled(d, GLASS_SCALE)}"/></svg>\n`;
+const srgb = (hex) =>
+  `srgb:${[1, 3, 5].map((i) => (parseInt(hex.slice(i, i + 2), 16) / 255).toFixed(5)).join(",")},1.00000`;
+const ICON_COMPOSER = {
+  "icon.json": `${JSON.stringify(
+    {
+      fill: {
+        "linear-gradient": [srgb(COLORS.top), srgb(COLORS.bottom)],
+        orientation: { start: { x: 0.5, y: 0 }, stop: { x: 0.5, y: 1 } },
+      },
+      groups: [
+        {
+          layers: [
+            { "image-name": "strokes.svg", name: "strokes" },
+            { "image-name": "ribbon.svg", name: "ribbon" },
+          ],
+        },
+      ],
+      "supported-platforms": { circles: ["watchOS"], squares: "shared" },
+    },
+    null,
+    2,
+  )}\n`,
+  "Assets/strokes.svg": layer(MARK.strokes, COLORS.strokes),
+  "Assets/ribbon.svg": layer(MARK.ribbon, COLORS.ribbon),
+};
+
+/** The major version of Xcode's actool, or 0 without Xcode. */
+function actoolVersion() {
+  try {
+    const out = execFileSync(
+      "xcrun",
+      ["actool", "--version", "--output-format", "human-readable-text"],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+    );
+    return Number(/short-bundle-version: (\d+)/.exec(out)?.[1] ?? 0);
+  } catch {
+    return 0;
+  }
+}
+
+if (actoolVersion() < 26) {
+  console.error(
+    "The macOS icon (Assets.car) needs Xcode 26 or later: install it and select it with xcode-select.",
+  );
+  process.exit(1);
+}
+
 // --- Rendering -----------------------------------------------------------------
 
 const browser = await chromium.launch();
@@ -168,6 +232,47 @@ try {
     copyFileSync(join(work, "macos", name), join(desktopIcons, name));
   }
   copyFileSync(join(work, "windows", "icon.ico"), join(desktopIcons, "icon.ico"));
+
+  // macOS 26: the Icon Composer source and Assets.car, compiled as the Tauri bundler would
+  // compile it (the bundler takes the .car as it is, so release builds need no Xcode 26).
+  const iconComposer = join(desktopIcons, "Icon.icon");
+  rmSync(iconComposer, { recursive: true, force: true });
+  for (const [name, content] of Object.entries(ICON_COMPOSER)) {
+    mkdirSync(dirname(join(iconComposer, name)), { recursive: true });
+    writeFileSync(join(iconComposer, name), content);
+  }
+  const car = join(work, "car");
+  mkdirSync(car);
+  execFileSync(
+    "xcrun",
+    [
+      "actool",
+      iconComposer,
+      "--compile",
+      car,
+      "--output-format",
+      "human-readable-text",
+      "--notices",
+      "--warnings",
+      "--output-partial-info-plist",
+      join(car, "Info.plist"),
+      "--app-icon",
+      "Icon",
+      "--include-all-app-icons",
+      "--enable-on-demand-resources",
+      "NO",
+      "--development-region",
+      "en",
+      "--target-device",
+      "mac",
+      "--minimum-deployment-target",
+      "26.0",
+      "--platform",
+      "macosx",
+    ],
+    { stdio: "inherit" },
+  );
+  copyFileSync(join(car, "Assets.car"), join(desktopIcons, "Assets.car"));
 
   // Web.
   const web = join(root, "apps/web/public");

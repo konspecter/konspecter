@@ -176,7 +176,8 @@ pnpm licenses:check   # npm dependency license policy
 pnpm check            # all of the above, as CI runs them
 pnpm e2e              # Playwright end-to-end tests in Chromium (see docs/testing.md; the account
                       # and sync flows need a live server: KONSPECTER_E2E_* variables)
-pnpm icons            # re-render every app icon from scripts/render-icons.mjs (needs e2e deps)
+pnpm icons            # re-render every app icon from scripts/render-icons.mjs (needs e2e deps
+                      # and Xcode 26 for the macOS Icon Composer icon)
 pnpm --filter @konspecter/web coverage   # unit tests with coverage
 pnpm --filter @konspecter/web bench      # performance measurements (docs/performance.md)
 

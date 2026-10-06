@@ -1,0 +1,38 @@
+{
+  "fill": {
+    "linear-gradient": [
+      "srgb:0.16471,0.18431,0.21569,1.00000",
+      "srgb:0.10196,0.11373,0.13333,1.00000"
+    ],
+    "orientation": {
+      "start": {
+        "x": 0.5,
+        "y": 0
+      },
+      "stop": {
+        "x": 0.5,
+        "y": 1
+      }
+    }
+  },
+  "groups": [
+    {
+      "layers": [
+        {
+          "image-name": "strokes.svg",
+          "name": "strokes"
+        },
+        {
+          "image-name": "ribbon.svg",
+          "name": "ribbon"
+        }
+      ]
+    }
+  ],
+  "supported-platforms": {
+    "circles": [
+      "watchOS"
+    ],
+    "squares": "shared"
+  }
+}
