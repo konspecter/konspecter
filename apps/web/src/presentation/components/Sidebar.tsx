@@ -176,7 +176,7 @@ export const Sidebar = memo(function Sidebar({
           <GearIcon />
         </Link>
         <Link
-          to="/notes/new"
+          to="/conspects/new"
           className="icon-button"
           aria-label={t("sidebar.newNote")}
           title={withShortcut(t("sidebar.newNote"), SHORTCUTS.newNote.keys)}
@@ -294,7 +294,7 @@ const RecentNote = memo(function RecentNote({
   return (
     <li>
       <Link
-        to={`/notes/${encodeURIComponent(note.id)}`}
+        to={`/conspects/${encodeURIComponent(note.id)}`}
         className="recent-link"
         {...(current ? { "aria-current": "page" } : {})}
       >

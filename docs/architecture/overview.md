@@ -77,8 +77,9 @@ app library (`NoteStore`, IndexedDB) on web and mobile, and the desktop's folder
 ### Web app
 
 - Two panels, a sidebar and the main area: see [user interface](ui.md). Routes (React
-  Router): `/` every note (`?q=` searches and filters it, also by `#tag`), `/notes/new`,
-  `/notes/:id` (both the editor), `/settings`. Anything else shows "not found".
+  Router): `/` every note (`?q=` searches and filters it, also by `#tag`), `/conspects/new`,
+  `/conspects/:id` (both the editor), `/settings`. The old `/notes/…` paths lead to
+  `/conspects/…`. Anything else shows "not found".
 - `main.tsx` opens IndexedDB before the first render and passes the `NoteStore` to `App` as a
   prop, which passes it on to the pages. If IndexedDB cannot be opened, a startup error
   is shown instead.

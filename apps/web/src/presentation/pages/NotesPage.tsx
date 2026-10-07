@@ -223,7 +223,7 @@ const ResultRow = memo(function ResultRow({ row }: { row: Row }) {
     <li className="note-result">
       <ListCover id={row.id} cover={row.cover} title={row.title} />
       <div className="note-result-body">
-        <Link to={`/notes/${encodeURIComponent(row.id)}`} className="note-result-title">
+        <Link to={`/conspects/${encodeURIComponent(row.id)}`} className="note-result-title">
           {row.title.map((part, index) =>
             part.match ? <mark key={index}>{part.text}</mark> : part.text,
           )}
@@ -294,7 +294,7 @@ function Welcome({ store }: { store: NoteRepository }) {
       <h2 id="welcome-title">{t("welcome.title")}</h2>
       <p>{rich("welcome.text", { tags: <code>#tags</code> })}</p>
       <div className="actions">
-        <Link to="/notes/new" className="button button-primary">
+        <Link to="/conspects/new" className="button button-primary">
           {t("welcome.create")}
         </Link>
         <button
@@ -304,7 +304,7 @@ function Welcome({ store }: { store: NoteRepository }) {
           onClick={() => {
             setAdding(true);
             void store.create(t("welcome.exampleNote"), new Date()).then((note) => {
-              void navigate(`/notes/${encodeURIComponent(note.id)}`);
+              void navigate(`/conspects/${encodeURIComponent(note.id)}`);
             });
           }}
         >

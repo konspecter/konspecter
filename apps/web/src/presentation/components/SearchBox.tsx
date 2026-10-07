@@ -79,7 +79,7 @@ export function SearchBox({
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const onList = location.pathname === "/";
-  const onNote = useMatch("/notes/:id") !== null;
+  const onNote = useMatch("/conspects/:id") !== null;
   const query = onList ? (searchParams.get("q") ?? "") : "";
 
   // The query split into chips and text. The URL is the truth: when it

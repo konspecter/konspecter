@@ -36,7 +36,7 @@ type NotePageProps = {
 type Adopted = { readonly id: string; readonly key: string; readonly note: Note };
 
 /**
- * A new note (/notes/new) or an existing one (/notes/:id), open in the
+ * A new note (/conspects/new) or an existing one (/conspects/:id), open in the
  * editor. Both routes render this component, so when a new note's first
  * save gives it an id, the URL changes but the editing session (and the
  * editor, caret and all) stays mounted.
@@ -72,7 +72,7 @@ export function NotePage({ store, mode, activity, readingPosition = "restore" }:
   const adopt = useCallback(
     (note: Note) => {
       setAdopted({ id: note.id, key: sessionKey, note });
-      void navigate(`/notes/${encodeURIComponent(note.id)}`, { replace: true });
+      void navigate(`/conspects/${encodeURIComponent(note.id)}`, { replace: true });
     },
     [sessionKey, navigate],
   );
@@ -192,7 +192,7 @@ function NoteSession({
       const current = autosave.note;
       if (change.source !== "remote" || !current) return;
       if (change.previousId === current.id) {
-        void navigate(`/notes/${encodeURIComponent(change.noteId)}`, { replace: true });
+        void navigate(`/conspects/${encodeURIComponent(change.noteId)}`, { replace: true });
         return;
       }
       if (change.noteId !== current.id || autosave.dirty) return;
@@ -248,7 +248,7 @@ function NoteSession({
         <p role="note" className="conflict-banner">
           {rich("note.conflictCopy", {
             original: (
-              <Link to={`/notes/${encodeURIComponent(metadata.conflictOf)}`}>
+              <Link to={`/conspects/${encodeURIComponent(metadata.conflictOf)}`}>
                 {t("note.theOriginal")}
               </Link>
             ),

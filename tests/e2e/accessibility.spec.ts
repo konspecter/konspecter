@@ -12,12 +12,12 @@ async function audit(page: Page) {
 }
 
 async function seed(page: Page) {
-  await page.goto("/notes/new");
+  await page.goto("/conspects/new");
   await page.getByRole("textbox", { name: "Conspect text" }).click();
   await page.keyboard.type("# Accessible note");
   await page.keyboard.press("Enter");
   await page.keyboard.type("Some text with #tag and a list:");
-  await expect(page).toHaveURL(/\/notes\/(?!new$)[^/]+$/, { timeout: 10_000 });
+  await expect(page).toHaveURL(/\/conspects\/(?!new$)[^/]+$/, { timeout: 10_000 });
   await expect(
     page.getByRole("img", { name: "Everything is stored on this device" }),
   ).toBeVisible();
@@ -32,7 +32,7 @@ for (const scheme of ["light", "dark"] as const) {
     const note = page.url();
     expect(await audit(page), "note").toEqual([]);
 
-    for (const path of ["/", "/?q=note", "/?q=%23tag", "/settings", "/notes/new", "/nowhere"]) {
+    for (const path of ["/", "/?q=note", "/?q=%23tag", "/settings", "/conspects/new", "/nowhere"]) {
       await page.goto(path);
       await page.waitForLoadState("networkidle");
       expect(await audit(page), path).toEqual([]);
@@ -61,7 +61,7 @@ test("no screen overflows sideways on a phone", async ({ browser }) => {
   const overflow = () =>
     page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
 
-  for (const path of ["/", "/?q=note", "/settings", "/notes/new", note]) {
+  for (const path of ["/", "/?q=note", "/settings", "/conspects/new", note]) {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
     expect(await overflow(), path).toBeLessThanOrEqual(0);
@@ -124,7 +124,7 @@ test("the layout fills the window at any size", async ({ page }) => {
 });
 
 test("the sidebar's panes stay inside it, whatever the titles", async ({ page }) => {
-  await page.goto("/notes/new");
+  await page.goto("/conspects/new");
   await page.getByRole("textbox", { name: "Conspect text" }).click();
   await page.keyboard.type("# A conspect title far too long to fit in the sidebar's width at all");
   await page.keyboard.press("Enter");

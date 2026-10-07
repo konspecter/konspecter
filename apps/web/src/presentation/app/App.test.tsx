@@ -234,6 +234,17 @@ describe("layout", () => {
 
     expect(screen.getByRole("heading", { name: "Page not found" })).toBeInTheDocument();
   });
+
+  it("opens a conspect at /conspects/:id, and an old /notes/ link there too", async () => {
+    const store = await newStore();
+    await store.put(javaNote);
+    renderApp(store, "/notes/java");
+
+    expect(await textEditor()).toHaveTextContent("Java Collections");
+    const link = within(recentNav()).getByRole("link", { name: "Java Collections" });
+    expect(link).toHaveAttribute("href", "/conspects/java");
+    expect(link).toHaveAttribute("aria-current", "page");
+  });
 });
 
 describe("sidebar panes", () => {
@@ -245,7 +256,7 @@ describe("sidebar panes", () => {
   };
 
   it("folds each pane on its header, any number open, and remembers it", async () => {
-    renderApp(await taggedStore(), "/notes/java");
+    renderApp(await taggedStore(), "/conspects/java");
     await textEditor();
     const tags = await within(sidebar()).findByRole("navigation", { name: "Tags" });
     const javaTag = within(tags).getByRole("link", { name: "Java" });
@@ -265,7 +276,7 @@ describe("sidebar panes", () => {
     expect(recentNote).toBeVisible();
 
     cleanup();
-    renderApp(await taggedStore(), "/notes/java");
+    renderApp(await taggedStore(), "/conspects/java");
     await textEditor();
     await within(sidebar()).findByRole("navigation", { name: "Tags" });
     expect(paneToggle("Tags")).toHaveAttribute("aria-expanded", "false");
@@ -298,7 +309,7 @@ describe("sidebar panes", () => {
   });
 
   it("enters the sidebar with Ctrl+\\ on an open pane only", async () => {
-    renderApp(await taggedStore(), "/notes/java");
+    renderApp(await taggedStore(), "/conspects/java");
     await within(sidebar()).findByRole("navigation", { name: "Tags" });
     await userEvent.click(paneToggle("Recent"));
     await userEvent.click(paneToggle("Tags"));
@@ -321,7 +332,7 @@ describe("the note list", () => {
     const list = await noteList();
     expect(within(list).getByRole("link", { name: "Java Collections" })).toHaveAttribute(
       "href",
-      "/notes/java",
+      "/conspects/java",
     );
     // A row is the cover, title, date and tags, and the start of the text.
     expect(within(list).getByText(/ArrayList — dynamic array\./)).toBeInTheDocument();
@@ -423,7 +434,7 @@ describe("creating a note", () => {
 
   it("stores nothing when left blank", async () => {
     const store = await newStore();
-    renderApp(store, "/notes/new");
+    renderApp(store, "/conspects/new");
 
     await textEditor();
     await userEvent.click(within(sidebar()).getByRole("link", { name: "Settings" }));
@@ -434,7 +445,7 @@ describe("creating a note", () => {
 
   it("does not save invalid frontmatter, and explains why", async () => {
     const store = await newStore();
-    renderApp(store, "/notes/new");
+    renderApp(store, "/conspects/new");
 
     const editor = await markdownEditor();
     setSourceValue(editor, "---\ncreated: tomorrow\n---\nText");
@@ -450,7 +461,7 @@ describe("creating a note", () => {
     const store = await newStore();
     vi.spyOn(store, "put").mockRejectedValueOnce(new Error("Quota exceeded"));
     vi.spyOn(console, "error").mockImplementation(() => undefined);
-    renderApp(store, "/notes/new");
+    renderApp(store, "/conspects/new");
 
     const editor = await textEditor();
     await userEvent.type(editor, "Important{Enter}text");
@@ -477,7 +488,7 @@ describe("a note", () => {
       markdown:
         "---\ntitle: Covered\ncreated: 2026-09-01T00:00:00Z\nupdated: 2026-09-28T00:00:00Z\ncover: https://example.com/c.png\n---\n\nBody",
     });
-    renderApp(store, "/notes/c");
+    renderApp(store, "/conspects/c");
 
     expect(await textEditor()).toHaveTextContent("Body");
     expect(screen.getByRole("heading", { level: 1, name: "Covered" })).toBeInTheDocument();
@@ -497,7 +508,7 @@ describe("a note", () => {
   it("keeps empty title and cover fields out of the way until asked for", async () => {
     const store = await newStore();
     await store.put(javaNote);
-    renderApp(store, "/notes/java");
+    renderApp(store, "/conspects/java");
 
     await textEditor();
     expect(screen.queryByRole("textbox", { name: "Title" })).not.toBeInTheDocument();
@@ -513,7 +524,7 @@ describe("a note", () => {
   it("saves an author set in the properties into the frontmatter", async () => {
     const store = await newStore();
     await store.put(javaNote);
-    renderApp(store, "/notes/java");
+    renderApp(store, "/conspects/java");
 
     await textEditor();
     await userEvent.click(screen.getByRole("button", { name: "Properties" }));
@@ -536,7 +547,7 @@ describe("a note", () => {
         "maps",
       ),
     );
-    renderApp(store, "/notes/maps");
+    renderApp(store, "/conspects/maps");
 
     expect(await screen.findByRole("table")).toHaveTextContent("TreeMap");
     expect(screen.getByRole("status")).toHaveTextContent("This conspect uses tables");
@@ -549,7 +560,7 @@ describe("a note", () => {
   it("edits the whole document and bumps only the updated date", async () => {
     const store = await newStore();
     await store.put(javaNote);
-    renderApp(store, "/notes/java");
+    renderApp(store, "/conspects/java");
 
     await textEditor();
     const editor = await markdownEditor();
@@ -572,7 +583,7 @@ describe("a note", () => {
     const store = await newStore();
     await store.put(javaNote);
     await store.put(createNote("# Newer", new Date("2021-01-01T00:00:00Z"), "newer"));
-    renderApp(store, "/notes/java");
+    renderApp(store, "/conspects/java");
 
     const box = await textEditor();
     await waitFor(() => {
@@ -591,7 +602,7 @@ describe("a note", () => {
   it("opens a note with invalid frontmatter as source, and saves the fix", async () => {
     const store = await newStore();
     await store.put(brokenNote);
-    renderApp(store, "/notes/broken");
+    renderApp(store, "/conspects/broken");
 
     const source = await screen.findByRole("textbox", { name: "Markdown" });
     expect(screen.getByRole("status")).toHaveTextContent("Text editing is unavailable");
@@ -603,7 +614,7 @@ describe("a note", () => {
   });
 
   it("shows not found for an unknown note", async () => {
-    renderApp(await newStore(), "/notes/missing");
+    renderApp(await newStore(), "/conspects/missing");
 
     expect(await screen.findByRole("heading", { name: "Conspect not found" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Back to conspects" })).toHaveAttribute("href", "/");
@@ -612,7 +623,7 @@ describe("a note", () => {
   it("is deleted after confirmation", async () => {
     const store = await newStore();
     await store.put(javaNote);
-    renderApp(store, "/notes/java");
+    renderApp(store, "/conspects/java");
 
     await userEvent.click(await screen.findByRole("button", { name: "Delete" }));
     const dialog = screen.getByRole("alertdialog", { name: "Delete this conspect?" });
@@ -632,7 +643,7 @@ describe("a note", () => {
   it("is kept when the deletion is cancelled", async () => {
     const store = await newStore();
     await store.put(javaNote);
-    renderApp(store, "/notes/java");
+    renderApp(store, "/conspects/java");
 
     await userEvent.click(await screen.findByRole("button", { name: "Delete" }));
     await userEvent.keyboard("{Escape}");
@@ -682,7 +693,7 @@ describe("tags", () => {
     await userEvent.click(within(tree).getByRole("button", { name: "Expand #collections" }));
     expect(await within(tree).findByRole("link", { name: "Lists" })).toHaveAttribute(
       "href",
-      "/notes/lists",
+      "/conspects/lists",
     );
     await userEvent.click(within(tree).getByRole("button", { name: "Expand #fp" }));
     // The note "Streams" (in #fp), beside the tag folder of the same name.
@@ -691,7 +702,7 @@ describe("tags", () => {
         within(tree)
           .getAllByRole("link", { name: "Streams" })
           .map((link) => link.getAttribute("href")),
-      ).toEqual(["/notes/streams", "/?q=%23streams"]);
+      ).toEqual(["/conspects/streams", "/?q=%23streams"]);
     });
     expect(within(tree).queryByRole("link", { name: "Untagged" })).not.toBeInTheDocument();
   });
@@ -718,7 +729,7 @@ describe("tags", () => {
     const note = await waitFor(() => {
       const link = within(tree)
         .getAllByRole("link", { name: "Streams" })
-        .find((each) => each.getAttribute("href") === "/notes/streams");
+        .find((each) => each.getAttribute("href") === "/conspects/streams");
       expect(link).toBeDefined();
       return link;
     });
@@ -771,7 +782,7 @@ describe("tags", () => {
     await userEvent.click(within(tree).getByRole("button", { name: "Expand #child" }));
     expect(await within(tree).findByRole("link", { name: "Meta" })).toHaveAttribute(
       "href",
-      "/notes/m",
+      "/conspects/m",
     );
   });
 
@@ -895,7 +906,7 @@ describe("search", () => {
   });
 
   it("keeps an open note until something is typed, and returns to it when cleared", async () => {
-    renderApp(await storeWithNotes(), "/notes/maps");
+    renderApp(await storeWithNotes(), "/conspects/maps");
     const editor = await textEditor();
     await userEvent.click(editor);
 
@@ -915,7 +926,7 @@ describe("search", () => {
   });
 
   it("keeps a new note when the search box is focused", async () => {
-    renderApp(await storeWithNotes(), "/notes/new");
+    renderApp(await storeWithNotes(), "/conspects/new");
     await textEditor();
 
     await userEvent.click(findBox());
@@ -936,7 +947,7 @@ describe("search", () => {
     const list = await noteList();
     expect(within(list).getByRole("link", { name: "Hash maps" })).toHaveAttribute(
       "href",
-      "/notes/maps",
+      "/conspects/maps",
     );
     expect(list.querySelector("mark")).toHaveTextContent("collisions");
   });
@@ -1039,7 +1050,7 @@ describe("search", () => {
   });
 
   it("searches the library from a note with Ctrl+P and opens results", async () => {
-    renderApp(await storeWithNotes(), "/notes/maps");
+    renderApp(await storeWithNotes(), "/conspects/maps");
     await textEditor();
 
     await userEvent.keyboard("{Control>}p{/Control}");
@@ -1111,7 +1122,7 @@ describe("search in the note", () => {
   async function openMaps(settings?: Settings) {
     const store = await newStore();
     await store.put(maps);
-    renderApp(store, "/notes/maps", settings);
+    renderApp(store, "/conspects/maps", settings);
     return store;
   }
 
@@ -1259,7 +1270,7 @@ describe("search in the note", () => {
         "table",
       ),
     );
-    renderApp(store, "/notes/table");
+    renderApp(store, "/conspects/table");
     await screen.findByRole("table");
 
     await userEvent.click(findBox());
@@ -1386,7 +1397,7 @@ describe("settings and the top bar", () => {
   it("switches the open note between Text and Markdown from the top bar, and keeps the mode", async () => {
     const store = await newStore();
     await store.put(javaNote);
-    renderWithSettings(store, "/notes/java");
+    renderWithSettings(store, "/conspects/java");
 
     await textEditor();
     expect(topBarButton("Markdown")).toHaveAttribute("aria-pressed", "false");
@@ -1421,7 +1432,7 @@ describe("settings and the top bar", () => {
       configurable: true,
       value: 3000,
     });
-    renderWithSettings(store, "/notes/java", { ...DEFAULT_SETTINGS, readingPosition: "ask" });
+    renderWithSettings(store, "/conspects/java", { ...DEFAULT_SETTINGS, readingPosition: "ask" });
 
     expect(await screen.findByText("You were 50% through this conspect.")).toBeInTheDocument();
   });
@@ -1476,7 +1487,7 @@ describe("the dates a save writes", () => {
   it("appear in the Markdown source at once, next to what is typed", async () => {
     const store = await newStore();
     const settings: Settings = { ...DEFAULT_SETTINGS, defaultEditor: "markdown" };
-    renderApp(store, "/notes/new", settings);
+    renderApp(store, "/conspects/new", settings);
     const source = await screen.findByRole("textbox", { name: "Markdown" });
 
     setSourceValue(source, "# Dated\n\nbody");
@@ -1493,7 +1504,7 @@ describe("the dates a save writes", () => {
 describe("a new note's first line", () => {
   async function typedNote(keys: string, settings?: Settings) {
     const store = await newStore();
-    renderApp(store, "/notes/new", settings);
+    renderApp(store, "/conspects/new", settings);
     const box = await screen.findByRole("textbox", {
       name: settings?.defaultEditor === "markdown" ? "Markdown" : "Conspect text",
     });
@@ -1535,7 +1546,7 @@ describe("note details", () => {
         "maps",
       ),
     );
-    renderApp(store, "/notes/maps");
+    renderApp(store, "/conspects/maps");
 
     await textEditor();
     const region = await within(sidebar()).findByRole("region", { name: "Details" });
@@ -1563,7 +1574,7 @@ describe("note details", () => {
   });
 
   it("shows a new note's details before it is saved", async () => {
-    renderApp(await newStore(), "/notes/new");
+    renderApp(await newStore(), "/conspects/new");
 
     const region = await within(sidebar()).findByRole("region", { name: "Details" });
     expect(region).toHaveTextContent("Not saved yet");
@@ -1576,7 +1587,7 @@ describe("the antenna", () => {
   it("transmits while a change is being saved, then rests", async () => {
     const store = await newStore();
     await store.put(javaNote);
-    renderApp(store, "/notes/java");
+    renderApp(store, "/conspects/java");
 
     const box = await textEditor();
     await userEvent.click(box);
@@ -1669,7 +1680,7 @@ describe("sync", () => {
     await store.put(javaNote);
     // Synced: the server's version may replace it.
     await store.markPushed("java", { revision: 1, markdown: javaNote.markdown });
-    renderApp(store, "/notes/java");
+    renderApp(store, "/conspects/java");
     await textEditor();
     const editor = await markdownEditor();
     setSourceValue(editor, "# My edit");
@@ -1722,7 +1733,7 @@ describe("file mode", () => {
   });
 
   it("creates a file for a new note and trashes deleted ones", async () => {
-    const { folder, render: show } = await folderApp("/notes/new");
+    const { folder, render: show } = await folderApp("/conspects/new");
     show();
 
     await userEvent.type(await textEditor(), "# Fresh idea{Enter}Body");
@@ -1741,7 +1752,7 @@ describe("file mode", () => {
   });
 
   it("updates the list and the open note when files change on disk", async () => {
-    const { folder, store, render: show } = await folderApp("/notes/live.md");
+    const { folder, store, render: show } = await folderApp("/conspects/live.md");
     folder.edit("live.md", "# Live\n\nfirst version");
     await store.watch();
     show();
@@ -1756,7 +1767,7 @@ describe("file mode", () => {
   });
 
   it("follows a note whose file was renamed", async () => {
-    const { folder, store, render: show } = await folderApp("/notes/old.md");
+    const { folder, store, render: show } = await folderApp("/conspects/old.md");
     folder.edit("old.md", "# Moving");
     await store.watch();
     show();
@@ -1767,14 +1778,14 @@ describe("file mode", () => {
 
     await waitFor(() => {
       const link = within(recentNav()).getByRole("link", { name: "Moving" });
-      expect(link).toHaveAttribute("href", "/notes/archive%2Fnew.md");
+      expect(link).toHaveAttribute("href", "/conspects/archive%2Fnew.md");
       expect(link).toHaveAttribute("aria-current", "page");
     });
     expect(await textEditor()).toHaveTextContent("Moving");
   });
 
   it("renames the open note's file after its title, and the editing goes on", async () => {
-    const { folder, render: show } = await folderApp("/notes/test.md", { followTitles: true });
+    const { folder, render: show } = await folderApp("/conspects/test.md", { followTitles: true });
     folder.edit("test.md", "# Test\n\nBody");
     show();
 
@@ -1785,7 +1796,7 @@ describe("file mode", () => {
     });
     await waitFor(() => {
       const link = within(recentNav()).getByRole("link", { name: "Hello мир!" });
-      expect(link).toHaveAttribute("href", "/notes/hello-mir.md");
+      expect(link).toHaveAttribute("href", "/conspects/hello-mir.md");
       expect(link).toHaveAttribute("aria-current", "page");
     });
 
@@ -1799,7 +1810,7 @@ describe("file mode", () => {
   });
 
   it("keeps file names when titles change, unless the setting says otherwise", async () => {
-    const { folder, render: show } = await folderApp("/notes/test.md");
+    const { folder, render: show } = await folderApp("/conspects/test.md");
     folder.edit("test.md", "# Test");
     show();
 
@@ -1811,7 +1822,7 @@ describe("file mode", () => {
   });
 
   it("opens a note in the external editor", async () => {
-    const { folder, render: show } = await folderApp("/notes/ext.md");
+    const { folder, render: show } = await folderApp("/conspects/ext.md");
     folder.edit("ext.md", "# External");
     show();
 
@@ -1823,7 +1834,7 @@ describe("file mode", () => {
   });
 
   it("writes an edit over a file changed on disk meanwhile: the later edit wins", async () => {
-    const { folder, store, render: show } = await folderApp("/notes/race.md");
+    const { folder, store, render: show } = await folderApp("/conspects/race.md");
     folder.edit("race.md", "# Race\n\noriginal");
     await store.watch();
     show();
@@ -1845,7 +1856,7 @@ describe("file mode", () => {
   });
 
   it("writes over a change another program made just before saving", async () => {
-    const { folder, render: show } = await folderApp("/notes/race.md");
+    const { folder, render: show } = await folderApp("/conspects/race.md");
     folder.edit("race.md", "# Race\n\noriginal");
     show();
     await textEditor();
@@ -2093,7 +2104,7 @@ describe("onboarding", () => {
     const welcome = await screen.findByRole("region", { name: "Welcome to Konspecter" });
     expect(
       within(welcome).getByRole("link", { name: "Create your first conspect" }),
-    ).toHaveAttribute("href", "/notes/new");
+    ).toHaveAttribute("href", "/conspects/new");
     await userEvent.click(within(welcome).getByRole("button", { name: "Add an example conspect" }));
 
     await waitFor(() => {
@@ -2110,7 +2121,7 @@ describe("keyboard shortcuts", () => {
   it("opens a new note with Ctrl+N and settings with Ctrl+, from anywhere", async () => {
     const store = await newStore();
     await store.put(javaNote);
-    renderApp(store, "/notes/java");
+    renderApp(store, "/conspects/java");
     await userEvent.click(await textEditor());
 
     await userEvent.keyboard("{Control>},{/Control}");
@@ -2124,7 +2135,7 @@ describe("keyboard shortcuts", () => {
   it("toggles the sidebar with Ctrl+\\: in to the open note when shown, back to the editor", async () => {
     const store = await newStore();
     await store.put(javaNote);
-    renderApp(store, "/notes/java");
+    renderApp(store, "/conspects/java");
     await userEvent.click(await textEditor());
 
     await userEvent.keyboard("{Control>}\\{/Control}");
@@ -2141,7 +2152,7 @@ describe("keyboard shortcuts", () => {
   it("switches between the text and Markdown editors with Ctrl+/, the caret following", async () => {
     const store = await newStore();
     await store.put(javaNote);
-    renderApp(store, "/notes/java");
+    renderApp(store, "/conspects/java");
     await userEvent.click(await textEditor());
 
     await userEvent.keyboard("{Control>}/{/Control}");
@@ -2156,7 +2167,7 @@ describe("keyboard shortcuts", () => {
 
   it("starts another new note on Ctrl+N from a new note", async () => {
     const store = await newStore();
-    renderApp(store, "/notes/new");
+    renderApp(store, "/conspects/new");
     await userEvent.type(await textEditor(), "# First{Enter}one");
     await waitFor(async () => {
       expect(await store.list()).toHaveLength(1);
@@ -2173,7 +2184,7 @@ describe("keyboard shortcuts", () => {
   it("navigates with single keys, but not while typing", async () => {
     const store = await newStore();
     await store.put(javaNote);
-    renderApp(store, "/notes/java");
+    renderApp(store, "/conspects/java");
     const editor = await textEditor();
     await userEvent.click(editor);
     caretAtEnd(editor);
@@ -2192,7 +2203,7 @@ describe("keyboard shortcuts", () => {
   it("goes to every note with Escape, also from the editor", async () => {
     const store = await newStore();
     await store.put(javaNote);
-    renderApp(store, "/notes/java");
+    renderApp(store, "/conspects/java");
     await userEvent.click(await textEditor());
 
     await userEvent.keyboard("{Escape}");
@@ -2203,7 +2214,7 @@ describe("keyboard shortcuts", () => {
   it("leaves Escape to dialogs and the search box", async () => {
     const store = await newStore();
     await store.put(javaNote);
-    renderApp(store, "/notes/java", { ...DEFAULT_SETTINGS, defaultEditor: "markdown" });
+    renderApp(store, "/conspects/java", { ...DEFAULT_SETTINGS, defaultEditor: "markdown" });
     const source = await screen.findByRole("textbox", { name: "Markdown" });
 
     await userEvent.click(screen.getByRole("button", { name: "Delete" }));
@@ -2333,7 +2344,7 @@ describe("small screens", () => {
   });
 
   it("searches the open note from the island", async () => {
-    renderApp(await storeWithNotes(), "/notes/maps");
+    renderApp(await storeWithNotes(), "/conspects/maps");
     const editor = await textEditor();
 
     await userEvent.click(islandButton("Search in this conspect"));
@@ -2346,7 +2357,7 @@ describe("small screens", () => {
   });
 
   it("keeps the note's details behind a button in the sidebar", async () => {
-    renderApp(await storeWithNotes(), "/notes/maps");
+    renderApp(await storeWithNotes(), "/conspects/maps");
     await textEditor();
     await userEvent.click(islandButton("Show sidebar"));
 
@@ -2359,7 +2370,7 @@ describe("small screens", () => {
   });
 
   it("holds the text editor's tools: the one in effect, and every tool until one is used", async () => {
-    renderApp(await storeWithNotes(), "/notes/maps");
+    renderApp(await storeWithNotes(), "/conspects/maps");
     const editor = await textEditor();
     expect(
       [...island().querySelectorAll("button, a")].map((control) =>
@@ -2398,7 +2409,7 @@ describe("small screens", () => {
   });
 
   it("has no editor tools in the Markdown source", async () => {
-    renderApp(await storeWithNotes(), "/notes/maps");
+    renderApp(await storeWithNotes(), "/conspects/maps");
     await textEditor();
     await markdownEditor();
     expect(within(island()).queryByRole("button", { name: "Formatting" })).not.toBeInTheDocument();

@@ -55,7 +55,7 @@ test("a note written on one device reaches the server and another device", async
   await a.keyboard.type(`# ${title}`);
   await a.keyboard.press("Enter");
   await a.keyboard.type("travels through the server");
-  await expect(a).toHaveURL(/\/notes\/(?!new$)[^/]+$/, { timeout: 10_000 });
+  await expect(a).toHaveURL(/\/conspects\/(?!new$)[^/]+$/, { timeout: 10_000 });
 
   // The server holds the note, but only as ciphertext: no trace of the title.
   await expect(async () => {

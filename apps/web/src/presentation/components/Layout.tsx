@@ -99,7 +99,7 @@ export function Layout({
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const noteMatch = useMatch("/notes/:id");
+  const noteMatch = useMatch("/conspects/:id");
   const matchedId = noteMatch?.params.id;
   const currentNoteId = matchedId === undefined || matchedId === "new" ? null : matchedId;
   const onNote = noteMatch !== null;
@@ -221,7 +221,7 @@ export function Layout({
     setLibraryScope(false);
     focusSearch();
   };
-  const newNote = () => void navigate("/notes/new");
+  const newNote = () => void navigate("/conspects/new");
   useShortcuts({
     search: openSearch,
     quickSearch: openSearch,
@@ -313,7 +313,7 @@ export function Layout({
                   <SidebarIcon />
                 </button>
                 <Link
-                  to="/notes/new"
+                  to="/conspects/new"
                   className="icon-button"
                   aria-label={t("sidebar.newNote")}
                   title={withShortcut(t("sidebar.newNote"), SHORTCUTS.newNote.keys)}
@@ -400,7 +400,7 @@ export function Layout({
               {/* The open editor's tools, when it has any. */}
               <span ref={setIslandSlot} className="island-slot" />
               <Link
-                to="/notes/new"
+                to="/conspects/new"
                 className="island-button"
                 aria-label={t("sidebar.newNote")}
                 onClick={closeSidebarOnNarrow}

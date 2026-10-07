@@ -172,7 +172,7 @@ function TagFolder({ node, depth, parent, activeTag, currentNoteId, loadNotes }:
           {notes.map((note) => (
             <li key={note.id}>
               <Link
-                to={`/notes/${encodeURIComponent(note.id)}`}
+                to={`/conspects/${encodeURIComponent(note.id)}`}
                 className="tree-row tree-document"
                 style={indent(depth + 1)}
                 {...(note.id === currentNoteId ? { "aria-current": "page" } : {})}

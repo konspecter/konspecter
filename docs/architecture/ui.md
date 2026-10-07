@@ -112,12 +112,12 @@ breakpoint in the CSS), in the browser, the PWA and the Android app alike
 
 ## Main content
 
-| Route        | Shows                                                                    |
-| ------------ | ------------------------------------------------------------------------ |
-| `/`          | Every note, most recently edited first, no heading; `?q=` filters it     |
-| `/notes/new` | The editor on a new note, focused; stored by its first non-blank save    |
-| `/notes/:id` | The editor on a note; its details and actions in the sidebar's last pane |
-| `/settings`  | Settings, including the keyboard shortcuts                               |
+| Route            | Shows                                                                    |
+| ---------------- | ------------------------------------------------------------------------ |
+| `/`              | Every note, most recently edited first, no heading; `?q=` filters it     |
+| `/conspects/new` | The editor on a new note, focused; stored by its first non-blank save    |
+| `/conspects/:id` | The editor on a note; its details and actions in the sidebar's last pane |
+| `/settings`      | Settings, including the keyboard shortcuts                               |
 
 - **The list** (`pages/NotesPage.tsx`): two columns where they fit (at least 320px each), one
   on small screens or beside a sidebar on a medium one; the arrow keys move through the grid

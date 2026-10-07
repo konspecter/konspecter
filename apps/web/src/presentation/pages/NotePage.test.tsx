@@ -49,8 +49,8 @@ function renderNotePage(
     <MemoryRouter initialEntries={[path]}>
       <WithDetails>
         <Routes>
-          <Route path="notes/new" element={page} />
-          <Route path="notes/:id" element={page} />
+          <Route path="conspects/new" element={page} />
+          <Route path="conspects/:id" element={page} />
         </Routes>
       </WithDetails>
       <Where />
@@ -78,7 +78,7 @@ function caretAtEnd(box: HTMLElement) {
 describe("a new note", () => {
   it("opens focused, and is stored by typing alone, without a remount", async () => {
     const store = await newStore();
-    renderNotePage(store, "/notes/new");
+    renderNotePage(store, "/conspects/new");
 
     const box = await textBox();
     expect(box).toHaveFocus();
@@ -89,7 +89,7 @@ describe("a new note", () => {
     });
     const [note] = await store.list();
     await waitFor(() => {
-      expect(location()).toHaveTextContent(`/notes/${note?.id ?? ""}`);
+      expect(location()).toHaveTextContent(`/conspects/${note?.id ?? ""}`);
     });
     expect(parseDocument(note?.markdown ?? "").body).toBe("# Autosaved\n\nBody");
     // The same editor, still focused: typing simply continues.
@@ -104,7 +104,7 @@ describe("a new note", () => {
 
   it("stores nothing while it is blank", async () => {
     const store = await newStore();
-    renderNotePage(store, "/notes/new");
+    renderNotePage(store, "/conspects/new");
 
     await textBox();
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -117,7 +117,7 @@ describe("an existing note", () => {
     const store = await newStore();
     await store.put(createNote("# Java\n\nBody", new Date("2020-01-01T00:00:00Z"), "java"));
     const activity = new Activity({ linger: 0 });
-    renderNotePage(store, "/notes/java", activity);
+    renderNotePage(store, "/conspects/java", activity);
 
     const box = await textBox();
     await userEvent.click(box);
@@ -142,7 +142,7 @@ describe("an existing note", () => {
   it("saves at once with Ctrl+S", async () => {
     const store = await newStore();
     await store.put(createNote("# Java", new Date("2020-01-01T00:00:00Z"), "java"));
-    renderNotePage(store, "/notes/java");
+    renderNotePage(store, "/conspects/java");
 
     const box = await textBox();
     await userEvent.click(box);
@@ -157,7 +157,7 @@ describe("an existing note", () => {
   it("shows a version changed elsewhere when nothing is unsaved", async () => {
     const store = await newStore();
     await synced(store, "java", "# Java\n\nold");
-    renderNotePage(store, "/notes/java");
+    renderNotePage(store, "/conspects/java");
     const box = await textBox();
     const put = vi.spyOn(store, "put");
 
@@ -178,7 +178,7 @@ describe("an existing note", () => {
   it("keeps an edit that crossed a change from elsewhere: the later edit wins", async () => {
     const store = await newStore();
     await synced(store, "shared", "# Shared\n\nold");
-    renderNotePage(store, "/notes/shared");
+    renderNotePage(store, "/conspects/shared");
 
     const box = await textBox();
     await userEvent.click(box);
@@ -195,7 +195,7 @@ describe("an existing note", () => {
       expect((await store.get("shared"))?.markdown).toContain("old mine");
     });
     expect(await store.list()).toHaveLength(1);
-    expect(location()).toHaveTextContent("/notes/shared");
+    expect(location()).toHaveTextContent("/conspects/shared");
     expect(await textBox()).toHaveTextContent("old mine");
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
   });
@@ -203,7 +203,7 @@ describe("an existing note", () => {
   it("says when the open note was deleted elsewhere, and brings it back when edited", async () => {
     const store = await newStore();
     await synced(store, "gone", "# Gone\n\ntext");
-    renderNotePage(store, "/notes/gone");
+    renderNotePage(store, "/conspects/gone");
     const box = await textBox();
 
     await store.applyRemote({ id: "gone", revision: 2, markdown: "", deleted: true });
@@ -224,10 +224,10 @@ describe("an existing note", () => {
     const store = await newStore();
     await store.put({ id: "broken", markdown: "---\ntitle: [\n---\n\nStill here." });
     render(
-      <MemoryRouter initialEntries={["/notes/broken"]}>
+      <MemoryRouter initialEntries={["/conspects/broken"]}>
         <Routes>
           <Route
-            path="notes/:id"
+            path="conspects/:id"
             element={<NotePage store={store} mode="markdown" activity={new Activity()} />}
           />
         </Routes>
@@ -248,7 +248,7 @@ describe("an existing note", () => {
     for (const mode of ["text", "markdown"] as const) {
       const store = await newStore();
       await store.put(createNote("---\ntags: [extra, go]\n---\n\n# N #go", new Date(), "n"));
-      renderNotePage(store, "/notes/n", new Activity(), mode);
+      renderNotePage(store, "/conspects/n", new Activity(), mode);
       const details = await screen.findByRole("region", { name: "Details" });
 
       // #go is written in the text: it is removed there.
@@ -269,7 +269,7 @@ describe("an existing note", () => {
 
   it("shows not found for an unknown note", async () => {
     const store = await newStore();
-    renderNotePage(store, "/notes/nowhere");
+    renderNotePage(store, "/conspects/nowhere");
 
     expect(await screen.findByRole("heading", { name: "Conspect not found" })).toBeInTheDocument();
   });
@@ -278,7 +278,7 @@ describe("an existing note", () => {
 it("shows an error instead of crashing when the renderer cannot be loaded", async () => {
   const store = await newStore();
   await store.put(createNote("# Table\n\n| a |\n| - |\n| b |", new Date(), "table"));
-  renderNotePage(store, "/notes/table");
+  renderNotePage(store, "/conspects/table");
 
   expect(await screen.findByRole("alert")).toHaveTextContent("Could not load the conspect reader");
   expect(screen.getByRole("heading", { level: 1, name: "Table" })).toBeInTheDocument();

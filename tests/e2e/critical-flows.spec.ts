@@ -1,8 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
-/** Waits until the new note has been stored: the URL changes from /notes/new to its id. */
+/** Waits until the new note has been stored: the URL changes from /conspects/new to its id. */
 async function saved(page: Page) {
-  await expect(page).toHaveURL(/\/notes\/(?!new$)[^/]+$/, { timeout: 10_000 });
+  await expect(page).toHaveURL(/\/conspects\/(?!new$)[^/]+$/, { timeout: 10_000 });
 }
 
 async function createNote(page: Page, lines: string[]) {
@@ -69,7 +69,7 @@ test("Markdown → index → search, and Markdown → tags → navigation", asyn
 });
 
 test("notes persist in IndexedDB across reloads and render as Markdown", async ({ page }) => {
-  await page.goto("/notes/new");
+  await page.goto("/conspects/new");
   await page.getByRole("banner").getByRole("button", { name: "Markdown" }).click();
   await page.getByRole("textbox", { name: "Markdown" }).click();
   await page.keyboard.type(
@@ -115,7 +115,7 @@ test("HTML in a note cannot run script", async ({ page }) => {
     dialogs.push(dialog.message());
     void dialog.dismiss();
   });
-  await page.goto("/notes/new");
+  await page.goto("/conspects/new");
   await page.getByRole("banner").getByRole("button", { name: "Markdown" }).click();
   await page.getByRole("textbox", { name: "Markdown" }).click();
   await page.keyboard.type(
@@ -206,7 +206,7 @@ test("typing in Markdown mode through several saves keeps every character", asyn
 });
 
 test("switching modes keeps the caret and the text on screen in a long note", async ({ page }) => {
-  await page.goto("/notes/new");
+  await page.goto("/conspects/new");
   await page.getByRole("banner").getByRole("button", { name: "Markdown" }).click();
   const source = page.getByRole("textbox", { name: "Markdown" });
   await source.click();

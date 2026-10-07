@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Conspects have their own addresses:** `/conspects/new` and `/conspects/:id` instead of
+  `/notes/…`. Old links and the place the app last showed still open, at the new address. The
+  server API keeps `/api/notes`.
 - **Sidebar panes fold** like VS Code's: Tags, Recent and Details each fold on their header,
   any number open at once, each scrolling on its own; what is folded is kept per device.
 - **Self-hosting from published images.** Each release pushes `konspecter-server`,

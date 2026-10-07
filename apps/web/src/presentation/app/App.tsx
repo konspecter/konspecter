@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Route, Routes } from "react-router";
+import { Navigate, Route, Routes, useLocation } from "react-router";
 import {
   DEFAULT_SETTINGS,
   type EditorMode,
@@ -146,8 +146,9 @@ export function App({
         >
           <Route index element={<NotesPage store={store} catalog={catalog} />} />
           {/* The same element for both, so a new note keeps its editor once saved. */}
-          <Route path="notes/new" element={notePage} />
-          <Route path="notes/:id" element={notePage} />
+          <Route path="conspects/new" element={notePage} />
+          <Route path="conspects/:id" element={notePage} />
+          <Route path="notes/*" element={<OldNotePath />} />
           <Route
             path="settings"
             element={
@@ -166,4 +167,10 @@ export function App({
       </Routes>
     </>
   );
+}
+
+/** A link from before conspects had their own paths: /notes/… is now /conspects/…. */
+function OldNotePath() {
+  const { pathname, search, hash } = useLocation();
+  return <Navigate to={pathname.replace(/^\/notes\//, "/conspects/") + search + hash} replace />;
 }

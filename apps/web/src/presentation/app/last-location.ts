@@ -8,7 +8,7 @@ const KEY = "konspecter.lastLocation";
 
 /** Remembers `path` (pathname and search). A new, still empty note is not a place to return to. */
 export function rememberLocation(path: string): void {
-  if (path.startsWith("/notes/new")) return;
+  if (path.startsWith("/conspects/new")) return;
   try {
     localStorage.setItem(KEY, path);
   } catch {
@@ -30,9 +30,10 @@ export async function restoreLocation(noteExists: (id: string) => Promise<boolea
     return;
   }
   if (saved === null || !saved.startsWith("/") || saved.startsWith("//")) return;
-  const url = new URL(saved, window.location.origin);
+  // Saved before conspects had their own paths.
+  const url = new URL(saved.replace(/^\/notes\//, "/conspects/"), window.location.origin);
   if (url.origin !== window.location.origin || url.pathname + url.search === "/") return;
-  const note = /^\/notes\/([^/]+)$/.exec(url.pathname)?.[1];
+  const note = /^\/conspects\/([^/]+)$/.exec(url.pathname)?.[1];
   if (note !== undefined && !(await noteExists(decodeURIComponent(note)).catch(() => false))) {
     return;
   }

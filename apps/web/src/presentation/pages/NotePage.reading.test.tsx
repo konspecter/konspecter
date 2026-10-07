@@ -19,10 +19,10 @@ async function storeWithNote() {
 
 function renderNote(store: NoteStore, mode: ReadingPositionMode, editor: EditorMode = "text") {
   return render(
-    <MemoryRouter initialEntries={["/notes/n"]}>
+    <MemoryRouter initialEntries={["/conspects/n"]}>
       <Routes>
         <Route
-          path="notes/:id"
+          path="conspects/:id"
           element={
             <NotePage
               store={store}
