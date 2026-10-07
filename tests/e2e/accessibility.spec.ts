@@ -123,6 +123,23 @@ test("the layout fills the window at any size", async ({ page }) => {
   }
 });
 
+test("the sidebar's panes stay inside it, whatever the titles", async ({ page }) => {
+  await page.goto("/notes/new");
+  await page.getByRole("textbox", { name: "Conspect text" }).click();
+  await page.keyboard.type("# A conspect title far too long to fit in the sidebar's width at all");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Text #tag");
+  const sidebar = page.getByRole("complementary", { name: "Sidebar" });
+  const recent = sidebar.getByRole("navigation", { name: "Recent" });
+  await expect(recent.getByRole("link", { name: /far too long/ })).toBeVisible();
+  const right =
+    ((await sidebar.boundingBox())?.x ?? 0) + ((await sidebar.boundingBox())?.width ?? 0);
+  for (const name of ["Tags", "Recent", "Details"]) {
+    const header = await sidebar.getByRole("button", { name, exact: true }).boundingBox();
+    expect((header?.x ?? 0) + (header?.width ?? 0), name).toBeLessThanOrEqual(right);
+  }
+});
+
 test("the shortcuts dialog is accessible", async ({ page }) => {
   await page.goto("/");
   // Wait for the app to render (and its shortcut listener to exist).

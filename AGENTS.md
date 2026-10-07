@@ -72,13 +72,14 @@ All planned phases are done. New work needs a new plan in `.claude/plans/`.
 | Reset      | Settings → Reset to factory settings: app data erased, the files never      | Done   |
 | Folder     | Desktop is always a folder (`~/Konspecter`), synced through file links      | Done   |
 | Key by QR  | The site's QR code hands the encryption key over: no passphrase on the app  | Done   |
+| Panes      | Sidebar blocks fold like VS Code's: any number open, each scrolls, kept     | Done   |
 
 Specs and notes: `.claude/plans/updates-1.md` (+ `updates-1-implementation.md`), `updates-2.md`
 (+ `updates-2-implementation.md`), `markdown-single-source.md`, `last-write-wins.md`, `tag-chains.md` (item 1 of `updates-3.md`), `note-find.md` (item 3), `friendly-errors.md` (item 5), `slug-file-names.md` (item 8), `mode-switch-place.md` (item 14), `mobile-view.md` (mobile view updates), `updates-4.md` (+ `updates-4-implementation.md`), `sync-app-site.md` (+
 `sync-app-site-implementation.md`; ADR-014 to ADR-017), `feedback-1.md`, `feedback.md` (+
 `feedback-implementation.md`; ADR-019), `ignore-file.md`, `self-hosted.md` (ADR-023;
 `docs/self-hosting.md`), `factory-reset.md`, `folder-sync.md` (ADR-024), `connect-with-key.md`
-(ADR-025). UI architecture:
+(ADR-025), `sidebar-panes.md`. UI architecture:
 `docs/architecture/ui.md`; languages: `docs/architecture/i18n.md`; server and API:
 `docs/architecture/server.md`.
 

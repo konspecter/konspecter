@@ -19,7 +19,7 @@ import { GearIcon, ListIcon, NewNoteIcon, SearchIcon, SidebarIcon } from "@konsp
 import { NO_FIND, NoteFindContext, type NoteFind, type NoteFindChannel } from "./note-find";
 import { SearchBox } from "./SearchBox";
 import { ShortcutsDialog } from "./ShortcutsDialog";
-import { Sidebar, SIDEBAR_ROWS, withShortcut } from "./Sidebar";
+import { inOpenPane, Sidebar, SIDEBAR_ROWS, withShortcut } from "./Sidebar";
 import { SyncIndicator } from "./SyncIndicator";
 import { ModeToggle, ThemeToggle, useDarkTheme } from "./TopBarControls";
 import { UpdateBanner } from "./UpdateBanner";
@@ -61,13 +61,19 @@ function rememberSidebar(open: boolean): void {
   }
 }
 
-/** Where Mod+\ enters the sidebar: the open note, else what is current there, else the first row. */
+/**
+ * Where Mod+\ enters the sidebar, in the open panes: the open note, else what
+ * is current there, else the first row; with every pane folded, the first header.
+ */
 function sidebarEntry(): HTMLElement | null {
   const sidebar = document.getElementById("sidebar");
+  const first = (selector: string) =>
+    [...(sidebar?.querySelectorAll<HTMLElement>(selector) ?? [])].find(inOpenPane);
   return (
-    sidebar?.querySelector<HTMLElement>(".recent-link[aria-current]") ??
-    sidebar?.querySelector<HTMLElement>(".sidebar-scroll [aria-current]") ??
-    sidebar?.querySelector<HTMLElement>(SIDEBAR_ROWS) ??
+    first(".recent-link[aria-current]") ??
+    first("nav.sidebar-pane [aria-current]") ??
+    first(SIDEBAR_ROWS) ??
+    first(".pane-toggle") ??
     null
   );
 }

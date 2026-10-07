@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Sidebar panes fold** like VS Code's: Tags, Recent and Details each fold on their header,
+  any number open at once, each scrolling on its own; what is folded is kept per device.
 - **Self-hosting from published images.** Each release pushes `konspecter-server`,
   `konspecter-site` and `konspecter-web` for amd64 and arm64 (GHCR, and the GitLab
   registry), plus a deploy bundle: `compose.yaml`, `Caddyfile` and `.env.example`. Download

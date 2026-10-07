@@ -236,6 +236,79 @@ describe("layout", () => {
   });
 });
 
+describe("sidebar panes", () => {
+  const paneToggle = (name: string) => within(sidebar()).getByRole("button", { name });
+  const taggedStore = async () => {
+    const store = await newStore();
+    await store.put(createNote("# Java Collections\n\nArrayList. #java", new Date(), "java"));
+    return store;
+  };
+
+  it("folds each pane on its header, any number open, and remembers it", async () => {
+    renderApp(await taggedStore(), "/notes/java");
+    await textEditor();
+    const tags = await within(sidebar()).findByRole("navigation", { name: "Tags" });
+    const javaTag = within(tags).getByRole("link", { name: "Java" });
+    const recentNote = within(recentNav()).getByRole("link", { name: "Java Collections" });
+    const details = within(sidebar()).getByRole("region", { name: "Details" });
+    for (const name of ["Tags", "Recent", "Details"]) {
+      expect(paneToggle(name)).toHaveAttribute("aria-expanded", "true");
+    }
+
+    await userEvent.click(paneToggle("Tags"));
+    expect(paneToggle("Tags")).toHaveAttribute("aria-expanded", "false");
+    expect(javaTag).not.toBeVisible();
+    expect(recentNote).toBeVisible();
+    expect(details).toBeVisible();
+    await userEvent.click(paneToggle("Details"));
+    expect(details).not.toBeVisible();
+    expect(recentNote).toBeVisible();
+
+    cleanup();
+    renderApp(await taggedStore(), "/notes/java");
+    await textEditor();
+    await within(sidebar()).findByRole("navigation", { name: "Tags" });
+    expect(paneToggle("Tags")).toHaveAttribute("aria-expanded", "false");
+    expect(paneToggle("Recent")).toHaveAttribute("aria-expanded", "true");
+    expect(paneToggle("Details")).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(paneToggle("Tags"));
+    expect(within(sidebar()).getByRole("link", { name: "Java" })).toBeVisible();
+  });
+
+  it("moves with ↑/↓ through the headers and the rows of open panes", async () => {
+    renderApp(await taggedStore());
+    await within(sidebar()).findByRole("navigation", { name: "Tags" });
+    act(() => {
+      paneToggle("Tags").focus();
+    });
+
+    await userEvent.keyboard("{ArrowDown}");
+    expect(within(sidebar()).getByRole("link", { name: "Java" })).toHaveFocus();
+    await userEvent.keyboard("{ArrowDown}");
+    expect(paneToggle("Recent")).toHaveFocus();
+    await userEvent.keyboard("{ArrowDown}");
+    expect(within(recentNav()).getByRole("link", { name: "Java Collections" })).toHaveFocus();
+
+    // A folded pane's rows are skipped.
+    await userEvent.click(paneToggle("Tags"));
+    await userEvent.keyboard("{ArrowDown}");
+    expect(paneToggle("Recent")).toHaveFocus();
+    await userEvent.keyboard("{ArrowUp}");
+    expect(paneToggle("Tags")).toHaveFocus();
+  });
+
+  it("enters the sidebar with Ctrl+\\ on an open pane only", async () => {
+    renderApp(await taggedStore(), "/notes/java");
+    await within(sidebar()).findByRole("navigation", { name: "Tags" });
+    await userEvent.click(paneToggle("Recent"));
+    await userEvent.click(paneToggle("Tags"));
+    await userEvent.click(await textEditor());
+
+    await userEvent.keyboard("{Control>}\\{/Control}{Control>}\\{/Control}");
+    expect(paneToggle("Tags")).toHaveFocus();
+  });
+});
+
 describe("the note list", () => {
   it("lists every note, most recently edited first, here and in the sidebar", async () => {
     const store = await newStore();
@@ -661,8 +734,10 @@ describe("tags", () => {
     await userEvent.keyboard("{ArrowUp}");
     expect(within(tree).getByRole("link", { name: "Fp" })).toHaveFocus();
 
-    // Past the tree, the recent notes: one list.
+    // Past the tree, the recent notes' header and the notes: one list.
     await userEvent.keyboard("{ArrowDown}{ArrowLeft}{ArrowDown}");
+    expect(within(sidebar()).getByRole("button", { name: "Recent" })).toHaveFocus();
+    await userEvent.keyboard("{ArrowDown}");
     expect(within(recentNav()).getByRole("link", { name: "Lists" })).toHaveFocus();
   });
 

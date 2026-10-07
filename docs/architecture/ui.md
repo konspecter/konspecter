@@ -10,10 +10,11 @@ interface speaks English and Russian ([i18n](i18n.md)). The account site shares 
 ```text
 ┌─ Sidebar ─────────────┬─ Top bar: ≡ [‹ › search ]  (theme) (mode)           (antenna) ─┐
 │ ☰         ⚙  ✎        ├────────────────────────────────────────────────────────────────┤
-│ Tags (tree)           │                                                                │
-│ Recent (by last edit) │   Main content: note list · editor · settings                  │
+│ › Tags (tree)         │                                                                │
+│ ───────────────────── │   Main content: note list · editor · settings                  │
+│ › Recent (last edit)  │                                                                │
 │ ───────────────────── │                                                                │
-│ Details (note page)   │                                                                │
+│ › Details (note page) │                                                                │
 └───────────────────────┴────────────────────────────────────────────────────────────────┘
 ```
 
@@ -22,9 +23,15 @@ interface speaks English and Russian ([i18n](i18n.md)). The account site shares 
   position keeps using the window's scroll). No app header, brand or menu.
 - **Sidebar** (`Sidebar.tsx`): toggle, Settings, New note; the tag tree (tags as folders,
   notes as documents inside them; a tag's name opens `/?q=#tag`, see [tags](tags.md)); recent notes, most recently edited first, with the open
-  one marked. Hidden or shown per device (`localStorage`); while it is hidden, its toggle and New note sit at the start of the top bar; on small screens it starts hidden
+  one marked. These and the details are panes, as in VS Code's side bar: each header (a chevron
+  and the title, a button with `aria-expanded`) folds or opens its pane, any number open at once;
+  the open panes share the height, each scrolling on its own and taking no more than its content
+  needs. The tags keep to the top and the details to the bottom; folded, the recent notes drop
+  down to the details. ↑/↓ move through the headers and the rows of open panes as one list. What is folded is
+  remembered per device (`localStorage`, `konspecter.sidebar.folded`); at first everything is
+  open, except the details on small screens. Hidden or shown per device (`localStorage`); while it is hidden, its toggle and New note sit at the start of the top bar; on small screens it starts hidden
   and covers the whole screen when opened (see [Small screens](#small-screens)).
-- **Details** (`NoteDetails.tsx`, the sidebar's footer): on the note page only (new or
+- **Details** (`NoteDetails.tsx`, the sidebar's last pane): on the note page only (new or
   existing), the note page renders its details into the sidebar through a portal
   (`details-slot.tsx`: the layout provides the element, `<Details>` renders into it). What the
   document says about itself: created and edited dates, author, length (words, characters, reading
@@ -87,8 +94,8 @@ breakpoint in the CSS), in the browser, the PWA and the Android app alike
   does not count when it starts in a dialog or in something that scrolls sideways (a code
   block, a table), or while text is selected.
 - **Sidebar:** a full-screen menu, without its own bar (the island holds those buttons), in
-  bigger text (16px, the tree 15px, the details 14px). The note's details wait behind a
-  "Details" button at its foot (`aria-expanded`).
+  bigger text (16px, the tree 15px, the details 14px) and 36px pane headers. The note's details
+  start folded behind their "Details" header.
 - **Editors:** the editor takes nearly the whole screen, with 8px of room around it (top and
   sides, instead of the page's inset), and its text 4px inside it on every side (CodeMirror's own
   line padding is dropped). The Markdown source is 13px, at a line height of 1.45.
@@ -105,12 +112,12 @@ breakpoint in the CSS), in the browser, the PWA and the Android app alike
 
 ## Main content
 
-| Route        | Shows                                                                 |
-| ------------ | --------------------------------------------------------------------- |
-| `/`          | Every note, most recently edited first, no heading; `?q=` filters it  |
-| `/notes/new` | The editor on a new note, focused; stored by its first non-blank save |
-| `/notes/:id` | The editor on a note; its details and actions in the sidebar's footer |
-| `/settings`  | Settings, including the keyboard shortcuts                            |
+| Route        | Shows                                                                    |
+| ------------ | ------------------------------------------------------------------------ |
+| `/`          | Every note, most recently edited first, no heading; `?q=` filters it     |
+| `/notes/new` | The editor on a new note, focused; stored by its first non-blank save    |
+| `/notes/:id` | The editor on a note; its details and actions in the sidebar's last pane |
+| `/settings`  | Settings, including the keyboard shortcuts                               |
 
 - **The list** (`pages/NotesPage.tsx`): two columns where they fit (at least 320px each), one
   on small screens or beside a sidebar on a medium one; the arrow keys move through the grid
