@@ -21,6 +21,7 @@ import { openNoteStore } from "./infrastructure/storage/note-store";
 import { SyncEngine } from "./infrastructure/sync/sync-engine";
 import { App } from "./presentation/app/App";
 import { flushBeforeClosing } from "./presentation/app/closing";
+import { factoryReset, type FactoryReset } from "./presentation/app/factory-reset";
 import { restoreLocation } from "./presentation/app/last-location";
 import type { LibraryControls } from "./presentation/app/library";
 import type { UpdateSource } from "./presentation/app/updates";
@@ -113,6 +114,19 @@ try {
   // On the desktop the access token lives in the OS keychain.
   const sync = new SyncEngine(store, isDesktop() ? { credentials: keychainCredentials } : {});
   void sync.start();
+  // Clears what the app keeps, never the files of a Markdown folder.
+  const reset: FactoryReset = {
+    appNotes: async () => (await store.list()).length,
+    async run() {
+      await factoryReset({
+        sync,
+        closeFolder: folder ? closeFolder : undefined,
+        store,
+        storage: localStorage,
+      });
+      window.location.replace("/");
+    },
+  };
   root.render(
     <StrictMode>
       <BrowserRouter>
@@ -126,6 +140,7 @@ try {
           library={library}
           updates={updates}
           sync={folder ? undefined : sync}
+          reset={reset}
         />
       </BrowserRouter>
     </StrictMode>,

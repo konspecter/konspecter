@@ -19,6 +19,7 @@ import { NotesPage } from "../pages/NotesPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import { applyLanguage } from "../i18n/setup";
 import { Activity } from "./activity";
+import type { FactoryReset } from "./factory-reset";
 import type { LibraryControls } from "./library";
 import type { UpdateSource } from "./updates";
 
@@ -33,6 +34,8 @@ type AppProps = {
   updates?: UpdateSource;
   /** Background sync with a server; absent when not wired up (tests). */
   sync?: SyncEngine | undefined;
+  /** Reset to factory settings in Settings; absent in tests. */
+  reset?: FactoryReset | undefined;
 };
 
 /** Runs `task` once the browser has nothing more urgent to do. */
@@ -56,6 +59,7 @@ export function App({
   library,
   updates,
   sync,
+  reset,
 }: AppProps) {
   const [settings, setSettings] = useState(initialSettings);
   const [catalog] = useState(() => new NoteCatalog(store));
@@ -153,6 +157,7 @@ export function App({
                 sync={sync}
                 library={library}
                 store={store}
+                reset={reset}
               />
             }
           />

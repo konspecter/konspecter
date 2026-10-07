@@ -69,12 +69,13 @@ All planned phases are done. New work needs a new plan in `.claude/plans/`.
 | Paid sync  | Optional: an external service decides on sync; 402 pause, terms, cookies    | Done   |
 | Ignore     | `.konspecterignore`: gitignore rules for folder import and File Mode        | Done   |
 | Self-host  | Published images (amd64, arm64), deploy bundle, run-time server URL         | Done   |
+| Reset      | Settings → Reset to factory settings: app data erased, the files never      | Done   |
 
 Specs and notes: `.claude/plans/updates-1.md` (+ `updates-1-implementation.md`), `updates-2.md`
 (+ `updates-2-implementation.md`), `markdown-single-source.md`, `last-write-wins.md`, `tag-chains.md` (item 1 of `updates-3.md`), `note-find.md` (item 3), `friendly-errors.md` (item 5), `slug-file-names.md` (item 8), `mode-switch-place.md` (item 14), `mobile-view.md` (mobile view updates), `updates-4.md` (+ `updates-4-implementation.md`), `sync-app-site.md` (+
 `sync-app-site-implementation.md`; ADR-014 to ADR-017), `feedback-1.md`, `feedback.md` (+
 `feedback-implementation.md`; ADR-019), `ignore-file.md`, `self-hosted.md` (ADR-023;
-`docs/self-hosting.md`). UI architecture:
+`docs/self-hosting.md`), `factory-reset.md`. UI architecture:
 `docs/architecture/ui.md`; languages: `docs/architecture/i18n.md`; server and API:
 `docs/architecture/server.md`.
 

@@ -125,6 +125,8 @@ const MAX_RETRY_MS = 5 * 60_000;
 const UNPAID_CHECK_MS = 10 * 60_000;
 /** How old the account's sync state may get before it is asked again. */
 const ACCESS_TTL_MS = 60 * 60_000;
+/** How long a factory reset waits for the server to sign the device out. */
+const SIGN_OUT_WAIT_MS = 3_000;
 
 const browserScheduler: Scheduler = {
   set: (callback, delayMs) => setTimeout(callback, delayMs),
@@ -342,14 +344,37 @@ export class SyncEngine {
    * reconnecting to the same account resumes.
    */
   async disconnect(): Promise<void> {
+    await this.#signOut();
+  }
+
+  /**
+   * Factory reset: disconnects and stops for good. The page reloads next, so
+   * this waits (a few seconds at most) for the server to sign the device out.
+   */
+  async forget(): Promise<void> {
+    const signedOut = await this.#signOut();
+    this.stop();
+    let timer: unknown = null;
+    await Promise.race([
+      signedOut.done,
+      new Promise<void>((resolve) => {
+        timer = this.#scheduler.set(resolve, SIGN_OUT_WAIT_MS);
+      }),
+    ]);
+    this.#scheduler.clear(timer);
+  }
+
+  /** Disconnects; `done` settles once the server has answered the sign-out (or failed to). */
+  async #signOut(): Promise<{ done: Promise<void> }> {
     this.#closeStream();
     this.#cancelTimer();
     await this.#running;
     const config = this.#config;
-    if (config)
-      void this.#client(config)
-        .revokeCurrentToken()
-        .catch(() => undefined);
+    const done = config
+      ? this.#client(config)
+          .revokeCurrentToken()
+          .catch(() => undefined)
+      : Promise.resolve();
     this.#config = null;
     this.#disconnected = null;
     await this.#store.saveMeta(CONFIG_KEY, undefined);
@@ -363,6 +388,7 @@ export class SyncEngine {
       lock: null,
       access: null,
     });
+    return { done };
   }
 
   async #loadKey(): Promise<void> {

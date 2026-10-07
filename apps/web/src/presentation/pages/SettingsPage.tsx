@@ -25,7 +25,9 @@ import { FolderIgnoreSettings, IgnoreSettings } from "../components/IgnoreSettin
 import { ReformatDialog } from "../components/ReformatPrompt";
 import { BackupRecovery } from "../components/BackupRecovery";
 import { ShortcutList } from "../components/ShortcutsDialog";
+import { FactoryResetSettings } from "../components/FactoryResetSettings";
 import type { NoteRepository } from "../../application/notes/note-repository";
+import type { FactoryReset } from "../app/factory-reset";
 import type { LibraryControls } from "../app/library";
 import { useAsync } from "../hooks/use-async";
 import { LOCALE_NAMES, LOCALES, t, tn, type TextKey } from "../i18n/i18n";
@@ -38,6 +40,8 @@ type SettingsPageProps = {
   library?: LibraryControls | undefined;
   /** Where imports go and exports come from; hidden when absent. */
   store?: NoteRepository | undefined;
+  /** Reset to factory settings; hidden when absent. */
+  reset?: FactoryReset | undefined;
 };
 
 type Option<T> = { readonly value: T; readonly label: string };
@@ -90,7 +94,14 @@ function options() {
 }
 
 /** Changes apply and are saved immediately. */
-export function SettingsPage({ settings, onChange, sync, library, store }: SettingsPageProps) {
+export function SettingsPage({
+  settings,
+  onChange,
+  sync,
+  library,
+  store,
+  reset,
+}: SettingsPageProps) {
   const [saveError, setSaveError] = useState<unknown>(null);
   const saveErrorText = useErrorMessage(saveError);
   const choices = options();
@@ -203,6 +214,7 @@ export function SettingsPage({ settings, onChange, sync, library, store }: Setti
         </h2>
         <ShortcutList />
       </section>
+      {reset && <FactoryResetSettings reset={reset} />}
       {saveErrorText !== null && (
         <p role="alert" className="inline-error">
           {t("settings.saveFailed", { error: saveErrorText })}

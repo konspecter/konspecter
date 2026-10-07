@@ -15,6 +15,20 @@ const monday = new Date("2026-09-28T10:00:00.000Z");
 const tuesday = new Date("2026-09-29T10:00:00.000Z");
 
 describe("NoteStore", () => {
+  it("erases the whole database for a factory reset", async () => {
+    const name = uniqueName();
+    const store = await openNoteStore(name);
+    await store.put(createNote("# First #tag", monday, "n1"));
+    await store.saveSettings({ ...DEFAULT_SETTINGS, theme: "dark" });
+
+    await store.erase();
+
+    const fresh = await openNoteStore(name);
+    expect(await fresh.list()).toEqual([]);
+    expect(await fresh.tags()).toEqual([]);
+    expect(await fresh.loadSettings()).toEqual(DEFAULT_SETTINGS);
+  });
+
   it("starts empty", async () => {
     const store = await openNoteStore(uniqueName());
 

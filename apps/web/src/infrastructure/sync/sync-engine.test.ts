@@ -471,6 +471,43 @@ describe("SyncEngine", () => {
     restarted.stop();
     again.stop();
   });
+
+  it("forgets the connection for a factory reset, once the server has signed the device out", async () => {
+    const server = new FakeServer();
+    const a = await device(server);
+    await connected(a.engine, config);
+
+    await a.engine.forget();
+
+    expect(server.tokens.has(config.token)).toBe(false);
+    expect(a.engine.getStatus().state).toBe("disabled");
+    expect(a.scheduler.pending).toEqual([]);
+    const restarted = new SyncEngine(a.store, { fetch: server.fetch, scheduler: a.scheduler });
+    await restarted.start();
+    expect(restarted.getStatus().state).toBe("disabled");
+    restarted.stop();
+  });
+
+  it("does not wait for long on an unreachable server when forgetting", async () => {
+    const server = new FakeServer();
+    const a = await device(server);
+    await connected(a.engine, config);
+    let answer: (() => void) | null = null;
+    server.beforeRespond = () =>
+      new Promise<void>((resolve) => {
+        answer = resolve;
+      });
+
+    const forgotten = a.engine.forget();
+    await vi.waitFor(() => {
+      expect(a.scheduler.pending).toHaveLength(1);
+    });
+    a.scheduler.pending[0]?.callback();
+    await forgotten;
+
+    expect(a.engine.getStatus().state).toBe("disabled");
+    (answer as (() => void) | null)?.();
+  });
 });
 
 describe("SyncEngine and the account's devices", () => {

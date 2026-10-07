@@ -296,6 +296,21 @@ source, or delete this conspect when you are done.
   "backup.downloadFirst": "Download them first",
   "backup.removed": "Unreadable records removed.",
 
+  "reset.title": "Reset to factory settings",
+  "reset.hint":
+    "Returns Konspecter to how it was when installed: settings, the sync connection, reading positions and the app library are erased. Markdown files outside the app are never touched.",
+  "reset.start": "Reset Konspecter…",
+  "reset.confirmTitle": "Reset Konspecter?",
+  "reset.confirm": {
+    one: "The {count} conspect in the app library is erased, with the settings, the sync connection and reading positions. Conspects synced to your account stay there and come back when you connect again; to keep a copy, export them first. Markdown files outside the app are not touched.",
+    other:
+      "The {count} conspects in the app library are erased, with the settings, the sync connection and reading positions. Conspects synced to your account stay there and come back when you connect again; to keep a copy, export them first. Markdown files outside the app are not touched.",
+  },
+  "reset.confirmEmpty":
+    "The settings, the sync connection and reading positions are erased. Markdown files outside the app are not touched.",
+  "reset.confirmButton": "Erase and reset",
+  "reset.resetting": "Resetting…",
+
   "ignore.title": "Ignored files",
   "ignore.app": "What a folder import skips. Files chosen one by one are imported as chosen.",
   "ignore.folder":

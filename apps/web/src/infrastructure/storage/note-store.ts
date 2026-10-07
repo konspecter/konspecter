@@ -1,4 +1,4 @@
-import { openDB, type IDBPDatabase, type IDBPObjectStore, type StoreNames } from "idb";
+import { deleteDB, openDB, type IDBPDatabase, type IDBPObjectStore, type StoreNames } from "idb";
 import { formatTimestamp, parseDocument, updateMetadata } from "../../domain/document/document";
 import type { NoteRepository, UnreadableRecord } from "../../application/notes/note-repository";
 import { createNote, parseNote, type Note } from "../../domain/note/note";
@@ -467,6 +467,16 @@ export class NoteStore implements NoteRepository {
   rebuildIndexes(): Promise<void> {
     this.#search = null;
     return rebuildTagIndex(this.#db);
+  }
+
+  /**
+   * Factory reset: closes the database and deletes it with everything in it.
+   * The store cannot be used afterwards; the app starts afresh on reload.
+   */
+  async erase(): Promise<void> {
+    const { name } = this.#db;
+    this.#db.close();
+    await deleteDB(name);
   }
 }
 
