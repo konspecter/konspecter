@@ -152,7 +152,8 @@ docs/performance.md       measurements and optimizations
 docs/security.md          threat model and measures
 tests/e2e/                Playwright end-to-end tests
 .claude/skills/           commit, konspecter-go (shared with konspecter-billing)
-logo/                     master logo artwork (SVG: black, white, colour, app tile)
+logo/                     master logo artwork (SVG: black, white, colour, app tile, light and dark tiles;
+                          both tiles as 1024 px PNGs for the GitHub avatar)
 docs/license-policy.md    dependency license policy
 license-policy.json       machine-readable license policy used by CI
 scripts/check-licenses.mjs
