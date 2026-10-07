@@ -3,6 +3,9 @@
 // passphrase (or, to set a new passphrase, with the recovery key) and
 // encrypt every note with it; the server only stores and hands out the
 // wrapped forms and checks that notes name the current key.
+//
+// A browser that holds the key can also hand it to an app it connects by
+// QR code, sealed with a secret the server never sees (ADR-025).
 package keys
 
 import (
@@ -74,6 +77,25 @@ func (k Key) Validate() error {
 		return errors.New(`"wrapped_key" must be a wrapped 256-bit key in base64url`)
 	case !decodesTo(k.RecoveryWrappedKey, wrappedBytes):
 		return errors.New(`"recovery_wrapped_key" must be a wrapped 256-bit key in base64url`)
+	}
+	return nil
+}
+
+// Handover is the content key as a browser sealed it for the app that
+// redeems a connect code. Only the secret in the code's link opens it.
+type Handover struct {
+	KeyID string
+	// SealedKey is the content key encrypted with the secret's key.
+	SealedKey string
+}
+
+// Validate checks a handover a client sent.
+func (h Handover) Validate() error {
+	switch {
+	case !notes.ValidKeyID(h.KeyID):
+		return errors.New(`"key_id" must be 1-64 letters, digits, '-' or '_'`)
+	case !decodesTo(h.SealedKey, wrappedBytes):
+		return errors.New(`"sealed_key" must be a sealed 256-bit key in base64url`)
 	}
 	return nil
 }

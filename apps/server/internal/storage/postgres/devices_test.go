@@ -9,6 +9,7 @@ import (
 	"konspecter/server/internal/accounts"
 	"konspecter/server/internal/auth"
 	"konspecter/server/internal/devices"
+	"konspecter/server/internal/keys"
 )
 
 var laptop = devices.Client{Name: "Firefox on Linux", Platform: "linux", ClientVersion: "0.2.0"}
@@ -233,33 +234,42 @@ func TestConnectingADeviceByCode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := db.CreateConnectCode(ctx, user.ID, []byte("first"), time.Now().Add(5*time.Minute)); err != nil {
+	if err := db.CreateConnectCode(ctx, user.ID, []byte("first"), time.Now().Add(5*time.Minute), &keys.Handover{KeyID: "k1", SealedKey: "sealed"}); err != nil {
 		t.Fatal(err)
 	}
-	// A new code replaces the account's old one.
-	if err := db.CreateConnectCode(ctx, user.ID, []byte("second"), time.Now().Add(5*time.Minute)); err != nil {
+	// A new code replaces the account's old one, and its key with it.
+	if err := db.CreateConnectCode(ctx, user.ID, []byte("second"), time.Now().Add(5*time.Minute), nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := db.RedeemConnectCode(ctx, []byte("first"), []byte("t1"), laptop); !errors.Is(err, devices.ErrInvalidConnectCode) {
+	if _, _, _, err := db.RedeemConnectCode(ctx, []byte("first"), []byte("t1"), laptop); !errors.Is(err, devices.ErrInvalidConnectCode) {
 		t.Errorf("the replaced code = %v", err)
 	}
 
 	token, hash, _ := auth.NewToken()
-	device, owner, err := db.RedeemConnectCode(ctx, []byte("second"), hash, laptop)
-	if err != nil || owner.ID != user.ID || owner.Email != "ann@example.com" || owner.Name != "Ann" || device.Name != laptop.Name {
-		t.Fatalf("redeem = %+v, %+v, %v", device, owner, err)
+	device, owner, key, err := db.RedeemConnectCode(ctx, []byte("second"), hash, laptop)
+	if err != nil || owner.ID != user.ID || owner.Email != "ann@example.com" || owner.Name != "Ann" || device.Name != laptop.Name || key != nil {
+		t.Fatalf("redeem = %+v, %+v, %+v, %v", device, owner, key, err)
 	}
 	if d, err := db.DeviceByToken(ctx, token); err != nil || d.ID != device.ID {
 		t.Errorf("the new device's token = %+v, %v", d, err)
 	}
-	if _, _, err := db.RedeemConnectCode(ctx, []byte("second"), []byte("t2"), laptop); !errors.Is(err, devices.ErrInvalidConnectCode) {
+	if _, _, _, err := db.RedeemConnectCode(ctx, []byte("second"), []byte("t2"), laptop); !errors.Is(err, devices.ErrInvalidConnectCode) {
 		t.Errorf("a used code = %v", err)
 	}
 
-	if err := db.CreateConnectCode(ctx, user.ID, []byte("old"), time.Now().Add(-time.Second)); err != nil {
+	// A code with a sealed key hands it over with the token.
+	sealed := keys.Handover{KeyID: "k1", SealedKey: "sealed"}
+	if err := db.CreateConnectCode(ctx, user.ID, []byte("keyed"), time.Now().Add(5*time.Minute), &sealed); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := db.RedeemConnectCode(ctx, []byte("old"), []byte("t3"), laptop); !errors.Is(err, devices.ErrInvalidConnectCode) {
+	if _, _, key, err := db.RedeemConnectCode(ctx, []byte("keyed"), []byte("t4"), laptop); err != nil || key == nil || *key != sealed {
+		t.Errorf("redeem with a key = %+v, %v", key, err)
+	}
+
+	if err := db.CreateConnectCode(ctx, user.ID, []byte("old"), time.Now().Add(-time.Second), nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := db.RedeemConnectCode(ctx, []byte("old"), []byte("t3"), laptop); !errors.Is(err, devices.ErrInvalidConnectCode) {
 		t.Errorf("an expired code = %v", err)
 	}
 }

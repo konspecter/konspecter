@@ -191,6 +191,20 @@ it("connects with a link pasted from the site", async () => {
   );
 });
 
+it("needs no passphrase when the link hands the key over", async () => {
+  const { server } = await setup();
+  const secret = await server.connectCodeWithKey(code);
+  const user = userEvent.setup();
+  await user.click(screen.getByText("Connect with a link from the site"));
+  await user.type(screen.getByLabelText("Connect link"), `${link}.${secret}`);
+  await user.click(screen.getByRole("button", { name: "Connect with the link" }));
+
+  expect(await screen.findByText(/Connected to/)).toHaveTextContent(
+    "Connected to https://sync.example.com as ada@example.com.",
+  );
+  expect(screen.queryByLabelText("Encryption passphrase")).toBeNull();
+});
+
 it("explains a disconnected device and offers to sign in again or stop", async () => {
   const { server, engine } = await setup();
   await engine.connect({ serverUrl: "https://sync.example.com", token: "ksp_ada" });

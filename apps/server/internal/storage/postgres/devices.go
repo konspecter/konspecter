@@ -10,6 +10,7 @@ import (
 
 	"konspecter/server/internal/auth"
 	"konspecter/server/internal/devices"
+	"konspecter/server/internal/keys"
 )
 
 // revokedKept is how long a disconnected device's row stays, so its app
@@ -272,17 +273,22 @@ func (db *DB) ExchangeDeviceCode(ctx context.Context, deviceCodeHash, tokenHash 
 	return device, user, nil
 }
 
-// CreateConnectCode stores the account's connect code, replacing the one it
-// had, and drops expired codes.
-func (db *DB) CreateConnectCode(ctx context.Context, userID string, codeHash []byte, expiresAt time.Time) error {
+// CreateConnectCode stores the account's connect code, with the content key
+// sealed for the app that redeems it (or nil), replacing the code it had,
+// and drops expired codes.
+func (db *DB) CreateConnectCode(ctx context.Context, userID string, codeHash []byte, expiresAt time.Time, key *keys.Handover) error {
+	var keyID, sealedKey *string
+	if key != nil {
+		keyID, sealedKey = &key.KeyID, &key.SealedKey
+	}
 	return pgx.BeginFunc(ctx, db.pool, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, `DELETE FROM device_connect_codes WHERE expires_at <= now()`); err != nil {
 			return fmt.Errorf("prune connect codes: %w", err)
 		}
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO device_connect_codes (code_hash, user_id, expires_at) VALUES ($1, $2, $3)
-			ON CONFLICT (user_id) DO UPDATE SET code_hash = $1, created_at = now(), expires_at = $3`,
-			codeHash, userID, expiresAt,
+			INSERT INTO device_connect_codes (code_hash, user_id, expires_at, key_id, sealed_key) VALUES ($1, $2, $3, $4, $5)
+			ON CONFLICT (user_id) DO UPDATE SET code_hash = $1, created_at = now(), expires_at = $3, key_id = $4, sealed_key = $5`,
+			codeHash, userID, expiresAt, keyID, sealedKey,
 		); err != nil {
 			return fmt.Errorf("store connect code: %w", err)
 		}
@@ -291,19 +297,21 @@ func (db *DB) CreateConnectCode(ctx context.Context, userID string, codeHash []b
 }
 
 // RedeemConnectCode uses up a live connect code: it connects the app as a
-// device of the code's account under tokenHash and returns the device and
-// the user. devices.ErrInvalidConnectCode if no live code has that hash.
-func (db *DB) RedeemConnectCode(ctx context.Context, codeHash, tokenHash []byte, client devices.Client) (devices.Device, auth.User, error) {
+// device of the code's account under tokenHash and returns the device, the
+// user and the key sealed for the app (nil if none).
+// devices.ErrInvalidConnectCode if no live code has that hash.
+func (db *DB) RedeemConnectCode(ctx context.Context, codeHash, tokenHash []byte, client devices.Client) (devices.Device, auth.User, *keys.Handover, error) {
 	var device devices.Device
 	var user auth.User
+	var keyID, sealedKey *string
 	err := pgx.BeginFunc(ctx, db.pool, func(tx pgx.Tx) error {
 		err := tx.QueryRow(ctx, `
 			WITH used AS (
 				DELETE FROM device_connect_codes WHERE code_hash = $1 AND expires_at > now()
-				RETURNING user_id
+				RETURNING user_id, key_id, sealed_key
 			)
-			SELECT u.id::text, u.email, u.display_name FROM used JOIN users u ON u.id = used.user_id`, codeHash,
-		).Scan(&user.ID, &user.Email, &user.Name)
+			SELECT u.id::text, u.email, u.display_name, used.key_id, used.sealed_key FROM used JOIN users u ON u.id = used.user_id`, codeHash,
+		).Scan(&user.ID, &user.Email, &user.Name, &keyID, &sealedKey)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return devices.ErrInvalidConnectCode
 		}
@@ -314,10 +322,14 @@ func (db *DB) RedeemConnectCode(ctx context.Context, codeHash, tokenHash []byte,
 		return err
 	})
 	if errors.Is(err, devices.ErrInvalidConnectCode) {
-		return devices.Device{}, auth.User{}, err
+		return devices.Device{}, auth.User{}, nil, err
 	}
 	if err != nil {
-		return devices.Device{}, auth.User{}, fmt.Errorf("redeem connect code: %w", err)
+		return devices.Device{}, auth.User{}, nil, fmt.Errorf("redeem connect code: %w", err)
 	}
-	return device, user, nil
+	var key *keys.Handover
+	if keyID != nil && sealedKey != nil {
+		key = &keys.Handover{KeyID: *keyID, SealedKey: *sealedKey}
+	}
+	return device, user, key, nil
 }

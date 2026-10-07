@@ -1,8 +1,10 @@
+import { createKey, openKeyTransfer } from "@konspecter/crypto";
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createRoutesStub, useActionData, useLoaderData } from "react-router";
 import { ConnectApp, parseConnectCode, type ConnectCode } from "./connect-app";
 import type { Device } from "./devices";
+import { forgetKey, rememberKey } from "./remembered-key";
 import App from "./root";
 
 const phone: Device = {
@@ -17,12 +19,22 @@ const phone: Device = {
 
 const url = "https://notes.example.com/connect#ksc_abcdefghijklmnopqrstuvwxyz012345";
 
-/** The settings page's part: the action hands out a code, the loader lists `devices.now`. */
-function renderConnect(devices: { now: Device[] }) {
+/**
+ * The settings page's part: the action hands out a code (and records what
+ * was posted to it), the loader lists `devices.now`.
+ */
+function renderConnect(devices: { now: Device[] }, posted: FormData[] = []) {
   function Page() {
     const loaded = useLoaderData<{ devices: Device[] }>();
     const result = useActionData<{ connect: ConnectCode }>();
-    return <ConnectApp code={result?.connect ?? null} error={null} devices={loaded.devices} />;
+    return (
+      <ConnectApp
+        account="a@example.com"
+        code={result?.connect ?? null}
+        error={null}
+        devices={loaded.devices}
+      />
+    );
   }
   const Stub = createRoutesStub([
     {
@@ -41,7 +53,10 @@ function renderConnect(devices: { now: Device[] }) {
           path: "settings",
           Component: Page,
           loader: () => ({ devices: devices.now }),
-          action: () => ({ connect: { url, expiresIn: 300 } }),
+          action: async ({ request }) => {
+            posted.push(await request.formData());
+            return { connect: { url, expiresIn: 300 } };
+          },
         },
       ],
     },
@@ -49,8 +64,9 @@ function renderConnect(devices: { now: Device[] }) {
   render(<Stub initialEntries={["/settings"]} />);
 }
 
-afterEach(() => {
+afterEach(async () => {
   vi.useRealTimers();
+  await forgetKey();
 });
 
 it("reads the API's code", () => {
@@ -72,6 +88,45 @@ it("shows the code as a QR code and as a link to paste", async () => {
   expect(screen.getByText("The code works once, for 5 min.")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Show a new code" })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Done" })).toHaveAttribute("href", "/settings");
+});
+
+it("says the app will ask for the passphrase while this browser does not remember the key", async () => {
+  const posted: FormData[] = [];
+  renderConnect({ now: [] }, posted);
+  expect(await screen.findByRole("link", { name: "Connect apps without it" })).toHaveAttribute(
+    "href",
+    "#encryption",
+  );
+  await userEvent.click(screen.getByRole("button", { name: "Show QR code" }));
+  await screen.findByRole("img", { name: /QR code/ });
+  expect(posted[0]?.get("intent")).toBe("connect");
+  expect(posted[0]?.has("sealed_key")).toBe(false);
+});
+
+it("hands the remembered key over: sealed to the server, its secret only in the link", async () => {
+  const { record, raw } = await createKey("a long passphrase", 1_000);
+  await rememberKey("a@example.com", record.keyId, raw);
+  const posted: FormData[] = [];
+  renderConnect({ now: [] }, posted);
+  expect(await screen.findByText(/This browser remembers your encryption key/)).toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole("button", { name: "Show QR code" }));
+  await screen.findByRole("img", { name: /QR code/ });
+  expect(screen.getByText(/it carries your encryption key too/)).toBeInTheDocument();
+
+  const sent = posted[0];
+  const link = screen.getByLabelText<HTMLInputElement>(
+    "No camera? Paste this link into the app instead",
+  ).value;
+  const secret = link.slice(url.length + 1);
+  expect(link.startsWith(`${url}.`)).toBe(true);
+  expect(sent?.get("intent")).toBe("connect");
+  expect(sent?.get("key_id")).toBe(record.keyId);
+  expect([...(sent?.values() ?? [])]).not.toContain(secret);
+  const sealedKey = sent?.get("sealed_key");
+  if (typeof sealedKey !== "string") throw new Error("no sealed key");
+  const opened = await openKeyTransfer(record.keyId, sealedKey, secret);
+  expect(opened.type).toBe("secret");
 });
 
 it("says which app connected, checking the devices while the code shows", async () => {

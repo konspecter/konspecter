@@ -8,6 +8,7 @@ import { parseDevices, timeAgo, type Device } from "../devices";
 import { Encryption } from "../encryption";
 import { useLocale, useT } from "../i18n/i18n";
 import { readPreferences } from "../preferences.server";
+import { forgetKey, forgetKeyThenSubmit } from "../remembered-key";
 import { parseBilling, parsePlans, type Billing } from "../subscription";
 import { SubscriptionSection } from "../subscription-section";
 import type { Route } from "./+types/settings";
@@ -98,7 +99,13 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   if (intent === "connect") {
-    const result = await callApi(request, "/api/devices/connect-codes", { method: "POST" });
+    // The content key, sealed in the browser for the app, when it remembers the key.
+    const keyId = textField(form, "key_id");
+    const sealedKey = textField(form, "sealed_key");
+    const result = await callApi(request, "/api/devices/connect-codes", {
+      method: "POST",
+      ...(keyId && sealedKey ? { body: { key_id: keyId, sealed_key: sealedKey } } : {}),
+    });
     signInAgainOn401(request, result);
     const code = parseConnectCode(result.data);
     if (result.error || !code) return failed("connect", result);
@@ -203,13 +210,18 @@ export default function Settings() {
         <section className="settings-section" id="encryption" aria-labelledby="encryption-heading">
           <h2 id="encryption-heading">{t("encryption.title")}</h2>
           <p className="settings-text">{t("encryption.lead")}</p>
-          <Encryption />
+          <Encryption account={account.email} />
         </section>
 
         <section className="settings-section" id="connect" aria-labelledby="connect-heading">
           <h2 id="connect-heading">{t("settings.connect.title")}</h2>
           <p className="settings-text">{t("settings.connect.lead")}</p>
-          <ConnectApp code={result?.connect ?? null} error={errorOf("connect")} devices={devices} />
+          <ConnectApp
+            account={account.email}
+            code={result?.connect ?? null}
+            error={errorOf("connect")}
+            devices={devices}
+          />
         </section>
 
         <section className="settings-section" id="devices" aria-labelledby="devices-heading">
@@ -269,7 +281,13 @@ export default function Settings() {
           <h2 id="delete-heading">{t("settings.delete.title")}</h2>
           <p className="settings-text">{t("settings.delete.lead")}</p>
           {account.recentSignIn ? (
-            <Form method="post" className="settings-form">
+            <Form
+              method="post"
+              className="settings-form"
+              onSubmit={() => {
+                void forgetKey();
+              }}
+            >
               <Field
                 label={t("settings.delete.label", { email: account.email })}
                 name="email"
@@ -284,7 +302,12 @@ export default function Settings() {
             </Form>
           ) : (
             // Signing in again starts a fresh session, which may delete the account.
-            <form method="post" action="/logout" className="settings-form">
+            <form
+              method="post"
+              action="/logout"
+              className="settings-form"
+              onSubmit={forgetKeyThenSubmit}
+            >
               <input type="hidden" name="next" value="/login?next=%2Fsettings%23delete" />
               <p className="settings-text">{t("settings.delete.signInAgain")}</p>
               <div className="actions">

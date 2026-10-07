@@ -42,21 +42,21 @@ in-memory fakes.
 
 ## Data model
 
-| Table                   | Holds                                                                                                  |
-| ----------------------- | ------------------------------------------------------------------------------------------------------ |
-| `users`                 | `id`, `email` (unique, lowercase, always verified), `password_hash`, `display_name`, `change_seq`      |
-| `sessions`              | a signed-in browser: `id_hash`, `user_id`, `user_agent`, `created_at`, `last_seen_at`, `expires_at`    |
-| `email_codes`           | one-time sign-in codes: `code_hash`, attempts, expiry, an optional password hash and identity to link  |
-| `password_resets`       | single-use reset links: `token_hash`, `user_id`, expiry                                                |
-| `user_identities`       | `(provider, subject)` linked to a user                                                                 |
-| `pending_identities`    | a provider sign-in waiting for its owner to prove an address (30 minutes)                              |
-| `devices`               | a connected app: `id`, `token_hash` (unique), name, platform, version, last use and sync, `revoked_at` |
-| `device_authorizations` | an app waiting for approval: both codes' hashes, its description, status, expiry, last poll            |
-| `device_connect_codes`  | a code the site shows as a QR code: `code_hash`, `user_id` (unique: one per account), expiry           |
-| `encryption_keys`       | the account's content key, wrapped: `key_id`, `kdf`, `kdf_params`, `salt`, `wrapped_key`, `recovery_…` |
-| `notes`                 | `(user_id, id)`, `content` (envelope), `key_id`, `revision`, timestamps, `deleted_at`, `change_seq`    |
-| `sync_changes`          | the change log: `(user_id, seq)`, `note_id`, `revision`, `operation`                                   |
-| `entitlements`          | paid sync: whether each account may sync, and until when                                               |
+| Table                   | Holds                                                                                                    |
+| ----------------------- | -------------------------------------------------------------------------------------------------------- |
+| `users`                 | `id`, `email` (unique, lowercase, always verified), `password_hash`, `display_name`, `change_seq`        |
+| `sessions`              | a signed-in browser: `id_hash`, `user_id`, `user_agent`, `created_at`, `last_seen_at`, `expires_at`      |
+| `email_codes`           | one-time sign-in codes: `code_hash`, attempts, expiry, an optional password hash and identity to link    |
+| `password_resets`       | single-use reset links: `token_hash`, `user_id`, expiry                                                  |
+| `user_identities`       | `(provider, subject)` linked to a user                                                                   |
+| `pending_identities`    | a provider sign-in waiting for its owner to prove an address (30 minutes)                                |
+| `devices`               | a connected app: `id`, `token_hash` (unique), name, platform, version, last use and sync, `revoked_at`   |
+| `device_authorizations` | an app waiting for approval: both codes' hashes, its description, status, expiry, last poll              |
+| `device_connect_codes`  | a code the site shows as a QR code: `code_hash`, `user_id` (unique: one per account), expiry, sealed key |
+| `encryption_keys`       | the account's content key, wrapped: `key_id`, `kdf`, `kdf_params`, `salt`, `wrapped_key`, `recovery_…`   |
+| `notes`                 | `(user_id, id)`, `content` (envelope), `key_id`, `revision`, timestamps, `deleted_at`, `change_seq`      |
+| `sync_changes`          | the change log: `(user_id, seq)`, `note_id`, `revision`, `operation`                                     |
+| `entitlements`          | paid sync: whether each account may sync, and until when                                                 |
 
 `users` also keeps `locale`, the language of its emails.
 
@@ -165,16 +165,16 @@ and `/api/billing/plans` says `paid: false`.
 
 ### Devices
 
-| Method & path                         | Auth    | Purpose                                                                                                           |
-| ------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------- |
-| `POST /api/devices/authorize`         | none    | an app asks to be connected: `{device_code, user_code, verification_uri(_complete), expires_in, interval}`        |
-| `POST /api/devices/token`             | none    | the app polls: `authorization_pending`, `slow_down`, `access_denied`, `expired_token`, or `{token, device, user}` |
-| `GET /api/devices/pending?user_code=` | session | the app waiting under a code, for `/activate`                                                                     |
-| `POST /api/devices/approve`, `/deny`  | session | decide                                                                                                            |
-| `POST /api/devices/connect-codes`     | session | a code to show as a QR code ([ADR-019](decisions/ADR-019-connect-by-qr-code.md)): `{code, url, expires_in}`       |
-| `POST /api/devices/connect`           | none    | an app trades a scanned code for `{token, device, user}`; else `400 invalid_connect_code`                         |
-| `GET /api/devices`                    | session | the connected devices, most recently active first                                                                 |
-| `DELETE /api/devices/{id}`            | session | disconnect: the token stops working and its streams end at once                                                   |
+| Method & path                         | Auth    | Purpose                                                                                                                                                                                                                                                                   |
+| ------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/devices/authorize`         | none    | an app asks to be connected: `{device_code, user_code, verification_uri(_complete), expires_in, interval}`                                                                                                                                                                |
+| `POST /api/devices/token`             | none    | the app polls: `authorization_pending`, `slow_down`, `access_denied`, `expired_token`, or `{token, device, user}`                                                                                                                                                         |
+| `GET /api/devices/pending?user_code=` | session | the app waiting under a code, for `/activate`                                                                                                                                                                                                                             |
+| `POST /api/devices/approve`, `/deny`  | session | decide                                                                                                                                                                                                                                                                    |
+| `POST /api/devices/connect-codes`     | session | a code to show as a QR code ([ADR-019](decisions/ADR-019-connect-by-qr-code.md)): `{code, url, expires_in}`; an optional body `{key_id, sealed_key}` stores the content key sealed for the app ([ADR-025](decisions/ADR-025-connect-with-key.md)), else `400 invalid_key` |
+| `POST /api/devices/connect`           | none    | an app trades a scanned code for `{token, device, user, key}` (`key`: the sealed key, or `null`); else `400 invalid_connect_code`                                                                                                                                         |
+| `GET /api/devices`                    | session | the connected devices, most recently active first                                                                                                                                                                                                                         |
+| `DELETE /api/devices/{id}`            | session | disconnect: the token stops working and its streams end at once                                                                                                                                                                                                           |
 
 ## Change events
 

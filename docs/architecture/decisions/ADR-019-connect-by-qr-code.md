@@ -1,6 +1,7 @@
 # ADR-019: Connecting an app by QR code
 
-Status: accepted (2026-10-06)
+Status: accepted (2026-10-06). Point 5 amended by
+[ADR-025](ADR-025-connect-with-key.md): a code may carry the content key.
 
 ## Context
 
@@ -33,6 +34,8 @@ done, as messaging apps do.
    app can also paste the link. Android declares `CAMERA` (not required to install).
 5. **Encryption is unchanged.** The code connects the app to the account; the content key
    still needs the passphrase on the device ([ADR-017](ADR-017-end-to-end-encryption.md)).
+   Since [ADR-025](ADR-025-connect-with-key.md), a browser that remembers the key adds it to
+   the code, sealed, and the app needs no passphrase.
 
 ## Consequences
 

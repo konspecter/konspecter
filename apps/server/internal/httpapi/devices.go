@@ -8,6 +8,7 @@ import (
 
 	"konspecter/server/internal/auth"
 	"konspecter/server/internal/devices"
+	"konspecter/server/internal/keys"
 )
 
 // Connecting apps (RFC 8628, the OAuth device flow, over JSON). An app asks
@@ -139,13 +140,32 @@ func (a *api) deviceToken(w http.ResponseWriter, r *http.Request) {
 // createConnectCode gives the signed-in owner a code to show as a QR code,
 // replacing the one they had. The link carries the code in its fragment: a
 // phone camera that opens it sends no secret to the server.
+//
+// A browser that holds the content key may send it sealed (key_id,
+// sealed_key) for the app that redeems the code; it adds the secret that
+// opens it to the link's fragment itself (ADR-025). The body is optional.
 func (a *api) createConnectCode(w http.ResponseWriter, r *http.Request, user auth.User) {
+	var key *keys.Handover
+	if r.ContentLength != 0 {
+		var body struct {
+			KeyID     string `json:"key_id"`
+			SealedKey string `json:"sealed_key"`
+		}
+		if !a.decode(w, r, &body) {
+			return
+		}
+		key = &keys.Handover{KeyID: body.KeyID, SealedKey: body.SealedKey}
+		if err := key.Validate(); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_key", err.Error())
+			return
+		}
+	}
 	code, err := devices.NewConnectCode()
 	if err != nil {
 		a.internalError(w, r, err)
 		return
 	}
-	if err := a.accounts.Devices.CreateConnectCode(r.Context(), user.ID, devices.HashCode(code), time.Now().Add(devices.ConnectCodeTTL)); err != nil {
+	if err := a.accounts.Devices.CreateConnectCode(r.Context(), user.ID, devices.HashCode(code), time.Now().Add(devices.ConnectCodeTTL), key); err != nil {
 		a.internalError(w, r, err)
 		return
 	}
@@ -157,8 +177,8 @@ func (a *api) createConnectCode(w http.ResponseWriter, r *http.Request, user aut
 }
 
 // connectDevice trades a scanned connect code for the app's token, as an
-// approved device-flow poll does. A wrong code counts against the client's
-// address.
+// approved device-flow poll does, and for the content key sealed with it
+// ("key", null if none). A wrong code counts against the client's address.
 func (a *api) connectDevice(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Code          string `json:"code"`
@@ -187,14 +207,18 @@ func (a *api) connectDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	info := devices.NormalizeClient(devices.Client{Name: body.Name, Platform: body.Platform, ClientVersion: body.ClientVersion})
-	device, user, err := a.accounts.Devices.RedeemConnectCode(r.Context(), devices.HashCode(body.Code), tokenHash, info)
+	device, user, key, err := a.accounts.Devices.RedeemConnectCode(r.Context(), devices.HashCode(body.Code), tokenHash, info)
 	switch {
 	case errors.Is(err, devices.ErrInvalidConnectCode):
 		invalid()
 	case err != nil:
 		a.internalError(w, r, err)
 	default:
-		writeJSON(w, http.StatusOK, map[string]any{"token": token, "device": toDeviceJSON(device), "user": userJSON(user)})
+		var handover any
+		if key != nil {
+			handover = map[string]any{"key_id": key.KeyID, "sealed_key": key.SealedKey}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"token": token, "device": toDeviceJSON(device), "user": userJSON(user), "key": handover})
 	}
 }
 

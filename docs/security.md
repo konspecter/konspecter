@@ -80,7 +80,14 @@ What Konspecter protects, from whom, and how. Every item below has tests unless 
   the site shows a connect code (192-bit) only when its signed-in owner asks; it works once,
   for 5 minutes, one per account, stored as a hash. It travels in the link's fragment, so a
   camera opening the link sends it nowhere, and is never logged. Wrong codes count against
-  the client address. An app connected with it still needs the passphrase to read notes.
+  the client address. An app connected with it needs the passphrase to read notes, unless
+  the browser showing the code remembers the content key
+  ([ADR-025](architecture/decisions/ADR-025-connect-with-key.md)): then the code carries the
+  key, sealed with a one-time secret that only the link's fragment holds, and whoever scans
+  it within its 5 minutes gets an app that reads the notes. The site says so next to such a
+  code; the sealed key is deleted with the code. A browser remembers the key only where the
+  passphrase or the recovery key opened it, for one account, until _Forget on this browser_,
+  sign-out, a reset or another key.
 - **Revocation**: the site disconnects a device (its token stops working and its open event
   streams end at once; its app hears `401 device_revoked` and keeps its notes).
   `DELETE /api/tokens/current` signs the calling device out;

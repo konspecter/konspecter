@@ -14,11 +14,16 @@ import {
 import { useEffect, useState, type ReactNode, type SubmitEvent } from "react";
 import { Field } from "./auth-form";
 import { useLocale, useT, type SiteTranslator } from "./i18n/i18n";
+import { forgetKey, forgetKeyUnless, rememberKey, useRememberedKeyId } from "./remembered-key";
 
 /**
  * The Encryption section of the settings page. It runs in the browser only:
  * the passphrase and the content key never leave it. The server gets (and
  * gives back) the key wrapped, through /api/keys with the session cookie.
+ *
+ * Wherever the passphrase or the recovery key opens the key here, this
+ * browser remembers it, so its QR codes connect apps without the passphrase
+ * (remembered-key.ts); it can be forgotten again.
  */
 
 type TextKey = Parameters<SiteTranslator["t"]>[0];
@@ -83,10 +88,25 @@ type State =
   | { readonly kind: "loading" }
   | { readonly kind: "failed"; readonly problem: TextKey }
   | { readonly kind: "off" }
-  | { readonly kind: "recovery"; readonly record: KeyRecord; readonly recoveryKey: string }
+  | {
+      readonly kind: "recovery";
+      readonly record: KeyRecord;
+      readonly recoveryKey: string;
+      readonly raw: Uint8Array<ArrayBuffer>;
+    }
   | { readonly kind: "on"; readonly key: StoredKey };
 
-export function Encryption() {
+/** Remembers the key `raw` opened, once the server has what was changed; then wipes it. */
+async function rememberOpened(account: string, keyId: string, raw: Uint8Array<ArrayBuffer>) {
+  try {
+    await rememberKey(account, keyId, raw);
+  } finally {
+    raw.fill(0);
+  }
+}
+
+/** `account` is the signed-in account's email: the key is remembered for it alone. */
+export function Encryption({ account }: { account: string }) {
   const { t } = useT();
   const [state, setState] = useState<State>({ kind: "loading" });
   const [notice, setNotice] = useState<TextKey | null>(null);
@@ -95,6 +115,8 @@ export function Encryption() {
     let current = true;
     loadKey().then(
       (key) => {
+        // A key remembered before a reset (or another account's) is no use.
+        void forgetKeyUnless(account, key?.keyId ?? null);
         if (current) setState(key ? { kind: "on", key } : { kind: "off" });
       },
       (error: unknown) => {
@@ -104,7 +126,7 @@ export function Encryption() {
     return () => {
       current = false;
     };
-  }, []);
+  }, [account]);
 
   return (
     <div className="encryption">
@@ -124,9 +146,9 @@ export function Encryption() {
       {state.kind === "failed" && <p className="inline-error">{t(state.problem)}</p>}
       {state.kind === "off" && (
         <SetUp
-          onCreated={(record, recoveryKey) => {
+          onCreated={(record, recoveryKey, raw) => {
             setNotice(null);
-            setState({ kind: "recovery", record, recoveryKey });
+            setState({ kind: "recovery", record, recoveryKey, raw });
           }}
         />
       )}
@@ -134,7 +156,8 @@ export function Encryption() {
         <SaveRecoveryKey
           record={state.record}
           recoveryKey={state.recoveryKey}
-          onSaved={(key) => {
+          onSaved={async (key) => {
+            await rememberOpened(account, key.keyId, state.raw);
             setNotice("encryption.setUpDone");
             setState({ kind: "on", key });
           }}
@@ -142,6 +165,7 @@ export function Encryption() {
       )}
       {state.kind === "on" && (
         <KeyOn
+          account={account}
           stored={state.key}
           onChanged={(key, done) => {
             setNotice(done);
@@ -247,7 +271,11 @@ function newPassphrase(form: HTMLFormElement): string {
   return passphrase;
 }
 
-function SetUp({ onCreated }: { onCreated: (record: KeyRecord, recoveryKey: string) => void }) {
+function SetUp({
+  onCreated,
+}: {
+  onCreated: (record: KeyRecord, recoveryKey: string, raw: Uint8Array<ArrayBuffer>) => void;
+}) {
   const { t } = useT();
   return (
     <>
@@ -255,8 +283,8 @@ function SetUp({ onCreated }: { onCreated: (record: KeyRecord, recoveryKey: stri
       <ActionForm
         submit={t("encryption.setUp")}
         action={async (form) => {
-          const { record, recoveryKey } = await createKey(newPassphrase(form));
-          onCreated(record, recoveryKey);
+          const { record, recoveryKey, raw } = await createKey(newPassphrase(form));
+          onCreated(record, recoveryKey, raw);
         }}
       >
         <NewPassphrase />
@@ -273,7 +301,7 @@ function SaveRecoveryKey({
 }: {
   record: KeyRecord;
   recoveryKey: string;
-  onSaved: (key: StoredKey) => void;
+  onSaved: (key: StoredKey) => Promise<void>;
 }) {
   const { t } = useT();
   const [copied, setCopied] = useState(false);
@@ -304,7 +332,7 @@ function SaveRecoveryKey({
           if (!typed || !shown || typed.some((byte, i) => byte !== shown[i])) {
             throw new Problem("encryption.error.recoveryMismatch");
           }
-          onSaved(await saveKey(record));
+          await onSaved(await saveKey(record));
         }}
       >
         <Field
@@ -321,20 +349,69 @@ function SaveRecoveryKey({
 }
 
 function KeyOn({
+  account,
   stored,
   onChanged,
   onReset,
 }: {
+  account: string;
   stored: StoredKey;
   onChanged: (key: StoredKey, done: TextKey) => void;
   onReset: () => void;
 }) {
   const { t } = useT();
   const locale = useLocale();
+  const remembered = useRememberedKeyId(account);
   const since = new Date(stored.createdAt).toLocaleDateString(locale, { dateStyle: "long" });
   return (
     <>
       <p className="settings-text">{t("encryption.onLead", { date: since })}</p>
+      {remembered === stored.keyId ? (
+        <div className="encryption-remembered">
+          <p className="settings-text">{t("encryption.remembered")}</p>
+          <button
+            type="button"
+            className="button"
+            onClick={() => {
+              void forgetKey().then(() => {
+                onChanged(stored, "encryption.forgotten");
+              });
+            }}
+          >
+            {t("encryption.forget")}
+          </button>
+        </div>
+      ) : (
+        remembered !== undefined && (
+          <details className="encryption-action">
+            <summary>{t("encryption.remember")}</summary>
+            <p className="settings-text">{t("encryption.rememberLead")}</p>
+            <ActionForm
+              submit={t("encryption.rememberSubmit")}
+              action={async (form) => {
+                let raw;
+                try {
+                  raw = await openWithPassphrase(stored, text(form, "passphrase"));
+                } catch (error) {
+                  if (error instanceof WrongSecretError)
+                    throw new Problem("encryption.error.wrongPassphrase");
+                  throw error;
+                }
+                await rememberOpened(account, stored.keyId, raw);
+                onChanged(stored, "encryption.rememberedNow");
+              }}
+            >
+              <Field
+                label={t("encryption.passphrase")}
+                name="passphrase"
+                type="password"
+                autoComplete="current-password"
+                required
+              />
+            </ActionForm>
+          </details>
+        )
+      )}
       <details className="encryption-action">
         <summary>{t("encryption.change")}</summary>
         <ActionForm
@@ -349,10 +426,10 @@ function KeyOn({
                 throw new Problem("encryption.error.wrongCurrent");
               throw error;
             }
-            onChanged(
-              await saveKey(await rewrap(stored, raw, next), stored.updatedAt),
-              "encryption.changed",
-            );
+            const opened = raw.slice(); // rewrap wipes raw.
+            const saved = await saveKey(await rewrap(stored, raw, next), stored.updatedAt);
+            await rememberOpened(account, saved.keyId, opened);
+            onChanged(saved, "encryption.changed");
           }}
         >
           <Field
@@ -380,10 +457,10 @@ function KeyOn({
                 throw new Problem("encryption.error.wrongRecovery");
               throw error;
             }
-            onChanged(
-              await saveKey(await rewrap(stored, raw, next), stored.updatedAt),
-              "encryption.changed",
-            );
+            const opened = raw.slice(); // rewrap wipes raw.
+            const saved = await saveKey(await rewrap(stored, raw, next), stored.updatedAt);
+            await rememberOpened(account, saved.keyId, opened);
+            onChanged(saved, "encryption.changed");
           }}
         >
           <Field
@@ -405,6 +482,7 @@ function KeyOn({
           danger
           action={async () => {
             await keysRequest("DELETE");
+            await forgetKey();
             onReset();
           }}
         >

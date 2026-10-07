@@ -19,6 +19,7 @@ import { accountContext, loadAccount } from "./account.server";
 import { siteConfig } from "./config.server";
 import { LOCALE_NAMES, LOCALES, translator, useT, type Locale } from "./i18n/i18n";
 import { isSameOriginRequest } from "./origin.server";
+import { forgetKeyThenSubmit } from "./remembered-key";
 import { cookieNoticeSeen, readPreferences, type Theme } from "./preferences.server";
 import type { Route } from "./+types/root";
 import "./site.css";
@@ -167,7 +168,7 @@ function AccountLinks({
   const { t } = useT();
   if (email) {
     return (
-      <form method="post" action="/logout" className="site-account">
+      <form method="post" action="/logout" className="site-account" onSubmit={forgetKeyThenSubmit}>
         <Link
           to="/settings"
           className="site-account-email"

@@ -561,7 +561,7 @@ describe("SyncEngine and the account's devices", () => {
     await a.store.put(createNote("# Local", date, "n1"));
 
     const account = await a.engine.connectWithLink(
-      { serverUrl: "https://sync.example.com", code },
+      { serverUrl: "https://sync.example.com", code, keySecret: null },
       laptop,
     );
 
@@ -577,8 +577,61 @@ describe("SyncEngine and the account's devices", () => {
     expect(server.notes.has("n1")).toBe(false);
     // The code is used up.
     await expect(
-      a.engine.connectWithLink({ serverUrl: "https://sync.example.com", code }, laptop),
+      a.engine.connectWithLink(
+        { serverUrl: "https://sync.example.com", code, keySecret: null },
+        laptop,
+      ),
     ).rejects.toMatchObject({ code: "invalid_connect_code" });
+  });
+
+  it("connects and unlocks with a link that hands the key over: nothing to type", async () => {
+    const server = new FakeServer();
+    const code = "ksc_abcdefghijklmnopqrstuvwxyz012345";
+    const keySecret = await server.connectCodeWithKey(code);
+    const a = await device(server);
+    await a.store.put(createNote("# Local", date, "n1"));
+
+    await a.engine.connectWithLink(
+      { serverUrl: "https://sync.example.com", code, keySecret },
+      laptop,
+    );
+
+    expect(a.engine.getStatus()).toMatchObject({ state: "idle", lock: null, pending: 0 });
+    expect(server.notes.get("n1")?.markdown).toContain("# Local");
+    expect(server.connectKeys.size).toBe(0);
+  });
+
+  it("asks for the passphrase when the handed-over key does not open", async () => {
+    const server = new FakeServer();
+    const code = "ksc_abcdefghijklmnopqrstuvwxyz012345";
+    await server.connectCodeWithKey(code);
+    const a = await device(server);
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await a.engine.connectWithLink(
+      { serverUrl: "https://sync.example.com", code, keySecret: "x".repeat(43) },
+      laptop,
+    );
+
+    expect(a.engine.getStatus()).toMatchObject({ state: "locked", lock: "unlock" });
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
+  });
+
+  it("locks again when the handed-over key is no longer the account's", async () => {
+    const server = new FakeServer();
+    const code = "ksc_abcdefghijklmnopqrstuvwxyz012345";
+    const keySecret = await server.connectCodeWithKey(code);
+    server.resetKey();
+    await server.setUpKey();
+    const a = await device(server);
+
+    await a.engine.connectWithLink(
+      { serverUrl: "https://sync.example.com", code, keySecret },
+      laptop,
+    );
+
+    expect(a.engine.getStatus()).toMatchObject({ state: "locked", lock: "unlock" });
   });
 
   it("tells when the owner denies the device", async () => {

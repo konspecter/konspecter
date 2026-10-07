@@ -3,6 +3,7 @@ import {
   decryptNote,
   encryptNote,
   envelopeKeyId,
+  sealKeyForTransfer,
   unlock,
   type KeyRecord,
 } from "@konspecter/crypto";
@@ -36,7 +37,7 @@ type Json = Record<string, unknown>;
 export class FakeServer {
   readonly notes = new Map<string, StoredNote>();
   /** The account's key: the wrapped record, and the content key the server should not have. */
-  #key: { record: KeyRecord; contentKey: CryptoKey } | null = null;
+  #key: { record: KeyRecord; contentKey: CryptoKey; raw: Uint8Array<ArrayBuffer> } | null = null;
   #ready: Promise<unknown>;
   #seq = 0;
   readonly tokens = new Map<string, { id: string; email: string }>([
@@ -74,8 +75,8 @@ export class FakeServer {
   /** Sets up a new key (as its owner does on the site); returns its recovery key. */
   async setUpKey(passphrase = TEST_PASSPHRASE): Promise<string> {
     // Light stretching keeps tests fast; the record says how much was used.
-    const { record, recoveryKey } = await createKey(passphrase, 1_000);
-    this.#key = { record, contentKey: await unlock(record, passphrase) };
+    const { record, recoveryKey, raw } = await createKey(passphrase, 1_000);
+    this.#key = { record, contentKey: await unlock(record, passphrase), raw };
     this.#announce();
     return recoveryKey;
   }
@@ -173,14 +174,31 @@ export class FakeServer {
 
   /** Connect codes the site handed out, and the token each one gives. */
   readonly connectCodes = new Map<string, string>();
+  /** The content key sealed for the app that redeems a code, by code. */
+  readonly connectKeys = new Map<string, { key_id: string; sealed_key: string }>();
+
+  /**
+   * Hands out a connect code with the content key sealed for the app, as a
+   * browser that holds the key does; returns the secret for the link.
+   */
+  async connectCodeWithKey(code: string, token = "ksp_ada"): Promise<string> {
+    await this.#ready;
+    if (!this.#key) throw new Error("No key to hand over");
+    const { secret, sealedKey } = await sealKeyForTransfer(this.#key.raw, this.#key.record.keyId);
+    this.connectCodes.set(code, token);
+    this.connectKeys.set(code, { key_id: this.#key.record.keyId, sealed_key: sealedKey });
+    return secret;
+  }
 
   #connect(body: Json): Response {
     const code = String(body.code);
     const token = this.connectCodes.get(code);
+    const key = this.connectKeys.get(code) ?? null;
     this.connectCodes.delete(code);
+    this.connectKeys.delete(code);
     if (!token) return json(400, error("invalid_connect_code", "wrong, used or expired"));
     this.connected.push(body);
-    return json(200, { token, device: { id: "d1" }, user: {} });
+    return json(200, { token, device: { id: "d1" }, user: {}, key });
   }
 
   /** What each app that connected by code said about itself. */

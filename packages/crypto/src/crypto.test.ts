@@ -7,14 +7,17 @@ import {
   envelopeKeyId,
   formatRecoveryKey,
   fromBase64Url,
+  isTransferSecret,
   ITERATIONS,
   keyFromJson,
   keyToJson,
   KDF,
+  openKeyTransfer,
   openWithPassphrase,
   openWithRecoveryKey,
   parseRecoveryKey,
   rewrap,
+  sealKeyForTransfer,
   toBase64Url,
   unlock,
   WrongSecretError,
@@ -96,6 +99,39 @@ describe("the account's key", () => {
 
   it("uses 600 000 iterations for new keys by default", () => {
     expect(ITERATIONS).toBe(600_000);
+  });
+});
+
+describe("handing the key to a new app", () => {
+  it("opens with the one-time secret, to the account's content key", async () => {
+    const { record, raw } = await createKey("correct horse battery", FAST);
+    expect(raw).toEqual(await openWithPassphrase(record, "correct horse battery"));
+    const transfer = await sealKeyForTransfer(raw, record.keyId);
+    expect(isTransferSecret(transfer.secret)).toBe(true);
+    expect(transfer.sealedKey).not.toContain(toBase64Url(raw));
+
+    const handed = await openKeyTransfer(record.keyId, transfer.sealedKey, transfer.secret);
+    expect(handed.extractable).toBe(false);
+    const unlocked = await unlock(record, "correct horse battery");
+    const envelope = await encryptNote(unlocked, record.keyId, "n1", "# Hello");
+    expect(await decryptNote(handed, record.keyId, "n1", envelope)).toBe("# Hello");
+  });
+
+  it("refuses another secret, another key id, a tampered or malformed key", async () => {
+    const { record, raw } = await createKey("correct horse battery", FAST);
+    const { secret, sealedKey } = await sealKeyForTransfer(raw, record.keyId);
+    const other = await sealKeyForTransfer(raw, record.keyId);
+    const flipped = fromBase64Url(sealedKey);
+    flipped[20] = (flipped[20] ?? 0) ^ 1;
+    for (const [keyId, sealed, key] of [
+      [record.keyId, sealedKey, other.secret],
+      ["another-key-", sealedKey, secret],
+      [record.keyId, toBase64Url(flipped), secret],
+      [record.keyId, "not*base64", secret],
+      [record.keyId, sealedKey, "short"],
+    ] as const) {
+      await expect(openKeyTransfer(keyId, sealed, key)).rejects.toBeInstanceOf(WrongSecretError);
+    }
   });
 });
 

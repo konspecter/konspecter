@@ -13,6 +13,10 @@
  * A note travels as the envelope `ksp1.<keyId>.<base64url(iv ‖ ciphertext ‖
  * tag)>`, with the note's id as additional data: the server cannot read it,
  * change it unnoticed, or pass one note off as another.
+ *
+ * To connect an app without the passphrase, a browser that holds K seals it
+ * with a one-time secret (HKDF again, being random) for the server to hand
+ * over once; the secret travels only in the connect link's fragment.
  */
 
 /** How the passphrase is stretched; the only method so far. */
@@ -28,6 +32,7 @@ const TAG_BYTES = 16;
 const SALT_BYTES = 16;
 const KEY_ID_BYTES = 9;
 const RECOVERY_BYTES = 20;
+const TRANSFER_SECRET_BYTES = 32;
 const MAX_ITERATIONS = 10_000_000;
 
 /** The account's key as the server stores it (all binary values base64url). */
@@ -244,18 +249,18 @@ function checkRecord(record: KeyRecord): number {
 /**
  * Makes the account's key: a new content key, wrapped with the passphrase
  * and with a new recovery key, which is returned once to show to the owner.
+ * `raw` is the content key itself, for the caller to keep (or wipe).
  * `iterations` is for tests only.
  */
 export async function createKey(
   passphrase: string,
   iterations: number = ITERATIONS,
-): Promise<{ record: KeyRecord; recoveryKey: string }> {
+): Promise<{ record: KeyRecord; recoveryKey: string; raw: Uint8Array<ArrayBuffer> }> {
   const raw = random(32);
   const keyId = toBase64Url(random(KEY_ID_BYTES));
   const recovery = random(RECOVERY_BYTES);
   const wrapped = await wrapWithPassphrase(raw, keyId, passphrase, iterations);
   const recoveryWrapped = await seal(await recoveryKeyKey(recovery), raw, keyAad(keyId));
-  raw.fill(0);
   return {
     record: {
       keyId,
@@ -265,6 +270,7 @@ export async function createKey(
       recoveryWrappedKey: toBase64Url(recoveryWrapped),
     },
     recoveryKey: formatRecoveryKey(recovery),
+    raw,
   };
 }
 
@@ -319,6 +325,81 @@ export async function rewrap(
  */
 export async function unlock(record: KeyRecord, passphrase: string): Promise<CryptoKey> {
   const raw = await openWithPassphrase(record, passphrase);
+  try {
+    return await crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"]);
+  } finally {
+    raw.fill(0);
+  }
+}
+
+// --- Handing the key to a new app -------------------------------------------
+
+/** The content key sealed for one app, and the secret that opens it. */
+export interface KeyTransfer {
+  /** 32 random bytes (base64url): for the connect link's fragment only. */
+  readonly secret: string;
+  /** K sealed with the secret's key: for the server to hand over once. */
+  readonly sealedKey: string;
+}
+
+/** Whether `text` has the form of a transfer secret (32 bytes in base64url). */
+export function isTransferSecret(text: string): boolean {
+  return /^[A-Za-z0-9_-]{43}$/.test(text);
+}
+
+async function transferKey(secret: Uint8Array<ArrayBuffer>) {
+  const material = await crypto.subtle.importKey("raw", secret, "HKDF", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    {
+      name: "HKDF",
+      hash: "SHA-256",
+      salt: new Uint8Array(0),
+      info: encoder.encode("konspecter/transfer/v1"),
+    },
+    material,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
+function transferAad(keyId: string): Uint8Array<ArrayBuffer> {
+  return encoder.encode(`konspecter/transfer/v1|${keyId}`);
+}
+
+/** Seals the raw content key `raw` (of `keyId`) with a new one-time secret. */
+export async function sealKeyForTransfer(
+  raw: Uint8Array<ArrayBuffer>,
+  keyId: string,
+): Promise<KeyTransfer> {
+  const secret = random(TRANSFER_SECRET_BYTES);
+  const sealed = await seal(await transferKey(secret), raw, transferAad(keyId));
+  return { secret: toBase64Url(secret), sealedKey: toBase64Url(sealed) };
+}
+
+/**
+ * The content key a browser sealed for this app, opened with the secret
+ * from the link, as `unlock` returns it (not extractable). Throws
+ * WrongSecretError when the secret, the key id or the sealed key is wrong.
+ */
+export async function openKeyTransfer(
+  keyId: string,
+  sealedKey: string,
+  secret: string,
+): Promise<CryptoKey> {
+  if (!isTransferSecret(secret)) throw new WrongSecretError();
+  let raw: Uint8Array<ArrayBuffer> | null;
+  try {
+    raw = await open(
+      await transferKey(fromBase64Url(secret)),
+      fromBase64Url(sealedKey),
+      transferAad(keyId),
+    );
+  } catch (error) {
+    if (error instanceof DecryptionError) throw new WrongSecretError();
+    throw error;
+  }
+  if (raw?.length !== 32) throw new WrongSecretError();
   try {
     return await crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"]);
   } finally {

@@ -137,7 +137,20 @@ describe("settings", () => {
       error: null,
       connect: { url: "https://site.test/connect#ksc_x", expiresIn: 300 },
     });
-    expect(calls.map((c) => c.call)).toEqual(["POST /api/devices/connect-codes"]);
+    expect(calls).toEqual([{ call: "POST /api/devices/connect-codes", body: null }]);
+  });
+
+  it("passes on the key the browser sealed for the app", async () => {
+    const calls = stubApi({
+      "POST /api/devices/connect-codes": () =>
+        Response.json({ code: "ksc_x", url: "https://site.test/connect#ksc_x", expires_in: 300 }),
+    });
+    await settingsAction(
+      args(post("/settings", { intent: "connect", key_id: "k1", sealed_key: "sealed" })),
+    );
+    expect(calls).toEqual([
+      { call: "POST /api/devices/connect-codes", body: { key_id: "k1", sealed_key: "sealed" } },
+    ]);
   });
 
   function renderSettings(

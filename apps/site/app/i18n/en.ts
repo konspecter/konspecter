@@ -147,9 +147,16 @@ export const en = {
   "settings.connect.qrLabel": "QR code that connects an app to this account",
   "settings.connect.scan":
     "Scan it only with your own devices: whoever scans it connects an app to your account. The app still needs your passphrase to open your conspects.",
+  "settings.connect.scanWithKey":
+    "Scan it only with your own devices: it carries your encryption key too, so whoever scans it connects an app that opens your conspects.",
+  "settings.connect.withKey":
+    "This browser remembers your encryption key, so the app opens your conspects without the passphrase.",
+  "settings.connect.withoutKey": "The app will then ask for your encryption passphrase.",
+  "settings.connect.rememberLink": "Connect apps without it",
   "settings.connect.expires": "The code works once, for {minutes} min.",
   "settings.connect.link": "No camera? Paste this link into the app instead",
   "settings.connect.connected": "{name} is connected. Unlock sync in the app with your passphrase.",
+  "settings.connect.connectedWithKey": "{name} is connected and syncing.",
   "settings.connect.expired": "The code has expired. Show a new one to connect an app.",
   "settings.devices.title": "Connected devices",
   "settings.devices.lead":
@@ -192,8 +199,21 @@ export const en = {
   "encryption.copied": "Copied",
   "encryption.confirmRecovery": "Type the recovery key to confirm you saved it",
   "encryption.finishSetUp": "Finish setting up",
-  "encryption.setUpDone": "Encryption is set up. Unlock sync in each app with your passphrase.",
+  "encryption.setUpDone":
+    "Encryption is set up. Apps you connect with a QR code from this browser need no passphrase; others ask for it once.",
   "encryption.onLead": "Encryption is on, since {date}.",
+  "encryption.remembered":
+    "This browser remembers the key: apps you connect with its QR codes open your conspects without the passphrase.",
+  "encryption.forget": "Forget on this browser",
+  "encryption.forgotten":
+    "This browser no longer remembers the key. Apps you connect will ask for the passphrase.",
+  "encryption.remember": "Connect apps without the passphrase",
+  "encryption.rememberLead":
+    "Enter the passphrase once, and this browser remembers the key. The QR codes it shows then hand the key to the app, so the app needs no passphrase. Do this only on a computer of your own; signing out forgets it.",
+  "encryption.passphrase": "Passphrase",
+  "encryption.rememberSubmit": "Remember on this browser",
+  "encryption.rememberedNow":
+    "This browser remembers the key now. Apps you connect with its QR codes need no passphrase.",
   "encryption.change": "Change the passphrase",
   "encryption.currentPassphrase": "Current passphrase",
   "encryption.changeSubmit": "Change passphrase",
@@ -214,6 +234,7 @@ export const en = {
   "encryption.error.recoveryMismatch":
     "That is not the recovery key shown above. Check it, letter by letter.",
   "encryption.error.wrongCurrent": "The current passphrase is wrong.",
+  "encryption.error.wrongPassphrase": "That passphrase does not open this account's key.",
   "encryption.error.wrongRecovery": "That recovery key does not open this account's key.",
   "encryption.error.conflict":
     "Encryption was changed in another window or device. Reload the page and try again.",

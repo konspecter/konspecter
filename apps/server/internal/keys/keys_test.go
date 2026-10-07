@@ -34,3 +34,21 @@ func TestValidate(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateHandover(t *testing.T) {
+	if err := (Handover{KeyID: "k1", SealedKey: b64(60)}).Validate(); err != nil {
+		t.Fatalf("valid handover: %v", err)
+	}
+	for name, h := range map[string]Handover{
+		"no key id":  {SealedKey: b64(60)},
+		"key id":     {KeyID: "has.dot", SealedKey: b64(60)},
+		"no key":     {KeyID: "k1"},
+		"short key":  {KeyID: "k1", SealedKey: b64(32)},
+		"not base64": {KeyID: "k1", SealedKey: "not base64!"},
+		"padded key": {KeyID: "k1", SealedKey: base64.URLEncoding.EncodeToString(make([]byte, 61))},
+	} {
+		if err := h.Validate(); err == nil {
+			t.Errorf("%s: no error", name)
+		}
+	}
+}

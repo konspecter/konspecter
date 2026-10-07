@@ -1,4 +1,4 @@
-import { unlock } from "@konspecter/crypto";
+import { openKeyTransfer, unlock } from "@konspecter/crypto";
 import { planResolution } from "../../domain/sync/conflicts";
 import type { ConnectLink } from "../../domain/sync/connect-link";
 import type { RemoteNote, SyncEntry } from "../../domain/sync/sync-state";
@@ -12,6 +12,7 @@ import {
   type Cipher,
   type DeviceAuthorization,
   type DeviceDescription,
+  type HandedKey,
   type ServerConfig,
   type SyncAccess,
 } from "../http/api-client";
@@ -155,6 +156,19 @@ const ACCESS_TTL_MS = 60 * 60_000;
 /** How long a factory reset waits for the server to sign the device out. */
 const SIGN_OUT_WAIT_MS = 3_000;
 
+/** The handed-over content key, opened with the link's secret; null when it does not open. */
+async function openHandedKey(handed: HandedKey, secret: string): Promise<Cipher | null> {
+  try {
+    return {
+      keyId: handed.keyId,
+      key: await openKeyTransfer(handed.keyId, handed.sealedKey, secret),
+    };
+  } catch (error) {
+    console.error("The key handed over with the connect code does not open:", error);
+    return null;
+  }
+}
+
 const browserScheduler: Scheduler = {
   set: (callback, delayMs) => setTimeout(callback, delayMs),
   clear: (handle) => {
@@ -273,6 +287,11 @@ export class SyncEngine {
    * account queues every local note for upload to it.
    */
   async connect(config: ServerConfig): Promise<Account> {
+    return this.#connect(config, null);
+  }
+
+  /** Connects as `connect` does, unlocked at once with `handed` if there is one. */
+  async #connect(config: ServerConfig, handed: Cipher | null): Promise<Account> {
     const serverUrl = normalizeServerUrl(config.serverUrl);
     const token = config.token.trim();
     const account = await this.#client({ serverUrl, token }).me();
@@ -282,6 +301,11 @@ export class SyncEngine {
     if (!sameAccount) {
       await this.#store.resetSync();
       await this.#saveKey(null, null); // Another account has another key.
+    }
+    if (handed) {
+      // As unlocking: a key this device has not held means the server's notes were made without it.
+      if (handed.keyId !== this.#keyId) await this.#store.resetSync();
+      await this.#saveKey(handed.keyId, handed.key);
     }
     this.#closeStream();
     this.#disconnected = null;
@@ -341,10 +365,14 @@ export class SyncEngine {
   /**
    * Connects with a link from the account site (scanned as a QR code, or
    * pasted): the server trades its one-time code for this device's token.
+   * When the site's browser handed the content key over too, the link's
+   * secret opens it and no passphrase is needed; a key that does not open
+   * leaves sync locked, to unlock with the passphrase as usual.
    */
   async connectWithLink(link: ConnectLink, device: DeviceDescription): Promise<Account> {
-    const token = await connectDevice(link.serverUrl, link.code, device, this.#fetch);
-    return this.connect({ serverUrl: link.serverUrl, token });
+    const { token, key } = await connectDevice(link.serverUrl, link.code, device, this.#fetch);
+    const handed = key && link.keySecret ? await openHandedKey(key, link.keySecret) : null;
+    return this.#connect({ serverUrl: link.serverUrl, token }, handed);
   }
 
   #sleep(ms: number, signal: AbortSignal | undefined): Promise<void> {

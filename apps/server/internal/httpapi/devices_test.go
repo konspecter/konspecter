@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -298,7 +299,7 @@ func TestConnectingAnAppByQRCode(t *testing.T) {
 	token, _ := res.body["token"].(string)
 	user, _ := res.body["user"].(map[string]any)
 	device, _ := res.body["device"].(map[string]any)
-	if res.status != http.StatusOK || !strings.HasPrefix(token, "ksp_") || user["email"] != "ann@example.com" || device["platform"] != "android" {
+	if res.status != http.StatusOK || !strings.HasPrefix(token, "ksp_") || user["email"] != "ann@example.com" || device["platform"] != "android" || res.body["key"] != nil {
 		t.Fatalf("connect = %d %v", res.status, res.body)
 	}
 	if res.header.Get("Access-Control-Allow-Origin") != "https://app.example.com" {
@@ -313,6 +314,38 @@ func TestConnectingAnAppByQRCode(t *testing.T) {
 	res = appCall(t, s.server.URL, http.MethodPost, "/api/devices/connect", "", map[string]any{"code": code})
 	if res.status != http.StatusBadRequest || errorCode(res) != "invalid_connect_code" {
 		t.Errorf("the code again = %d %v", res.status, res.body)
+	}
+}
+
+func TestAConnectCodeHandsOverTheSealedKeyOnce(t *testing.T) {
+	s := newAccountServer(t, nil)
+	session := signedIn(t, s, "ann@example.com")
+	sealed := base64.RawURLEncoding.EncodeToString(make([]byte, 60))
+
+	res := siteCall(t, s.server.URL, http.MethodPost, "/api/devices/connect-codes", session, map[string]any{"key_id": "k1", "sealed_key": sealed})
+	code, _ := res.body["code"].(string)
+	if res.status != http.StatusOK || res.body["url"] != site+"/connect#"+code {
+		t.Fatalf("connect code = %d %v", res.status, res.body)
+	}
+	res = appCall(t, s.server.URL, http.MethodPost, "/api/devices/connect", "", map[string]any{"code": code})
+	key, _ := res.body["key"].(map[string]any)
+	if res.status != http.StatusOK || key["key_id"] != "k1" || key["sealed_key"] != sealed {
+		t.Fatalf("connect = %d %v", res.status, res.body)
+	}
+	res = appCall(t, s.server.URL, http.MethodPost, "/api/devices/connect", "", map[string]any{"code": code})
+	if errorCode(res) != "invalid_connect_code" || res.body["key"] != nil {
+		t.Errorf("the code again = %d %v", res.status, res.body)
+	}
+
+	for _, body := range []map[string]any{
+		{"key_id": "k1"},
+		{"key_id": "k1", "sealed_key": "short"},
+		{"key_id": "has.dot", "sealed_key": sealed},
+		{"key_id": "k1", "sealed_key": sealed, "secret": "never sent"},
+	} {
+		if res := siteCall(t, s.server.URL, http.MethodPost, "/api/devices/connect-codes", session, body); res.status != http.StatusBadRequest {
+			t.Errorf("%v = %d %v", body, res.status, res.body)
+		}
 	}
 }
 

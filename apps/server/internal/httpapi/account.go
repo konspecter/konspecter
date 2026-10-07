@@ -12,6 +12,7 @@ import (
 	"konspecter/server/internal/accounts"
 	"konspecter/server/internal/auth"
 	"konspecter/server/internal/devices"
+	"konspecter/server/internal/keys"
 	"konspecter/server/internal/mail"
 	"konspecter/server/internal/oauth"
 )
@@ -43,8 +44,8 @@ type DeviceStore interface {
 	PendingDeviceAuthorization(ctx context.Context, userCodeHash []byte) (devices.Client, error)
 	DecideDeviceAuthorization(ctx context.Context, userCodeHash []byte, userID string, approve bool) (devices.Client, error)
 	ExchangeDeviceCode(ctx context.Context, deviceCodeHash, tokenHash []byte) (devices.Device, auth.User, error)
-	CreateConnectCode(ctx context.Context, userID string, codeHash []byte, expiresAt time.Time) error
-	RedeemConnectCode(ctx context.Context, codeHash, tokenHash []byte, client devices.Client) (devices.Device, auth.User, error)
+	CreateConnectCode(ctx context.Context, userID string, codeHash []byte, expiresAt time.Time, key *keys.Handover) error
+	RedeemConnectCode(ctx context.Context, codeHash, tokenHash []byte, client devices.Client) (devices.Device, auth.User, *keys.Handover, error)
 	ListDevices(ctx context.Context, userID string) ([]devices.Device, error)
 	RevokeDevice(ctx context.Context, userID, deviceID string) error
 }

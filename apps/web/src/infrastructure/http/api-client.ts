@@ -392,18 +392,22 @@ export async function pollDeviceToken(
   return { status: "approved", token };
 }
 
+/** The content key a browser sealed for this app (ADR-025): only the link's secret opens it. */
+export type HandedKey = { readonly keyId: string; readonly sealedKey: string };
+
 /**
  * Trades a connect code (scanned from the account site's QR code) for this
- * app's token: no one has to approve anything. ApiError
- * `invalid_connect_code` when the code is wrong, used or expired.
+ * app's token, and the content key sealed with it if there is one: no one
+ * has to approve anything. ApiError `invalid_connect_code` when the code is
+ * wrong, used or expired.
  */
 export async function connectDevice(
   serverUrl: string,
   code: string,
   device: DeviceDescription,
   fetchFn: Fetch = (input, init) => fetch(input, init),
-): Promise<string> {
-  const { token } = asRecord(
+): Promise<{ token: string; key: HandedKey | null }> {
+  const body = asRecord(
     await send(
       fetchFn,
       apiUrl(serverUrl, "api/devices/connect"),
@@ -412,8 +416,11 @@ export async function connectDevice(
       null,
     ),
   );
-  if (typeof token !== "string") throw invalid("device token");
-  return token;
+  if (typeof body.token !== "string") throw invalid("device token");
+  const { key_id: keyId, sealed_key: sealedKey } = asRecord(body.key);
+  const key =
+    typeof keyId === "string" && typeof sealedKey === "string" ? { keyId, sealedKey } : null;
+  return { token: body.token, key };
 }
 
 /** Throws the error a failed response describes. */

@@ -250,6 +250,7 @@ type fakeDevices struct {
 type fakeConnectCode struct {
 	userID    string
 	expiresAt time.Time
+	key       *keys.Handover
 }
 
 type fakeDevice struct {
@@ -392,7 +393,7 @@ func (f *fakeDevices) ExchangeDeviceCode(_ context.Context, deviceCodeHash, toke
 	return f.addLocked("hash:"+string(tokenHash), user, a.client), user, nil
 }
 
-func (f *fakeDevices) CreateConnectCode(_ context.Context, userID string, codeHash []byte, expiresAt time.Time) error {
+func (f *fakeDevices) CreateConnectCode(_ context.Context, userID string, codeHash []byte, expiresAt time.Time, key *keys.Handover) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	for hash, c := range f.connectCodes {
@@ -400,20 +401,20 @@ func (f *fakeDevices) CreateConnectCode(_ context.Context, userID string, codeHa
 			delete(f.connectCodes, hash)
 		}
 	}
-	f.connectCodes[string(codeHash)] = fakeConnectCode{userID: userID, expiresAt: expiresAt}
+	f.connectCodes[string(codeHash)] = fakeConnectCode{userID: userID, expiresAt: expiresAt, key: key}
 	return nil
 }
 
-func (f *fakeDevices) RedeemConnectCode(_ context.Context, codeHash, tokenHash []byte, client devices.Client) (devices.Device, auth.User, error) {
+func (f *fakeDevices) RedeemConnectCode(_ context.Context, codeHash, tokenHash []byte, client devices.Client) (devices.Device, auth.User, *keys.Handover, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	c, ok := f.connectCodes[string(codeHash)]
 	delete(f.connectCodes, string(codeHash))
 	if !ok || time.Now().After(c.expiresAt) {
-		return devices.Device{}, auth.User{}, devices.ErrInvalidConnectCode
+		return devices.Device{}, auth.User{}, nil, devices.ErrInvalidConnectCode
 	}
 	user := auth.User{ID: c.userID, Email: strings.TrimPrefix(c.userID, "user-")}
-	return f.addLocked("hash:"+string(tokenHash), user, client), user, nil
+	return f.addLocked("hash:"+string(tokenHash), user, client), user, c.key, nil
 }
 
 // expireConnectCodes makes every connect code run out.

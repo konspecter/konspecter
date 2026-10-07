@@ -211,8 +211,12 @@ Settings → **Sync**:
    settings show, `<site>/connect#ksc_…`, and the app trades it for its token at once; the
    site's address is the server ([ADR-019](decisions/ADR-019-connect-by-qr-code.md)). An
    app without a camera pastes the same link under **Connect with a link from the site**.
-2. **Unlock**: the passphrase prompt, or, while the account has no encryption, a button to
-   the site's encryption settings.
+   When the site's browser remembers the content key, the link is
+   `<site>/connect#ksc_….<secret>`: the server hands the key over sealed with the token, the
+   secret opens it, and the app is unlocked at once
+   ([ADR-025](decisions/ADR-025-connect-with-key.md)).
+2. **Unlock** (unless the link handed the key over): the passphrase prompt, or, while the
+   account has no encryption, a button to the site's encryption settings.
 3. Then the status, last sync, waiting and held-back counts, _Sync now_ and _Disconnect_.
 
 Connecting to a different account queues every local note for upload to it. Disconnecting
