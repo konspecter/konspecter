@@ -98,7 +98,7 @@ it("leaves out the downloads when none are configured", async () => {
 it("speaks Russian, with the language dropdown and the other theme", async () => {
   renderHome("ru", [{ platform: "linux", url: "https://example.com/k.AppImage" }]);
   expect(
-    await screen.findByRole("heading", { level: 1, name: "Понял. Сохранил. Вернулся." }),
+    await screen.findByRole("heading", { level: 1, name: "Познал. Сохранил. Вернулся." }),
   ).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Скачать" })).toHaveAttribute("href", "#download");
   expect(screen.getByRole("combobox", { name: "Язык" })).toHaveValue("ru");
