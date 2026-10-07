@@ -1,5 +1,3 @@
-import type { ImportReport } from "../../application/library/import-markdown";
-
 /** File Mode: the files with tags outside their first chain's folder, and moving them there (ADR-013). */
 export type FolderReformat = {
   misplaced(): Promise<readonly string[]>;
@@ -14,16 +12,15 @@ export type FolderIgnore = {
   save(text: string): Promise<void>;
 };
 
-/** Choosing where notes live, on the desktop (see docs/architecture/filesystem-mode.md). */
+/**
+ * The desktop's folder, where every note is a file (see
+ * docs/architecture/filesystem-mode.md and ADR-024).
+ */
 export type LibraryControls = {
-  /** The open Markdown folder's path, or null for the app library. */
+  /** The folder's path; null only when not even the default folder could be opened. */
   readonly folder: string | null;
   /** Opens the system folder picker; the app reloads on the chosen folder. */
   chooseFolder: () => Promise<void>;
-  /** Returns to the app library. */
-  closeFolder: () => Promise<void>;
-  /** Copies every Markdown file of the open folder into the app library. */
-  importFolder: () => Promise<ImportReport>;
   /** File Mode: reformats the folder so its files are in their tags' folders. */
   reformat?: FolderReformat | undefined;
   /** File Mode: the folder's ignore rules. */

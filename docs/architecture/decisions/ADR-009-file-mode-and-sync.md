@@ -1,7 +1,8 @@
 # ADR-009: How File Mode and cloud sync interact
 
-Status: accepted (2026-09-28). Conflict copies and the changed-on-disk refusal (3) are
-superseded by [ADR-011](ADR-011-last-write-wins.md): the later write wins.
+Status: superseded by [ADR-024](ADR-024-desktop-folder-sync.md) (2026-10-07): the desktop
+library is always a folder, and sync covers it. Earlier, conflict copies and the
+changed-on-disk refusal (3) were superseded by [ADR-011](ADR-011-last-write-wins.md).
 
 ## Context
 

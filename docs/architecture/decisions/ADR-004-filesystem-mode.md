@@ -1,6 +1,7 @@
 # ADR-004: File Mode is a separate storage backend
 
-Status: accepted (2026-09-28)
+Status: accepted (2026-09-28). Amended by [ADR-024](ADR-024-desktop-folder-sync.md): the
+desktop always works on a folder (`~/Konspecter` by default), and sync covers it.
 
 ## Context
 

@@ -1,4 +1,3 @@
-import { importFolder } from "../../application/library/import-folder";
 import { frontmatterTags, parseDocument } from "../../domain/document/document";
 import { DEFAULT_IGNORE } from "../../domain/note/ignore";
 import { readNotes, updateNote } from "../../domain/note/note";
@@ -396,24 +395,6 @@ describe("FolderStore with ignore rules", () => {
     const saved = await store.put({ ...note, markdown: "# A\n\n#bin" });
     expect(saved.id).toBe("notes/a.md");
     expect(await store.misplaced()).toEqual([]);
-  });
-});
-
-describe("importFolder", () => {
-  it("copies files into the library once, keeping their content", async () => {
-    const { folder, library } = await setup();
-    folder.edit("a.md", "# A\n\nalpha");
-    folder.edit("b.md", "---\ntitle: B\ntags: [x]\n---\n\nbeta");
-    folder.edit("broken.md", "---\ntitle: [\n---\nstill text");
-
-    expect(await importFolder(folder, library, now)).toMatchObject({ imported: 3, duplicates: 0 });
-    expect(await importFolder(folder, library, now)).toMatchObject({ imported: 0, duplicates: 3 });
-
-    const bodies = (await library.list()).map((note) => note.markdown);
-    expect(bodies.some((md) => md.includes("alpha"))).toBe(true);
-    expect(bodies.some((md) => md.includes("tags: [x]") && md.includes("beta"))).toBe(true);
-    expect(bodies.some((md) => md.includes("still text"))).toBe(true);
-    expect(folder.files.get("a.md")?.text).toBe("# A\n\nalpha");
   });
 });
 

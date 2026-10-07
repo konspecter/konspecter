@@ -247,18 +247,14 @@ source, or delete this conspect when you are done.
     "{name} {version} for {os}. Conspects are stored in the app's local database.",
   "settings.about.unavailable": "Desktop details are unavailable.",
   "settings.library": "Library",
-  "settings.library.app":
-    "Conspects are kept in the app's own library, which can sync with a server. You can instead work directly on a folder of {md} files.",
-  "settings.library.open": "Open a Markdown folder…",
+  "settings.library.none":
+    "Konspecter keeps every conspect as a {md} file in a folder, but could not open one. Choose a folder to work in.",
+  "settings.library.open": "Choose a folder…",
+  "settings.library.change": "Change folder…",
   "settings.library.folder":
-    "Working on the Markdown files in {folder}. Changes are saved to the files; deleted conspects go to the system trash.",
+    "Every conspect is a Markdown file in {folder}, where any file manager or editor can open it. Changes are saved to the files; deleted conspects go to the system trash.",
   "settings.library.folderSync":
-    "Sync applies to the app library, which keeps syncing in the background. To have this folder on other devices, sync it with Git, iCloud Drive, Dropbox or Syncthing: Konspecter follows their changes, and when a file is edited in two places, the later edit wins.",
-  "settings.library.nothingToImport": "Nothing to import: the library already has these conspects.",
-  "settings.library.imported": {
-    one: "Imported {count} conspect into the app library.",
-    other: "Imported {count} conspects into the app library.",
-  },
+    "Sync covers this folder: conspects from your other devices are written here as files, and the files you change here, in Konspecter or in another program, go to them. When a conspect is edited in two places, the later edit wins.",
   "settings.library.folders":
     "The folders follow the tags: a conspect is kept in the folder of its first tag, so #java#collections is java/collections/.",
   "settings.library.reformat": "Reformat the folder…",
@@ -275,8 +271,6 @@ source, or delete this conspect when you are done.
   },
   "reformat.confirm": "Reformat",
   "reformat.keep": "Keep as is",
-  "settings.library.import": "Import into the app library",
-  "settings.library.useApp": "Use the app library",
 
   "backup.title": "Backup & recovery",
   "backup.hint":
@@ -298,7 +292,7 @@ source, or delete this conspect when you are done.
 
   "reset.title": "Reset to factory settings",
   "reset.hint":
-    "Returns Konspecter to how it was when installed: settings, the sync connection, reading positions and the app library are erased. Markdown files outside the app are never touched.",
+    "Returns Konspecter to how it was when installed: settings, the sync connection, reading positions and the app library are erased. Markdown files are never touched, the desktop app's folder included.",
   "reset.start": "Reset Konspecter…",
   "reset.confirmTitle": "Reset Konspecter?",
   "reset.confirm": {
@@ -307,7 +301,7 @@ source, or delete this conspect when you are done.
       "The {count} conspects in the app library are erased, with the settings, the sync connection and reading positions. Conspects synced to your account stay there and come back when you connect again; to keep a copy, export them first. Markdown files outside the app are not touched.",
   },
   "reset.confirmEmpty":
-    "The settings, the sync connection and reading positions are erased. Markdown files outside the app are not touched.",
+    "The settings, the sync connection and reading positions are erased. Markdown files are not touched, the desktop app's folder included.",
   "reset.confirmButton": "Erase and reset",
   "reset.resetting": "Resetting…",
 

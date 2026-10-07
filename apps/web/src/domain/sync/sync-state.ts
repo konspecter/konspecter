@@ -72,10 +72,10 @@ export function parseSyncEntry(value: unknown): SyncEntry {
   if (typeof dirty !== "boolean" || typeof deleted !== "boolean") {
     throw new InvalidSyncStateError(`Sync entry ${noteId} has invalid flags`);
   }
-  return { noteId, baseRevision, dirty, deleted, blocked: parseBlock(blocked) };
+  return { noteId, baseRevision, dirty, deleted, blocked: parseSyncBlock(blocked) };
 }
 
-function parseBlock(value: unknown): SyncBlock | null {
+export function parseSyncBlock(value: unknown): SyncBlock | null {
   if (value === null || value === undefined) return null;
   if (typeof value !== "object") throw new InvalidSyncStateError("Invalid sync block");
   const { reason, remote, message } = value as Record<string, unknown>;

@@ -1,31 +1,53 @@
 # File Mode (desktop)
 
-On the desktop, the library can be a real folder of Markdown files instead of the app's
-own database ([ADR-004](decisions/ADR-004-filesystem-mode.md)). The files are the only copy
-of the notes. Other programs (VS Code, Vim, Obsidian, Git) can read and change them, and
-Konspecter reads and writes them in place.
+On the desktop, the library is a real folder of Markdown files
+([ADR-004](decisions/ADR-004-filesystem-mode.md), [ADR-024](decisions/ADR-024-desktop-folder-sync.md)):
+every conspect is a file the user can see in Finder or Explorer. The files are the only copy
+of the notes on the device. Other programs (VS Code, Vim, Obsidian, Git) can read and change
+them, Konspecter reads and writes them in place, and sync carries them to the other devices.
 
 ```text
-~/Notes/
+~/Konspecter/
 ├── java.md
 ├── databases/postgres.md
 └── networking.md
 ```
 
-## Choosing the library
+## The folder
 
-Settings → **Library** (desktop only):
+- **`~/Konspecter`** by default, made on first start: in the home folder, not hidden, and
+  outside iCloud's Documents folder. The shell falls back to it whenever no folder was
+  chosen, or the chosen one is gone.
+- Settings → **Library** → **Change folder…** shows the system folder picker; the app
+  reloads on the chosen folder, which is remembered by the desktop shell (`folder.json` in
+  the app's config directory). The files of the previous folder are not touched.
+- **The app library moves in once.** On the first start after the desktop became
+  folder-only, the notes of the app library (IndexedDB) are written into the folder (or
+  linked to a file with the same text), keeping their sync ids and state, and leave the
+  library without a deletion being queued (`FolderSync.moveLibrary`).
+- Web and mobile keep the app library.
 
-- **App library** (default): notes in IndexedDB, with sync.
-- **Open a Markdown folder…** shows the system folder picker. The app reloads on the folder.
-  _Use the app library_ switches back. The folder's files are never changed by switching.
-- **Import into the app library** copies the folder's files into the app library, for
-  example to sync them. Files whose content is already in the library are skipped, so
-  importing twice adds nothing, and the files themselves stay as they are.
+## Sync
 
-The choice is remembered by the desktop shell (`folder.json` in the app's config
-directory). **Sync applies to the app library only.** To sync a folder across devices, use Git,
-iCloud Drive, Dropbox or Syncthing ([ADR-009](decisions/ADR-009-file-mode-and-sync.md)).
+Sync covers the folder (`infrastructure/folder/folder-sync.ts`, `FolderSync`, the engine's
+`SyncStore` port; [sync](sync.md#the-desktop-folder)). The files stay plain Markdown; the
+app's database keeps a **link** per file: the server's note id, the path, the base revision
+and the SHA-256 of the text last synced.
+
+- **Any change is an edit:** a file whose text hashes differently from its link is pushed,
+  whether Konspecter, another program or Git changed it. New files get a link and are
+  uploaded; a linked file that is gone is a deletion.
+- **Renames keep the note:** the app's own renames and the watcher's (same text, new path)
+  move the link, and so does a file renamed while the app was closed (found by its hash).
+- **Pulls are files:** a note from elsewhere is written in its first tag chain's folder,
+  named after its title (numbered if taken), a changed one is written over and moved when
+  its chain changed, and a deleted one goes to the trash. Open editors take them in place.
+- **Adoption:** another folder, account or key starts over: until the first complete pull,
+  files that never reached the server wait, and a pulled note with exactly their text links
+  to them rather than being written again. A copy of the folder duplicates nothing.
+- **An emptied folder deletes nothing:** one with none of its linked files on start is
+  adopted, and the notes are written back into it. Deleting files while the app runs does
+  delete them everywhere, and so does an ignore rule that leaves them out.
 
 ## How it works
 

@@ -17,7 +17,8 @@ to, and export as ordinary `.md` files.
 - **Local-first:** conspects live on your device (IndexedDB) and the app is an installable PWA.
   Sync with a Konspecter server is optional, with conflict handling that never loses a
   version.
-- **Desktop (Tauri):** work directly on a folder of `.md` files, alongside VS Code, Vim or Git.
+- **Desktop (Tauri):** every conspect is a `.md` file in a folder (`~/Konspecter`), synced, and
+  open to VS Code, Vim or Git alongside.
 - **Android (Capacitor):** the same app on your phone.
 - **Import and export:** `.md` files and folders in, `.md` files (ZIP or folder) out.
 
@@ -25,8 +26,8 @@ to, and export as ordinary `.md` files.
 
 - **Web:** open the app and install it from the browser (it works offline after the first
   visit).
-- **Desktop:** download the `.dmg`, `.msi` or `.AppImage` from a release. Settings → Library
-  → _Open a Markdown folder…_ works on real files.
+- **Desktop:** download the `.dmg`, `.msi` or `.AppImage` from a release. Conspects are files
+  in `~/Konspecter`; Settings → Library → _Change folder…_ picks another folder.
 - **Android:** install the APK from a release.
 
 Conspects save themselves as you type. Keyboard shortcuts (<kbd>⌘</kbd> on macOS, <kbd>Ctrl</kbd>

@@ -314,7 +314,12 @@ export class FolderStore implements NoteRepository {
    */
   async create(markdown: string, now: Date): Promise<Note> {
     await this.#ensureLoaded();
-    const note = createNote(markdown, now);
+    const created = await this.#newFile(createNote(markdown, now));
+    this.#emit({ noteId: created.id, source: "local" });
+    return created;
+  }
+
+  async #newFile(note: Note): Promise<Note> {
     const folder = this.#notIgnored(
       chainFolder(placingChain(readNote(note)), foldersOf(this.#files.keys())),
       "",
@@ -324,7 +329,6 @@ export class FolderStore implements NoteRepository {
     );
     const created = this.#remember(entry, note.markdown);
     this.#moving.delete(entry.path);
-    this.#emit({ noteId: entry.path, source: "local" });
     return created;
   }
 
@@ -336,14 +340,32 @@ export class FolderStore implements NoteRepository {
    */
   async put(note: Note): Promise<Note> {
     await this.#ensureLoaded();
-    const previous = this.#files.get(note.id)?.markdown;
-    const entry = await this.#folder.write(note.id, note.markdown);
-    const written = this.#remember(entry, note.markdown);
-    const moved = await this.#relocate(note.id, previous);
+    return this.#write(note.id, note.markdown, "local");
+  }
+
+  /**
+   * Sync: writes a version from elsewhere exactly as it is. A note without a
+   * file here (`path` null, or gone) gets a new one, placed and named like a
+   * new note; a known file is written over and moved where the note now
+   * belongs. Emitted as a remote change, so an open editor takes it in place.
+   */
+  async receive(path: string | null, markdown: string): Promise<Note> {
+    await this.#ensureLoaded();
+    if (path !== null && this.#files.has(path)) return this.#write(path, markdown, "remote");
+    const created = await this.#newFile({ id: path ?? "", markdown });
+    this.#emit({ noteId: created.id, source: "remote" });
+    return created;
+  }
+
+  async #write(path: string, markdown: string, source: NoteChange["source"]): Promise<Note> {
+    const previous = this.#files.get(path)?.markdown;
+    const entry = await this.#folder.write(path, markdown);
+    const written = this.#remember(entry, markdown);
+    const moved = await this.#relocate(path, previous);
     this.#emit({
-      noteId: moved?.id ?? note.id,
-      source: "local",
-      ...(moved ? { previousId: note.id } : {}),
+      noteId: moved?.id ?? path,
+      source,
+      ...(moved ? { previousId: path } : {}),
     });
     return moved ?? written;
   }
@@ -490,11 +512,20 @@ export class FolderStore implements NoteRepository {
 
   /** Moves the file to the system trash. */
   async delete(id: string): Promise<void> {
+    await this.#trash(id, "local");
+  }
+
+  /** Sync: the note was deleted elsewhere; its file goes to the trash. */
+  async remove(id: string): Promise<void> {
+    await this.#trash(id, "remote");
+  }
+
+  async #trash(id: string, source: NoteChange["source"]): Promise<void> {
     await this.#folder.trash(id);
     this.#files.delete(id);
     this.#search?.remove(id);
     await this.#removeIfEmpty(id);
-    this.#emit({ noteId: id, source: "local" });
+    this.#emit({ noteId: id, source });
   }
 
   async tags(): Promise<TagCount[]> {

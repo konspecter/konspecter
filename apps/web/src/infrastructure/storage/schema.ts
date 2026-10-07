@@ -27,4 +27,10 @@ export interface KonspecterDb extends DBSchema {
     // Validated on read.
     value: unknown;
   };
+  /** Desktop: how the folder's files map to synced notes (folder/folder-sync.ts). */
+  links: {
+    key: string;
+    // Validated on read.
+    value: unknown;
+  };
 }

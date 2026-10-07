@@ -37,8 +37,9 @@ const DEFAULT_DATABASE_NAME = "konspecter";
  * 3: adds the derived tag index (`tags`) and `meta`.
  * 4: adds reading positions (`reading`).
  * 5: adds sync bookkeeping (`sync`).
+ * 6: adds the desktop folder's links to synced notes (`links`).
  */
-const DATABASE_VERSION = 5;
+const DATABASE_VERSION = 6;
 
 export type StoreChange = { readonly noteId: string; readonly source: "local" | "remote" };
 
@@ -463,6 +464,48 @@ export class NoteStore implements NoteRepository {
     return notes.filter((note): note is Note => note !== undefined);
   }
 
+  /**
+   * Removes notes that moved elsewhere (the desktop folder) without queuing
+   * their deletion: the server keeps them, now synced from there.
+   */
+  async forgetNotes(ids: readonly string[]): Promise<void> {
+    const tx = this.#db.transaction(["notes", "tags", "reading", "sync"], "readwrite");
+    await Promise.all([
+      ...ids.flatMap((id) => [
+        tx.objectStore("notes").delete(id),
+        tx.objectStore("tags").delete(id),
+        tx.objectStore("reading").delete(id),
+        tx.objectStore("sync").delete(id),
+      ]),
+      tx.done,
+    ]);
+    const search = await this.#search;
+    for (const id of ids) search?.remove(id);
+  }
+
+  // --- Desktop folder links (folder/folder-sync.ts validates them) --------
+
+  folderLinks(): Promise<unknown[]> {
+    return this.#db.getAll("links");
+  }
+
+  /** Stores `links` (each under its `noteId`) and removes `removed`, in one transaction. */
+  async saveFolderLinks(
+    links: readonly { readonly noteId: string }[],
+    removed: readonly string[] = [],
+  ): Promise<void> {
+    const tx = this.#db.transaction("links", "readwrite");
+    await Promise.all([
+      ...removed.map((id) => tx.store.delete(id)),
+      ...links.map((link) => tx.store.put(link, link.noteId)),
+      tx.done,
+    ]);
+  }
+
+  async clearFolderLinks(): Promise<void> {
+    await this.#db.clear("links");
+  }
+
   /** Discards the derived indexes and recomputes them from the notes. */
   rebuildIndexes(): Promise<void> {
     this.#search = null;
@@ -503,6 +546,9 @@ export async function openNoteStore(name: string = DEFAULT_DATABASE_NAME): Promi
       if (oldVersion < 5) {
         // Filled when sync is first set up (resetSync).
         database.createObjectStore("sync");
+      }
+      if (oldVersion < 6) {
+        database.createObjectStore("links");
       }
     },
     // Another tab wants a newer schema: let it upgrade instead of waiting forever.

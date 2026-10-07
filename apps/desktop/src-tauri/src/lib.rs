@@ -172,6 +172,11 @@ fn save_folder(app: &AppHandle, folder: Option<&Folder>) {
     }
 }
 
+/// `~/Konspecter`: the library when no folder was chosen, or the chosen one is gone.
+fn default_folder(app: &AppHandle) -> Option<Folder> {
+    Folder::open_default(&app.path().home_dir().ok()?).ok()
+}
+
 fn load_folder(app: &AppHandle) -> Option<Folder> {
     let text = std::fs::read_to_string(saved_folder_file(app)?).ok()?;
     let json: serde_json::Value = serde_json::from_str(&text).ok()?;
@@ -211,12 +216,13 @@ async fn folder_pick(
     Ok(Some(root))
 }
 
-/// Stops using the folder. The files are not touched.
+/// Forgets the chosen folder: back to the default one. The files are not touched.
 #[tauri::command]
 fn folder_close(app: AppHandle, state: State<'_, FolderState>) {
     save_folder(&app, None);
-    watch(&app, None);
-    state.set(None);
+    let folder = default_folder(&app);
+    watch(&app, folder.as_ref());
+    state.set(folder);
 }
 
 #[tauri::command]
@@ -416,7 +422,7 @@ pub fn run() {
         .manage(FolderState::default())
         .manage(WatchState::default())
         .setup(|app| {
-            let folder = load_folder(app.handle());
+            let folder = load_folder(app.handle()).or_else(|| default_folder(app.handle()));
             watch(app.handle(), folder.as_ref());
             app.state::<FolderState>().set(folder);
             Ok(())

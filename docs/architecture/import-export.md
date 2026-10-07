@@ -5,11 +5,10 @@ Notes are plain Markdown, so moving them in and out is copying files, never a co
 
 ## Import
 
-| From                      | How                                                             |
-| ------------------------- | --------------------------------------------------------------- |
-| `.md` files               | _Import .md files…_ (multiple selection)                        |
-| a folder                  | _Import a folder…_ (browser folder picker; subfolders included) |
-| the open File Mode folder | Settings → Library → _Import into the app library_ (desktop)    |
+| From        | How                                                             |
+| ----------- | --------------------------------------------------------------- |
+| `.md` files | _Import .md files…_ (multiple selection)                        |
+| a folder    | _Import a folder…_ (browser folder picker; subfolders included) |
 
 `application/library/import-markdown.ts`:
 

@@ -4,7 +4,6 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { registerSW } from "virtual:pwa-register";
-import { importFolder } from "./application/library/import-folder";
 import type { NoteRepository } from "./application/notes/note-repository";
 import {
   closeFolder,
@@ -16,12 +15,14 @@ import {
   pickFolder,
 } from "./infrastructure/desktop/desktop";
 import { FolderStore } from "./infrastructure/folder/folder-store";
+import { FolderSync } from "./infrastructure/folder/folder-sync";
 import { isNativeMobile } from "./infrastructure/mobile/mobile";
 import { openNoteStore } from "./infrastructure/storage/note-store";
 import { SyncEngine } from "./infrastructure/sync/sync-engine";
 import { App } from "./presentation/app/App";
 import { flushBeforeClosing } from "./presentation/app/closing";
 import { factoryReset, type FactoryReset } from "./presentation/app/factory-reset";
+import { reportError } from "./presentation/app/errors";
 import { restoreLocation } from "./presentation/app/last-location";
 import type { LibraryControls } from "./presentation/app/library";
 import type { UpdateSource } from "./presentation/app/updates";
@@ -75,13 +76,18 @@ try {
   const settings = await store.loadSettings();
   applyLanguage(settings.language);
 
-  // On the desktop the library can be a folder of Markdown files (File Mode),
-  // a separate backend; the app library (IndexedDB, synced) is the default.
+  // On the desktop the library is a folder of Markdown files, ~/Konspecter
+  // unless another was chosen (ADR-024); elsewhere it is the app library (IndexedDB).
   const folder = isDesktop() ? await currentFolder() : null;
   const folderStore = folder
     ? new FolderStore(folderBridge, store, { followTitles: settings.fileNames === "title" })
     : null;
   const repository: NoteRepository = folderStore ?? store;
+  // Sync covers the folder: links tie its files to the synced notes.
+  const folderSync =
+    folderStore && folder ? await FolderSync.open(folderStore, store, folder) : null;
+  // Notes from before the desktop kept everything in the folder move into it, once.
+  await folderSync?.moveLibrary().catch(reportError);
   // Follow changes other programs make to the files.
   void folderStore?.watch();
   const library: LibraryControls | undefined = isDesktop()
@@ -90,11 +96,6 @@ try {
         async chooseFolder() {
           if (await pickFolder()) window.location.reload();
         },
-        async closeFolder() {
-          await closeFolder();
-          window.location.reload();
-        },
-        importFolder: () => importFolder(folderBridge, store),
         reformat: folderStore
           ? { misplaced: () => folderStore.misplaced(), apply: () => folderStore.reformat() }
           : undefined,
@@ -112,9 +113,12 @@ try {
 
   // Sync runs in the background for the app library; the UI never waits for it.
   // On the desktop the access token lives in the OS keychain.
-  const sync = new SyncEngine(store, isDesktop() ? { credentials: keychainCredentials } : {});
+  const sync = new SyncEngine(
+    folderSync ?? store,
+    isDesktop() ? { credentials: keychainCredentials } : {},
+  );
   void sync.start();
-  // Clears what the app keeps, never the files of a Markdown folder.
+  // Clears what the app keeps, never the folder's files.
   const reset: FactoryReset = {
     appNotes: async () => (await store.list()).length,
     async run() {
@@ -139,7 +143,7 @@ try {
           }}
           library={library}
           updates={updates}
-          sync={folder ? undefined : sync}
+          sync={sync}
           reset={reset}
         />
       </BrowserRouter>

@@ -70,8 +70,9 @@ deploy/                      PostgreSQL, the API, the site, the web app and Cadd
 ```
 
 `application/` holds the `NoteRepository` port that pages use, with two implementations: the
-app library (`NoteStore`, IndexedDB, synced) and desktop File Mode (`FolderStore`, `.md` files).
-See [File Mode](filesystem-mode.md).
+app library (`NoteStore`, IndexedDB) on web and mobile, and the desktop's folder (`FolderStore`,
+`.md` files). Both sync ([ADR-024](decisions/ADR-024-desktop-folder-sync.md)). See
+[File Mode](filesystem-mode.md).
 
 ### Web app
 

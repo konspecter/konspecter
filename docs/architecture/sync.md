@@ -13,6 +13,9 @@ device**: the server only ever holds ciphertext
 UI → NoteStore (IndexedDB) ⇄ SyncEngine ⇄ ApiClient (encrypts, decrypts) ⇄ HTTP/JSON API ⇄ PostgreSQL
 ```
 
+On the desktop the notes are files, synced through `FolderSync` instead of `NoteStore`
+([the desktop folder](#the-desktop-folder)).
+
 ## Server side
 
 - Every change to a user's notes (create, update, delete) takes the next value of that
@@ -165,10 +168,34 @@ Tested with two and three devices editing one note concurrently, a late offline 
 against delete, delete against edit, identical re-uploads after reconnecting, the change
 stream, and the real server.
 
-## File Mode
+## The desktop folder
 
-Sync covers the app library only. Folders opened in File Mode are not synced by Konspecter;
-they sync with file-level tools ([ADR-009](decisions/ADR-009-file-mode-and-sync.md)).
+On the desktop the notes are the files of a folder ([File Mode](filesystem-mode.md)), and
+the engine syncs them through `FolderSync` (`infrastructure/folder/folder-sync.ts`) instead
+of `NoteStore`: both implement the engine's `SyncStore` port, with server note ids
+([ADR-024](decisions/ADR-024-desktop-folder-sync.md)).
+
+```text
+FolderStore (files) ⇄ FolderSync (links in IndexedDB `links`) ⇄ SyncEngine ⇄ ApiClient ⇄ …
+```
+
+- **Links** (schema v6), one per file, keyed by note id: `{ noteId, path, baseRevision,
+syncedHash, blocked }`. `path` is null while a deletion is queued; `syncedHash` is the
+  SHA-256 of the text last pushed or pulled.
+- **Sync entries are derived:** dirty when the file's text hashes differently (or the file
+  is gone), so edits from any program queue the note. `FolderSync` follows `FolderStore`'s
+  changes (renames move the link, new files get one, missing files queue a deletion) and
+  tells the engine, which starts a cycle as after a local save.
+- **Pulled notes** are written with `FolderStore.receive` (exact text, placed and named like
+  a new note; moved when the chain changes) and `remove` (to the trash), as remote changes.
+- **Adoption:** `resetSync` (another account or key) and a different folder clear the
+  revisions and the cursor. Until the cycle's pull is complete, `pendingSync` leaves out
+  files that never reached the server; a pulled note whose text equals such a file takes it
+  over. The engine then hears from `pulled()` that they are released and pushes them in
+  the same cycle.
+- On start (`FolderSync.open`), links are squared with the files: a link whose file moved
+  while the app was closed follows the same text; one whose file is gone queues a deletion;
+  if none of the linked files is there, the folder is adopted instead and nothing is deleted.
 
 ## UI
 

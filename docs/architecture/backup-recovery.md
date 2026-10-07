@@ -45,13 +45,14 @@ a confirmation that names how many notes the app library holds (an export keeps 
 1. signs the device out of sync and forgets the connection, its encryption key and, on the
    desktop, the token in the OS keychain (`SyncEngine.forget`, waiting up to 3 s for the
    server to answer);
-2. on the desktop, forgets the chosen Markdown folder (`folder_close`);
-3. deletes the IndexedDB database: the app library, settings, reading positions, indexes;
+2. on the desktop, forgets the chosen folder (`folder_close`): back to `~/Konspecter`;
+3. deletes the IndexedDB database: the app library, settings, reading positions, indexes,
+   and the desktop folder's sync links;
 4. clears `localStorage` (sidebar, toolbar, last location);
 
-then reloads on the empty library. The files of a Markdown folder, exported files and the
-server's copy of synced notes are never touched: connecting again brings the synced notes
-back. The desktop log file and the service worker's copy of the app stay.
+then reloads. The files of the desktop's folder, exported files and the server's copy of
+synced notes are never touched: connecting again brings the synced notes back, and the
+folder's files are matched with them rather than uploaded twice. The desktop log file and the service worker's copy of the app stay.
 
 ## Recovery paths, summarized
 

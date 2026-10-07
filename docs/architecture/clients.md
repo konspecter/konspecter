@@ -36,8 +36,8 @@ The web app is an installable Progressive Web App (`vite-plugin-pwa`, Workbox, M
   `deploy/` it is the `web` service, and Caddy in front serves it on its own address
   (`KONSPECTER_APP_ADDRESS`), apart from the site's origin. Hashed assets are cached for good,
   everything else is revalidated on each load. See [ADR-018](decisions/ADR-018-web-app-origin.md).
-- The PWA does not pretend to be a filesystem app. Working on real `.md` folders is the
-  desktop client's File Mode.
+- The PWA does not pretend to be a filesystem app. The desktop client keeps every conspect
+  as a `.md` file in a folder ([File Mode](filesystem-mode.md)).
 
 Background synchronization arrives with the sync engine (server phases).
 

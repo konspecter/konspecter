@@ -207,7 +207,7 @@ export function SettingsPage({
       )}
       {store && library?.folder == null && <ImportExport store={store} ignore={settings.ignore} />}
       {store && library?.folder == null && <BackupRecovery store={store} />}
-      {sync && library?.folder == null && <SyncSettings sync={sync} />}
+      {sync && <SyncSettings sync={sync} />}
       <section className="setting offline-storage" aria-labelledby="shortcuts-heading">
         <h2 id="shortcuts-heading" className="setting-heading">
           {t("settings.shortcuts")}
@@ -384,22 +384,7 @@ function LibrarySettings({ library }: { library: LibraryControls }) {
         {t("settings.library")}
       </h2>
       {library.folder === null ? (
-        <>
-          <p className="setting-hint">{rich("settings.library.app", { md: <code>.md</code> })}</p>
-          <button
-            type="button"
-            className="button"
-            disabled={busy}
-            onClick={() => {
-              run(async () => {
-                await library.chooseFolder();
-                return null;
-              });
-            }}
-          >
-            {t("settings.library.open")}
-          </button>
-        </>
+        <p className="setting-hint">{rich("settings.library.none", { md: <code>.md</code> })}</p>
       ) : (
         <>
           <p className="setting-hint">
@@ -407,55 +392,40 @@ function LibrarySettings({ library }: { library: LibraryControls }) {
           </p>
           <p className="setting-hint">{t("settings.library.folderSync")}</p>
           <p className="setting-hint">{t("settings.library.folders")}</p>
-          <div className="actions">
-            {reformat && (
-              <button
-                type="button"
-                className="button"
-                disabled={busy}
-                onClick={() => {
-                  run(async () => {
-                    const { length } = await reformat.misplaced();
-                    if (length === 0) return t("settings.library.nothingToReformat");
-                    setAsking(length);
-                    return null;
-                  });
-                }}
-              >
-                {t("settings.library.reformat")}
-              </button>
-            )}
-            <button
-              type="button"
-              className="button"
-              disabled={busy}
-              onClick={() => {
-                run(async () => {
-                  const { imported: count } = await library.importFolder();
-                  return count === 0
-                    ? t("settings.library.nothingToImport")
-                    : tn("settings.library.imported", count);
-                });
-              }}
-            >
-              {t("settings.library.import")}
-            </button>
-            <button
-              type="button"
-              className="button"
-              disabled={busy}
-              onClick={() => {
-                run(async () => {
-                  await library.closeFolder();
-                  return null;
-                });
-              }}
-            >
-              {t("settings.library.useApp")}
-            </button>
-          </div>
         </>
       )}
+      <div className="actions">
+        <button
+          type="button"
+          className="button"
+          disabled={busy}
+          onClick={() => {
+            run(async () => {
+              await library.chooseFolder();
+              return null;
+            });
+          }}
+        >
+          {t(library.folder === null ? "settings.library.open" : "settings.library.change")}
+        </button>
+        {reformat && (
+          <button
+            type="button"
+            className="button"
+            disabled={busy}
+            onClick={() => {
+              run(async () => {
+                const { length } = await reformat.misplaced();
+                if (length === 0) return t("settings.library.nothingToReformat");
+                setAsking(length);
+                return null;
+              });
+            }}
+          >
+            {t("settings.library.reformat")}
+          </button>
+        )}
+      </div>
       {reformat && asking !== null && (
         <ReformatDialog
           count={asking}

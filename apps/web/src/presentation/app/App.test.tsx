@@ -1802,8 +1802,6 @@ describe("file mode", () => {
               library={{
                 folder: "/Users/ada/Notes",
                 chooseFolder: () => Promise.resolve(),
-                closeFolder: () => Promise.resolve(),
-                importFolder: () => Promise.resolve({ imported: 0, duplicates: 0, rejected: [] }),
                 reformat: { misplaced: () => store.misplaced(), apply: () => store.reformat() },
               }}
             />
@@ -1868,8 +1866,6 @@ describe("file mode", () => {
           library={{
             folder: "/Users/ada/Notes",
             chooseFolder: () => Promise.resolve(),
-            closeFolder: () => Promise.resolve(),
-            importFolder: () => Promise.resolve({ imported: 0, duplicates: 0, rejected: [] }),
             ignore: { read: () => store.ignoreText(), save: (text) => store.setIgnore(text) },
           }}
         />
@@ -1891,26 +1887,17 @@ describe("file mode", () => {
     ]);
   });
 
-  it("shows the library choice in settings", async () => {
+  it("shows the folder in settings, and changes it", async () => {
     const store = await newStore();
-    const importFolderSpy = vi.fn(() =>
-      Promise.resolve({ imported: 3, duplicates: 0, rejected: [] }),
-    );
+    const chooseFolder = vi.fn(() => Promise.resolve());
     render(
       <MemoryRouter initialEntries={["/settings"]}>
-        <App
-          store={store}
-          library={{
-            folder: "/Users/ada/Notes",
-            chooseFolder: () => Promise.resolve(),
-            closeFolder: () => Promise.resolve(),
-            importFolder: importFolderSpy,
-          }}
-        />
+        <App store={store} library={{ folder: "/Users/ada/Konspecter", chooseFolder }} />
       </MemoryRouter>,
     );
 
-    expect(screen.getByText("/Users/ada/Notes")).toBeInTheDocument();
+    expect(screen.getByText("/Users/ada/Konspecter")).toBeInTheDocument();
+    expect(screen.getByText(/Sync covers this folder/)).toBeInTheDocument();
     const fileNames = screen.getByRole("group", { name: "File names" });
     expect(
       within(fileNames).getByRole("radio", { name: "Keep the name when the title changes" }),
@@ -1921,12 +1908,11 @@ describe("file mode", () => {
     expect(
       within(fileNames).getByRole("radio", { name: "Rename the file after the title" }),
     ).toBeChecked();
-    expect(screen.getByText(/Sync applies to the app library/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Import into the app library" }));
     expect(
-      await screen.findByText("Imported 3 conspects into the app library."),
-    ).toBeInTheDocument();
-    expect(importFolderSpy).toHaveBeenCalled();
+      screen.queryByRole("button", { name: "Import into the app library" }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Change folder…" }));
+    expect(chooseFolder).toHaveBeenCalled();
   });
 });
 

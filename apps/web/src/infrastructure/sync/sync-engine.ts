@@ -71,6 +71,33 @@ class KeyChangedError extends Error {
   }
 }
 
+/**
+ * Where sync reads and writes the device's notes, by their server ids: the app
+ * library (`NoteStore`), or on the desktop the folder (`folder/folder-sync.ts`).
+ */
+export type SyncStore = Pick<
+  NoteStore,
+  | "get"
+  | "onChange"
+  | "pendingSync"
+  | "syncEntries"
+  | "markPushed"
+  | "blockSync"
+  | "applyRemote"
+  | "applyResolution"
+  | "resetSync"
+  | "syncCursor"
+  | "setSyncCursor"
+  | "loadMeta"
+  | "saveMeta"
+> & {
+  /**
+   * Every change on the server is applied. Returns whether notes held back
+   * until then are ready to push (a folder new to sync, once matched).
+   */
+  pulled?(): Promise<boolean>;
+};
+
 type StoredConfig = ServerConfig & { readonly account: Account };
 
 /** Where this device was connected before the server let it go. */
@@ -147,7 +174,7 @@ const browserScheduler: Scheduler = {
  * cycle whenever something changes there.
  */
 export class SyncEngine {
-  readonly #store: NoteStore;
+  readonly #store: SyncStore;
   readonly #fetch: SyncEngineOptions["fetch"];
   readonly #scheduler: Scheduler;
   readonly #now: () => Date;
@@ -184,7 +211,7 @@ export class SyncEngine {
   #stream: ChangeStream | null = null;
   #streaming = false;
 
-  constructor(store: NoteStore, options: SyncEngineOptions = {}) {
+  constructor(store: SyncStore, options: SyncEngineOptions = {}) {
     this.#store = store;
     this.#fetch = options.fetch;
     this.#scheduler = options.scheduler ?? browserScheduler;
@@ -575,8 +602,10 @@ export class SyncEngine {
       }
       await this.#push(client);
       await this.#pull(client);
-      if (await this.#resolveConflicts(client)) {
-        await this.#push(client); // Upload the local versions that won right away.
+      const released = (await this.#store.pulled?.()) ?? false;
+      if ((await this.#resolveConflicts(client)) || released) {
+        // Upload the local versions that won right away, and what the pull released.
+        await this.#push(client);
       }
       this.#failures = 0;
       const access = await this.#currentAccess(client, wasUnpaid);

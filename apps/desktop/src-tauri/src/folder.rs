@@ -94,7 +94,18 @@ pub struct Folder {
     rules: Arc<RwLock<Gitignore>>,
 }
 
+/// The folder the desktop app uses when none is chosen, in the home folder.
+/// Not hidden, so the files show in Finder and Explorer.
+pub const DEFAULT_FOLDER_NAME: &str = "Konspecter";
+
 impl Folder {
+    /// Opens `<home>/Konspecter`, making it first if needed.
+    pub fn open_default(home: &Path) -> Result<Self, FolderError> {
+        let path = home.join(DEFAULT_FOLDER_NAME);
+        fs::create_dir_all(&path).map_err(|e| io("create default folder", e))?;
+        Folder::open(&path)
+    }
+
     pub fn open(path: &Path) -> Result<Self, FolderError> {
         let root = fs::canonicalize(path).map_err(|e| io("open folder", e))?;
         if !root.is_dir() {
@@ -609,6 +620,23 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let folder = Folder::open(dir.path()).unwrap();
         (dir, folder)
+    }
+
+    #[test]
+    fn opens_the_default_folder_making_it_once() {
+        let home = tempfile::tempdir().unwrap();
+        let folder = Folder::open_default(home.path()).unwrap();
+        assert!(folder.root().ends_with(DEFAULT_FOLDER_NAME));
+        assert!(folder.root().is_dir());
+
+        fs::write(folder.root().join("kept.md"), "# Kept").unwrap();
+        let again = Folder::open_default(home.path()).unwrap();
+        assert_eq!(again.root(), folder.root());
+        assert_eq!(
+            again.list().unwrap().len(),
+            1,
+            "an existing folder is reused as it is"
+        );
     }
 
     #[test]
