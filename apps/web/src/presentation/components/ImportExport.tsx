@@ -89,10 +89,10 @@ export function ImportExport({ store, ignore }: { store: NoteRepository; ignore:
   }
 
   return (
-    <section className="setting offline-storage" aria-labelledby="import-export">
-      <h2 id="import-export" className="setting-heading">
+    <section className="setting-block" aria-labelledby="import-export">
+      <h3 id="import-export" className="setting-heading">
         {t("transfer.title")}
-      </h2>
+      </h3>
       <p className="setting-hint">{rich("transfer.hint", { md: <code>.md</code> })}</p>
       <div className="actions">
         <label htmlFor={filesId} className="button">

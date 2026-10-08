@@ -41,21 +41,25 @@ export function syncSummary(status: SyncStatus): string {
 export function SyncSettings({ sync }: { sync: SyncEngine }) {
   const status = useSyncExternalStore(sync.subscribe, sync.getStatus);
   return (
-    <section className="setting sync-settings" aria-labelledby="sync-heading">
-      <h2 id="sync-heading" className="setting-heading">
+    <section className="settings-group" aria-labelledby="sync-heading">
+      <h2 id="sync-heading" className="settings-group-title">
         {t("sync.title")}
       </h2>
-      {status.state === "disabled" ? (
-        <ConnectForm sync={sync} />
-      ) : status.state === "disconnected" ? (
-        <Disconnected sync={sync} status={status} />
-      ) : status.state === "locked" ? (
-        <Locked sync={sync} status={status} />
-      ) : status.state === "unpaid" ? (
-        <Unpaid sync={sync} status={status} />
-      ) : (
-        <SyncState sync={sync} status={status} />
-      )}
+      <div className="settings-panel">
+        <div className="setting-block">
+          {status.state === "disabled" ? (
+            <ConnectForm sync={sync} />
+          ) : status.state === "disconnected" ? (
+            <Disconnected sync={sync} status={status} />
+          ) : status.state === "locked" ? (
+            <Locked sync={sync} status={status} />
+          ) : status.state === "unpaid" ? (
+            <Unpaid sync={sync} status={status} />
+          ) : (
+            <SyncState sync={sync} status={status} />
+          )}
+        </div>
+      </div>
     </section>
   );
 }

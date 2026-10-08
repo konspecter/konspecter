@@ -1,5 +1,5 @@
 import { ChevronIcon } from "@konspecter/ui/icons";
-import { useCallback, useId, useState } from "react";
+import { useCallback, useId, useState, type ReactNode } from "react";
 import type { ReadingPositionMode } from "../../domain/reading/reading";
 import {
   FONT_SCALES,
@@ -117,110 +117,130 @@ export function SettingsPage({
     <>
       <title>{t("app.title", { title: t("settings.title") })}</title>
       <h1 className="page-title">{t("settings.title")}</h1>
-      <form
-        className="settings"
-        onSubmit={(event) => {
-          event.preventDefault();
-        }}
-      >
-        <Choice
-          legend={t("settings.theme")}
-          options={choices.themes}
-          value={settings.theme}
-          onChange={(value) => {
-            update("theme", value);
-          }}
-        />
-        <Dropdown
-          label={t("settings.language")}
-          options={choices.languages}
-          value={settings.language}
-          onChange={(value) => {
-            update("language", value);
-          }}
-        />
-        <Choice
-          legend={t("settings.editor")}
-          hint={t("settings.editor.hint")}
-          options={choices.editors}
-          value={settings.defaultEditor}
-          onChange={(value) => {
-            update("defaultEditor", value);
-          }}
-        />
-        <Choice
-          legend={t("settings.editingArea")}
-          hint={t("settings.editingArea.hint")}
-          options={choices.editingAreas}
-          value={settings.editingArea}
-          onChange={(value) => {
-            update("editingArea", value);
-          }}
-        />
-        <Choice
-          legend={t("settings.textSize")}
-          options={choices.scales}
-          value={settings.fontScale}
-          onChange={(value) => {
-            update("fontScale", value);
-          }}
-        />
-        <Choice
-          legend={t("settings.tagNames")}
-          hint={t("settings.tagNames.hint")}
-          options={choices.tagNames}
-          value={settings.tagNames}
-          onChange={(value) => {
-            update("tagNames", value);
-          }}
-        />
-        <Choice
-          legend={t("settings.reading")}
-          options={choices.reading}
-          value={settings.readingPosition}
-          onChange={(value) => {
-            update("readingPosition", value);
-          }}
-        />
-        {library?.folder != null && (
+      <div className="settings">
+        <Group title={t("settings.group.appearance")}>
           <Choice
-            legend={t("settings.fileNames")}
-            hint={t("settings.fileNames.hint")}
-            options={choices.fileNames}
-            value={settings.fileNames}
+            legend={t("settings.theme")}
+            options={choices.themes}
+            value={settings.theme}
             onChange={(value) => {
-              update("fileNames", value);
+              update("theme", value);
             }}
           />
+          <Dropdown
+            legend={t("settings.language")}
+            options={choices.languages}
+            value={settings.language}
+            onChange={(value) => {
+              update("language", value);
+            }}
+          />
+          <Choice
+            legend={t("settings.textSize")}
+            options={choices.scales}
+            value={settings.fontScale}
+            onChange={(value) => {
+              update("fontScale", value);
+            }}
+          />
+          <Choice
+            legend={t("settings.editingArea")}
+            hint={t("settings.editingArea.hint")}
+            options={choices.editingAreas}
+            value={settings.editingArea}
+            onChange={(value) => {
+              update("editingArea", value);
+            }}
+          />
+        </Group>
+        <Group title={t("settings.group.writing")}>
+          <Choice
+            legend={t("settings.editor")}
+            hint={t("settings.editor.hint")}
+            options={choices.editors}
+            value={settings.defaultEditor}
+            onChange={(value) => {
+              update("defaultEditor", value);
+            }}
+          />
+          <Choice
+            legend={t("settings.reading")}
+            options={choices.reading}
+            value={settings.readingPosition}
+            onChange={(value) => {
+              update("readingPosition", value);
+            }}
+          />
+          <Choice
+            legend={t("settings.tagNames")}
+            hint={t("settings.tagNames.hint")}
+            options={choices.tagNames}
+            value={settings.tagNames}
+            onChange={(value) => {
+              update("tagNames", value);
+            }}
+          />
+        </Group>
+        {saveErrorText !== null && (
+          <p role="alert" className="inline-error">
+            {t("settings.saveFailed", { error: saveErrorText })}
+          </p>
         )}
-      </form>
-      {isDesktop() ? <DesktopAbout /> : <OfflineStorage />}
-      {library && <LibrarySettings library={library} />}
-      {library?.ignore ? (
-        <FolderIgnoreSettings ignore={library.ignore} />
-      ) : (
-        <IgnoreSettings
-          saved={settings.ignore}
-          inFolder={false}
-          onSave={(ignore) => onChange({ ...settings, ignore })}
-        />
-      )}
-      {store && library?.folder == null && <ImportExport store={store} ignore={settings.ignore} />}
-      {store && library?.folder == null && <BackupRecovery store={store} />}
-      {sync && <SyncSettings sync={sync} />}
-      <section className="setting offline-storage" aria-labelledby="shortcuts-heading">
-        <h2 id="shortcuts-heading" className="setting-heading">
-          {t("settings.shortcuts")}
-        </h2>
-        <ShortcutList />
-      </section>
-      {reset && <FactoryResetSettings reset={reset} />}
-      {saveErrorText !== null && (
-        <p role="alert" className="inline-error">
-          {t("settings.saveFailed", { error: saveErrorText })}
-        </p>
-      )}
+        {sync && <SyncSettings sync={sync} />}
+        <Group title={t("settings.group.files")}>
+          {library && <LibrarySettings library={library} />}
+          {library?.folder != null && (
+            <Choice
+              legend={t("settings.fileNames")}
+              hint={t("settings.fileNames.hint")}
+              options={choices.fileNames}
+              value={settings.fileNames}
+              onChange={(value) => {
+                update("fileNames", value);
+              }}
+            />
+          )}
+          {!isDesktop() && <OfflineStorage />}
+          {store && library?.folder == null && (
+            <ImportExport store={store} ignore={settings.ignore} />
+          )}
+          {store && library?.folder == null && <BackupRecovery store={store} />}
+          {library?.ignore ? (
+            <FolderIgnoreSettings ignore={library.ignore} />
+          ) : (
+            <IgnoreSettings
+              saved={settings.ignore}
+              inFolder={false}
+              onSave={(ignore) => onChange({ ...settings, ignore })}
+            />
+          )}
+        </Group>
+        <Group title={t("settings.shortcuts")}>
+          <div className="setting-block">
+            <ShortcutList />
+          </div>
+        </Group>
+        {(isDesktop() || reset) && (
+          <Group title={t("settings.group.app")}>
+            {isDesktop() && <DesktopAbout />}
+            {reset && <FactoryResetSettings reset={reset} />}
+          </Group>
+        )}
+      </div>
     </>
+  );
+}
+
+/** A titled group of settings, one row after another in a panel. */
+function Group({ title, children }: { title: string; children: ReactNode }) {
+  const id = useId();
+  return (
+    <section className="settings-group" aria-labelledby={id}>
+      <h2 id={id} className="settings-group-title">
+        {title}
+      </h2>
+      <div className="settings-panel">{children}</div>
+    </section>
   );
 }
 
@@ -232,23 +252,33 @@ type ChoiceProps<T> = {
   onChange: (value: T) => void;
 };
 
-function Choice<T extends string | number>({
-  legend,
-  hint,
-  options,
-  value,
-  onChange,
-}: ChoiceProps<T>) {
+/**
+ * Beyond this many characters of labels the choices no longer sit beside the
+ * setting's name as buttons (in every language), so they become a dropdown.
+ */
+const BUTTONS_LIMIT = 36;
+
+/** A few short choices as a segmented control of radio buttons; longer ones as a dropdown. */
+function Choice<T extends string | number>(props: ChoiceProps<T>) {
   const name = useId();
+  const hintId = useId();
+  const { legend, hint, options, value, onChange } = props;
+  const length = options.reduce((sum, option) => sum + option.label.length, 0);
+  if (length > BUTTONS_LIMIT) return <Dropdown {...props} />;
   return (
-    <fieldset className="setting">
-      <legend>{legend}</legend>
-      {hint && <p className="setting-hint">{hint}</p>}
-      <div className="setting-options">
+    <fieldset className="setting setting-row" aria-describedby={hint ? hintId : undefined}>
+      <legend className="setting-label">{legend}</legend>
+      {hint && (
+        <p id={hintId} className="setting-hint">
+          {hint}
+        </p>
+      )}
+      <div className="segmented">
         {options.map((option) => (
           <label key={String(option.value)}>
             <input
               type="radio"
+              className="visually-hidden"
               name={name}
               checked={option.value === value}
               onChange={() => {
@@ -264,29 +294,37 @@ function Choice<T extends string | number>({
 }
 
 /** A setting with a longer list of choices (the language), as a dropdown. */
-function Dropdown<T extends string>({
-  label,
+function Dropdown<T extends string | number>({
+  legend,
+  hint,
   options,
   value,
   onChange,
-}: Omit<ChoiceProps<T>, "legend" | "hint"> & { label: string }) {
+}: ChoiceProps<T>) {
   const id = useId();
+  const hintId = useId();
   return (
-    <div className="setting">
+    <div className="setting setting-row">
       <label htmlFor={id} className="setting-label">
-        {label}
+        {legend}
       </label>
-      <span className="select">
+      {hint && (
+        <p id={hintId} className="setting-hint">
+          {hint}
+        </p>
+      )}
+      <span className="select setting-control">
         <select
           id={id}
-          value={value}
+          value={String(value)}
+          aria-describedby={hint ? hintId : undefined}
           onChange={(event) => {
-            const chosen = options.find((option) => option.value === event.target.value);
+            const chosen = options.find((option) => String(option.value) === event.target.value);
             if (chosen) onChange(chosen.value);
           }}
         >
           {options.map((option) => (
-            <option key={option.value} value={option.value}>
+            <option key={String(option.value)} value={String(option.value)}>
               {option.label}
             </option>
           ))}
@@ -310,21 +348,23 @@ function OfflineStorage() {
   const status = requested ?? (initial.status === "success" ? initial.value : null);
 
   return (
-    <section className="setting offline-storage" aria-labelledby="offline-storage">
-      <h2 id="offline-storage" className="setting-heading">
+    <section className="setting-block" aria-labelledby="offline-storage">
+      <h3 id="offline-storage" className="setting-heading">
         {t("settings.storage")}
-      </h2>
+      </h3>
       {status && <p className="setting-hint">{t(STATUS_TEXT[status])}</p>}
       {status === "best-effort" && (
-        <button
-          type="button"
-          className="button"
-          onClick={() => {
-            void requestPersistence().then(setRequested);
-          }}
-        >
-          {t("settings.storage.keep")}
-        </button>
+        <div className="actions">
+          <button
+            type="button"
+            className="button"
+            onClick={() => {
+              void requestPersistence().then(setRequested);
+            }}
+          >
+            {t("settings.storage.keep")}
+          </button>
+        </div>
       )}
     </section>
   );
@@ -334,10 +374,10 @@ function DesktopAbout() {
   const load = useCallback(() => appInfo(), []);
   const info = useAsync(load);
   return (
-    <section className="setting offline-storage" aria-labelledby="about-desktop">
-      <h2 id="about-desktop" className="setting-heading">
+    <section className="setting-block" aria-labelledby="about-desktop">
+      <h3 id="about-desktop" className="setting-heading">
         {t("settings.about")}
-      </h2>
+      </h3>
       {info.status !== "loading" && (
         <p className="setting-hint">
           {info.status === "success"
@@ -379,10 +419,10 @@ function LibrarySettings({ library }: { library: LibraryControls }) {
   }
 
   return (
-    <section className="setting offline-storage" aria-labelledby="library-heading">
-      <h2 id="library-heading" className="setting-heading">
+    <section className="setting-block" aria-labelledby="library-heading">
+      <h3 id="library-heading" className="setting-heading">
         {t("settings.library")}
-      </h2>
+      </h3>
       {library.folder === null ? (
         <p className="setting-hint">{rich("settings.library.none", { md: <code>.md</code> })}</p>
       ) : (

@@ -199,6 +199,10 @@ source, or delete this conspect when you are done.
   "tool.link": "Link",
 
   "settings.title": "Settings",
+  "settings.group.appearance": "Appearance",
+  "settings.group.writing": "Writing and reading",
+  "settings.group.files": "Conspects and files",
+  "settings.group.app": "App",
   "settings.theme": "Theme",
   "settings.theme.system": "System",
   "settings.theme.light": "Light",

@@ -1326,7 +1326,10 @@ describe("settings and the top bar", () => {
 
     const tree = await within(sidebar()).findByRole("navigation", { name: "Tags" });
     expect(await within(tree).findByRole("link", { name: "Новые технологии" })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("radio", { name: "As written in conspects" }));
+    await userEvent.selectOptions(
+      screen.getByRole("combobox", { name: "Tag names" }),
+      "As written in conspects",
+    );
     expect(await within(tree).findByRole("link", { name: "новые технологии" })).toBeInTheDocument();
     await waitFor(async () => {
       expect(await store.loadSettings()).toMatchObject({ tagNames: "as-written" });
@@ -1984,16 +1987,10 @@ describe("file mode", () => {
 
     expect(screen.getByText("/Users/ada/Konspecter")).toBeInTheDocument();
     expect(screen.getByText(/Sync covers this folder/)).toBeInTheDocument();
-    const fileNames = screen.getByRole("group", { name: "File names" });
-    expect(
-      within(fileNames).getByRole("radio", { name: "Keep the name when the title changes" }),
-    ).toBeChecked();
-    await userEvent.click(
-      within(fileNames).getByRole("radio", { name: "Rename the file after the title" }),
-    );
-    expect(
-      within(fileNames).getByRole("radio", { name: "Rename the file after the title" }),
-    ).toBeChecked();
+    const fileNames = screen.getByRole("combobox", { name: "File names" });
+    expect(fileNames).toHaveDisplayValue("Keep the name when the title changes");
+    await userEvent.selectOptions(fileNames, "Rename the file after the title");
+    expect(fileNames).toHaveDisplayValue("Rename the file after the title");
     expect(
       screen.queryByRole("button", { name: "Import into the app library" }),
     ).not.toBeInTheDocument();

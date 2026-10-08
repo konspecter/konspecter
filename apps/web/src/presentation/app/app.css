@@ -1429,12 +1429,216 @@ kbd {
 
 /* --- Settings ------------------------------------------------------------ */
 
-.offline-storage,
-.sync-settings {
+/*
+ * Groups of settings, each a titled panel of rows split by hairlines. A row is
+ * a setting's name and hint on the left, its control on the right; a block
+ * (sync, import, ignored files…) is a heading, text and actions, top to bottom.
+ */
+.settings {
+  gap: 2.25rem;
   margin-top: 1.5rem;
-  padding-top: 1.25rem;
+  padding-bottom: 2rem;
+}
+
+.settings-group-title {
+  margin: 0 0 0.6rem;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.005em;
+}
+
+/* The panel is tinted like the sidebar; the fields on it take the page's colour to stand out. */
+.settings-panel {
+  --color-field: var(--color-bg);
+  --color-field-focus: var(--color-bg);
+
+  container-type: inline-size;
+  border-radius: 12px;
+  background: var(--color-sidebar);
+}
+
+.settings-panel > * + * {
   border-top: 1px solid var(--color-border);
-  font-family: var(--font-ui);
+}
+
+.setting-row {
+  display: grid;
+  grid-template-areas:
+    "label control"
+    "hint control";
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.2rem 1.5rem;
+  min-width: 0;
+  padding: 0.85rem 1rem;
+}
+
+/* A floated legend is laid out like any other child, so the grid places it. */
+.setting-row > .setting-label {
+  float: left;
+  grid-area: label;
+  align-self: end;
+  margin: 0;
+  padding: 0;
+  font-weight: 560;
+}
+
+/* Without a hint the name is centred on the control. */
+.setting-row:not(:has(> .setting-hint)) {
+  grid-template-areas: "label control";
+}
+
+.setting-row:not(:has(> .setting-hint)) > .setting-label {
+  align-self: center;
+}
+
+.setting-row > .setting-hint {
+  grid-area: hint;
+  align-self: start;
+  max-width: 60ch;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.setting-row > .segmented,
+.setting-row > .setting-control {
+  grid-area: control;
+  justify-self: end;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.setting-control select {
+  max-width: 100%;
+  text-overflow: ellipsis;
+}
+
+@container (max-width: 30rem) {
+  .setting-row,
+  .setting-row:not(:has(> .setting-hint)) {
+    grid-template-areas:
+      "label"
+      "hint"
+      "control";
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* On a phone a control takes the row's width. */
+  .setting-row > .segmented,
+  .setting-row > .setting-control {
+    justify-self: stretch;
+    margin-top: 0.5rem;
+  }
+
+  .setting-control select {
+    width: 100%;
+  }
+
+  /* One row across the width in every language: each segment as wide as its label, the room
+     left shared out; only a label too long for any room breaks, inside its own button. */
+  .setting-row > .segmented {
+    display: grid;
+    grid-auto-columns: auto;
+    grid-auto-flow: column;
+  }
+
+  .setting-row > .segmented label {
+    min-width: 0;
+    padding-inline: 0.4rem;
+    text-align: center;
+    white-space: normal;
+    overflow-wrap: break-word;
+  }
+}
+
+/*
+ * Radio buttons drawn as one control: the chosen one is raised out of the track.
+ * Beside a name, the name gives up its room first; the buttons wrap only when
+ * the whole row is too narrow, never sticking out. On a phone they are one row.
+ */
+.segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  max-width: 100%;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--color-active);
+}
+
+.segmented label {
+  display: inline-flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3rem 0.8rem;
+  border-radius: 7px;
+  color: var(--color-muted);
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease-out,
+    color 120ms ease-out;
+}
+
+.segmented label:hover {
+  color: var(--color-fg);
+}
+
+.segmented label:has(:checked) {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  box-shadow:
+    0 0 0 1px var(--color-border),
+    0 1px 2px var(--color-shadow);
+  font-weight: 560;
+}
+
+.segmented label:has(:focus-visible) {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segmented label {
+    transition: none;
+  }
+}
+
+.setting-block {
+  padding: 1rem;
+}
+
+.setting-block > .setting-heading {
+  margin-bottom: 0.35rem;
+  font-weight: 560;
+}
+
+.setting-block .setting-hint {
+  max-width: 64ch;
+  margin: 0 0 0.4rem;
+  line-height: 1.45;
+}
+
+/* Like the rows' controls, a block's buttons keep to the right edge, under its fields. */
+.setting-block .actions {
+  justify-content: flex-end;
+}
+
+.setting-block > .actions {
+  margin-top: 0.75rem;
+}
+
+.setting-block .connect-form,
+.setting-block .ignore-rules {
+  max-width: none;
+}
+
+.setting-block > .inline-error,
+.setting-block > [role="status"] {
+  margin-top: 0.75rem;
 }
 
 /* The .konspecterignore rules: plain text in a field, a line per pattern. */
@@ -1620,8 +1824,20 @@ kbd {
   margin-bottom: 0;
 }
 
-.offline-storage .shortcuts {
-  max-width: 28rem;
+/* In Settings the keys stand in a column, each action right after its keys. */
+.setting-block .shortcuts {
+  margin: 0;
+}
+
+.setting-block .shortcuts div {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, max-content) minmax(0, 1fr);
+  gap: 1.25rem;
+}
+
+.setting-block .shortcuts dd {
+  color: var(--color-muted);
+  text-align: left;
 }
 
 /* --- Narrow windows and phones ------------------------------------------- */

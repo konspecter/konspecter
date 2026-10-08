@@ -29,25 +29,27 @@ export function BackupRecovery({ store }: { store: NoteRepository }) {
   const records = unreadable.status === "success" ? unreadable.value : [];
 
   return (
-    <section className="setting offline-storage" aria-labelledby="backup-recovery">
-      <h2 id="backup-recovery" className="setting-heading">
+    <section className="setting-block" aria-labelledby="backup-recovery">
+      <h3 id="backup-recovery" className="setting-heading">
         {t("backup.title")}
-      </h2>
+      </h3>
       <p className="setting-hint">{t("backup.hint")}</p>
       {store.rebuildIndexes && (
-        <button
-          type="button"
-          className="button"
-          onClick={() => {
-            run(async () => {
-              await store.rebuildIndexes?.();
-              const count = (await store.list()).length;
-              return tn("backup.rebuilt", count);
-            });
-          }}
-        >
-          {t("backup.rebuild")}
-        </button>
+        <div className="actions">
+          <button
+            type="button"
+            className="button"
+            onClick={() => {
+              run(async () => {
+                await store.rebuildIndexes?.();
+                const count = (await store.list()).length;
+                return tn("backup.rebuilt", count);
+              });
+            }}
+          >
+            {t("backup.rebuild")}
+          </button>
+        </div>
       )}
       {records.length > 0 && (
         <div role="alert" className="recovery">

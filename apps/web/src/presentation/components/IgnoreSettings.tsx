@@ -45,10 +45,10 @@ export function IgnoreSettings({ saved, onSave, inFolder }: IgnoreSettingsProps)
   }
 
   return (
-    <section className="setting offline-storage" aria-labelledby="ignore-heading">
-      <h2 id="ignore-heading" className="setting-heading">
+    <section className="setting-block" aria-labelledby="ignore-heading">
+      <h3 id="ignore-heading" className="setting-heading">
         {t("ignore.title")}
-      </h2>
+      </h3>
       <p className="setting-hint">{inFolder ? rich("ignore.folder", code) : t("ignore.app")}</p>
       <p className="setting-hint">
         {rich("ignore.syntax", {
@@ -118,10 +118,10 @@ export function FolderIgnoreSettings({ ignore }: { ignore: FolderIgnore }) {
   if (rules.status === "loading") return null;
   if (rules.status === "error") {
     return (
-      <section className="setting offline-storage" aria-labelledby="ignore-heading">
-        <h2 id="ignore-heading" className="setting-heading">
+      <section className="setting-block" aria-labelledby="ignore-heading">
+        <h3 id="ignore-heading" className="setting-heading">
           {t("ignore.title")}
-        </h2>
+        </h3>
         <p role="alert" className="inline-error">
           {failureText}
         </p>

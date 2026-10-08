@@ -23,26 +23,28 @@ export function FactoryResetSettings({ reset }: { reset: FactoryReset }) {
   }
 
   return (
-    <section className="setting offline-storage" aria-labelledby="factory-reset">
-      <h2 id="factory-reset" className="setting-heading">
+    <section className="setting-block" aria-labelledby="factory-reset">
+      <h3 id="factory-reset" className="setting-heading">
         {t("reset.title")}
-      </h2>
+      </h3>
       <p className="setting-hint">{t("reset.hint")}</p>
-      <button
-        type="button"
-        className="button button-danger"
-        disabled={busy}
-        onClick={() => {
-          setFailure(null);
-          setBusy(true);
-          reset.appNotes().then((count) => {
-            setAsking(count);
-            setBusy(false);
-          }, fail);
-        }}
-      >
-        {t("reset.start")}
-      </button>
+      <div className="actions">
+        <button
+          type="button"
+          className="button button-danger"
+          disabled={busy}
+          onClick={() => {
+            setFailure(null);
+            setBusy(true);
+            reset.appNotes().then((count) => {
+              setAsking(count);
+              setBusy(false);
+            }, fail);
+          }}
+        >
+          {t("reset.start")}
+        </button>
+      </div>
       {asking !== null && (
         <ConfirmDialog
           title={t("reset.confirmTitle")}

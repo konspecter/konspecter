@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Settings in groups:** Appearance, Writing and reading, Sync, Conspects and files, Keyboard
+  shortcuts and App, each a tinted panel of rows. A setting's name and hint sit on the left;
+  its control, and a section's buttons, keep to the right edge, on one line in every language.
+  A few short choices are a segmented control, longer ones a dropdown. On a phone a segmented
+  control is one row across the width, in every language (Russian “Крупнее” and “Продолжать,
+  где остановился” are shorter to fit).
 - **No collapsing page on Android:** anything wider than the screen made the WebView widen the
   page, which read as a scrollbar hundreds of pixels wide and squeezed the column to nothing.
   The scrollbar is now measured on its own (0 on phones).
