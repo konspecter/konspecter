@@ -25,6 +25,7 @@
 }
 
 .button-primary {
+  --press-shade: color-mix(in srgb, var(--color-bg) 22%, transparent);
   border-color: var(--color-fg);
   background: var(--color-fg);
   color: var(--color-bg);

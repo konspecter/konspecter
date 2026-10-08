@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **No blue flash on tap** in the Android app: the WebView's tap highlight is off. Instead, a
+  pressed button or link shades at once and fades back over 200 ms, in the app and on the site.
 - **`pnpm version:set 0.2.0`** writes a release's version into every file that carries it,
   now including the Android app: `versionName` is the version and `versionCode` follows it
   (`major * 10000 + minor * 100 + patch`) instead of a fixed `1.0` and `1`

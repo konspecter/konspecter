@@ -12,9 +12,12 @@ body {
   background: var(--color-bg);
 }
 
-/* The page scrolls; the scrollbar's room is kept, so content never shifts when it appears. */
+/* The page scrolls; the scrollbar's room is kept, so content never shifts when it appears.
+   Touch browsers (the Android app's WebView) flash a box over whatever is tapped; controls show
+   their own pressed state instead. */
 html {
   scrollbar-gutter: stable;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -34,6 +37,20 @@ a {
 :focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
+}
+
+/* A pressed control darkens at once and fades back over 200ms when let go, so a tap on a phone
+   is seen. An inset shadow lies over any background and under the content; a control on a dark
+   fill sets a light --press-shade. Prose links (no class) are left as they are. */
+:where(button, [role="button"], summary, a[href][class]) {
+  --press-shade: color-mix(in srgb, var(--color-fg) 12%, transparent);
+  box-shadow: inset 0 0 0 100vmax transparent;
+  transition: box-shadow 200ms ease-out;
+}
+
+:where(button:not(:disabled), [role="button"], summary, a[href][class]):active {
+  box-shadow: inset 0 0 0 100vmax var(--press-shade);
+  transition: none;
 }
 
 /* Text never gets a box: fields and editors show focus with their background. */
