@@ -153,7 +153,7 @@ docs/testing.md           test strategy and map
 docs/performance.md       measurements and optimizations
 docs/security.md          threat model and measures
 tests/e2e/                Playwright end-to-end tests
-.claude/skills/           commit, konspecter-go (shared with konspecter-billing)
+.claude/skills/           commit, konspecter-go (shared with konspecter-billing), release
 logo/                     master logo artwork (SVG: black, white, colour, app tile, light and dark tiles;
                           both tiles as 1024 px PNGs for the GitHub avatar)
 docs/license-policy.md    dependency license policy
@@ -262,9 +262,11 @@ Markdown body when it helps. **No `Co-Authored-By:` trailer, ever.** The skill's
 | --------------- | ---------------------------------------------------------------------------- |
 | `commit`        | every commit                                                                 |
 | `konspecter-go` | writing or reviewing Go: the style this server and the billing service share |
+| `release`       | a release: the semver bump from the commits, version, changelog, tag, push   |
 
-These two are **the same in `konspecter-billing`**. Change them in both repositories
-together. From there, `diff -r -x billing-contract .claude/skills ../konspecter/.claude/skills`
+`commit` and `konspecter-go` are **the same in `konspecter-billing`**; `release` is this
+repository's own. Change the shared two in both repositories together. From there,
+`diff -r -x billing-contract -x release .claude/skills ../konspecter/.claude/skills`
 must print nothing.
 
 ## Definition of done

@@ -10,8 +10,12 @@
    tag). The Android `versionCode` is `major * 10000 + minor * 100 + patch`, so minor and
    patch stay below 100; a pre-release (`0.2.0-rc.1`) shares its release's code.
 2. Turn `## Unreleased` in `CHANGELOG.md` into the version's heading, commit, then tag and
-   push: `git tag v0.2.0 && git push --tags`. A pre-release tag (`v0.2.0-rc.1`) builds the
-   same, but does not move the images' `X.Y` and `latest`.
+   push: `git tag -a v0.2.0 -m "Konspecter 0.2.0" && git push --atomic origin main v0.2.0`.
+   A pre-release tag (`v0.2.0-rc.1`) builds the same, but does not move the images' `X.Y` and
+   `latest`. In Claude Code, the `release` skill (`/release`, or `/release minor`) does steps 1
+   and 2: it works out the bump from the Conventional Commits since the last tag (a breaking
+   change is major, a minor before 1.0; a `feat` minor; anything else patch), asks before
+   changing anything, then commits, tags and pushes.
 3. `.github/workflows/release.yml` builds everything into a **draft** GitHub Release:
 
    | Artifact                                                                    | Built by                               |
