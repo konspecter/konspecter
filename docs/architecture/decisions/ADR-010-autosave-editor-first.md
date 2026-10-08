@@ -6,7 +6,7 @@ Status: accepted (2026-09-28). §4 (conflict copies on save) is superseded by
 ## Context
 
 Until now a note opened in a read-only reader, editing was a separate page, and saving was
-explicit (Save / Cancel). Updates package 1 (`.claude/plans/updates-1.md`) asks for an
+explicit (Save / Cancel). Updates package 1 asks for an
 editor that is visible and interactive at once, realtime persistence without a Save button,
 three main states only (new note, edit note, search results), and no loading screens.
 

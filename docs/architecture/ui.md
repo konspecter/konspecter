@@ -1,8 +1,7 @@
 # User interface
 
-The web app is the UI of every client (browser, desktop, Android). Updates packages 1 and 2
-(`.claude/plans/updates-1.md`, `updates-2.md`) define it; this is how it is built. The
-interface speaks English and Russian ([i18n](i18n.md)). The account site shares its look
+The web app is the UI of every client (browser, desktop, Android); this is how it is built.
+The interface speaks English and Russian ([i18n](i18n.md)). The account site shares its look
 (see [the account site](#the-account-site) below).
 
 ## Layout
@@ -65,8 +64,7 @@ interface speaks English and Russian ([i18n](i18n.md)). The account site shares 
 ## Small screens
 
 Phones and windows up to 760px wide (`hooks/use-narrow.ts`: `NARROW`, `useNarrow()`; the same
-breakpoint in the CSS), in the browser, the PWA and the Android app alike
-([plan](../../.claude/plans/mobile-view.md)).
+breakpoint in the CSS), in the browser, the PWA and the Android app alike.
 
 ```text
 ┌──────────────────────── (theme) (mode) (antenna) ─┐
@@ -135,10 +133,10 @@ breakpoint in the CSS), in the browser, the PWA and the Android app alike
   results stay while the next search runs, so typing never blanks the list. ↓ moves into the
   results, the arrow keys move between them (↑ on the first row returns to the box), Enter opens the
   first. Neither the list nor the results have a visible heading.
-- **Search in the note** (`note-find.ts`, [plan](../../.claude/plans/note-find.md)): on the
-  note page (new or existing) the box searches the open note instead, unless it was opened
-  with `Mod+P` or `/` (the library, as above, until the box loses the focus). Every match is
-  marked like the list's, the selected one stronger (`--color-mark-current`), and the first
+- **Search in the note** (`note-find.ts`): on the note page (new or existing) the box searches
+  the open note instead, unless it was opened with `Mod+P` or `/` (the library, as above, until
+  the box loses the focus). Every match is marked like the list's, the selected one stronger
+  (`--color-mark-current`), and the first
   is scrolled to the middle of the page below the top bar. The box ends in `2/5` and ↑/↓;
   the ↓ and ↑ keys (or Enter and Shift+Enter) go to the next and the previous match, around
   the ends; Tab leaves the box as usual. The caret stays where it was. Matching is

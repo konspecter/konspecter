@@ -143,7 +143,7 @@
 
 ## 0.1.0 — 2026-09-28
 
-The first complete version, built phase by phase from the implementation plan.
+The first complete version, built phase by phase.
 
 - Markdown documents with YAML frontmatter (title, dates, cover) as the only source of truth.
 - A text editor (ProseMirror) that never changes a note's meaning, and a Markdown editor

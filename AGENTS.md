@@ -7,10 +7,12 @@ Konspecter is a local-first personal knowledge base for notes of every kind.
 
 ## Plans
 
-- The master plan is [`.claude/plans/konspecter-implementation-plan.md`](.claude/plans/konspecter-implementation-plan.md).
-  Read the relevant sections before starting any phase.
 - Save every new plan as a Markdown file in `.claude/plans/`. This is also the configured
   `plansDirectory` in `.claude/settings.json`.
+- **Plans are temporary working files**: the folder's contents are not committed, and a plan
+  may be gone tomorrow. Committed documents (`README.md`, `docs/`, ADRs, `CHANGELOG.md`, this
+  file) never link to a plan, name a plan file or cite a plan's section (`plan §27`). What a
+  plan decided that must last goes into `docs/` or an ADR, and documents point there.
 
 ## Current status
 
@@ -74,14 +76,14 @@ All planned phases are done. New work needs a new plan in `.claude/plans/`.
 | Key by QR  | The site's QR code hands the encryption key over: no passphrase on the app  | Done   |
 | Panes      | Sidebar blocks fold like VS Code's: any number open, each scrolls, kept     | Done   |
 
-Specs and notes: `.claude/plans/updates-1.md` (+ `updates-1-implementation.md`), `updates-2.md`
-(+ `updates-2-implementation.md`), `markdown-single-source.md`, `last-write-wins.md`, `tag-chains.md` (item 1 of `updates-3.md`), `note-find.md` (item 3), `friendly-errors.md` (item 5), `slug-file-names.md` (item 8), `mode-switch-place.md` (item 14), `mobile-view.md` (mobile view updates), `updates-4.md` (+ `updates-4-implementation.md`), `sync-app-site.md` (+
-`sync-app-site-implementation.md`; ADR-014 to ADR-017), `feedback-1.md`, `feedback.md` (+
-`feedback-implementation.md`; ADR-019), `ignore-file.md`, `self-hosted.md` (ADR-023;
-`docs/self-hosting.md`), `factory-reset.md`, `folder-sync.md` (ADR-024), `connect-with-key.md`
-(ADR-025), `sidebar-panes.md`. UI architecture:
-`docs/architecture/ui.md`; languages: `docs/architecture/i18n.md`; server and API:
-`docs/architecture/server.md`.
+Where the packages are described: UI architecture: `docs/architecture/ui.md`; languages:
+`docs/architecture/i18n.md`; server and API: `docs/architecture/server.md`; sync:
+`docs/architecture/sync.md`; File Mode and `.konspecterignore`:
+`docs/architecture/filesystem-mode.md`; self-hosting: `docs/self-hosting.md`. Decisions are in
+`docs/architecture/decisions/`: last write wins (ADR-011), change events (ADR-012), folders follow
+tags (ADR-013), the account site and end-to-end encrypted sync (ADR-014 to ADR-017), connecting by
+QR code (ADR-019), published images (ADR-023), desktop folder sync (ADR-024) and the key handed
+over by QR code (ADR-025).
 
 ## Working rules
 
@@ -107,9 +109,9 @@ Changes / Tests / Lint / Typecheck / Build / Known limitations
 
 Then stop and wait for the next instruction.
 
-Never implement anything from the plan's "Explicitly out of scope" list (section 30:
-AI, backlinks, wiki links, collaboration, plugins, templates, tag autocomplete, GraphQL,
-gRPC, Protobuf, microservices, …) without a separate decision.
+Never implement anything explicitly out of scope (AI, backlinks, wiki links, collaboration,
+plugins, templates, tag autocomplete, GraphQL, gRPC, Protobuf, microservices, …) without a
+separate decision.
 
 ## Repository layout
 

@@ -74,7 +74,7 @@ pages ─→ NoteRepository ─┬─ NoteStore    (IndexedDB, synced)       —
 ## Ignored files
 
 The folder's **`.konspecterignore`**, at its root and written like `.gitignore`, names what is
-not a note ([plan](../../.claude/plans/ignore-file.md)). Settings → **Ignored files** edits it
+not a note. Settings → **Ignored files** edits it
 in a text box; Save writes the file and reads the folder again by the new rules. A folder
 without the file uses the default (`domain/note/ignore.ts` `DEFAULT_IGNORE`, the same in
 `folder.rs`):

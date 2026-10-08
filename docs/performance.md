@@ -1,6 +1,6 @@
 # Performance
 
-Measured, then optimized only where the numbers called for it (plan §28). Machine: Apple
+Measured, then optimized only where the numbers called for it. Machine: Apple
 Silicon laptop (2026). Synthetic notes: 4 KB each with headings, lists, code and tags, and
 a 200 KB note for the large case.
 

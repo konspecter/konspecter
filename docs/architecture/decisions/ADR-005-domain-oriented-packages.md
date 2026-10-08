@@ -15,7 +15,7 @@ mappers and factories.
   `sync`, `reading`) under `internal/`, with entry points in `cmd/`. Interfaces are
   declared by consumers at real boundaries (e.g. storage). No generic packages (`utils`,
   `common`, `types`).
-- **Frontend:** the plan's `domain/application/infrastructure/presentation` split is a guide,
+- **Frontend:** the `domain/application/infrastructure/presentation` split is a guide,
   not a mandate. A folder or package is created when there is code with its own
   responsibility to put in it.
 

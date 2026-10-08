@@ -76,7 +76,7 @@ pnpm e2e
 | Devices (codes, flow states, revoke closing streams), keys, envelopes | `internal/devices`, `internal/keys`, `internal/notes`, `httpapi/{devices,keys}_test.go`       |
 | Cascades on deletion, key reset racing writes (PostgreSQL)            | `internal/storage/postgres/{devices,keys}_test.go`                                            |
 
-## Critical flows (plan §27)
+## Critical flows
 
 | Flow                                               | Unit / integration                                     | End to end                                                |
 | -------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------------------- |
