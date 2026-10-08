@@ -65,6 +65,9 @@ services:
     environment:
       KONSPECTER_SITE_ADDRESS: ${KONSPECTER_SITE_ADDRESS:-localhost}
       KONSPECTER_APP_ADDRESS: ${KONSPECTER_APP_ADDRESS:-app.localhost}
+      KONSPECTER_REDIRECT_ADDRESSES: ${KONSPECTER_REDIRECT_ADDRESSES:-www.localhost}
+      KONSPECTER_RU_REDIRECT_ADDRESSES: ${KONSPECTER_RU_REDIRECT_ADDRESSES:-ru.localhost}
+      KONSPECTER_PUBLIC_URL: ${KONSPECTER_PUBLIC_URL:-https://localhost}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

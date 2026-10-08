@@ -1,5 +1,6 @@
 import { detectLocale } from "@konspecter/i18n";
 import { DEFAULT_LOCALE, LOCALES, type Locale } from "./i18n/i18n";
+import { localizedPath, pageUrl, publicPage } from "./pages";
 
 /**
  * The visitor's language and theme, kept in two plain cookies so the server
@@ -56,19 +57,45 @@ export function acceptedLanguages(header: string | null): string[] {
     .map((entry) => entry.tag);
 }
 
-/** The chosen language (cookie), else the browser's (Accept-Language), else English. */
+/** The language the visitor chose with the switch (cookie), or null. */
+export function chosenLocale(request: Request): Locale | null {
+  const lang = readCookies(request.headers.get("Cookie")).get(LANG_COOKIE);
+  return isLocale(lang) ? lang : null;
+}
+
+/** The browser's language (Accept-Language) among the site's, else English. */
+export function browserLocale(request: Request): Locale {
+  return detectLocale(
+    acceptedLanguages(request.headers.get("Accept-Language")),
+    LOCALES,
+    DEFAULT_LOCALE,
+  );
+}
+
+/**
+ * The language a public page should be shown in, when it differs from the
+ * page's address (`at`): the chosen one, or — on a default-language address,
+ * the x-default — the browser's. An address in another language was picked on
+ * purpose (a link, the switch, a search result), so the browser's language
+ * never moves the visitor off it; null keeps the page where it is.
+ */
+export function preferredLocale(request: Request, at: Locale): Locale | null {
+  const preferred = chosenLocale(request) ?? (at === DEFAULT_LOCALE ? browserLocale(request) : at);
+  return preferred === at ? null : preferred;
+}
+
+/**
+ * The page's language: a public page's is its address's (pages.ts); any other
+ * page takes the chosen one (cookie), else the browser's (Accept-Language),
+ * else English.
+ */
 export function readPreferences(request: Request): Preferences {
-  const cookies = readCookies(request.headers.get("Cookie"));
-  const lang = cookies.get(LANG_COOKIE);
-  const theme = cookies.get(THEME_COOKIE);
+  const theme = readCookies(request.headers.get("Cookie")).get(THEME_COOKIE);
   return {
-    locale: isLocale(lang)
-      ? lang
-      : detectLocale(
-          acceptedLanguages(request.headers.get("Accept-Language")),
-          LOCALES,
-          DEFAULT_LOCALE,
-        ),
+    locale:
+      publicPage(pageUrl(request).pathname)?.locale ??
+      chosenLocale(request) ??
+      browserLocale(request),
     theme: isTheme(theme) ? theme : "system",
   };
 }
@@ -100,4 +127,16 @@ export function safeReturnPath(value: unknown): string {
   if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) return "/";
   if (value.includes("\\")) return "/";
   return value;
+}
+
+/** The same page in another language: a public page's own address in it; any other path as is. */
+export function pathInLocale(path: string, locale: Locale): string {
+  const url = new URL(path, "http://site.invalid");
+  const page = publicPage(url.pathname);
+  return page ? localizedPath(locale, page.page) + url.search + url.hash : path;
+}
+
+/** Home in the visitor's language: where signing out and the like lead. */
+export function homePath(request: Request): string {
+  return localizedPath(readPreferences(request).locale, "/");
 }

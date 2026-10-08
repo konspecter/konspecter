@@ -63,7 +63,7 @@ type Accounts struct {
 	// Mailer sends codes and reset links; nil means no email, and the flows
 	// that need one answer 503.
 	Mailer Mailer
-	// PublicURL is the site's origin ("https://notes.example.com"): links in
+	// PublicURL is the site's origin ("https://konspecter.com"): links in
 	// emails, the session cookie's Secure flag, and the only Origin allowed
 	// to sign in or use a session.
 	PublicURL        string

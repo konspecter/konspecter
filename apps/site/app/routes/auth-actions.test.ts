@@ -164,14 +164,14 @@ it("sends the visitor back to /login without a remembered address", async () => 
   ).rejects.toMatchObject({ status: 302 });
 });
 
-it("signs out through the API", async () => {
+it("signs out through the API and goes home in the visitor's language", async () => {
   const cleared = "ksp_session=; Path=/; Max-Age=0";
   stubApi({
     "/api/auth/logout": () =>
       new Response(null, { status: 204, headers: { "Set-Cookie": cleared } }),
   });
   const response = await logout(args(post("/logout", {}, "ksp_session=kss_1")));
-  expect(response.headers.get("Location")).toBe("/");
+  expect(response.headers.get("Location")).toBe("/ru/");
   expect(response.headers.getSetCookie()).toEqual([cleared]);
 });
 

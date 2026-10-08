@@ -26,6 +26,15 @@ type letter struct {
 	account bool
 }
 
+// homeURL is the site's home page in the letter's language: the site's public
+// pages have an address per language, the Russian ones under /ru/ (ADR-026).
+func (l letter) homeURL() string {
+	if l.locale == Russian {
+		return l.siteURL + "/ru/"
+	}
+	return l.siteURL
+}
+
 type button struct {
 	URL   string
 	Label string
@@ -79,7 +88,7 @@ func (l letter) html() string {
 		"LinkHint": linkHint,
 		"Outro":    l.outro,
 		"Footer":   footer(l.locale, l.siteURL, l.account),
-		"SiteURL":  l.siteURL,
+		"HomeURL":  l.homeURL(),
 	})
 	if err != nil {
 		// The template and its data are the package's own, so this does not

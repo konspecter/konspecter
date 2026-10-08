@@ -34,7 +34,7 @@ type Config struct {
 	// (KONSPECTER_ALLOWED_ORIGINS, comma-separated).
 	AllowedOrigins []string
 	// PublicURL is the origin of the account site and API behind the proxy,
-	// e.g. "https://notes.example.com" (KONSPECTER_PUBLIC_URL). Sign-in on the
+	// e.g. "https://konspecter.com" (KONSPECTER_PUBLIC_URL). Sign-in on the
 	// site is off without it: emails link to it, and browser requests that
 	// sign in or use a session must come from it.
 	PublicURL string
@@ -249,7 +249,7 @@ func (r *reader) origin(name string) string {
 	}
 	u, err := url.Parse(value)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		r.fail("%s must be an http(s) URL such as https://notes.example.com, not %q", name, value)
+		r.fail("%s must be an http(s) URL such as https://konspecter.com, not %q", name, value)
 		return ""
 	}
 	return u.Scheme + "://" + strings.ToLower(u.Host)

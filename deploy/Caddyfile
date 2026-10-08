@@ -1,5 +1,8 @@
-# Two addresses. Caddy gets a certificate for each on its own (a domain
-# name), or a local one for "localhost" and its subdomains.
+# Two addresses, and other names that redirect to the first. Caddy gets a
+# certificate for each on its own (a domain name), or a local one for
+# "localhost" and its subdomains. Konspecter's own service: konspecter.com
+# (the site and the API), app.konspecter.com (the web app), www.konspecter.com
+# and konspecter.ru redirecting (ADR-026).
 
 # The API and the site, on one origin.
 {$KONSPECTER_SITE_ADDRESS:localhost} {
@@ -24,4 +27,20 @@
 {$KONSPECTER_APP_ADDRESS:app.localhost} {
 	encode zstd gzip
 	reverse_proxy web:8080
+}
+
+# Other names of the site (www.…): moved for good (301) to the same page at
+# the public URL, the one name search engines index.
+{$KONSPECTER_REDIRECT_ADDRESSES:www.localhost} {
+	redir {$KONSPECTER_PUBLIC_URL:https://localhost}{uri} permanent
+}
+
+# Names for Russian visitors (konspecter.ru): moved for good to the Russian
+# pages, the same path under /ru (an address already under /ru as it is).
+{$KONSPECTER_RU_REDIRECT_ADDRESSES:ru.localhost} {
+	@ru path /ru /ru/*
+	route {
+		redir @ru {$KONSPECTER_PUBLIC_URL:https://localhost}{uri} permanent
+		redir {$KONSPECTER_PUBLIC_URL:https://localhost}/ru{uri} permanent
+	}
 }

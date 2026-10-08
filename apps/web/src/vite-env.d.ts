@@ -1,6 +1,6 @@
 /** Build-time settings (see .env.example). */
 interface ImportMetaEnv {
-  /** The sync server the connect form suggests, e.g. "https://notes.example.com". */
+  /** The sync server the connect form suggests, e.g. "https://konspecter.com". */
   readonly VITE_KONSPECTER_SERVER_URL?: string;
 }
 

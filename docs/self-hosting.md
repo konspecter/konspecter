@@ -19,7 +19,12 @@ The stack is five containers ([ADR-023](architecture/decisions/ADR-023-published
   computer, a NAS that runs containers).
 - **Two DNS names** pointing at it: one for the site and the API (`notes.example.com`),
   one for the web app (`app.notes.example.com`). The web app has an origin of its own
-  ([ADR-018](architecture/decisions/ADR-018-web-app-origin.md)).
+  ([ADR-018](architecture/decisions/ADR-018-web-app-origin.md)). Konspecter's own service
+  runs as `konspecter.com` and `app.konspecter.com`, the names `.env.example` is filled in
+  with.
+- Optional: more names that redirect to the site, such as `www.notes.example.com`, or a
+  domain for Russian visitors that leads to the Russian pages
+  ([ADR-026](architecture/decisions/ADR-026-canonical-domain.md)).
 - Ports 80 and 443 open: Caddy gets the certificates from Let's Encrypt by itself.
 - Optional: an SMTP account, for sign-in codes and password resets by email.
 
@@ -37,6 +42,9 @@ The stack is five containers ([ADR-023](architecture/decisions/ADR-023-published
      URL;
    - `KONSPECTER_APP_ADDRESS`: the web app's name, and its URL in
      `KONSPECTER_ALLOWED_ORIGINS` and `KONSPECTER_DOWNLOAD_WEB_URL`;
+   - `KONSPECTER_REDIRECT_ADDRESSES`, `KONSPECTER_RU_REDIRECT_ADDRESSES`: other names, each
+     redirecting (301) to the same page on the site, or to its Russian page under `/ru`;
+     delete both lines when you have none;
    - `POSTGRES_PASSWORD`: a long random one (`openssl rand -hex 24`);
    - email (`KONSPECTER_SMTP_*`), or `KONSPECTER_MAIL_TRANSPORT=log` to read the sign-in
      codes from `docker compose logs server` instead.

@@ -176,7 +176,7 @@ func TestTextsSpeakTheRequestedLanguage(t *testing.T) {
 func TestLettersHaveAnHTMLVersion(t *testing.T) {
 	const site = "https://notes.example.com"
 	code := SignInCode(Russian, site, "a@example.com", "123456", 10*time.Minute, false)
-	for _, want := range []string{`lang="ru"`, "Код для входа", "123456", `src="cid:` + logoID + `"`, "notes.example.com"} {
+	for _, want := range []string{`lang="ru"`, "Код для входа", "123456", `src="cid:` + logoID + `"`, "notes.example.com", `href="https://notes.example.com/ru/"`} {
 		if !strings.Contains(code.HTML, want) {
 			t.Errorf("code HTML lacks %q", want)
 		}
@@ -185,6 +185,10 @@ func TestLettersHaveAnHTMLVersion(t *testing.T) {
 	reset := PasswordReset(English, site, "a@example.com", site+"/reset?token=x&y=1", 30*time.Minute)
 	if strings.Count(reset.HTML, `href="https://notes.example.com/reset?token=x&amp;y=1"`) != 2 || !strings.Contains(reset.HTML, "Set a new password") {
 		t.Errorf("reset HTML = %s", reset.HTML)
+	}
+	// The site's home in the letter's language: English at the root.
+	if !strings.Contains(reset.HTML, `href="https://notes.example.com" `) {
+		t.Errorf("reset HTML lacks the English home link: %s", reset.HTML)
 	}
 	for _, m := range []Message{RegistrationClosed(English, site, "a@example.com"), NoAccount(Russian, site, "a@example.com")} {
 		if m.HTML == "" || strings.Contains(m.HTML, "<no value>") {

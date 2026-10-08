@@ -2,6 +2,7 @@ import { data, Form, Link, redirect, useActionData, useLoaderData } from "react-
 import { callApi, withCookies } from "../api.server";
 import { AuthPage, Field, FormMessage, formError, Submit, textField } from "../auth-form";
 import { useT } from "../i18n/i18n";
+import { homePath } from "../preferences.server";
 import type { Route } from "./+types/reset";
 
 /** The link from the reset email: /reset?token=… */
@@ -18,7 +19,7 @@ export async function action({ request }: Route.ActionArgs) {
   });
   if (result.error)
     return data({ error: formError(result.error.code, result.retryAfter) }, result.status);
-  return redirect("/", { headers: withCookies(result.cookies) });
+  return redirect(homePath(request), { headers: withCookies(result.cookies) });
 }
 
 export default function Reset() {

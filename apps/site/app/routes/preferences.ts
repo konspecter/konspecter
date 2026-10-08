@@ -2,13 +2,21 @@ import { redirect } from "react-router";
 import { accountContext } from "../account.server";
 import { callApi } from "../api.server";
 import { siteConfig } from "../config.server";
-import { isLocale, isTheme, preferenceCookie, safeReturnPath } from "../preferences.server";
+import {
+  homePath,
+  isLocale,
+  isTheme,
+  pathInLocale,
+  preferenceCookie,
+  safeReturnPath,
+} from "../preferences.server";
 import type { Route } from "./+types/preferences";
 
 /**
  * The language and theme switches, and the cookie notice's OK, post here
  * (plain forms, so they work without JavaScript). The choice goes into a
- * cookie and the visitor goes back to the page they were on. A signed-in
+ * cookie and the visitor goes back to the page they were on (a public page in
+ * the chosen language, at that language's address). A signed-in
  * visitor's language also becomes the language of the account's emails.
  */
 export async function action({ request, context }: Route.ActionArgs) {
@@ -28,10 +36,11 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (form.get("cookies") === "ok") {
     headers.append("Set-Cookie", preferenceCookie("cookies", "ok", secure));
   }
-  return redirect(safeReturnPath(form.get("back")), { headers });
+  const back = safeReturnPath(form.get("back"));
+  return redirect(isLocale(lang) ? pathInLocale(back, lang) : back, { headers });
 }
 
 // A GET (someone opening /preferences) has nothing to show.
-export function loader() {
-  return redirect("/");
+export function loader({ request }: Route.LoaderArgs) {
+  return redirect(homePath(request));
 }

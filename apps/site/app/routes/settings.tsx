@@ -7,7 +7,7 @@ import { ConnectApp, parseConnectCode, type ConnectCode } from "../connect-app";
 import { parseDevices, timeAgo, type Device } from "../devices";
 import { Encryption } from "../encryption";
 import { useLocale, useT } from "../i18n/i18n";
-import { readPreferences } from "../preferences.server";
+import { homePath, readPreferences } from "../preferences.server";
 import { forgetKey, forgetKeyThenSubmit } from "../remembered-key";
 import { parseBilling, parsePlans, type Billing } from "../subscription";
 import { SubscriptionSection } from "../subscription-section";
@@ -160,7 +160,7 @@ export async function action({ request }: Route.ActionArgs) {
     });
     signInAgainOn401(request, result);
     if (result.error) return failed("delete", result);
-    return redirect("/", { headers: withCookies(result.cookies) });
+    return redirect(homePath(request), { headers: withCookies(result.cookies) });
   }
 
   return data<ActionResult>({ intent: "rename", error: { code: "invalid_request" } }, 400);

@@ -10,6 +10,7 @@ import {
   Link,
   Links,
   Outlet,
+  redirect,
   Scripts,
   ScrollRestoration,
   useLocation,
@@ -18,9 +19,22 @@ import {
 import { accountContext, loadAccount } from "./account.server";
 import { siteConfig } from "./config.server";
 import { LOCALE_NAMES, LOCALES, translator, useT, type Locale } from "./i18n/i18n";
-import { isSameOriginRequest } from "./origin.server";
+import { expectedOrigin, isSameOriginRequest } from "./origin.server";
+import {
+  alternates,
+  localizedPath,
+  pageUrl,
+  publicPage,
+  useLocalePath,
+  type Alternate,
+} from "./pages";
 import { forgetKeyThenSubmit } from "./remembered-key";
-import { cookieNoticeSeen, readPreferences, type Theme } from "./preferences.server";
+import {
+  cookieNoticeSeen,
+  preferredLocale,
+  readPreferences,
+  type Theme,
+} from "./preferences.server";
 import type { Route } from "./+types/root";
 import "./site.css";
 
@@ -40,14 +54,41 @@ export const middleware: Route.MiddlewareFunction[] = [
 ];
 
 export function loader({ request, context }: Route.LoaderArgs) {
+  const url = pageUrl(request);
+  const page = publicPage(url.pathname);
+  // A public page in the visitor's language: the one chosen with the switch,
+  // else the browser's when the address is the x-default (ADR-026). Crawlers
+  // mostly send neither, and an address in another language is never moved by
+  // the browser's, so every language stays reachable for them.
+  const preferred = page ? preferredLocale(request, page.locale) : null;
+  if (page && preferred) {
+    throw redirect(localizedPath(preferred, page.page) + url.search, {
+      headers: { Vary: "Cookie, Accept-Language" },
+    });
+  }
   const { user, enabled } = context.get(accountContext);
+  const origin = expectedOrigin(request, siteConfig().publicOrigin);
   return {
     ...readPreferences(request),
     email: user?.email ?? null,
     name: user?.name ?? "",
     accounts: enabled,
     cookieNotice: !cookieNoticeSeen(request),
+    search: page
+      ? {
+          canonical: origin + localizedPath(page.locale, page.page),
+          alternates: alternates(origin, page.page),
+        }
+      : null,
   };
+}
+
+/**
+ * Every page depends on the language cookie and the browser's language (its
+ * language, or a redirect to another address): caches keep them apart.
+ */
+export function headers() {
+  return { Vary: "Cookie, Accept-Language" };
 }
 
 interface RootData {
@@ -59,6 +100,29 @@ interface RootData {
   readonly accounts: boolean;
   /** Whether to show the cookie notice (not seen yet). */
   readonly cookieNotice?: boolean;
+  /** A public page's own address and its translations; null keeps the page out of search. */
+  readonly search?: SearchLinks | null;
+}
+
+interface SearchLinks {
+  readonly canonical: string;
+  readonly alternates: readonly Alternate[];
+}
+
+/**
+ * What search engines read in the head (ADR-026): a public page's canonical
+ * address and its translations; any other page, and an error, is noindex.
+ */
+export function SearchTags({ search }: { search: SearchLinks | null }) {
+  if (!search) return <meta name="robots" content="noindex" />;
+  return (
+    <>
+      <link rel="canonical" href={search.canonical} />
+      {search.alternates.map((link) => (
+        <link key={link.hreflang} rel="alternate" hrefLang={link.hreflang} href={link.href} />
+      ))}
+    </>
+  );
 }
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -73,6 +137,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="color-scheme" content="light dark" />
         <meta name="description" content={translator(locale).t("site.description")} />
+        <SearchTags search={preferences?.search ?? null} />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <Links />
@@ -192,10 +257,11 @@ function AccountLinks({
 
 function Header({ data }: { data: RootData }) {
   const { t } = useT();
+  const localePath = useLocalePath();
   return (
     <header className="site-header">
       <div className="site-frame site-header-row">
-        <Link to="/" className="site-brand" aria-label={t("site.home")}>
+        <Link to={localePath("/")} className="site-brand" aria-label={t("site.home")}>
           <img className="logo-light" src="/logo.svg" alt="" width="28" height="28" />
           <img className="logo-dark" src="/logo-dark.svg" alt="" width="28" height="28" />
           <span>Konspecter</span>
@@ -211,14 +277,15 @@ function Header({ data }: { data: RootData }) {
 
 function Footer() {
   const { t } = useT();
+  const localePath = useLocalePath();
   return (
     <footer className="site-footer">
       <div className="site-frame site-footer-row">
         <p>{t("site.footer")}</p>
         <nav aria-label={t("site.footerLinks")} className="site-footer-links">
-          <Link to="/markdown">{t("site.markdown")}</Link>
-          <Link to="/terms">{t("site.terms")}</Link>
-          <Link to="/privacy">{t("site.privacy")}</Link>
+          <Link to={localePath("/markdown")}>{t("site.markdown")}</Link>
+          <Link to={localePath("/terms")}>{t("site.terms")}</Link>
+          <Link to={localePath("/privacy")}>{t("site.privacy")}</Link>
         </nav>
       </div>
     </footer>
@@ -231,12 +298,14 @@ function Footer() {
  */
 function CookieNotice() {
   const { t } = useT();
+  const localePath = useLocalePath();
   const location = useLocation();
   return (
     <aside className="cookie-notice" aria-label={t("cookies.label")}>
       <form method="post" action="/preferences" className="cookie-notice-body">
         <p>
-          {t("cookies.notice")} <Link to="/privacy#cookies">{t("cookies.more")}</Link>
+          {t("cookies.notice")}{" "}
+          <Link to={`${localePath("/privacy")}#cookies`}>{t("cookies.more")}</Link>
         </p>
         <input type="hidden" name="back" value={`${location.pathname}${location.search}`} />
         <button type="submit" name="cookies" value="ok" className="button button-primary">
@@ -266,6 +335,7 @@ export default function App({ loaderData }: Route.ComponentProps) {
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   const { t } = useT();
+  const localePath = useLocalePath();
   const missing = isRouteErrorResponse(error) && error.status === 404;
   if (!missing) console.error(error);
   return (
@@ -274,7 +344,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
       <h1>{missing ? t("error.title") : "Konspecter"}</h1>
       <p>{missing ? t("error.notFound") : t("error.failed")}</p>
       <p>
-        <Link to="/">{t("error.home")}</Link>
+        <Link to={localePath("/")}>{t("error.home")}</Link>
       </p>
     </main>
   );

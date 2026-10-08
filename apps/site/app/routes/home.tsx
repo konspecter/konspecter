@@ -3,6 +3,7 @@ import { callApi } from "../api.server";
 import { firstMarks, MARKDOWN_GUIDE } from "../cheatsheet";
 import { siteConfig } from "../config.server";
 import { useLocale, useT } from "../i18n/i18n";
+import { useLocalePath } from "../pages";
 import { guessPlatform, PLATFORMS, type Platform } from "../platform";
 import { readPreferences } from "../preferences.server";
 import { durationText, money, parsePlans, periodText } from "../subscription";
@@ -43,6 +44,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   const translate = useT();
   const { t } = translate;
   const locale = useLocale();
+  const localePath = useLocalePath();
   const { downloads, suggested } = loaderData;
   const pricing = loaderData.pricing;
   const platformName = (platform: Platform) => t(`home.platform.${platform}`);
@@ -107,7 +109,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           <h2 id="markdown-title">{t("home.markdown.title")}</h2>
           <p className="section-lead">{t("home.markdown.text")}</p>
           <div className="actions">
-            <Link className="button" to="/markdown">
+            <Link className="button" to={localePath("/markdown")}>
               {t("home.markdown.cheatsheet")}
             </Link>
             <a className="button" href={MARKDOWN_GUIDE[locale]}>
@@ -150,7 +152,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 <Link className="button button-primary" to="/settings">
                   {pricing.trial ? t("home.price.try") : t("home.price.get")}
                 </Link>
-                <Link className="price-terms" to="/terms">
+                <Link className="price-terms" to={localePath("/terms")}>
                   {t("home.pricingTerms")}
                 </Link>
               </div>

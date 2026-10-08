@@ -2,7 +2,7 @@
 # (apps/web/Caddyfile). Built from the repository root, since the app uses the
 # workspace packages:
 #   docker build -f apps/web/Dockerfile -t konspecter-web .
-#   docker run -e KONSPECTER_PUBLIC_URL=https://notes.example.com -p 8080:8080 konspecter-web
+#   docker run -e KONSPECTER_PUBLIC_URL=https://konspecter.com -p 8080:8080 konspecter-web
 # KONSPECTER_PUBLIC_URL is the sync server the app suggests (/config.json).
 # The build runs on the build machine: its output is the same on every platform.
 FROM --platform=$BUILDPLATFORM node:22-slim AS build

@@ -1,12 +1,16 @@
 import {
   acceptedLanguages,
+  browserLocale,
+  chosenLocale,
+  pathInLocale,
   preferenceCookie,
   readCookies,
   readPreferences,
   safeReturnPath,
 } from "./preferences.server";
 
-const request = (headers: Record<string, string>) => new Request("http://site.test/", { headers });
+const request = (headers: Record<string, string>, path = "/login") =>
+  new Request(`http://site.test${path}`, { headers });
 
 describe("readPreferences", () => {
   it("prefers the chosen language and theme", () => {
@@ -25,6 +29,16 @@ describe("readPreferences", () => {
       theme: "system",
     });
   });
+
+  it("speaks a public page's language, whatever was chosen", () => {
+    expect(readPreferences(request({ Cookie: "lang=ru" }, "/markdown")).locale).toBe("en");
+    expect(readPreferences(request({ "Accept-Language": "en" }, "/ru/terms")).locale).toBe("ru");
+  });
+});
+
+it("reads the chosen language only from the cookie", () => {
+  expect(chosenLocale(request({ Cookie: "lang=ru" }, "/"))).toBe("ru");
+  expect(chosenLocale(request({ "Accept-Language": "ru" }))).toBeNull();
 });
 
 it("orders accepted languages by weight and drops refused ones", () => {
@@ -52,4 +66,16 @@ it("only returns to paths on this site", () => {
   for (const path of ["//evil.example", "https://evil.example", "/\\evil.example", "", null]) {
     expect(safeReturnPath(path)).toBe("/");
   }
+});
+
+it("switches a public page to its address in the new language, and leaves others", () => {
+  expect(pathInLocale("/markdown", "ru")).toBe("/ru/markdown");
+  expect(pathInLocale("/ru/?x=1#download", "en")).toBe("/?x=1#download");
+  expect(pathInLocale("/settings?tab=1", "ru")).toBe("/settings?tab=1");
+});
+
+it("reads the browser's language among the site's, else English", () => {
+  expect(browserLocale(request({ "Accept-Language": "de, ru-RU;q=0.5" }))).toBe("ru");
+  expect(browserLocale(request({ "Accept-Language": "de" }))).toBe("en");
+  expect(browserLocale(request({}))).toBe("en");
 });

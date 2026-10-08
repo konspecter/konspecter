@@ -1,7 +1,7 @@
 import { redirect } from "react-router";
 import { callApi, withCookies } from "../api.server";
 import { textField } from "../auth-form";
-import { safeReturnPath } from "../preferences.server";
+import { homePath, safeReturnPath } from "../preferences.server";
 import type { Route } from "./+types/logout";
 
 /**
@@ -11,11 +11,12 @@ import type { Route } from "./+types/logout";
 export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
   const result = await callApi(request, "/api/auth/logout", { method: "POST" });
-  return redirect(safeReturnPath(textField(form, "next") || "/"), {
+  const next = textField(form, "next");
+  return redirect(next ? safeReturnPath(next) : homePath(request), {
     headers: withCookies(result.cookies),
   });
 }
 
-export function loader() {
-  return redirect("/");
+export function loader({ request }: Route.LoaderArgs) {
+  return redirect(homePath(request));
 }

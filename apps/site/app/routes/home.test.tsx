@@ -106,5 +106,5 @@ it("speaks Russian, with the language dropdown and the other theme", async () =>
     "value",
     "dark",
   );
-  expect(screen.getByRole("link", { name: "Главная Konspecter" })).toHaveAttribute("href", "/");
+  expect(screen.getByRole("link", { name: "Главная Konspecter" })).toHaveAttribute("href", "/ru/");
 });

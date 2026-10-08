@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **One canonical domain:** Konspecter's own service is `konspecter.com` (the site and the API)
+  and `app.konspecter.com` (the web app). `www.konspecter.com` redirects (301) to the same page
+  there, and `konspecter.ru` to the Russian one; a self-hosted server can redirect its own extra
+  names the same way (`KONSPECTER_REDIRECT_ADDRESSES`, `KONSPECTER_RU_REDIRECT_ADDRESSES`).
+- **Russian pages of their own:** the landing page, the Markdown cheatsheet, the terms and the
+  privacy policy are in English at their paths and in Russian under `/ru` (`/ru/`,
+  `/ru/markdown`), each with canonical and `hreflang` links for search engines, in a new
+  `/sitemap.xml` with `/robots.txt`. Sign-in, settings and the web app stay out of search.
+  A Russian browser opening an English page gets its Russian one; the language switch goes
+  to the page in the chosen language and keeps the choice, and Russian emails link to
+  `/ru/` ([ADR-026](docs/architecture/decisions/ADR-026-canonical-domain.md)).
 - **Release notes from the changelog:** a release's GitHub draft and GitLab Release carry the
   version's `CHANGELOG.md` section as their notes (`scripts/release-notes.mjs`), and a tag
   without one stops at the first job. In Claude Code, `/release` picks the version from the

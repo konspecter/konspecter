@@ -75,6 +75,7 @@ All planned phases are done. New work needs a new plan in `.claude/plans/`.
 | Folder     | Desktop is always a folder (`~/Konspecter`), synced through file links      | Done   |
 | Key by QR  | The site's QR code hands the encryption key over: no passphrase on the app  | Done   |
 | Panes      | Sidebar blocks fold like VS Code's: any number open, each scrolls, kept     | Done   |
+| Domains    | konspecter.com canonical, `/ru` pages, hreflang, sitemap, `.ru`/`www` 301   | Done   |
 
 Where the packages are described: UI architecture: `docs/architecture/ui.md`; languages:
 `docs/architecture/i18n.md`; server and API: `docs/architecture/server.md`; sync:
@@ -82,8 +83,8 @@ Where the packages are described: UI architecture: `docs/architecture/ui.md`; la
 `docs/architecture/filesystem-mode.md`; self-hosting: `docs/self-hosting.md`. Decisions are in
 `docs/architecture/decisions/`: last write wins (ADR-011), change events (ADR-012), folders follow
 tags (ADR-013), the account site and end-to-end encrypted sync (ADR-014 to ADR-017), connecting by
-QR code (ADR-019), published images (ADR-023), desktop folder sync (ADR-024) and the key handed
-over by QR code (ADR-025).
+QR code (ADR-019), published images (ADR-023), desktop folder sync (ADR-024), the key handed
+over by QR code (ADR-025) and the canonical domain with an address per language (ADR-026).
 
 ## Working rules
 
@@ -249,6 +250,32 @@ and `sync` in `/api/me`. Changes to the paid sync code (`internal/entitlements`,
 `internal/httpapi/billing.go`, `internal/mail/subscription.go`, the site's subscription
 section) are made from that repository. Without the service, sync is free, and nothing here
 may come to depend on it.
+
+## Domains and search
+
+Konspecter's own service ([ADR-026](docs/architecture/decisions/ADR-026-canonical-domain.md)):
+
+| Name                                 | What                                                             |
+| ------------------------------------ | ---------------------------------------------------------------- |
+| `konspecter.com`                     | canonical: the site and the API (`KONSPECTER_PUBLIC_URL`)        |
+| `app.konspecter.com`                 | the web app (`KONSPECTER_APP_ADDRESS`), `noindex`                |
+| `www.konspecter.com`                 | 301 to the same path on `konspecter.com`                         |
+| `konspecter.ru`, `www.konspecter.ru` | 301 to the same path under `konspecter.com/ru` (`/ru…` as it is) |
+
+- Name the service `https://konspecter.com` and the web app `https://app.konspecter.com`, never
+  `konspecter.ru` or a `www.` name. `deploy/.env.example` is filled in with these names;
+  self-hosting docs and tests keep `example.com` ones.
+- **Public pages** (indexed) are listed in `apps/site/app/pages.ts` and routed twice in
+  `routes.ts`: English at the path, Russian under `ru/`. That gives them `<html lang>`, a
+  canonical link, `hreflang` en/ru/x-default and a place in `/sitemap.xml`. Every other site
+  page has one address, speaks the visitor's language and is `noindex`.
+- Link to a public page with `useLocalePath()` and send a visitor home with
+  `homePath(request)`, never a bare `"/terms"` or `"/"`.
+- Canonical, `hreflang`, `robots.txt` and sitemap URLs come from `KONSPECTER_PUBLIC_URL`, not
+  the request's host. A public page redirects (302) to the visitor's language: the one chosen
+  with the switch (the `lang` cookie), else, from an English (x-default) address only, the
+  browser's (`Accept-Language`). Never move a `/ru/…` address by the browser's language, and
+  never redirect by user agent.
 
 ## Commit messages
 

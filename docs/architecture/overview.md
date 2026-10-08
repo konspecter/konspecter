@@ -119,6 +119,9 @@ React Router in framework mode, server-rendered in Node, on the API's origin beh
 proxy. See [user interface](ui.md#the-account-site) and
 [ADR-014](decisions/ADR-014-account-site.md) to [ADR-017](decisions/ADR-017-end-to-end-encryption.md).
 The hosted web app is on an origin of its own: [ADR-018](decisions/ADR-018-web-app-origin.md).
+Konspecter's own service: the site and the API at `konspecter.com` (the canonical name; `www.`
+and `konspecter.ru` redirect there), the web app at `app.konspecter.com`, and the site's
+public pages at an address per language ([ADR-026](decisions/ADR-026-canonical-domain.md)).
 
 ## Planned frontend structure
 

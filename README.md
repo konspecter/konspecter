@@ -8,7 +8,7 @@ Konspecter is a **local-first knowledge base for your own conspects** — notes 
 
 Every conspect is a plain **Markdown file**. Everything else — tags, search indexes, reading positions, and other metadata — is derived from your content and can be rebuilt.
 
-[Website](https://konspecter.ru) · [Documentation](docs/) · [Releases](https://github.com/konspecter/konspecter/releases) · [Issues](https://github.com/konspecter/konspecter/issues)
+[Website](https://konspecter.com) · [Documentation](docs/) · [Releases](https://github.com/konspecter/konspecter/releases) · [Issues](https://github.com/konspecter/konspecter/issues)
 
 ![Konspecter: a conspect in the text editor, the tag tree and recent conspects in the sidebar](docs/assets/hero.png)
 
@@ -194,7 +194,7 @@ If a hosted subscription expires:
 
 Self-hosting remains an option.
 
-[Learn more about Konspecter Sync →](https://konspecter.ru)
+[Learn more about Konspecter Sync →](https://konspecter.com)
 
 ---
 
@@ -219,7 +219,7 @@ Self-hosting remains an option.
 
 Open the web application and install it from your browser.
 
-**Web app:** https://app.konspecter.ru
+**Web app:** https://app.konspecter.com
 
 After the first visit, the application continues to work offline.
 

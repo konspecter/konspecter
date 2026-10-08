@@ -73,7 +73,7 @@ The site tarball runs on Node 22 or later, behind the same origin as the API:
 
 ```sh
 tar -xzf konspecter-site-v0.1.0.tar.gz && cd konspecter-site-v0.1.0
-KONSPECTER_API_URL=http://127.0.0.1:8080 KONSPECTER_PUBLIC_URL=https://notes.example.com \
+KONSPECTER_API_URL=http://127.0.0.1:8080 KONSPECTER_PUBLIC_URL=https://konspecter.com \
   node_modules/.bin/react-router-serve build/server/index.js   # PORT, default 3000
 ```
 

@@ -13,6 +13,9 @@
 		X-Content-Type-Options nosniff
 		Referrer-Policy no-referrer
 		X-Frame-Options DENY
+		# The app is a tool, not pages to find: search engines leave it out
+		# and index the site instead (ADR-026).
+		X-Robots-Tag "noindex, nofollow"
 	}
 
 	# The server the app suggests in its sync settings: the public URL this

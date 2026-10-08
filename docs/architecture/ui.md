@@ -265,6 +265,10 @@ from the same parts as the app, so the two cannot drift apart:
 - **Pages:** `/` (landing, download buttons from `KONSPECTER_DOWNLOAD_*_URL`), `/login`
   (password, email code or a provider), `/register`, `/login/code`, `/forgot`, `/reset`,
   `/complete` (an address for a provider that gave none), `/settings` and `/activate`.
+- **Search engines:** the public pages (`/`, `/markdown`, `/terms`, `/privacy`) are in
+  English at those paths and in Russian under `/ru`, each with a canonical link and `hreflang`
+  links, listed in `/sitemap.xml`; every other page is `noindex`
+  ([ADR-026](decisions/ADR-026-canonical-domain.md)).
 
 ## Sync in the app
 
