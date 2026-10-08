@@ -1,9 +1,17 @@
 # Releasing
 
-1. Set the same version everywhere: `package.json`, `apps/*/package.json`,
-   `apps/desktop/src-tauri/tauri.conf.json`, `Cargo.toml` and `KONSPECTER_VERSION` in
-   `deploy/.env.example`. `pnpm versions:check` verifies it.
-2. Update `CHANGELOG.md`, commit, then tag and push: `git tag v0.1.0 && git push --tags`.
+1. Pick the version by [semantic versioning](https://semver.org): a patch (`0.1.1`) for fixes,
+   a minor (`0.2.0`) for features, a major for breaking changes (before 1.0, a minor may
+   break too: the sync API, the stored notes, the deploy's settings). `pnpm version:set 0.2.0`
+   writes it everywhere: `package.json`, `apps/*/package.json`,
+   `apps/desktop/src-tauri/tauri.conf.json`, `Cargo.toml` and `Cargo.lock`, the Android
+   `versionName` and `versionCode`, and `KONSPECTER_VERSION` in `deploy/.env.example`.
+   `pnpm versions:check` verifies it (CI runs it on every push, and the release against its
+   tag). The Android `versionCode` is `major * 10000 + minor * 100 + patch`, so minor and
+   patch stay below 100; a pre-release (`0.2.0-rc.1`) shares its release's code.
+2. Turn `## Unreleased` in `CHANGELOG.md` into the version's heading, commit, then tag and
+   push: `git tag v0.2.0 && git push --tags`. A pre-release tag (`v0.2.0-rc.1`) builds the
+   same, but does not move the images' `X.Y` and `latest`.
 3. `.github/workflows/release.yml` builds everything into a **draft** GitHub Release:
 
    | Artifact                                                                    | Built by                               |

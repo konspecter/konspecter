@@ -186,6 +186,8 @@ pnpm e2e              # Playwright end-to-end tests in Chromium (see docs/testin
                       # and sync flows need a live server: KONSPECTER_E2E_* variables)
 pnpm icons            # re-render every app icon from scripts/render-icons.mjs (needs e2e deps
                       # and Xcode 26 for the macOS Icon Composer icon)
+pnpm version:set 0.2.0 # write a release's version everywhere (docs/release.md);
+                      # versions:check verifies it
 pnpm --filter @konspecter/web coverage   # unit tests with coverage
 pnpm --filter @konspecter/web bench      # performance measurements (docs/performance.md)
 

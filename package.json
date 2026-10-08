@@ -19,6 +19,7 @@
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm licenses:check",
     "e2e": "pnpm --filter @konspecter/e2e e2e",
     "versions:check": "node scripts/check-versions.mjs",
+    "version:set": "node scripts/set-version.mjs",
     "icons": "node scripts/render-icons.mjs"
   },
   "devDependencies": {

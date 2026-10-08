@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **`pnpm version:set 0.2.0`** writes a release's version into every file that carries it,
+  now including the Android app: `versionName` is the version and `versionCode` follows it
+  (`major * 10000 + minor * 100 + patch`) instead of a fixed `1.0` and `1`
+  ([docs/release.md](docs/release.md)).
 - **Conspects have their own addresses:** `/conspects/new` and `/conspects/:id` instead of
   `/notes/…`. Old links and the place the app last showed still open, at the new address. The
   server API keeps `/api/notes`.
