@@ -54,6 +54,11 @@ with a contextual formatting toolbar and Markdown-style shortcuts.
   bulleted and numbered lists, and code block. The toolbar shows which marks and blocks
   are active (a quote while the selection is inside one). A list tool toggles: in a list of its kind it takes the selected items out, in
   a list of the other kind it changes that list's kind (the innermost list, when nested).
+- **Following links:** a click in text being edited places the caret, so links are opened
+  with a button instead: while the text has focus and the caret is in a link, or in a web
+  address written out in the text (which the reader links, as GFM does), a small button
+  just under the caret shows the address and opens it in the browser (`linkAtCaret`,
+  `openInBrowser`). Only `http(s)` addresses get it, as the desktop shell opens nothing else.
 - **Shortcuts:** typing `#`–`######` + space makes a heading, `>` a quote, `-`/`*`/`+` a
   list, `1.` a numbered list, and ` ```lang ` + space a code block (any info string: `c++`, `c#`). Backspace right
   after a shortcut undoes it. `Mod-B/I/\`` toggle marks, `Mod-Z`/`Mod-Shift-Z`undo and redo,`Mod-[`/`Mod-]`outdent and indent list items, and`Shift-Enter` inserts a line break.

@@ -178,6 +178,22 @@ describe("text mode", () => {
     );
   });
 
+  it("opens the link at the caret with a button under it", async () => {
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    renderEditor("Read");
+
+    await typeAtEnd(" https://example.com/docs");
+    const button = screen.getByRole("button", { name: "Open https://example.com/docs" });
+    expect(button).toHaveTextContent("example.com/docs");
+    await userEvent.click(button);
+    expect(open).toHaveBeenCalledWith("https://example.com/docs", "_blank", "noopener");
+    expect(textBox()).toHaveFocus();
+
+    await userEvent.keyboard(" more");
+    expect(screen.queryByRole("button", { name: /^Open / })).not.toBeInTheDocument();
+    open.mockRestore();
+  });
+
   it("formats with the toolbar", async () => {
     const { save } = renderEditor("");
 

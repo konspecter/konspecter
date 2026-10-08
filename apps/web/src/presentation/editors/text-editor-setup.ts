@@ -591,6 +591,61 @@ export function isLinkActive(state: EditorState): boolean {
   return isMarkActive(state, marks.link);
 }
 
+/** Only web addresses are opened: the desktop app's shell opens nothing else. */
+const WEB_ADDRESS = /^https?:\/\//i;
+
+/** A web address written out, as GFM links it (`www.` gets `http://`). */
+const WRITTEN_ADDRESS = /(?:https?:\/\/|www\.)[^\s<]+/gi;
+
+/**
+ * `address` without what GFM leaves out of a written address: punctuation
+ * at its end, and closing parentheses it does not open.
+ */
+function trimAddress(address: string): string {
+  let trimmed = address.replace(/[.,:;!?'"*_~]+$/, "");
+  while (trimmed.endsWith(")")) {
+    const open = trimmed.split("(").length - 1;
+    const close = trimmed.split(")").length - 1;
+    if (close <= open) break;
+    trimmed = trimmed.slice(0, -1).replace(/[.,:;!?'"*_~]+$/, "");
+  }
+  return trimmed;
+}
+
+/** The web address written out in `text` around `offset` (at its ends too), if any. */
+export function writtenAddressAt(text: string, offset: number): string | null {
+  for (const match of text.matchAll(WRITTEN_ADDRESS)) {
+    const address = trimAddress(match[0]);
+    if (offset >= match.index && offset <= match.index + address.length) {
+      return /^www\./i.test(address) ? `http://${address}` : address;
+    }
+  }
+  return null;
+}
+
+/**
+ * The web address under the caret (not a selection): the link around it,
+ * at either end too, or else an address written out in the text, which the
+ * reader shows as a link. None in code.
+ */
+export function linkAtCaret(state: EditorState): string | null {
+  const { empty, $head } = state.selection;
+  const { parent, parentOffset } = $head;
+  if (!empty || !parent.isTextblock || parent.type.spec.code) return null;
+  const around = [parent.childBefore(parentOffset).node, parent.childAfter(parentOffset).node];
+  if (around.some((node) => node && marks.code.isInSet(node.marks))) return null;
+  for (const node of around) {
+    const link = node && marks.link.isInSet(node.marks);
+    if (link) {
+      const href = String(link.attrs.href);
+      return WEB_ADDRESS.test(href) ? href : null;
+    }
+  }
+  // Inline nodes other than text stand for a space: an address never runs through them.
+  const text = parent.textBetween(0, parent.content.size, undefined, " ");
+  return writtenAddressAt(text, parentOffset);
+}
+
 const markTools: readonly (readonly [TextKey, MarkType])[] = [
   ["tool.bold", marks.strong],
   ["tool.italic", marks.em],

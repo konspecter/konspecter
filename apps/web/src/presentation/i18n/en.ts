@@ -186,6 +186,8 @@ source, or delete this conspect when you are done.
   "editor.showTools": "Show all formatting tools",
   "editor.foldTools": "Fold the toolbar",
   "editor.linkAddress": "Link address",
+  "editor.openLink": "Open {address}",
+  "editor.openLinkHint": "Open the link in the browser",
   "editor.taskDone": "Done",
   "tool.bold": "Bold",
   "tool.italic": "Italic",

@@ -13,7 +13,9 @@ import {
   type FocusEvent,
   type ReactNode,
 } from "react";
-import { ChevronIcon } from "@konspecter/ui/icons";
+import { ChevronIcon, ExternalIcon } from "@konspecter/ui/icons";
+import { openInBrowser } from "../../infrastructure/desktop/desktop";
+import { reportError } from "../app/errors";
 import { InIsland } from "../components/island-slot";
 import { NO_FIND, revealMatch, type NoteFind } from "../components/note-find";
 import {
@@ -22,6 +24,7 @@ import {
   foundMatches,
   FROM_ELSEWHERE,
   isLinkActive,
+  linkAtCaret,
   linkCommand,
   replaceDocument,
   TOOL_USED,
@@ -187,6 +190,28 @@ export function toolbarTopFor(
 }
 
 /**
+ * Where the button that opens a link goes, relative to its container: just
+ * under the caret, starting at it, moved left as far as it must to stay
+ * within the container.
+ */
+export function linkButtonSpotFor(
+  caret: { left: number; bottom: number },
+  container: DOMRect,
+  width: number,
+): { top: number; left: number } {
+  const right = Math.max(0, container.width - width);
+  return {
+    top: caret.bottom - container.top + 4,
+    left: Math.min(Math.max(0, caret.left - container.left), right),
+  };
+}
+
+/** An address as the link button shows it: without `http(s)://`. */
+function shownAddress(href: string): string {
+  return href.replace(/^https?:\/\//i, "");
+}
+
+/**
  * A Telegraph-like rich-text editor whose document maps one-to-one to
  * Markdown. The formatting toolbar is contextual: a vertical strip beside
  * the block being edited, shown only while the editor has focus. It is
@@ -210,6 +235,7 @@ export const TextEditor = memo(function TextEditor({
 }: TextEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
+  const linkButtonRef = useRef<HTMLButtonElement>(null);
   const mountRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -228,6 +254,7 @@ export const TextEditor = memo(function TextEditor({
   const [focused, setFocused] = useState(false);
   const narrow = useNarrow();
   const [toolbarTop, setToolbarTop] = useState<number | null>(null);
+  const [linkButtonSpot, setLinkButtonSpot] = useState<{ top: number; left: number } | null>(null);
   const [folded, setFolded] = useState(initialFolded);
   const [lastUsed, setLastUsed] = useState(initialLastUsed);
   /** A tool was used, from the toolbar or by its shortcut. */
@@ -380,6 +407,34 @@ export const TextEditor = memo(function TextEditor({
     };
   }, [focused, narrow, place]);
 
+  // Links cannot be followed by clicking in text being edited: while the caret
+  // is in one, a button under it opens it.
+  const link = focused ? linkAtCaret(editorState) : null;
+  const placeLinkButton = useCallback(() => {
+    const view = viewRef.current;
+    const container = containerRef.current;
+    const button = linkButtonRef.current;
+    if (!view || !container || !button) return;
+    setLinkButtonSpot(
+      linkButtonSpotFor(
+        view.coordsAtPos(view.state.selection.head),
+        container.getBoundingClientRect(),
+        button.offsetWidth,
+      ),
+    );
+  }, []);
+  const linkButtonPlaced = linkButtonSpot !== null;
+  useLayoutEffect(() => {
+    if (link) placeLinkButton();
+  }, [link, editorState, linkButtonPlaced, placeLinkButton]);
+  useEffect(() => {
+    if (!link) return;
+    window.addEventListener("resize", placeLinkButton);
+    return () => {
+      window.removeEventListener("resize", placeLinkButton);
+    };
+  }, [link, placeLinkButton]);
+
   function handleFocus() {
     setFocused(true);
   }
@@ -442,6 +497,27 @@ export const TextEditor = memo(function TextEditor({
   return (
     <div ref={containerRef} className="text-editor" onFocus={handleFocus} onBlur={handleBlur}>
       <div ref={mountRef} />
+      {link && (
+        <button
+          ref={linkButtonRef}
+          type="button"
+          className="link-open"
+          aria-label={t("editor.openLink", { address: link })}
+          title={t("editor.openLinkHint")}
+          hidden={linkButtonSpot === null}
+          style={linkButtonSpot ?? undefined}
+          // Keep the caret in the text when the button is clicked.
+          onMouseDown={(event) => {
+            event.preventDefault();
+          }}
+          onClick={() => {
+            openInBrowser(link).catch(reportError);
+          }}
+        >
+          <ExternalIcon />
+          <span className="link-open-address">{shownAddress(link)}</span>
+        </button>
+      )}
       {narrow ? (
         <InIsland>
           <IslandTools tools={tools} pinned={pinned} onUse={applyTool} />

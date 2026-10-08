@@ -208,6 +208,8 @@ Map<String, Integer> counts = new HashMap<>();
   "editor.showTools": "Показать все инструменты форматирования",
   "editor.foldTools": "Свернуть панель",
   "editor.linkAddress": "Адрес ссылки",
+  "editor.openLink": "Открыть {address}",
+  "editor.openLinkHint": "Открыть ссылку в браузере",
   "editor.taskDone": "Сделано",
   "tool.bold": "Жирный",
   "tool.italic": "Курсив",

@@ -109,6 +109,51 @@
   }
 }
 
+/*
+ * The button that opens the link at the caret: a small raised pill just under
+ * the caret, showing where the link goes.
+ */
+.link-open {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(22rem, 100%);
+  padding: 4px 10px 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--color-raised);
+  box-shadow:
+    0 0 0 1px var(--color-border),
+    0 4px 14px var(--color-shadow);
+  color: var(--color-accent);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.link-open[hidden] {
+  display: none;
+}
+
+.link-open:hover {
+  background: var(--color-hover);
+}
+
+.link-open .icon {
+  flex: none;
+  width: 15px;
+  height: 15px;
+}
+
+.link-open-address {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .text-editor-content {
   min-height: 55vh;
   outline: none;

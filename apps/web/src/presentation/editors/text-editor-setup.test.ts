@@ -5,12 +5,14 @@ import {
   findInDocument,
   findTransaction,
   foundMatches,
+  linkAtCaret,
   tagDecorations,
   toolbarActions,
   toolsInEffect,
+  writtenAddressAt,
 } from "./text-editor-setup";
 import { textDocToMarkdown } from "./text-markdown";
-import { toolbarTopFor } from "./TextEditor";
+import { linkButtonSpotFor, toolbarTopFor } from "./TextEditor";
 import { textMarkdownParser, textSchema } from "./text-schema";
 
 function editorWith(markdown: string) {
@@ -243,6 +245,71 @@ describe("tools in effect", () => {
       "tool.quote",
       "tool.bulletList",
     ]);
+  });
+});
+
+describe("link at the caret", () => {
+  /** The state of `markdown` with the caret `after` characters into the first `word`. */
+  const caretIn = (markdown: string, word: string, after = 1) => {
+    const state = createTextEditorState(textMarkdownParser.parse(markdown));
+    let at = -1;
+    state.doc.descendants((node, pos) => {
+      const index = node.isText ? (node.text ?? "").indexOf(word) : -1;
+      if (at < 0 && index >= 0) at = pos + index + after;
+    });
+    return state.apply(state.tr.setSelection(TextSelection.create(state.doc, at)));
+  };
+
+  it("is the link's address, at its ends too", () => {
+    const markdown = "See [the docs](https://example.com/docs) now";
+    expect(linkAtCaret(caretIn(markdown, "docs"))).toBe("https://example.com/docs");
+    expect(linkAtCaret(caretIn(markdown, "the", 0))).toBe("https://example.com/docs");
+    expect(linkAtCaret(caretIn(markdown, " now", 0))).toBe("https://example.com/docs");
+    expect(linkAtCaret(caretIn(markdown, "See"))).toBeNull();
+  });
+
+  it("is an address written out in the text, as the reader links it", () => {
+    expect(linkAtCaret(caretIn("Go to https://example.com/a, then", "example"))).toBe(
+      "https://example.com/a",
+    );
+    expect(linkAtCaret(caretIn("at www.example.com.", "example"))).toBe("http://www.example.com");
+    expect(linkAtCaret(caretIn("Go to https://example.com now", "now"))).toBeNull();
+  });
+
+  it("is none for a selection, in code or for anything but a web address", () => {
+    const state = caretIn("[docs](https://example.com)", "docs");
+    const selected = state.apply(state.tr.setSelection(TextSelection.create(state.doc, 1, 3)));
+    expect(linkAtCaret(selected)).toBeNull();
+    expect(linkAtCaret(caretIn("`https://example.com`", "example"))).toBeNull();
+    expect(linkAtCaret(caretIn("```\nhttps://example.com\n```", "example"))).toBeNull();
+    expect(linkAtCaret(caretIn("[mail](mailto:me@example.com)", "mail"))).toBeNull();
+    expect(linkAtCaret(caretIn("[next](other.md)", "next"))).toBeNull();
+  });
+
+  it.each([
+    ["(see https://en.wikipedia.org/wiki/Owl_(bird))", "https://en.wikipedia.org/wiki/Owl_(bird)"],
+    ["(see https://example.com)", "https://example.com"],
+    ["https://example.com/?q=1!", "https://example.com/?q=1"],
+  ])("leaves out what GFM leaves out of %j", (text, address) => {
+    expect(writtenAddressAt(text, text.indexOf("://"))).toBe(address);
+  });
+});
+
+describe("link button placement", () => {
+  const container = new DOMRect(100, 50, 600, 900);
+
+  it("goes just under the caret, starting at it", () => {
+    expect(linkButtonSpotFor({ left: 250, bottom: 320 }, container, 200)).toEqual({
+      top: 274,
+      left: 150,
+    });
+  });
+
+  it("moves left to stay within the container", () => {
+    expect(linkButtonSpotFor({ left: 650, bottom: 320 }, container, 200)).toEqual({
+      top: 274,
+      left: 400,
+    });
   });
 });
 
