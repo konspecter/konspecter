@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **No collapsing page on Android:** anything wider than the screen made the WebView widen the
+  page, which read as a scrollbar hundreds of pixels wide and squeezed the column to nothing.
+  The scrollbar is now measured on its own (0 on phones).
 - **No blue flash on tap** in the Android app: the WebView's tap highlight is off. Instead, a
   pressed button or link shades at once and fades back over 200 ms, in the app and on the site.
 - **`pnpm version:set 0.2.0`** writes a release's version into every file that carries it,
