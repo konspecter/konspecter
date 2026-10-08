@@ -7,7 +7,8 @@ flows run end to end in a real browser.
 ## How to run
 
 ```sh
-pnpm test                          # every workspace: web (~810), site (~70), crypto, i18n
+pnpm test                          # every workspace: web (~810), site (~70), crypto, i18n;
+                                   # then the release scripts (node --test)
 pnpm --filter @konspecter/web coverage   # with coverage (text summary + HTML in apps/web/coverage)
 pnpm e2e                           # Playwright, real Chromium, production build + service worker
 cd apps/server && go test -race ./...   # PostgreSQL tests need KONSPECTER_TEST_DATABASE_URL

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Release notes from the changelog:** a release's GitHub draft and GitLab Release carry the
+  version's `CHANGELOG.md` section as their notes (`scripts/release-notes.mjs`), and a tag
+  without one stops at the first job. In Claude Code, `/release` picks the version from the
+  commits, dates the changelog, tags and pushes ([docs/release.md](docs/release.md)).
 - **Settings in groups:** Appearance, Writing and reading, Sync, Conspects and files, Keyboard
   shortcuts and App, each a tinted panel of rows. A setting's name and hint sit on the left;
   its control, and a section's buttons, keep to the right edge, on one line in every language.

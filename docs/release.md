@@ -16,7 +16,10 @@
    and 2: it works out the bump from the Conventional Commits since the last tag (a breaking
    change is major, a minor before 1.0; a `feat` minor; anything else patch), asks before
    changing anything, then commits, tags and pushes.
-3. `.github/workflows/release.yml` builds everything into a **draft** GitHub Release:
+3. `.github/workflows/release.yml` builds everything into a **draft** GitHub Release. Its
+   notes are the version's section of `CHANGELOG.md` (`scripts/release-notes.mjs`; a
+   pre-release without a section of its own takes the Unreleased ones). With no section, the
+   release stops at its first job.
 
    | Artifact                                                                    | Built by                               |
    | --------------------------------------------------------------------------- | -------------------------------------- |
@@ -44,7 +47,7 @@ and on the default branch, and the release builds of `release.yml` on a `v*` tag
 no draft releases, so the last job, **publish**, is manual: once the build jobs have passed
 (their artifacts can be downloaded from the pipeline), running it uploads every artifact to
 the project's generic package registry (`konspecter/<version>`) and creates the GitLab
-Release that links them. The images go to the project's container registry
+Release that links them, with the same notes from `CHANGELOG.md`. The images go to the project's container registry
 (`$CI_REGISTRY_IMAGE/konspecter-{server,site,web}`, which must be enabled) from
 `release-images`, built with Docker in Docker (the runner must allow privileged
 containers); `publish-images` moves `X.Y` and `latest` once **publish** has run.

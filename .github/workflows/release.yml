@@ -17,6 +17,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: node scripts/check-versions.mjs "${GITHUB_REF_NAME}"
+      # The draft's notes are the version's CHANGELOG.md section. Created here, before
+      # every build, so the jobs below only add their files to it.
+      - run: node scripts/release-notes.mjs "${GITHUB_REF_NAME}" > release-notes.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          name: Konspecter ${{ github.ref_name }}
+          body_path: release-notes.md
 
   web:
     needs: check

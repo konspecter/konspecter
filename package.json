@@ -10,7 +10,7 @@
     "dev": "pnpm --filter @konspecter/web dev",
     "dev:site": "pnpm --filter @konspecter/site dev",
     "build": "pnpm -r build",
-    "test": "pnpm -r test",
+    "test": "pnpm -r test && node --test 'scripts/*.test.mjs' '.claude/skills/*/scripts/*.test.mjs'",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint .",
     "format": "prettier --write .",

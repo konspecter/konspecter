@@ -75,6 +75,7 @@ others (`— updates package 2`) become `###` headings over their entries. Chang
 ```bash
 pnpm versions:check
 pnpm exec prettier --check CHANGELOG.md
+node scripts/release-notes.mjs vX.Y.Z    # the release notes the pipelines will use
 git diff --stat               # only the versioned files and CHANGELOG.md
 ```
 
@@ -95,4 +96,5 @@ leave the commit and the tag in place and tell the user; do not force anything o
 ## 6. Report
 
 The version and level, the tag, the commit, and what comes next: the release workflow builds a **draft** GitHub
-Release (or the GitLab pipeline waits on its manual **publish** job), to be checked and published by hand.
+Release (or the GitLab pipeline waits on its manual **publish** job), to be checked and published by hand. Its notes
+are the new `## X.Y.Z — …` section of `CHANGELOG.md`, so that heading must keep exactly this form.
