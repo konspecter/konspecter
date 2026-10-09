@@ -2335,7 +2335,9 @@ describe("small screens", () => {
 
   it("shows the search while a tag filters the list, and ends it when a result opens", async () => {
     renderApp(await storeWithNotes(), "/?q=%23java");
-    expect(await listTitles()).toEqual(["Hash maps"]);
+    await waitFor(async () => {
+      expect(await listTitles()).toEqual(["Hash maps"]);
+    });
     expect(within(island()).getByRole("list", { name: "Tag filters" })).toHaveTextContent("#java");
 
     await userEvent.click(screen.getByRole("link", { name: "Hash maps" }));

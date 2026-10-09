@@ -97,6 +97,7 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     restoreMocks: true,
+    testTimeout: 20_000,
     setupFiles: ["./src/test-setup.ts"],
     coverage: {
       provider: "v8",

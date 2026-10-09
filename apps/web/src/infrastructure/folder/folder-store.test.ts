@@ -413,7 +413,7 @@ describe("FolderStore following external changes", () => {
     return { ...context, changes };
   }
 
-  /** Lets the store finish applying a watcher event. */
+  /** Gives the store time to apply a watcher event that should change nothing. */
   const settle = () => new Promise((resolve) => setTimeout(resolve, 25));
 
   it("updates a file edited in another program", async () => {
@@ -423,11 +423,12 @@ describe("FolderStore following external changes", () => {
 
     folder.edit("note.md", "# v2 #new");
     folder.notify({ paths: ["note.md"], rescan: false });
-    await settle();
+    await vi.waitFor(() => {
+      expect(changes).toEqual(["remote:note.md"]);
+    });
 
     expect((await store.get("note.md"))?.markdown).toBe("# v2 #new");
     expect((await store.tags()).map(({ tag }) => tag.name)).toEqual(["new"]);
-    expect(changes).toEqual(["remote:note.md"]);
   });
 
   it("adds new files and removes deleted ones", async () => {
@@ -439,11 +440,12 @@ describe("FolderStore following external changes", () => {
     folder.edit("new.md", "fresh words");
     folder.files.delete("gone.md");
     folder.notify({ paths: ["new.md", "gone.md"], rescan: false });
-    await settle();
+    await vi.waitFor(() => {
+      expect([...changes].sort()).toEqual(["remote:gone.md", "remote:new.md"]);
+    });
 
     expect((await store.list()).map((note) => note.id).sort()).toEqual(["keep.md", "new.md"]);
     expect((await store.search(parseQuery("fresh"))).map((hit) => hit.id)).toEqual(["new.md"]);
-    expect(changes.sort()).toEqual(["remote:gone.md", "remote:new.md"]);
   });
 
   it("recognizes a rename and moves the reading position", async () => {
@@ -454,10 +456,10 @@ describe("FolderStore following external changes", () => {
 
     folder.move("draft.md", "final/Published.md");
     folder.notify({ paths: ["draft.md", "final/Published.md"], rescan: false });
-    await settle();
-    await settle();
+    await vi.waitFor(() => {
+      expect(changes).toEqual(["draft.md→final/Published.md"]);
+    });
 
-    expect(changes).toEqual(["draft.md→final/Published.md"]);
     expect((await store.readingState("final/Published.md"))?.position).toBe(0.6);
   });
 
@@ -485,11 +487,11 @@ describe("FolderStore following external changes", () => {
     folder.move("a/one.md", "b/one.md");
     folder.edit("b/two.md", "two");
     folder.notify({ paths: [], rescan: true });
-    await settle();
-    await settle();
+    await vi.waitFor(() => {
+      expect([...changes].sort()).toEqual(["a/one.md→b/one.md", "remote:b/two.md"]);
+    });
 
     expect((await store.list()).map((note) => note.id).sort()).toEqual(["b/one.md", "b/two.md"]);
-    expect(changes.sort()).toEqual(["a/one.md→b/one.md", "remote:b/two.md"]);
   });
 });
 
@@ -506,10 +508,11 @@ describe("FolderStore robust reload", () => {
     folder.files.delete("note.md");
     folder.notify({ paths: ["note.md"], rescan: false });
     folder.edit("note.md", "v2 from the editor");
-    await new Promise((resolve) => setTimeout(resolve, 25));
+    await vi.waitFor(() => {
+      expect(changes).toEqual(["note.md"]);
+    });
 
     expect((await store.get("note.md"))?.markdown).toBe("v2 from the editor");
-    expect(changes).toEqual(["note.md"]);
   });
 
   it("opens files in the external editor and reveals them", async () => {

@@ -1,5 +1,5 @@
 import { createKey, keyToJson, openWithPassphrase, type KeyRecord } from "@konspecter/crypto";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createRoutesStub } from "react-router";
 import { Encryption } from "./encryption";
@@ -203,9 +203,12 @@ it("remembers the key on this browser with the passphrase, and forgets it", asyn
   expect(await rememberedKeyId()).toBe(record.keyId);
 
   await user.click(await screen.findByRole("button", { name: "Forget on this browser" }));
-  expect(await screen.findByRole("status")).toHaveTextContent(
-    "This browser no longer remembers the key.",
-  );
+  // The status still reads the last message until forgetting is done.
+  await waitFor(() => {
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "This browser no longer remembers the key.",
+    );
+  });
   expect(await rememberedKeyId()).toBeNull();
   expect(await screen.findByText("Connect apps without the passphrase")).toBeInTheDocument();
 });
