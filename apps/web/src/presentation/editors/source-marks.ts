@@ -1,4 +1,4 @@
-import { syntaxTree } from "@codemirror/language";
+import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import {
   EditorSelection,
   Prec,
@@ -36,8 +36,13 @@ const CODE = new Set(["FencedCode", "CodeBlock", "InlineCode", "Frontmatter"]);
 
 type SyntaxNode = { readonly name: string; readonly parent: SyntaxNode | null };
 
-function within(state: EditorState, pos: number, names: ReadonlySet<string>): boolean {
-  let node: SyntaxNode | null = syntaxTree(state).resolveInner(pos, 1);
+function within(
+  state: EditorState,
+  pos: number,
+  names: ReadonlySet<string>,
+  tree = syntaxTree(state),
+): boolean {
+  let node: SyntaxNode | null = tree.resolveInner(pos, 1);
   for (; node; node = node.parent) {
     if (names.has(node.name)) return true;
   }
@@ -205,6 +210,17 @@ function wrapSelection(view: EditorView, open: string): boolean {
 }
 
 /**
+ * The tree parsed at least past `pos`. CodeMirror parses a long note in the
+ * background; a quote typed before it gets there parses up to the caret at
+ * once, however long that takes, so that code is never taken for prose.
+ */
+function parsedTo(state: EditorState, pos: number) {
+  return (
+    ensureSyntaxTree(state, Math.min(pos + 1, state.doc.length), Infinity) ?? syntaxTree(state)
+  );
+}
+
+/**
  * The typed text, with two rules: an opening character over a selection
  * wraps it (`PAIRS`), and straight quotes in code stay straight. When the
  * system replaces a typed `"` or `'` with a typographic quote (macOS smart
@@ -225,7 +241,7 @@ function typing(): Extension {
       typed = null;
       if (view.composing) return false;
       const insert =
-        quote !== null && within(view.state, from, CODE)
+        quote !== null && within(view.state, from, CODE, parsedTo(view.state, from))
           ? text.replace(quote === '"' ? SMART_DOUBLE : SMART_SINGLE, quote)
           : text;
       const { main } = view.state.selection;

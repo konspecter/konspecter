@@ -661,6 +661,17 @@ describe("tags and code in the editors", () => {
     expect(sourceValue(box)).toBe('Text\n\n```json\n{"}\n```');
     expect(typeSubstituted(box, 4, '"', "«")).toBe(false);
   });
+
+  it("keeps a straight quote in code that is not parsed yet", () => {
+    // CodeMirror parses the start of a long note at once and the rest later.
+    const prose = Array.from({ length: 600 }, (_, line) => `Line ${String(line)}`).join("\n\n");
+    renderEditor(`${prose}\n\n\`x\``, "markdown");
+    const box = sourceBox();
+    const inCode = prose.length + "\n\n`".length;
+
+    expect(typeSubstituted(box, inCode, '"', "«")).toBe(true);
+    expect(sourceValue(box).endsWith('`"x`')).toBe(true);
+  });
 });
 
 describe("paired characters in the Markdown editor", () => {
