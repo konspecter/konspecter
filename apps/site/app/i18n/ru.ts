@@ -81,6 +81,8 @@ export const ru: Dictionary = {
   "home.platformNote.linux": "AppImage и .deb",
   "home.platformNote.android": "Android 7 и новее",
   "home.platformNote.web": "Любой современный браузер, можно установить как приложение",
+  "home.macosFirstOpen":
+    "Приложение для macOS пока не заверено Apple. В первый раз откройте его, затем нажмите «Всё равно открыть» в Системных настройках → Конфиденциальность и безопасность.",
   "home.get": "Скачать",
   "home.open": "Открыть",
 

@@ -689,6 +689,12 @@ main {
   font-size: 15px;
 }
 
+.platform-footnote {
+  margin: 0.85rem 0 0;
+  color: var(--color-muted);
+  font-size: 14px;
+}
+
 .message-page {
   padding-block: clamp(3rem, 8vw, 6rem);
 }

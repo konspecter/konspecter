@@ -53,6 +53,7 @@ it("shows the landing page with the configured downloads", async () => {
   );
   const downloads = screen.getByRole("region", { name: "Get Konspecter" });
   expect(within(downloads).getAllByRole("listitem")).toHaveLength(2);
+  expect(downloads).toHaveTextContent("click Open Anyway in System Settings");
   expect(
     screen.getByRole("figure", { name: "A conspect as Konspecter stores it" }),
   ).toHaveTextContent("title: Grandma's apple pie");
@@ -101,6 +102,8 @@ it("speaks Russian, with the language dropdown and the other theme", async () =>
     await screen.findByRole("heading", { level: 1, name: "Познал. Сохранил. Вернулся." }),
   ).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Скачать" })).toHaveAttribute("href", "#download");
+  // The note on opening the macOS app comes only with a macOS download.
+  expect(screen.queryByText(/Всё равно открыть/)).not.toBeInTheDocument();
   expect(screen.getByRole("combobox", { name: "Язык" })).toHaveValue("ru");
   expect(screen.getByRole("button", { name: "Включить тёмную тему" })).toHaveAttribute(
     "value",

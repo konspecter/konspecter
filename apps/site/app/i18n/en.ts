@@ -84,6 +84,8 @@ export const en = {
   "home.platformNote.linux": "AppImage and .deb",
   "home.platformNote.android": "Android 7 and later",
   "home.platformNote.web": "Any modern browser, installable as an app",
+  "home.macosFirstOpen":
+    "The macOS app is not notarized by Apple yet. The first time, open it, then click Open Anyway in System Settings → Privacy & Security.",
   "home.get": "Download",
   "home.open": "Open",
 

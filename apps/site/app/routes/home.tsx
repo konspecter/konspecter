@@ -184,6 +184,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               </li>
             ))}
           </ul>
+          {downloads.some((download) => download.platform === "macos") && (
+            <p className="platform-footnote">{t("home.macosFirstOpen")}</p>
+          )}
         </section>
       )}
     </>

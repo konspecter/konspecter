@@ -231,6 +231,17 @@ Download the latest release for your platform:
 - [Windows](https://github.com/konspecter/konspecter/releases)
 - [Linux](https://github.com/konspecter/konspecter/releases)
 
+The macOS app is not notarized by Apple yet, so macOS asks before opening it the first time:
+
+1. Drag Konspecter to Applications and open it; macOS says it could not verify the app.
+   Click **Done**.
+2. Open **System Settings → Privacy & Security**, find the message about Konspecter and click
+   **Open Anyway**, then confirm.
+
+Or, in Terminal: `xattr -dr com.apple.quarantine /Applications/Konspecter.app`. If macOS asks
+for your login password to use "Konspecter WebCrypto Master Key", enter it and click **Always
+Allow**; once is enough, updates included.
+
 Conspects are stored in:
 
 ```text
