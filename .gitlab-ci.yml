@@ -342,6 +342,12 @@ release-desktop-macos:
     - source "$HOME/.cargo/env"
     - brew install node@24 && export PATH="$(brew --prefix node@24)/bin:$PATH"
     - corepack enable && pnpm install --frozen-lockfile
+    # Without a Developer ID (APPLE_*), a self-signed certificate keeps one signer (docs/release.md).
+    - |
+      if [ -z "${APPLE_CERTIFICATE:-}" ] && [ -n "${MACOS_CERTIFICATE:-}" ]; then
+        APPLE_SIGNING_IDENTITY="$(scripts/macos-signing-keychain.sh)"
+        export APPLE_SIGNING_IDENTITY
+      fi
     - pnpm --filter @konspecter/desktop tauri build --target "$TARGET"
     - mkdir -p release
     - for dmg in apps/desktop/src-tauri/target/"$TARGET"/release/bundle/dmg/*.dmg; do cp "$dmg" "release/$(basename "${dmg%.dmg}")-${TARGET}.dmg"; done

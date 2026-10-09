@@ -182,8 +182,32 @@ jobs:
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
       - run: pnpm install --frozen-lockfile
-      # Signing and notarization: set APPLE_* / TAURI_SIGNING_* secrets (docs/release.md).
+      # Signing (docs/release.md): a Developer ID (APPLE_*) signs and notarizes; without one, a
+      # self-signed certificate (MACOS_CERTIFICATE) keeps the app one signer from release to
+      # release. Only the secrets that are set reach Tauri: it fails on an empty one.
+      - if: startsWith(matrix.os, 'macos')
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ] && [ -n "$MACOS_CERTIFICATE" ]; then
+            APPLE_SIGNING_IDENTITY="$(scripts/macos-signing-keychain.sh)"
+          fi
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY \
+            APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            if [ -n "${!name}" ]; then
+              printf '%s<<END_OF_VALUE\n%s\nEND_OF_VALUE\n' "$name" "${!name}" >> "$GITHUB_ENV"
+            fi
+          done
       - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: apps/desktop
           tauriScript: pnpm tauri

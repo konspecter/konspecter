@@ -91,13 +91,52 @@ passphrase. So, before upgrading the server:
 
 ## Signing (secrets to add before a public release)
 
-| Platform                   | Secrets                                                                                                                    | Notes                                                                                                                               |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| macOS                      | `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | picked up by `tauri-action` for signing and notarization. Unsigned builds are ad-hoc signed and blocked by Gatekeeper on other Macs |
-| Windows                    | code-signing certificate (`tauri.conf.json` `bundle.windows`)                                                              | unsigned builds trigger SmartScreen                                                                                                 |
-| Android                    | a keystore (`KEYSTORE_BASE64`, passwords) for `assembleRelease`                                                            | the workflows ship a debug APK until one exists                                                                                     |
-| Desktop updates (optional) | `TAURI_SIGNING_PRIVATE_KEY`                                                                                                | only if the Tauri updater is enabled                                                                                                |
+| Platform                   | Secrets                                                                                                                    | Notes                                                                             |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| macOS (Developer ID)       | `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | signs and notarizes: Gatekeeper opens the app without a warning                   |
+| macOS (self-signed)        | `MACOS_CERTIFICATE`, `MACOS_CERTIFICATE_PASSWORD`                                                                          | until there is a Developer ID; see below. Ignored once `APPLE_CERTIFICATE` is set |
+| Windows                    | code-signing certificate (`tauri.conf.json` `bundle.windows`)                                                              | unsigned builds trigger SmartScreen                                               |
+| Android                    | a keystore (`KEYSTORE_BASE64`, passwords) for `assembleRelease`                                                            | the workflows ship a debug APK until one exists                                   |
+| Desktop updates (optional) | `TAURI_SIGNING_PRIVATE_KEY`                                                                                                | only if the Tauri updater is enabled                                              |
 
 The app identifiers (`app.konspecter.desktop`, `app.konspecter.mobile`) are placeholders.
 Change them to a domain you control before the first public release. They cannot change
 afterwards without losing app data.
+
+### macOS without a Developer ID
+
+Without either certificate the app is ad-hoc signed, and macOS takes every build for a
+different app. The keychain then asks for the login password again after each update: the
+encryption key WebKit keeps for the app ("Konspecter WebCrypto Master Key") and the sync
+token are trusted to the build that saved them, and "Always Allow" lasts only until the next
+one.
+
+A self-signed certificate fixes that. The keychain trusts its designated requirement,
+`identifier "app.konspecter.desktop" and certificate leaf = H"…"`, so one "Always Allow"
+carries over every later release signed with the same certificate. It does not satisfy
+Gatekeeper: people open the app once by hand (see the README's Quick start).
+
+Make the certificate once, valid for ten years (Keychain Access gives one year, and a new
+certificate means one more password prompt for everyone). With Homebrew's OpenSSL 3; drop
+`-legacy` with macOS's own `openssl`:
+
+```sh
+openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=Konspecter" \
+  -addext "basicConstraints=critical,CA:false" -addext "keyUsage=critical,digitalSignature" \
+  -addext "extendedKeyUsage=critical,codeSigning" -keyout konspecter.key -out konspecter.crt
+openssl pkcs12 -export -legacy -inkey konspecter.key -in konspecter.crt -name Konspecter \
+  -out konspecter.p12
+base64 -i konspecter.p12 | pbcopy   # MACOS_CERTIFICATE; the export password is MACOS_CERTIFICATE_PASSWORD
+```
+
+Keep `konspecter.p12` and its password somewhere safe and delete the rest. The release jobs
+put the certificate in a keychain of their own (`scripts/macos-signing-keychain.sh`) and sign
+with it. Tauri's `APPLE_CERTIFICATE` import is not used for it: it accepts only identities
+macOS trusts, which a self-signed one is not.
+
+To sign your own builds with it, import it into the login keychain (`security import
+konspecter.p12 -k ~/Library/Keychains/login.keychain-db -T /usr/bin/codesign`) and build with
+`APPLE_SIGNING_IDENTITY=Konspecter pnpm --filter @konspecter/desktop bundle`. A build
+signed this way and a release are the same app to the keychain.
+
+Moving to a Developer ID later changes the signer, so the keychain asks once more.
