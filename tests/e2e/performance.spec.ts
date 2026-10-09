@@ -1,10 +1,24 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 
 /**
  * Real-browser performance with a large library. Numbers are printed and
  * recorded in docs/performance.md; the budgets only catch big regressions.
  */
 const NOTES = 2000;
+
+// Playwright measures every element when it snapshots the page, and with 2,001 rows
+// (`content-visibility: auto`) that forces thousands of layouts and blocks the page for
+// seconds. So no trace, which snapshots after every action (it made a 0.3 s start 2.9 s
+// on a laptop, 9 s in CI), and the timed steps wait with `visible`, not `expect`.
+test.use({ trace: "off" });
+
+/**
+ * Waits for `locator` like `expect(locator).toBeVisible()`, but without the page
+ * snapshot an expect takes when its first check fails.
+ */
+async function visible(locator: Locator, timeout = 10_000): Promise<void> {
+  await locator.waitFor({ timeout });
+}
 
 function note(i: number, kilobytes = 4): string {
   const words = "array list hash map tree set queue stack graph node edge index query cache".split(
@@ -48,22 +62,22 @@ test("a library of 2,000 notes stays fast", async ({ page }) => {
 
   start = Date.now();
   await page.goto("/");
-  await expect(page.locator(".note-results > li")).toHaveCount(NOTES + 1, { timeout: 30_000 });
+  await visible(page.locator(".note-results > li").nth(NOTES), 30_000);
   const startup = Date.now() - start;
   log(`cold start to a catalog of ${String(NOTES + 1)} notes`, startup);
   expect(startup).toBeLessThan(5000);
 
   start = Date.now();
   await page.getByRole("searchbox", { name: "Search conspects" }).fill("hash");
-  await expect(page.locator(".note-results mark").first()).toBeVisible();
+  await visible(page.locator(".note-results mark").first());
   const firstSearch = Date.now() - start;
   log("first search (index warmed while idle)", firstSearch);
 
   start = Date.now();
   // The tag becomes a chip in the search box once a space follows it.
   await page.getByRole("searchbox", { name: "Search conspects" }).fill("#topic3 queue");
-  await expect(page.getByRole("list", { name: "Tag filters" })).toBeVisible();
-  await expect(page.locator(".note-results mark").first()).toBeVisible();
+  await visible(page.getByRole("list", { name: "Tag filters" }));
+  await visible(page.locator(".note-results mark").first());
   log("next search", Date.now() - start);
   expect(firstSearch).toBeLessThan(10_000);
 
@@ -72,13 +86,14 @@ test("a library of 2,000 notes stays fast", async ({ page }) => {
     .getByRole("list", { name: "Conspects" })
     .getByRole("link", { name: "Note 1", exact: true })
     .click();
-  await expect(page.getByRole("textbox", { name: "Conspect text" })).toBeVisible();
+  const editor = page.getByRole("textbox", { name: "Conspect text" });
+  await visible(editor);
   start = Date.now();
   await page
     .getByRole("complementary", { name: "Sidebar" })
     .getByRole("link", { name: "Note 2", exact: true })
     .click();
-  await expect(page.getByRole("textbox", { name: "Conspect text" })).toContainText("Note 2");
+  await visible(editor.filter({ hasText: "Note 2" }));
   const open = Date.now() - start;
   log("switch to another note (editor ready)", open);
   expect(open).toBeLessThan(1000);
@@ -88,13 +103,12 @@ test("a library of 2,000 notes stays fast", async ({ page }) => {
     .getByRole("complementary", { name: "Sidebar" })
     .getByRole("link", { name: "Note 99999" })
     .click();
-  await expect(page.getByRole("textbox", { name: "Conspect text" })).toContainText("Note 99999");
+  await visible(editor.filter({ hasText: "Note 99999" }));
   const render = Date.now() - start;
   log("open a 200 KB note in the editor", render);
   expect(render).toBeLessThan(5000);
 
   // Typing stays immediate in the large note; saving runs behind it.
-  const editor = page.getByRole("textbox", { name: "Conspect text" });
   await editor.click();
   start = Date.now();
   await page.keyboard.type("typing in a large note");
@@ -111,7 +125,7 @@ test("a library of 2,000 notes stays fast", async ({ page }) => {
     .getByRole("complementary", { name: "Sidebar" })
     .getByRole("link", { name: "Note 3", exact: true })
     .click();
-  await expect(page.getByRole("textbox", { name: "Conspect text" })).toContainText("Note 3");
+  await visible(editor.filter({ hasText: "Note 3" }));
   await page.reload();
   const shown = await page.evaluate(
     () =>

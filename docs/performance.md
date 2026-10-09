@@ -18,21 +18,22 @@ cd apps/desktop/src-tauri && cargo test --release -- --ignored # File Mode file 
 
 | Scenario (2,001 notes)                 | Time   | Budget |
 | -------------------------------------- | ------ | ------ |
-| cold start to the full note list       | 1.4 s  | 5 s    |
-| first search right after start-up      | 0.85 s | 10 s   |
-| next search                            | 90 ms  |        |
-| switch to another note (editor ready)  | 145 ms | 1 s    |
-| open a 200 KB note in the editor       | 127 ms | 5 s    |
-| type 22 characters in the 200 KB note  | 49 ms  |        |
-| open the app on a note (load → editor) | 182 ms | 2 s    |
-| import 2,001 files through the UI      | 27 s   |        |
+| cold start to the full note list       | 0.29 s | 5 s    |
+| first search right after start-up      | 0.53 s | 10 s   |
+| next search                            | 30 ms  |        |
+| switch to another note (editor ready)  | 260 ms | 1 s    |
+| open a 200 KB note in the editor       | 220 ms | 5 s    |
+| type 22 characters in the 200 KB note  | 97 ms  |        |
+| open the app on a note (load → editor) | 245 ms | 2 s    |
+| import 2,001 files through the UI      | 17 s   |        |
 
-Measured after updates package 1 (editor-first UI, autosave). The list now renders 2,001
-rows with titles, dates and excerpts, and the sidebar another 2,001 recent entries, so the
-cold start is slower than the earlier catalog of titles (186 ms); it stays well inside the
-budget. The import is slower because every imported note now updates the sidebar and the
-list as it arrives. Those figures come from one run on the machine above; expect some spread
-between runs.
+Medians of eight runs on the machine above, after the account site package. Earlier figures
+(a 1.4 s cold start, 0.85 s for the first search) timed Playwright as much as the app: a trace
+snapshots the page after every action, and an `expect` whose first check fails snapshots it
+too. Playwright measures every element for a snapshot, and with 2,001 rows that are
+`content-visibility: auto` each measurement forces a layout, so one snapshot blocked the page
+for seconds: the cold start read 2.9 s on the laptop and 9 s in CI. The test now runs without
+a trace and waits for its timed steps with `locator.waitFor()`, which takes no snapshot.
 
 ### Core logic (`core.perf.ts`, Node + fake-indexeddb)
 
