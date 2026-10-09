@@ -423,11 +423,14 @@ describe("creating a note", () => {
     await waitFor(() => {
       expect(document.title).toBe("Hash maps · Konspecter");
     });
-    expect(recentTitles()).toEqual(["Hash maps"]);
-    expect(within(recentNav()).getByRole("link", { name: "Hash maps" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
+    // The title follows the text; the address moves to the saved note's a moment later.
+    await waitFor(() => {
+      expect(recentTitles()).toEqual(["Hash maps"]);
+      expect(within(recentNav()).getByRole("link", { name: "Hash maps" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+    });
     // There is no save button to press.
     expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
   });

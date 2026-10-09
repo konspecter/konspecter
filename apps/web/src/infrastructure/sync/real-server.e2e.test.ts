@@ -93,7 +93,10 @@ describe.skipIf(!url || !token)("sync against a real server", () => {
     await a.engine.syncNow();
     await b.engine.syncNow();
     expect(await b.store.get(id)).toBeUndefined();
-    expect(a.engine.getStatus()).toMatchObject({ state: "idle", pending: 0 });
+    // The change stream may have A looking again on its own; it settles with nothing left.
+    await vi.waitFor(() => {
+      expect(a.engine.getStatus()).toMatchObject({ state: "idle", pending: 0 });
+    });
     a.engine.stop();
     b.engine.stop();
   });
