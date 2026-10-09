@@ -1,8 +1,9 @@
 name: Release
 
 # Push a tag like v0.1.0 to build every artifact into a draft GitHub Release, and the
-# server, site and web images to GHCR as 0.1.0 (images-latest.yml moves 0.1 and latest
-# once the release is published).
+# server, site and web images to GHCR as 0.1.0. Once every build has passed, the release
+# publishes itself (a pre-release as one), images-latest.yml moves 0.1 and latest, and an
+# optional hook tells whoever deploys the release (docs/release.md).
 on:
   push:
     tags: ["v*"]
@@ -241,3 +242,43 @@ jobs:
         with:
           draft: true
           files: konspecter-*-debug.apk
+
+  # A failed build leaves the draft, to be fixed or published by hand.
+  publish:
+    needs: [web, site, server, images, deploy, desktop, android]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          if [ "${GITHUB_REF_NAME#*-}" != "${GITHUB_REF_NAME}" ]; then
+            gh release edit "${GITHUB_REF_NAME}" --draft=false --prerelease
+          else
+            gh release edit "${GITHUB_REF_NAME}" --draft=false
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+
+  # A release published with GITHUB_TOKEN starts no workflow of its own, so
+  # images-latest.yml runs from here.
+  latest:
+    needs: publish
+    if: ${{ !contains(github.ref_name, '-') }}
+    uses: ./.github/workflows/images-latest.yml
+    with:
+      tag: ${{ github.ref_name }}
+
+  # The deploy hook, off unless the repository sets both: the variable DEPLOY_REPOSITORY
+  # (owner/name) and the secret DEPLOY_TOKEN, a token that may write to its contents.
+  # A release, not a pre-release, sends it a repository_dispatch "konspecter-release"
+  # with {"version": "X.Y.Z"}, once its images and deploy bundle can be downloaded.
+  notify:
+    needs: publish
+    if: ${{ vars.DEPLOY_REPOSITORY != '' && !contains(github.ref_name, '-') }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          gh api --method POST "repos/${DEPLOY_REPOSITORY}/dispatches" \
+            -f event_type=konspecter-release -f "client_payload[version]=${GITHUB_REF_NAME#v}"
+        env:
+          GH_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+          DEPLOY_REPOSITORY: ${{ vars.DEPLOY_REPOSITORY }}

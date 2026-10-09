@@ -9,8 +9,8 @@ description:
 
 # Release
 
-The steps of [docs/release.md](../../../docs/release.md) up to the push; the pipelines take it from there (a draft
-GitHub Release, the GitLab release jobs). This skill is Konspecter's own: unlike `commit` and `konspecter-go`, it has
+The steps of [docs/release.md](../../../docs/release.md) up to the push; the pipelines take it from there (a GitHub
+Release that publishes itself, the GitLab release jobs). This skill is Konspecter's own: unlike `commit` and `konspecter-go`, it has
 no copy in `konspecter-billing`.
 
 ## 1. Check the ground
@@ -96,5 +96,6 @@ leave the commit and the tag in place and tell the user; do not force anything o
 ## 6. Report
 
 The version and level, the tag, the commit, and what comes next: the release workflow builds a **draft** GitHub
-Release (or the GitLab pipeline waits on its manual **publish** job), to be checked and published by hand. Its notes
+Release and publishes it once every build has passed, then runs the deploy hook if the repository sets one (the
+GitLab pipeline waits on its manual **publish** job instead). Its notes
 are the new `## X.Y.Z — …` section of `CHANGELOG.md`, so that heading must keep exactly this form.

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Releases publish themselves:** a tagged release's GitHub draft is published once every
+  build has passed, and the images' `X.Y` and `latest` move with it. A repository that sets
+  `DEPLOY_REPOSITORY` and `DEPLOY_TOKEN` also tells another repository to deploy the release
+  ([docs/release.md](docs/release.md)).
 - **One canonical domain:** Konspecter's own service is `konspecter.com` (the site and the API)
   and `app.konspecter.com` (the web app). `www.konspecter.com` redirects (301) to the same page
   there, and `konspecter.ru` to the Russian one; a self-hosted server can redirect its own extra

@@ -33,8 +33,16 @@
    It also pushes the images `ghcr.io/<owner>/konspecter-{server,site,web}:X.Y.Z` for
    `linux/amd64` and `linux/arm64` ([ADR-023](architecture/decisions/ADR-023-published-images.md)).
 
-4. Check the draft, then publish it. Publishing points the images' `X.Y` and `latest` tags
-   at `X.Y.Z` (`images-latest.yml`; not for a pre-release).
+4. Once every build has passed, the release publishes itself (a pre-release tag as a
+   pre-release), and points the images' `X.Y` and `latest` tags at `X.Y.Z`
+   (`images-latest.yml`; not for a pre-release). A failed build leaves the draft: run the
+   failed jobs again, or fix and publish it by hand, which moves `X.Y` and `latest` too.
+5. **Deploying it** (optional). With the repository variable `DEPLOY_REPOSITORY` (an
+   `owner/name`) and the secret `DEPLOY_TOKEN` (a fine-grained token that may write that
+   repository's contents), a published release, not a pre-release, ends with a
+   `repository_dispatch` there: the event `konspecter-release`, with `{"version": "X.Y.Z"}`.
+   Its images and deploy bundle can be downloaded by then, so a workflow there can deploy
+   it. Without both, the release stops at publishing.
 
 The first release creates the three GHCR packages **private**. Make each public once
 (the package's settings → Change visibility) and link it to the repository, so anyone can
