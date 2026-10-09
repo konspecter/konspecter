@@ -1498,11 +1498,9 @@ describe("the dates a save writes", () => {
 
     setSourceValue(source, "# Dated\n\nbody");
     await waitFor(async () => {
-      expect(await store.list()).toHaveLength(1);
-    });
-    const [stored] = await store.list();
-    await waitFor(() => {
-      expect(sourceValue(source)).toBe(stored?.markdown);
+      const notes = await store.list();
+      expect(notes).toHaveLength(1);
+      expect(sourceValue(source)).toBe(notes[0]?.markdown);
     });
   });
 });

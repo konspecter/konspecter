@@ -84,14 +84,16 @@ describe("a new note", () => {
     expect(box).toHaveFocus();
     await userEvent.keyboard("# Autosaved{Enter}Body");
 
+    // Autosave may store the note mid-word first: wait for the save with the whole text.
     await waitFor(async () => {
-      expect(await store.list()).toHaveLength(1);
+      const notes = await store.list();
+      expect(notes).toHaveLength(1);
+      expect(parseDocument(notes[0]?.markdown ?? "").body).toBe("# Autosaved\n\nBody");
     });
     const [note] = await store.list();
     await waitFor(() => {
       expect(location()).toHaveTextContent(`/conspects/${note?.id ?? ""}`);
     });
-    expect(parseDocument(note?.markdown ?? "").body).toBe("# Autosaved\n\nBody");
     // The same editor, still focused: typing simply continues.
     expect(await textBox()).toBe(box);
     expect(box).toHaveFocus();

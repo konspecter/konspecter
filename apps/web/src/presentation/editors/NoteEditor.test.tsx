@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { NoteEditor, type EditorMode } from "./NoteEditor";
@@ -642,13 +642,16 @@ describe("tags and code in the editors", () => {
     expect(marked(textBox())).toEqual(["#java"]);
   });
 
-  it("marks tags and code blocks in the Markdown editor", () => {
+  it("marks tags and code blocks in the Markdown editor", async () => {
     renderEditor(
       '---\nk: "#no"\n---\n# Title #tips\n\nSee `#no` https://a.b/#no\n\n```json\n{"a": "#no"}\n```',
       "markdown",
     );
 
-    expect(marked(sourceBox())).toEqual(["#tips"]);
+    // The marks follow the parse, which a busy machine may finish a moment later.
+    await waitFor(() => {
+      expect(marked(sourceBox())).toEqual(["#tips"]);
+    });
     expect(sourceBox().querySelectorAll(".cm-code-line")).toHaveLength(3);
   });
 

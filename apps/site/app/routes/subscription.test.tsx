@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createRoutesStub, RouterContextProvider } from "react-router";
 import { accountContext } from "../account.server";
@@ -263,7 +263,10 @@ describe("the subscription in the settings", () => {
       "href",
       "https://pay.example.com/approve?ba=1",
     );
-    expect(assign).toHaveBeenCalledWith("https://pay.example.com/approve?ba=1");
+    // The redirect is an effect: React may run it a moment after the link is on the page.
+    await waitFor(() => {
+      expect(assign).toHaveBeenCalledWith("https://pay.example.com/approve?ba=1");
+    });
   });
 
   it("shows a renewing subscription with its payments, and cancels after saying what stays", async () => {
