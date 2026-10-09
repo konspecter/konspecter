@@ -261,13 +261,21 @@ const BUTTONS_LIMIT = 36;
 /** A few short choices as a segmented control of radio buttons; longer ones as a dropdown. */
 function Choice<T extends string | number>(props: ChoiceProps<T>) {
   const name = useId();
+  const labelId = useId();
   const hintId = useId();
   const { legend, hint, options, value, onChange } = props;
   const length = options.reduce((sum, option) => sum + option.label.length, 0);
   if (length > BUTTONS_LIMIT) return <Dropdown {...props} />;
   return (
-    <fieldset className="setting setting-row" aria-describedby={hint ? hintId : undefined}>
-      <legend className="setting-label">{legend}</legend>
+    <div
+      role="radiogroup"
+      className="setting setting-row"
+      aria-labelledby={labelId}
+      aria-describedby={hint ? hintId : undefined}
+    >
+      <span id={labelId} className="setting-label">
+        {legend}
+      </span>
       {hint && (
         <p id={hintId} className="setting-hint">
           {hint}
@@ -289,7 +297,7 @@ function Choice<T extends string | number>(props: ChoiceProps<T>) {
           </label>
         ))}
       </div>
-    </fieldset>
+    </div>
   );
 }
 
