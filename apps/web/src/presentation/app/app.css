@@ -1493,7 +1493,6 @@ kbd {
 .setting-row > .setting-hint {
   grid-area: hint;
   align-self: start;
-  max-width: 60ch;
   margin: 0;
   line-height: 1.45;
 }
@@ -1614,8 +1613,8 @@ kbd {
   font-weight: 560;
 }
 
+/* Text runs to the panel's edge, like the fields and buttons under it. */
 .setting-block .setting-hint {
-  max-width: 64ch;
   margin: 0 0 0.4rem;
   line-height: 1.45;
 }
