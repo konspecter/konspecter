@@ -12,7 +12,7 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test && node --test 'scripts/*.test.mjs' '.claude/skills/*/scripts/*.test.mjs'",
     "typecheck": "pnpm -r typecheck",
-    "lint": "eslint .",
+    "lint": "pnpm --filter @konspecter/site typegen && eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "licenses:check": "node scripts/check-licenses.mjs",

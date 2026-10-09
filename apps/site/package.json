@@ -9,7 +9,8 @@
     "build": "react-router build",
     "start": "react-router-serve ./build/server/index.js",
     "test": "vitest run",
-    "typecheck": "react-router typegen && tsc -b"
+    "typegen": "react-router typegen",
+    "typecheck": "pnpm typegen && tsc -b"
   },
   "devDependencies": {
     "@konspecter/crypto": "workspace:*",
