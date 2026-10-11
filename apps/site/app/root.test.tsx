@@ -40,6 +40,14 @@ it("offers the languages in a dropdown, each by its own name", async () => {
   expect(language.closest("form")).toHaveAttribute("action", "/preferences");
 });
 
+it("links to the source code on GitHub", async () => {
+  renderHeader({ email: null, name: "" });
+  expect(await screen.findByRole("link", { name: "Konspecter on GitHub" })).toHaveAttribute(
+    "href",
+    "https://github.com/konspecter/konspecter",
+  );
+});
+
 describe("search engines", () => {
   const load = (path: string, cookie = "", language = "") => {
     const context = new RouterContextProvider();

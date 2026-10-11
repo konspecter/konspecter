@@ -11,6 +11,7 @@ export const ru: Dictionary = {
   "site.languageApply": "Сменить",
   "site.toLight": "Включить светлую тему",
   "site.toDark": "Включить тёмную тему",
+  "site.sourceCode": "Konspecter на GitHub",
   "site.footerLinks": "О сайте",
   "site.markdown": "Шпаргалка по Markdown",
   "site.terms": "Условия и оферта",

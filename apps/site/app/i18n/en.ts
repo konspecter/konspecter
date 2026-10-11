@@ -14,6 +14,7 @@ export const en = {
   "site.languageApply": "Change",
   "site.toLight": "Switch to the light theme",
   "site.toDark": "Switch to the dark theme",
+  "site.sourceCode": "Konspecter on GitHub",
   "site.footerLinks": "About the site",
   "site.markdown": "Markdown cheatsheet",
   "site.terms": "Terms",

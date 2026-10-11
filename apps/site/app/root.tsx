@@ -1,4 +1,4 @@
-import { ChevronIcon, GlobeIcon, MoonIcon, SunIcon } from "@konspecter/ui/icons";
+import { ChevronIcon, GitHubIcon, GlobeIcon, MoonIcon, SunIcon } from "@konspecter/ui/icons";
 import "@konspecter/ui/fonts.css";
 import "@konspecter/ui/tokens.css";
 import "@konspecter/ui/base.css";
@@ -151,6 +151,9 @@ export function Layout({ children }: { children: ReactNode }) {
   );
 }
 
+/** Where Konspecter's source code lives. */
+const SOURCE_CODE = "https://github.com/konspecter/konspecter";
+
 /**
  * The switches post to /preferences and come back here; plain forms, so no
  * script is needed. The language is a dropdown that sends itself once the
@@ -213,6 +216,14 @@ function Preferences({ locale }: { locale: Locale }) {
           <SunIcon />
         </button>
       </form>
+      <a
+        href={SOURCE_CODE}
+        className="icon-button"
+        aria-label={t("site.sourceCode")}
+        title={t("site.sourceCode")}
+      >
+        <GitHubIcon />
+      </a>
     </div>
   );
 }
