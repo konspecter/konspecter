@@ -31,6 +31,12 @@
    | desktop `.dmg` (Apple Silicon and Intel), `.msi`/`.exe`, `.AppImage`/`.deb`/`.rpm` | `tauri-action`                         |
    | `konspecter-vX-debug.apk`                                                          | Gradle (debug build)                   |
    | `konspecter-deploy-vX.tar.gz` (`compose.yaml`, `Caddyfile`, `.env.example`)        | `deploy/`, registry and version set    |
+   | `Konspecter-{macos-arm64,macos-x64}.dmg`, `Konspecter-windows-x64-setup.exe`,      | `publish`: copies of the downloads     |
+   | `Konspecter-linux-x64.AppImage`, `Konspecter-android.apk` (no version in the name) |                                        |
+
+   The copies without a version are what a site links to: `releases/latest/download/<name>`
+   always serves the newest release's (`KONSPECTER_DOWNLOAD_*_URL`). A pre-release is never
+   the latest, so it never reaches those links.
 
    It also pushes the images `ghcr.io/<owner>/konspecter-{server,site,web}:X.Y.Z` for
    `linux/amd64` and `linux/arm64` ([ADR-023](architecture/decisions/ADR-023-published-images.md)).

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Download links that never change:** each release also has its downloads under names
+  without the version (`Konspecter-macos-arm64.dmg`, `Konspecter-windows-x64-setup.exe`,
+  `Konspecter-linux-x64.AppImage`, `Konspecter-android.apk` and more), so a site's
+  `KONSPECTER_DOWNLOAD_*_URL` can point at `releases/latest/download/<name>` once.
+
 ## 0.2.1 — 2026-10-13
 
 - **`pnpm release`** releases from a terminal, without Claude Code: it works out the version

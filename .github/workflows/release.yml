@@ -248,6 +248,25 @@ jobs:
     needs: [web, site, server, images, deploy, desktop, android]
     runs-on: ubuntu-latest
     steps:
+      # The downloads again under names without the version, added while the release is
+      # a draft: releases/latest/download/<name> then always serves the newest release's
+      # (KONSPECTER_DOWNLOAD_*_URL in deploy/.env.example).
+      - run: |
+          version=${GITHUB_REF_NAME#v}
+          mkdir stable && cd stable
+          gh release download "$GITHUB_REF_NAME" \
+            -p "Konspecter_${version}_aarch64.dmg" -p "Konspecter_${version}_x64.dmg" \
+            -p "Konspecter_${version}_x64-setup.exe" -p "Konspecter_${version}_amd64.AppImage" \
+            -p "konspecter-${GITHUB_REF_NAME}-debug.apk"
+          mv "Konspecter_${version}_aarch64.dmg" Konspecter-macos-arm64.dmg
+          mv "Konspecter_${version}_x64.dmg" Konspecter-macos-x64.dmg
+          mv "Konspecter_${version}_x64-setup.exe" Konspecter-windows-x64-setup.exe
+          mv "Konspecter_${version}_amd64.AppImage" Konspecter-linux-x64.AppImage
+          mv "konspecter-${GITHUB_REF_NAME}-debug.apk" Konspecter-android.apk
+          gh release upload "$GITHUB_REF_NAME" ./* --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
       - run: |
           if [ "${GITHUB_REF_NAME#*-}" != "${GITHUB_REF_NAME}" ]; then
             gh release edit "${GITHUB_REF_NAME}" --draft=false --prerelease
