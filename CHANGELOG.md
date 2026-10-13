@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 — 2026-10-13
 
 - **Sign in with GitHub** on the account site, in English and in Russian
   (`KONSPECTER_OAUTH_GITHUB_CLIENT_ID`/`_SECRET`, a GitHub OAuth app). A verified primary
@@ -78,7 +78,7 @@
   account site shows it without the plate, in graphite or white by the site's theme. The
   master artwork is in `logo/`.
 
-## Unreleased — updates package 2
+### Updates package 2
 
 - The Tags field over the text is gone: tags are written in the text. A tag listed only in the
   frontmatter has a × next to it in Details that removes it, in either editor mode.
@@ -155,7 +155,7 @@
 - Dates written by other tools as `create_at` / `updated_at` are understood, and saving keeps
   those names instead of adding `created` / `updated` beside them.
 
-## Unreleased — updates package 1
+### Updates package 1
 
 - A two-panel window: a sidebar with the tag tree and recently edited notes, and a top bar
   with search, the theme and Text/Markdown toggles, and an activity antenna. No app header.
