@@ -20,7 +20,7 @@ import (
 )
 
 // IDs lists the providers this server knows, in the order the site shows them.
-var IDs = []string{"google", "linkedin", "x", "yandex", "vk"}
+var IDs = []string{"google", "github", "linkedin", "x", "yandex", "vk"}
 
 // Profile is what a provider says about the account that signed in.
 type Profile struct {
@@ -68,6 +68,17 @@ var specs = map[string]spec{
 		pkce:        true,
 		authStyle:   oauth2.AuthStyleInParams,
 		profile:     openIDProfile,
+	},
+	// A GitHub OAuth app. The address comes from the account's address list,
+	// read at the user info URL + "/emails" (the user:email scope).
+	"github": {
+		authURL:     "https://github.com/login/oauth/authorize",
+		tokenURL:    "https://github.com/login/oauth/access_token",
+		userInfoURL: "https://api.github.com/user",
+		scopes:      []string{"read:user", "user:email"},
+		pkce:        true,
+		authStyle:   oauth2.AuthStyleInParams,
+		profile:     githubProfile,
 	},
 	// Sign In with LinkedIn using OpenID Connect. LinkedIn takes PKCE from
 	// native apps only; the client secret and state protect the web flow.
@@ -214,6 +225,30 @@ func xProfile(ctx context.Context, p *Provider, token *oauth2.Token) (Profile, e
 		return Profile{}, err
 	}
 	return Profile{Subject: body.Data.ID}, nil
+}
+
+func githubProfile(ctx context.Context, p *Provider, token *oauth2.Token) (Profile, error) {
+	var user struct {
+		ID flexibleString `json:"id"`
+	}
+	if err := p.getJSON(ctx, p.UserInfoURL, "Bearer "+token.AccessToken, &user); err != nil {
+		return Profile{}, err
+	}
+	var emails []struct {
+		Email    string `json:"email"`
+		Primary  bool   `json:"primary"`
+		Verified bool   `json:"verified"`
+	}
+	if err := p.getJSON(ctx, p.UserInfoURL+"/emails", "Bearer "+token.AccessToken, &emails); err != nil {
+		return Profile{}, err
+	}
+	profile := Profile{Subject: string(user.ID)}
+	for _, e := range emails {
+		if e.Primary {
+			profile.Email, profile.EmailVerified = e.Email, e.Verified
+		}
+	}
+	return profile, nil
 }
 
 func yandexProfile(ctx context.Context, p *Provider, token *oauth2.Token) (Profile, error) {

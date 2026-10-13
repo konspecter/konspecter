@@ -39,7 +39,7 @@ func TestLoadUsesDefaults(t *testing.T) {
 		Mail:             Mail{Transport: "smtp", Port: 587, Security: "starttls"},
 		Rates:            Rates{LoginFailuresPerIP: 20, LoginFailuresPerEmail: 10, EmailsPerAddress: 5, EmailsPerIP: 20, DeviceRequestsPerIP: 20},
 		OAuth:            map[string]OAuthClient{},
-		LoginProviders:   map[string][]string{"en": {"google", "linkedin", "x"}, "ru": {"yandex", "vk"}},
+		LoginProviders:   map[string][]string{"en": {"google", "github", "linkedin", "x"}, "ru": {"yandex", "vk", "github"}},
 	}
 	if !reflect.DeepEqual(cfg, want) {
 		t.Errorf("Load() = %+v, want %+v", cfg, want)

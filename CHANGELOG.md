@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Sign in with GitHub** on the account site, in English and in Russian
+  (`KONSPECTER_OAUTH_GITHUB_CLIENT_ID`/`_SECRET`, a GitHub OAuth app). A verified primary
+  address signs straight in; otherwise the address is proven with a code first.
 - **Releases publish themselves:** a tagged release's GitHub draft is published once every
   build has passed, and the images' `X.Y` and `latest` move with it. A repository that sets
   `DEPLOY_REPOSITORY` and `DEPLOY_TOKEN` also tells another repository to deploy the release

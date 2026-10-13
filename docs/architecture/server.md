@@ -25,7 +25,7 @@ apps/server/
 ├── internal/auth/          User, Device, Session; API tokens and bearer header parsing
 ├── internal/accounts/      passwords (argon2id), email codes, reset tokens, identities, names
 ├── internal/devices/       device codes and user codes (RFC 8628), connect codes, app descriptions
-├── internal/oauth/         sign-in providers (Google, LinkedIn, X, Yandex ID, VK ID)
+├── internal/oauth/         sign-in providers (Google, GitHub, LinkedIn, X, Yandex ID, VK ID)
 ├── internal/entitlements/  paid sync: whether an account may sync
 ├── internal/mail/          the mailer (SMTP or log) and the emails in English and Russian:
 │                            plain text and HTML (letter.html, the logo inline by Content-ID)
@@ -228,7 +228,7 @@ lists them all:
 | `KONSPECTER_REGISTRATION`                                                                 | `open` or `closed`                               |
 | `KONSPECTER_SESSION_TTL`, `_EMAIL_CODE_TTL`, `_PASSWORD_RESET_TTL`, `_DEVICE_CODE_TTL`    | lifetimes                                        |
 | `KONSPECTER_MAIL_TRANSPORT` (`smtp`, `log`), `KONSPECTER_SMTP_*`                          | email                                            |
-| `KONSPECTER_OAUTH_<GOOGLE\|LINKEDIN\|X\|YANDEX\|VK>_CLIENT_ID/_SECRET`                    | sign-in providers (on when both are set)         |
+| `KONSPECTER_OAUTH_<GOOGLE\|GITHUB\|LINKEDIN\|X\|YANDEX\|VK>_CLIENT_ID/_SECRET`            | sign-in providers (on when both are set)         |
 | `KONSPECTER_LOGIN_PROVIDERS_EN`, `_RU`                                                    | the providers shown per language                 |
 | `KONSPECTER_TRUSTED_PROXIES`                                                              | proxies whose `X-Forwarded-For` names the client |
 | `KONSPECTER_RATE_LOGIN_PER_IP/_PER_EMAIL`, `_EMAIL_PER_ADDRESS/_PER_IP`, `_DEVICE_PER_IP` | abuse limits                                     |

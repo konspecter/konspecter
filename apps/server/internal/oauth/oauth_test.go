@@ -13,10 +13,12 @@ import (
 )
 
 // fakeProvider is a provider's token and user info endpoints. It answers
-// the user info request with userInfo and records the token request.
+// the user info request with userInfo, its "/emails" with emails, and
+// records the token request.
 type fakeProvider struct {
 	server   *httptest.Server
 	userInfo string
+	emails   string
 
 	mu           sync.Mutex
 	tokenForm    url.Values
@@ -54,6 +56,10 @@ func newFakeProvider(t *testing.T, userInfo string) *fakeProvider {
 		f.mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(f.userInfo))
+	})
+	mux.HandleFunc("GET /userinfo/emails", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(f.emails))
 	})
 	f.server = httptest.NewServer(mux)
 	t.Cleanup(f.server.Close)
@@ -173,6 +179,37 @@ func TestXProfileHasNoEmail(t *testing.T) {
 	// X takes the client's credentials in the Authorization header.
 	if f.tokenBasic != "client-1" || f.tokenForm.Has("client_secret") {
 		t.Errorf("token request: basic %q, form %v", f.tokenBasic, f.tokenForm)
+	}
+}
+
+func TestGitHubProfile(t *testing.T) {
+	f := newFakeProvider(t, `{"id":583231,"login":"ann"}`)
+	f.emails = `[{"email":"old@example.com","primary":false,"verified":true},` +
+		`{"email":"ann@example.com","primary":true,"verified":true}]`
+	profile, err := f.provider(t, "github").Profile(context.Background(), callback("the-code"), "v")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if profile != (Profile{Subject: "583231", Email: "ann@example.com", EmailVerified: true}) {
+		t.Errorf("profile = %+v", profile)
+	}
+	if f.tokenForm.Get("code_verifier") != "v" || f.tokenForm.Get("client_secret") != "secret-1" {
+		t.Errorf("token request = %v", f.tokenForm)
+	}
+	if f.authHeader != "Bearer the-token" {
+		t.Errorf("Authorization = %q", f.authHeader)
+	}
+}
+
+func TestGitHubUnverifiedPrimaryEmail(t *testing.T) {
+	f := newFakeProvider(t, `{"id":583231}`)
+	f.emails = `[{"email":"ann@example.com","primary":true,"verified":false}]`
+	profile, err := f.provider(t, "github").Profile(context.Background(), callback("the-code"), "v")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if profile != (Profile{Subject: "583231", Email: "ann@example.com"}) {
+		t.Errorf("profile = %+v", profile)
 	}
 }
 

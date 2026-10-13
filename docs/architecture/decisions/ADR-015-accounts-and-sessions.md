@@ -7,14 +7,15 @@ authenticates browsers, with a cookie.
 
 The account site ([ADR-014](ADR-014-account-site.md)) needs people to sign up and sign in
 on their own: with an email address (a password or a one-time code, and a way back when the
-password is forgotten), or with another service. That is Google, LinkedIn or X for English
-speakers, and Yandex ID or VK ID for Russian speakers. Browsers need a session; apps keep
+password is forgotten), or with another service. That is Google, GitHub, LinkedIn or X for
+English speakers, and Yandex ID, VK ID or GitHub for Russian speakers. Browsers need a session; apps keep
 their bearer tokens.
 
 ## Decision
 
 1. **Every account has a verified email address.** It is proven by an email code, a reset
-   link, or a provider that vouches for it (Google, LinkedIn with `email_verified`, Yandex).
+   link, or a provider that vouches for it (Google, LinkedIn with `email_verified`, GitHub
+   for a verified primary address, Yandex).
    A provider that gives no verified address (X, VK) creates no account. Its sign-in waits
    in `pending_identities` (30 minutes, a `ksp_link` cookie) until the visitor proves an
    address with a code, which then links the provider to that address's account. So

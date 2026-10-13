@@ -62,8 +62,8 @@ type Config struct {
 	// KONSPECTER_OAUTH_<ID>_CLIENT_ID and _CLIENT_SECRET are set.
 	OAuth map[string]OAuthClient
 	// LoginProviders are the providers the site offers per language
-	// (KONSPECTER_LOGIN_PROVIDERS_EN, default "google,linkedin,x";
-	// KONSPECTER_LOGIN_PROVIDERS_RU, default "yandex,vk").
+	// (KONSPECTER_LOGIN_PROVIDERS_EN, default "google,github,linkedin,x";
+	// KONSPECTER_LOGIN_PROVIDERS_RU, default "yandex,vk,github").
 	LoginProviders map[string][]string
 	// Billing makes sync paid; without it sync is free.
 	Billing Billing
@@ -165,8 +165,8 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 	cfg.OAuth = r.oauthClients()
 	cfg.LoginProviders = map[string][]string{
-		"en": r.providers("KONSPECTER_LOGIN_PROVIDERS_EN", "google,linkedin,x"),
-		"ru": r.providers("KONSPECTER_LOGIN_PROVIDERS_RU", "yandex,vk"),
+		"en": r.providers("KONSPECTER_LOGIN_PROVIDERS_EN", "google,github,linkedin,x"),
+		"ru": r.providers("KONSPECTER_LOGIN_PROVIDERS_RU", "yandex,vk,github"),
 	}
 	cfg.Billing = r.billing()
 	if cfg.Billing.Paid() && cfg.PublicURL == "" {
