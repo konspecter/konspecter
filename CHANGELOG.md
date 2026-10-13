@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.1 — 2026-10-13
 
 - **`pnpm release`** releases from a terminal, without Claude Code: it works out the version
   from the commits, asks, dates the changelog, commits, tags and pushes
