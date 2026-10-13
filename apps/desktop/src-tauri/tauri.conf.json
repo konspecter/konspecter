@@ -40,7 +40,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg"],
+    "targets": "all",
     "category": "Productivity",
     "shortDescription": "Local-first conspects in Markdown",
     "icon": [

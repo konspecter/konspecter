@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **Desktop packages for Linux and Windows:** a release builds `.deb`, `.rpm` and `.AppImage`,
+  and the `.msi` and `.exe` installers, beside the macOS `.dmg`. Only the macOS formats were
+  listed to bundle, so the 0.2.0 release had no Linux or Windows packages.
+
 ## 0.2.0 — 2026-10-13
 
 - **Sign in with GitHub** on the account site, in English and in Russian

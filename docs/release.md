@@ -21,14 +21,14 @@
    pre-release without a section of its own takes the Unreleased ones). With no section, the
    release stops at its first job.
 
-   | Artifact                                                                    | Built by                               |
-   | --------------------------------------------------------------------------- | -------------------------------------- |
-   | `konspecter-web-vX.zip` (static PWA, host behind HTTPS)                     | `pnpm --filter @konspecter/web build`  |
-   | `konspecter-site-vX.tar.gz` (account site: SSR build and its dependencies)  | `pnpm --filter @konspecter/site build` |
-   | `konspecter-server-vX-<os>-<arch>.tar.gz` (Linux, macOS, Windows)           | `go build` with the version stamped in |
-   | desktop `.dmg` (Apple Silicon and Intel), `.msi`/`.exe`, `.AppImage`/`.deb` | `tauri-action`                         |
-   | `konspecter-vX-debug.apk`                                                   | Gradle (debug build)                   |
-   | `konspecter-deploy-vX.tar.gz` (`compose.yaml`, `Caddyfile`, `.env.example`) | `deploy/`, registry and version set    |
+   | Artifact                                                                           | Built by                               |
+   | ---------------------------------------------------------------------------------- | -------------------------------------- |
+   | `konspecter-web-vX.zip` (static PWA, host behind HTTPS)                            | `pnpm --filter @konspecter/web build`  |
+   | `konspecter-site-vX.tar.gz` (account site: SSR build and its dependencies)         | `pnpm --filter @konspecter/site build` |
+   | `konspecter-server-vX-<os>-<arch>.tar.gz` (Linux, macOS, Windows)                  | `go build` with the version stamped in |
+   | desktop `.dmg` (Apple Silicon and Intel), `.msi`/`.exe`, `.AppImage`/`.deb`/`.rpm` | `tauri-action`                         |
+   | `konspecter-vX-debug.apk`                                                          | Gradle (debug build)                   |
+   | `konspecter-deploy-vX.tar.gz` (`compose.yaml`, `Caddyfile`, `.env.example`)        | `deploy/`, registry and version set    |
 
    It also pushes the images `ghcr.io/<owner>/konspecter-{server,site,web}:X.Y.Z` for
    `linux/amd64` and `linux/arm64` ([ADR-023](architecture/decisions/ADR-023-published-images.md)).
