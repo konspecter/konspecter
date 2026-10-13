@@ -1,4 +1,4 @@
-// node --test .claude/skills/release/scripts/next-version.test.mjs
+// node --test scripts/next-version.test.mjs
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { bump, highest, levelOf } from "./next-version.mjs";

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **`pnpm release`** releases from a terminal, without Claude Code: it works out the version
+  from the commits, asks, dates the changelog, commits, tags and pushes
+  ([docs/release.md](docs/release.md)).
 - **Desktop packages for Linux and Windows:** a release builds `.deb`, `.rpm` and `.AppImage`,
   and the `.msi` and `.exe` installers, beside the macOS `.dmg`. Only the macOS formats were
   listed to bundle, so the 0.2.0 release had no Linux or Windows packages.

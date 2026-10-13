@@ -10,7 +10,7 @@
     "dev": "pnpm --filter @konspecter/web dev",
     "dev:site": "pnpm --filter @konspecter/site dev",
     "build": "pnpm -r build",
-    "test": "pnpm -r test && node --test 'scripts/*.test.mjs' '.claude/skills/*/scripts/*.test.mjs'",
+    "test": "pnpm -r test && node --test 'scripts/*.test.mjs'",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm --filter @konspecter/site typegen && eslint .",
     "format": "prettier --write .",
@@ -20,6 +20,7 @@
     "e2e": "pnpm --filter @konspecter/e2e e2e",
     "versions:check": "node scripts/check-versions.mjs",
     "version:set": "node scripts/set-version.mjs",
+    "release": "node scripts/release.mjs",
     "icons": "node scripts/render-icons.mjs"
   },
   "devDependencies": {

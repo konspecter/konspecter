@@ -11,7 +11,8 @@ description:
 
 The steps of [docs/release.md](../../../docs/release.md) up to the push; the pipelines take it from there (a GitHub
 Release that publishes itself, the GitLab release jobs). This skill is Konspecter's own: unlike `commit` and `konspecter-go`, it has
-no copy in `konspecter-billing`.
+no copy in `konspecter-billing`. Without Claude Code, `pnpm release` (`scripts/release.mjs`) takes the same steps
+and asks in the terminal; a change to one belongs in the other.
 
 ## 1. Check the ground
 
@@ -29,7 +30,7 @@ pnpm versions:check           # every file carries the same version
 ## 2. Work out the version
 
 ```bash
-node .claude/skills/release/scripts/next-version.mjs [patch|minor|major|X.Y.Z]
+node scripts/next-version.mjs [patch|minor|major|X.Y.Z]
 ```
 
 It prints JSON: `current` (from `package.json`), `lastTag` (the last `v*` tag, or `null`), each commit since it with

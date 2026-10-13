@@ -1,11 +1,11 @@
 // The next release's version, from the Conventional Commits since the last one:
-//   node .claude/skills/release/scripts/next-version.mjs [patch|minor|major|X.Y.Z]
+//   node scripts/next-version.mjs [patch|minor|major|X.Y.Z]
 // Prints JSON: the current version, the last release tag, the commits since it,
 // the bump they ask for and the next version. An argument overrides the bump.
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { parseVersion } from "../../../../scripts/versions.mjs";
+import { parseVersion } from "./versions.mjs";
 
 const LEVELS = ["none", "patch", "minor", "major"];
 
@@ -53,7 +53,9 @@ function lastTag() {
   }
 }
 
-function main() {
+// The release the commits since the last tag ask for, or the one `override`
+// (a level or a version) names.
+export function nextVersion(override) {
   const root = git("rev-parse", "--show-toplevel");
   const current = JSON.parse(readFileSync(`${root}/package.json`, "utf8")).version;
   const tag = lastTag();
@@ -74,35 +76,34 @@ function main() {
       return { subject, level: levelOf(body.trim()) };
     });
 
-  const override = process.argv[2]?.replace(/^v/, "");
+  const wanted = override?.replace(/^v/, "");
   let level = released ? highest(commits.map((c) => c.level)) : "none";
   let next = bump(current, level);
-  if (override !== undefined) {
-    if (LEVELS.includes(override)) {
-      level = override;
+  if (wanted !== undefined) {
+    if (LEVELS.includes(wanted)) {
+      level = wanted;
       // Asked for by name, a major leaves 0.x (0.4.2 → 1.0.0).
       next =
-        override === "major"
+        wanted === "major"
           ? `${String(parseVersion(current).major + 1)}.0.0`
-          : bump(current, override);
-    } else if (parseVersion(override)) {
+          : bump(current, wanted);
+    } else if (parseVersion(wanted)) {
       level = "explicit";
-      next = override;
+      next = wanted;
     } else {
-      throw new Error(`Not a bump or a version: ${process.argv[2]}`);
+      throw new Error(`Not a bump or a version: ${override}`);
     }
   }
+  return { current, lastTag: tag ?? null, released, commits, level, next, tag: `v${next}` };
+}
 
+function main() {
+  const result = nextVersion(process.argv[2]);
   console.log(
     JSON.stringify(
       {
-        current,
-        lastTag: tag ?? null,
-        released,
-        commits: commits.map((c) => `${c.level.padEnd(5)} ${c.subject}`),
-        level,
-        next,
-        tag: `v${next}`,
+        ...result,
+        commits: result.commits.map((c) => `${c.level.padEnd(5)} ${c.subject}`),
       },
       null,
       2,

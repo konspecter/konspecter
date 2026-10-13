@@ -189,6 +189,8 @@ pnpm icons            # re-render every app icon from scripts/render-icons.mjs (
                       # and Xcode 26 for the macOS Icon Composer icon)
 pnpm version:set 0.2.0 # write a release's version everywhere (docs/release.md);
                       # versions:check verifies it
+pnpm release          # release: version from the commits, changelog, tag, push (asks first;
+                      # patch|minor|major|X.Y.Z overrides, --dry-run only shows)
 pnpm --filter @konspecter/web coverage   # unit tests with coverage
 pnpm --filter @konspecter/web bench      # performance measurements (docs/performance.md)
 

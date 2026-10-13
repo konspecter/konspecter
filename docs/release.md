@@ -12,10 +12,12 @@
 2. Turn `## Unreleased` in `CHANGELOG.md` into the version's heading, commit, then tag and
    push: `git tag -a v0.2.0 -m "Konspecter 0.2.0" && git push --atomic origin main v0.2.0`.
    A pre-release tag (`v0.2.0-rc.1`) builds the same, but does not move the images' `X.Y` and
-   `latest`. In Claude Code, the `release` skill (`/release`, or `/release minor`) does steps 1
-   and 2: it works out the bump from the Conventional Commits since the last tag (a breaking
-   change is major, a minor before 1.0; a `feat` minor; anything else patch), asks before
-   changing anything, then commits, tags and pushes.
+   `latest`. `pnpm release` does steps 1 and 2 (`pnpm release minor` or `pnpm release 0.3.0`
+   to choose the version, `--dry-run` to only show it and the notes), and so does the `release`
+   skill in Claude Code (`/release`, `/release minor`): it works out the bump from the
+   Conventional Commits since the last tag (a breaking change is major, a minor before 1.0; a
+   `feat` minor; anything else patch), asks before changing anything, then commits, tags and
+   pushes.
 3. `.github/workflows/release.yml` builds everything into a **draft** GitHub Release. Its
    notes are the version's section of `CHANGELOG.md` (`scripts/release-notes.mjs`; a
    pre-release without a section of its own takes the Unreleased ones). With no section, the
