@@ -1135,11 +1135,19 @@ main {
   font-size: 13px;
 }
 
+/* A code field stands alone, centred like the buttons under it. The indent
+   balances the spacing after the last character. */
+.field:has(.code-input) {
+  justify-items: center;
+}
+
 .field .code-input {
   max-width: 11rem;
   font-family: var(--font-mono);
   font-size: 1.35rem;
   letter-spacing: 0.3em;
+  text-align: center;
+  text-indent: 0.3em;
 }
 
 .form-notice {
@@ -1760,6 +1768,7 @@ main {
 .field .activate-code-input {
   max-width: 14rem;
   letter-spacing: 0.15em;
+  text-indent: 0.15em;
   text-transform: uppercase;
 }
 
