@@ -13,6 +13,22 @@
 - **↑/↓ in the sidebar work after a click in the macOS app:** a clicked row or pane header
   now takes the focus, so the keys go on from it with the focus ring. WebKit, under the macOS
   app and Safari, does not focus a clicked link, and the keys had no row to start from.
+- **A download page on the site:** `/download` (and `/ru/download`) lists the downloads, then
+  how to open the Mac app the first time, install the Android APK and the web app, where
+  conspects are kept, and links to the releases, the source, the Markdown guides and
+  self-hosting. The footer and the landing page's downloads link to it.
+- **Syncing your own way, on the landing page:** Konspecter needs no server, so a section
+  explains syncing through a cloud-drive folder, import and export or a server of your own,
+  beside this server's sync, free or paid, where it has one. It replaces the paid-only pricing
+  section, and its card leads with "No account".
+- **The landing page's features fit the sync mode:** where sync is paid they say it takes a
+  subscription; where it is off they promise no sync, server or connected devices.
+- **The site's forms work behind the TLS proxy:** the site read every request as `http://`, so
+  React Router refused each form post behind Caddy with 400. It now runs on its own
+  `server.js`, which trusts forwarded headers from a proxy on a private or local address.
+- **Text fixes:** the Russian welcome's link to Settings takes the case its sentence needs,
+  the reset texts no longer list reading positions among what is erased, and a typo in the
+  Russian site description is corrected.
 
 ## 0.3.0 — 2026-10-14
 
