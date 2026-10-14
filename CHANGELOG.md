@@ -1,7 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 — 2026-10-14
 
+- **Sync mode is chosen, not inferred (breaking):** `KONSPECTER_SYNC_MODE` is `free` (the
+  default), `paid` or `none`. `KONSPECTER_BILLING_URL` alone no longer makes sync paid: a
+  paid server now needs `KONSPECTER_SYNC_MODE=paid`, and without it sync is free and the
+  billing settings are ignored.
 - **Download links that never change:** each release also has its downloads under names
   without the version (`Konspecter-macos-arm64.dmg`, `Konspecter-windows-x64-setup.exe`,
   `Konspecter-linux-x64.AppImage`, `Konspecter-android.apk` and more), so a site's
