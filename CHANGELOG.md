@@ -5,6 +5,9 @@
 - **The pressed shade is only on the phone's island:** a click on any other button or link
   no longer darkens it and fades back, in the app and on the site. The island's big buttons
   keep it, so a tap there is seen.
+- **↑/↓ in the sidebar work after a click in the macOS app:** a clicked row or pane header
+  now takes the focus, so the keys go on from it with the focus ring. WebKit, under the macOS
+  app and Safari, does not focus a clicked link, and the keys had no row to start from.
 
 ## 0.3.0 — 2026-10-14
 

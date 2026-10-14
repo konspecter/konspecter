@@ -308,6 +308,20 @@ describe("sidebar panes", () => {
     expect(paneToggle("Tags")).toHaveFocus();
   });
 
+  it("moves with ↑/↓ from a clicked row, also where a click does not focus it (WebKit)", async () => {
+    renderApp(await taggedStore());
+    const tags = await within(sidebar()).findByRole("navigation", { name: "Tags" });
+    // A bare click event, as WebKit sends it: no focus of its own.
+    const java = within(tags).getByRole("link", { name: "Java" });
+    fireEvent.click(java);
+    expect(java).toHaveFocus();
+    // The chosen tag's folder opens.
+    const note = await within(tags).findByRole("link", { name: "Java Collections" });
+
+    await userEvent.keyboard("{ArrowDown}");
+    expect(note).toHaveFocus();
+  });
+
   it("enters the sidebar with Ctrl+\\ on an open pane only", async () => {
     renderApp(await taggedStore(), "/conspects/java");
     await within(sidebar()).findByRole("navigation", { name: "Tags" });

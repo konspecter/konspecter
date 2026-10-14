@@ -78,6 +78,16 @@ function moveBetweenRows(event: KeyboardEvent<HTMLElement>): void {
   next?.focus();
 }
 
+/**
+ * A clicked header or row takes the focus, so ↑/↓ go on from there. Chromium
+ * focuses a clicked link itself; WebKit (Safari, the macOS app) does not, and
+ * the keys had no row to start from. A click shows no ring: only the keys do.
+ */
+function focusClickedRow(event: MouseEvent<HTMLElement>): void {
+  if (!(event.target instanceof Element)) return;
+  rowOf(event.target)?.focus({ focusVisible: false, preventScroll: true });
+}
+
 type PaneId = "tags" | "recent" | "details";
 
 const PANES: readonly PaneId[] = ["tags", "recent", "details"];
@@ -188,6 +198,7 @@ export const Sidebar = memo(function Sidebar({
         className="sidebar-panes"
         data-recent={folded.has("recent") ? "folded" : "open"}
         onKeyDown={moveBetweenRows}
+        onClick={focusClickedRow}
       >
         <SidebarTags
           store={store}
