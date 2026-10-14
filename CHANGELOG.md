@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- **Signing in leads to the settings:** without a page to go back to, every way of signing in
+  (a code, a password, Google and the others) now ends on the account's settings instead of
+  the landing page.
+- **The Windows folder reads `C:\…`:** the desktop app showed its folder as
+  `\\?\C:\Users\…\Konspecter` on the welcome and in Settings. Sync knows it is the same folder,
+  so nothing is synced again.
+- **The hero's buttons fit one line:** the download button reads just "Download" (the platform
+  stays in its accessible name), so in Russian it no longer wraps under "Open in the browser".
+- **The sign-in code is centred:** the code field, its label and the code sit centred over the
+  buttons, on the code page and on `/activate`.
+- **Text fixes:** the Russian sign-in code email puts each closing remark on a line of its own.
+
 ## 0.4.0 — 2026-10-14
 
 - **The welcome shows the first keys:** new conspect, search, find in the conspect, the
