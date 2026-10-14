@@ -48,6 +48,10 @@ it("shows the landing page with the configured downloads", async () => {
   for (const link of screen.getAllByRole("link", { name: "Download for macOS" })) {
     expect(link).toHaveAttribute("href", "https://example.com/k.dmg");
   }
+  // The hero's button reads one short word, so both of its buttons fit a line.
+  expect(screen.getAllByRole("link", { name: "Download for macOS" })[0]).toHaveTextContent(
+    /^Download$/,
+  );
   expect(screen.getAllByRole("link", { name: "Open in the browser" })[0]).toHaveAttribute(
     "href",
     "https://app.example.com/",

@@ -85,8 +85,14 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           {(apps.length > 0 || web) && (
             <div className="actions hero-actions">
               {suggested && suggested !== "web" && suggestedUrl ? (
-                <a className="button button-primary" href={suggestedUrl}>
-                  {t("home.download", { platform: platformName(suggested) })}
+                // One short word, so both buttons fit on a line in every
+                // language; the platform is in its accessible name.
+                <a
+                  className="button button-primary"
+                  href={suggestedUrl}
+                  aria-label={t("home.download", { platform: platformName(suggested) })}
+                >
+                  {t("home.get")}
                 </a>
               ) : (
                 apps.length > 0 && (
