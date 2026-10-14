@@ -364,7 +364,8 @@ Conspects are stored in:
 ~/Konspecter
 ```
 
-**Settings → Library → Change folder…** lets you choose another folder.
+**Settings → Library → Change folder…** lets you choose another folder, as does the welcome
+while the folder is empty.
 
 ### Android
 

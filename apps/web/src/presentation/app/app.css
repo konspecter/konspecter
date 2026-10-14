@@ -1387,6 +1387,42 @@ kbd {
   margin-top: 1rem;
 }
 
+/* The folder in use (desktop): the sentence, then the button to change it. */
+.welcome-folder .button {
+  margin-top: 0.5rem;
+}
+
+.welcome-folder strong {
+  overflow-wrap: anywhere;
+}
+
+/* The first keys, as in Settings: keys in a column, each action after them. */
+.welcome-keys .setting-hint {
+  margin-bottom: 0.5rem;
+}
+
+.welcome-keys .shortcuts {
+  margin: 0;
+}
+
+.welcome-keys .shortcuts div {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, max-content) minmax(0, 1fr);
+  gap: 1.25rem;
+}
+
+.welcome-keys .shortcuts dd {
+  color: var(--color-muted);
+  text-align: left;
+}
+
+/* A touch screen has no keyboard to speak of. */
+@media (hover: none) and (pointer: coarse) {
+  .welcome-keys {
+    display: none;
+  }
+}
+
 .update-banner {
   display: flex;
   flex-wrap: wrap;

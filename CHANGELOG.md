@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **The welcome shows the first keys:** new conspect, search, find in the conspect, the
+  editor mode and the sidebar, with `?` for all of them. Touch screens leave them out.
+- **The welcome shows the desktop's folder:** "Your conspects are kept as Markdown files in
+  ~/Konspecter", already chosen, with _Choose another folder…_ beside it. The folder picker,
+  here and in Settings, opens in the folder in use, so confirming it at once keeps it.
 - **The pressed shade is only on the phone's island:** a click on any other button or link
   no longer darkens it and fades back, in the app and on the site. The island's big buttons
   keep it, so a tap there is seen.

@@ -1,13 +1,16 @@
 import { Fragment, useEffect, useRef } from "react";
-import { formatKeys, shortcutGroups } from "../app/shortcuts";
+import { formatKeys, shortcutGroups, type ShortcutName } from "../app/shortcuts";
 import { t } from "../i18n/i18n";
 import { CloseIcon } from "@konspecter/ui/icons";
 
-/** The shortcut registry as a definition list, one row per action (the dialog and Settings). */
-export function ShortcutList() {
+/**
+ * The shortcut registry as a definition list, one row per action (the dialog
+ * and Settings), or only the shortcuts in `only` (the welcome).
+ */
+export function ShortcutList({ only }: { only?: readonly ShortcutName[] }) {
   return (
     <dl className="shortcuts">
-      {shortcutGroups().map(({ keys, label }) => (
+      {shortcutGroups(only).map(({ keys, label }) => (
         <div key={label}>
           <dt>
             {keys.map((key, index) => (

@@ -18,9 +18,11 @@ them, Konspecter reads and writes them in place, and sync carries them to the ot
 - **`~/Konspecter`** by default, made on first start: in the home folder, not hidden, and
   outside iCloud's Documents folder. The shell falls back to it whenever no folder was
   chosen, or the chosen one is gone.
-- Settings → **Library** → **Change folder…** shows the system folder picker; the app
-  reloads on the chosen folder, which is remembered by the desktop shell (`folder.json` in
-  the app's config directory). The files of the previous folder are not touched.
+- Settings → **Library** → **Change folder…**, or **Choose another folder…** on the welcome
+  of an empty library, shows the system folder picker, opened in the folder in use (so
+  confirming at once keeps it); the app reloads on the chosen folder, which is remembered by
+  the desktop shell (`folder.json` in the app's config directory). The files of the previous
+  folder are not touched.
 - **The app library moves in once.** On the first start after the desktop became
   folder-only, the notes of the app library (IndexedDB) are written into the folder (or
   linked to a file with the same text), keeping their sync ids and state, and leave the

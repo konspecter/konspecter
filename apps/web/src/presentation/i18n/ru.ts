@@ -156,6 +156,10 @@ export const ru: Dictionary = {
   "welcome.import":
     "Уже есть конспекты? Импортируйте файлы {md} или папку в {settings}, там же подключается синхронизация.",
   "welcome.settings": "Настройках",
+  "welcome.folder":
+    "Конспекты хранятся файлами Markdown в папке {folder}. Оставьте её или выберите другую: подойдёт и папка с вашими файлами {md}.",
+  "welcome.chooseFolder": "Выбрать другую папку…",
+  "welcome.keys": "Клавиши для начала. {help} покажет все.",
   "welcome.exampleNote": `# Добро пожаловать в Konspecter
 
 Каждый конспект — это документ **Markdown**. Этот показывает, что это даёт.

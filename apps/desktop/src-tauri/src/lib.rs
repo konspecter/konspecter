@@ -190,18 +190,27 @@ fn folder_current(state: State<'_, FolderState>) -> Option<String> {
     guard.as_ref().map(|f| f.root().display().to_string())
 }
 
-/// Lets the user pick a folder with the system dialog and opens it.
+/// Lets the user pick a folder with the system dialog and opens it. The
+/// dialog opens in the folder in use (`~/Konspecter` by default), so
+/// confirming it at once keeps that folder.
 #[tauri::command]
 async fn folder_pick(
     app: AppHandle,
     state: State<'_, FolderState>,
 ) -> Result<Option<String>, CommandError> {
-    let Some(picked) = app
+    let current = state
+        .0
+        .lock()
+        .ok()
+        .and_then(|guard| guard.as_ref().map(|f| f.root().to_path_buf()));
+    let mut dialog = app
         .dialog()
         .file()
-        .set_title("Choose a folder of Markdown conspects")
-        .blocking_pick_folder()
-    else {
+        .set_title("Choose a folder of Markdown conspects");
+    if let Some(current) = current {
+        dialog = dialog.set_directory(current);
+    }
+    let Some(picked) = dialog.blocking_pick_folder() else {
         return Ok(None); // Cancelled.
     };
     let path = picked.into_path().map_err(|e| CommandError {

@@ -2128,6 +2128,60 @@ describe("onboarding", () => {
     expect(await within(tree).findByRole("link", { name: "Konspecter" })).toBeInTheDocument();
   });
 
+  it("shows the first keys, and ? for the rest", async () => {
+    renderApp(await newStore());
+
+    const welcome = await screen.findByRole("region", { name: "Welcome to Konspecter" });
+    expect(welcome).toHaveTextContent("Keys to start with. ? shows them all.");
+    expect(
+      within(welcome)
+        .getAllByRole("definition")
+        .map((row) => row.textContent),
+    ).toEqual([
+      "Search",
+      "Search in the open conspect",
+      "New conspect",
+      "Show or hide the sidebar",
+      "Switch between the text editor and Markdown",
+    ]);
+    // On the web there is no folder to choose.
+    expect(within(welcome).queryByRole("button", { name: /folder/ })).not.toBeInTheDocument();
+  });
+
+  it("shows the desktop's folder as chosen, and can choose another", async () => {
+    const chooseFolder = vi.fn(() => Promise.resolve());
+    render(
+      <MemoryRouter>
+        <App store={await newStore()} library={{ folder: "/Users/ada/Konspecter", chooseFolder }} />
+      </MemoryRouter>,
+    );
+
+    const welcome = await screen.findByRole("region", { name: "Welcome to Konspecter" });
+    expect(welcome).toHaveTextContent(
+      "Your conspects are kept as Markdown files in /Users/ada/Konspecter. Keep this folder",
+    );
+    await userEvent.click(within(welcome).getByRole("button", { name: "Choose another folder…" }));
+    expect(chooseFolder).toHaveBeenCalled();
+  });
+
+  it("says why choosing the folder failed", async () => {
+    const chooseFolder = vi.fn(() => Promise.reject(new Error("dialog crashed")));
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    render(
+      <MemoryRouter>
+        <App store={await newStore()} library={{ folder: null, chooseFolder }} />
+      </MemoryRouter>,
+    );
+
+    const welcome = await screen.findByRole("region", { name: "Welcome to Konspecter" });
+    await userEvent.click(within(welcome).getByRole("button", { name: "Choose a folder…" }));
+    expect(await within(welcome).findByRole("alert")).toHaveTextContent(
+      "Oops, something went wrong.",
+    );
+    expect(logged).toHaveBeenCalled();
+    logged.mockRestore();
+  });
+
   it("points to the settings in the case the sentence needs", async () => {
     // As main.tsx does before the first render.
     applyLanguage("ru");

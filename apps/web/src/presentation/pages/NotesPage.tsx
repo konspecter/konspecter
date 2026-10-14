@@ -14,19 +14,25 @@ import { highlight, snippet, type SnippetPart } from "../../domain/search/snippe
 import type { NoteCatalog, NoteSummary } from "../../application/notes/note-catalog";
 import type { NoteRepository } from "../../application/notes/note-repository";
 import type { SearchHit } from "../../infrastructure/search/search-index";
+import type { LibraryControls } from "../app/library";
+import type { ShortcutName } from "../app/shortcuts";
 import { isDisplayableCover } from "../components/CoverImage";
 import { EmptyState } from "../components/EmptyState";
 import { ErrorState } from "../components/ErrorState";
 import { NoteDate } from "../components/NoteDate";
+import { ShortcutList } from "../components/ShortcutsDialog";
 import { Snippet } from "../components/Snippet";
 import { summaryTitle } from "../components/note-title";
 import { useAsync } from "../hooks/use-async";
+import { useErrorMessage } from "../hooks/use-error-message";
 import { t } from "../i18n/i18n";
 import { rich } from "../i18n/rich";
 
 type NotesPageProps = {
   store: NoteRepository;
   catalog: NoteCatalog;
+  /** The desktop's folder; absent on the web and mobile. */
+  library?: LibraryControls | undefined;
 };
 
 type Row = {
@@ -83,7 +89,7 @@ function byRecentEdit(a: SearchHit, b: SearchHit): number {
  * you type (`?q=`, words and `#tag` filters) and marks what matched. While a
  * search runs, the previous list stays, so typing never blanks the page.
  */
-export function NotesPage({ store, catalog }: NotesPageProps) {
+export function NotesPage({ store, catalog, library: controls }: NotesPageProps) {
   const [searchParams] = useSearchParams();
   const query = searchParams.get("q") ?? "";
   const parsed = useMemo(() => parseQuery(query), [query]);
@@ -147,7 +153,7 @@ export function NotesPage({ store, catalog }: NotesPageProps) {
     } else if (searching && found?.query === query) {
       content = <EmptyState title={t("list.noMatches")} />;
     } else if (!searching) {
-      content = <Welcome store={store} />;
+      content = <Welcome store={store} library={controls} />;
     } else {
       content = null;
     }
@@ -286,7 +292,22 @@ function placeholderHue(id: string): number {
   return (hash >>> 0) % 360;
 }
 
-function Welcome({ store }: { store: NoteRepository }) {
+/** The keys the welcome shows: enough to start; "?" shows the rest. */
+const WELCOME_KEYS: readonly ShortcutName[] = [
+  "newNote",
+  "search",
+  "find",
+  "editorMode",
+  "toggleSidebar",
+];
+
+function Welcome({
+  store,
+  library,
+}: {
+  store: NoteRepository;
+  library: LibraryControls | undefined;
+}) {
   const navigate = useNavigate();
   const [adding, setAdding] = useState(false);
   return (
@@ -311,12 +332,64 @@ function Welcome({ store }: { store: NoteRepository }) {
           {t("welcome.example")}
         </button>
       </div>
+      {library && <WelcomeFolder library={library} />}
       <p className="setting-hint">
         {rich("welcome.import", {
           md: <code>.md</code>,
           settings: <Link to="/settings">{t("welcome.settings")}</Link>,
         })}
       </p>
+      <div className="welcome-keys">
+        <p className="setting-hint">{rich("welcome.keys", { help: <kbd>?</kbd> })}</p>
+        <ShortcutList only={WELCOME_KEYS} />
+      </div>
     </section>
+  );
+}
+
+/**
+ * The desktop's folder, already chosen: ~/Konspecter unless another was
+ * (ADR-024). Keeping it needs nothing; another one reloads the app on it.
+ */
+function WelcomeFolder({ library }: { library: LibraryControls }) {
+  const [choosing, setChoosing] = useState(false);
+  const [failure, setFailure] = useState<unknown>(null);
+  const failureText = useErrorMessage(failure);
+  return (
+    <div className="welcome-folder">
+      <p className="setting-hint">
+        {library.folder === null
+          ? rich("settings.library.none", { md: <code>.md</code> })
+          : rich("welcome.folder", {
+              folder: <strong>{library.folder}</strong>,
+              md: <code>.md</code>,
+            })}
+      </p>
+      <button
+        type="button"
+        className="button"
+        disabled={choosing}
+        onClick={() => {
+          setChoosing(true);
+          setFailure(null);
+          library.chooseFolder().then(
+            () => {
+              setChoosing(false);
+            },
+            (error: unknown) => {
+              setChoosing(false);
+              setFailure(error);
+            },
+          );
+        }}
+      >
+        {t(library.folder === null ? "settings.library.open" : "welcome.chooseFolder")}
+      </button>
+      {failureText !== null && (
+        <p role="alert" className="inline-error">
+          {failureText}
+        </p>
+      )}
+    </div>
   );
 }

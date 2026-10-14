@@ -30,11 +30,15 @@ export type ShortcutName = keyof typeof SHORTCUTS;
 
 /**
  * The shortcuts as the user reads them: one row per action, with every key
- * that does it ("Mod+P" and "/" both search), in the table's order.
+ * that does it ("Mod+P" and "/" both search), in the table's order; only
+ * those named in `only` when given.
  */
-export function shortcutGroups(): { label: TextKey; keys: string[] }[] {
+export function shortcutGroups(
+  only?: readonly ShortcutName[],
+): { label: TextKey; keys: string[] }[] {
   const groups = new Map<TextKey, string[]>();
-  for (const { keys, label } of Object.values(SHORTCUTS)) {
+  for (const [name, { keys, label }] of Object.entries(SHORTCUTS)) {
+    if (only && !only.includes(name as ShortcutName)) continue;
     groups.set(label, [...(groups.get(label) ?? []), keys]);
   }
   return [...groups].map(([label, keys]) => ({ label, keys }));

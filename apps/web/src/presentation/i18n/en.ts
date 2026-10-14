@@ -135,6 +135,10 @@ export const en = {
   "welcome.import":
     "Have conspects already? Import {md} files or a folder in {settings}, where you can also connect sync.",
   "welcome.settings": "Settings",
+  "welcome.folder":
+    "Your conspects are kept as Markdown files in {folder}. Keep this folder, or choose another one: a folder of {md} files you already have works too.",
+  "welcome.chooseFolder": "Choose another folder…",
+  "welcome.keys": "Keys to start with. {help} shows them all.",
   "welcome.exampleNote": `# Welcome to Konspecter
 
 Every conspect is a **Markdown** document. This one shows what that gives you.
