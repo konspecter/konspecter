@@ -61,8 +61,8 @@ export class FakeServer {
   /** Serves `GET /api/events`; off by default, like an older server (404). */
   eventStreams = false;
   /**
-   * Paid sync: the account's state as `GET /api/me` reports it. Expired, the
-   * sync routes answer 402.
+   * Paid sync: the account's state as `GET /api/me` reports it. Expired or
+   * unavailable, the sync routes answer 402.
    */
   access: { state: string; until: string | null } = { state: "free", until: null };
   readonly #streams = new Set<ReadableStreamDefaultController<Uint8Array>>();
@@ -129,6 +129,9 @@ export class FakeServer {
       url.pathname.startsWith("/api/notes");
     if (paidRoute && this.access.state === "expired") {
       return json(402, error("subscription_required", "sync needs a subscription"));
+    }
+    if (paidRoute && this.access.state === "unavailable") {
+      return json(402, error("sync_unavailable", "sync is not offered to this account"));
     }
     if (method === "GET" && url.pathname === "/api/events" && this.eventStreams) {
       return this.#events(init?.signal ?? null);

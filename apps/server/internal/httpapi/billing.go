@@ -18,7 +18,9 @@ import (
 
 // Paid sync: a billing service of its own sells sync. The server
 // keeps each account's latest entitlement and enforces it: the sync routes
-// answer 402 when the account may not sync. The site's subscription
+// answer 402 when the account may not sync. Sync is sold per language: an
+// account in a language the service sells nothing in cannot start syncing,
+// though time it already has lasts. The site's subscription
 // requests, the price list and the gateways' webhooks are passed on to the
 // service, the signed-in user named in headers the server sets itself. The
 // service pushes entitlements to the internal routes, and has the server
@@ -44,10 +46,11 @@ type Billing struct {
 
 type billingAPI struct {
 	Billing
-	service *entitlements.Client
-	proxy   *httputil.ReverseProxy
-	asked   *askLimiter
-	now     func() time.Time
+	service   *entitlements.Client
+	proxy     *httputil.ReverseProxy
+	asked     *askLimiter
+	languages *languages
+	now       func() time.Time
 }
 
 // The headers that name the signed-in user to the billing service.
@@ -77,8 +80,9 @@ func newBillingAPI(b Billing, now func() time.Time) (*billingAPI, error) {
 				writeError(w, http.StatusBadGateway, "billing_unavailable", "subscriptions cannot be reached; try again later")
 			},
 		},
-		asked: newAskLimiter(askInterval),
-		now:   now,
+		asked:     newAskLimiter(askInterval),
+		languages: &languages{answers: map[string]languageAnswer{}},
+		now:       now,
 	}, nil
 }
 
@@ -99,8 +103,12 @@ func (a *api) registerBillingRoutes(mux *http.ServeMux) {
 }
 
 // entitled lets next run only for accounts that may sync. While sync is
-// free it is next itself.
+// free it is next itself; while it is off with no billing service, it
+// lets no one through.
 func (a *api) entitled(next userHandler) userHandler {
+	if a.billing == nil && a.syncOff {
+		return func(w http.ResponseWriter, _ *http.Request, _ auth.User) { syncUnavailable(w) }
+	}
 	if a.billing == nil {
 		return next
 	}
@@ -113,6 +121,9 @@ func (a *api) entitled(next userHandler) userHandler {
 
 // entitledDevice is entitled for a device's request.
 func (a *api) entitledDevice(next deviceHandler) deviceHandler {
+	if a.billing == nil && a.syncOff {
+		return func(w http.ResponseWriter, _ *http.Request, _ auth.Device) { syncUnavailable(w) }
+	}
 	if a.billing == nil {
 		return next
 	}
@@ -123,9 +134,18 @@ func (a *api) entitledDevice(next deviceHandler) deviceHandler {
 	}
 }
 
-// syncAllowed answers 402 subscription_required, and false, when the user
-// may not sync. A sync request may start the account's trial.
+// syncAllowed answers 402, and false, when the user may not sync: time the
+// account has always counts; without any, an account in a language that
+// sells nothing gets sync_unavailable, and the others subscription_required.
+// A sync request may start the account's trial.
 func (a *api) syncAllowed(w http.ResponseWriter, r *http.Request, userID string) bool {
+	if held, err := a.entitlement(r.Context(), userID, false); err == nil && held.Allowed(a.billing.now()) {
+		return true
+	}
+	if sells, known := a.sells(r.Context(), userID); known && !sells {
+		syncUnavailable(w)
+		return false
+	}
 	e, err := a.entitlement(r.Context(), userID, true)
 	if err != nil {
 		a.logger.ErrorContext(r.Context(), "the billing service did not say whether an account may sync", "error", err)
@@ -138,6 +158,13 @@ func (a *api) syncAllowed(w http.ResponseWriter, r *http.Request, userID string)
 		return false
 	}
 	return true
+}
+
+// syncUnavailable answers a sync request the server offers no sync to: off,
+// or not sold in the account's language.
+func syncUnavailable(w http.ResponseWriter) {
+	writeError(w, http.StatusPaymentRequired, "sync_unavailable",
+		"this server does not offer sync to this account; every note is kept, here and on the devices")
 }
 
 // entitlement is the user's entitlement as the server holds it. It asks the
@@ -195,12 +222,19 @@ type accessJSON struct {
 	Until *time.Time `json:"until"`
 }
 
-var freeAccess = &accessJSON{State: "free"}
+var (
+	freeAccess        = &accessJSON{State: "free"}
+	unavailableAccess = &accessJSON{State: "unavailable"}
+)
 
-// access is the user's sync for /api/me: free, or the entitlement's status
-// and time. Nil when the billing service cannot say yet.
+// access is the user's sync for /api/me: free, unavailable (no time, and
+// sync off or not sold in the account's language), or the entitlement's
+// status and time. Nil when the billing service cannot say yet.
 func (a *api) access(r *http.Request, userID string) *accessJSON {
-	if a.billing == nil {
+	switch {
+	case a.billing == nil && a.syncOff:
+		return unavailableAccess
+	case a.billing == nil:
 		return freeAccess
 	}
 	e, err := a.entitlement(r.Context(), userID, false)
@@ -208,12 +242,75 @@ func (a *api) access(r *http.Request, userID string) *accessJSON {
 		a.logger.WarnContext(r.Context(), "the billing service did not say how an account's sync stands", "error", err)
 		return nil
 	}
+	if !e.Allowed(a.billing.now()) {
+		if sells, known := a.sells(r.Context(), userID); known && !sells {
+			return unavailableAccess
+		}
+	}
 	return &accessJSON{State: string(e.Status), Until: utc(e.Until)}
 }
 
+// sells reports whether the billing service sells sync in the user's
+// language (never while sync is off); known is false when that cannot be
+// told now, and the user is then treated as before languages counted.
+func (a *api) sells(ctx context.Context, userID string) (sells, known bool) {
+	if a.syncOff {
+		return false, true
+	}
+	_, locale, err := a.billing.Store.Recipient(ctx, userID)
+	if err == nil {
+		sells, err = a.billing.languages.sells(ctx, a.billing.service, locale, a.billing.now())
+	}
+	if err != nil {
+		a.logger.WarnContext(ctx, "whether sync is sold in an account's language is not known", "error", err)
+		return false, false
+	}
+	return sells, true
+}
+
+// languages remembers whether the billing service sells sync in each
+// language, asking it at most once a minute per language. While it cannot
+// answer, the last answer stands.
+type languages struct {
+	mu      sync.Mutex
+	answers map[string]languageAnswer
+}
+
+type languageAnswer struct {
+	sells bool
+	err   error // the service could not answer, and none came before
+	at    time.Time
+}
+
+func (l *languages) sells(ctx context.Context, service *entitlements.Client, locale string, now time.Time) (bool, error) {
+	l.mu.Lock()
+	last, ok := l.answers[locale]
+	l.mu.Unlock()
+	if ok && now.Sub(last.at) < askInterval {
+		return last.sells, last.err
+	}
+	sells, err := service.Sells(ctx, locale)
+	answer := languageAnswer{sells: sells, at: now}
+	if err != nil {
+		answer = languageAnswer{sells: last.sells, err: err, at: now}
+		if ok && last.err == nil {
+			answer.err = nil
+		}
+	}
+	l.mu.Lock()
+	l.answers[locale] = answer
+	l.mu.Unlock()
+	return answer.sells, answer.err
+}
+
 // plans says what sync costs, for the site's pages: the billing service's
-// answer, or that sync is free.
+// answer, none while sync is off (sold, but through no gateway), or that
+// sync is free.
 func (a *api) plans(w http.ResponseWriter, r *http.Request) {
+	if a.syncOff {
+		writeJSON(w, http.StatusOK, map[string]any{"paid": true, "trial": "", "grace": "", "gateways": []any{}})
+		return
+	}
 	if a.billing == nil {
 		writeJSON(w, http.StatusOK, map[string]any{"paid": false, "gateways": []any{}})
 		return
@@ -231,8 +328,15 @@ func (a *api) webhook(w http.ResponseWriter, r *http.Request) {
 }
 
 // subscription is the account's subscription as the site's settings show
-// it: the billing service's answer, or that sync is free.
+// it: the billing service's answer, nothing while sync is off without one,
+// or that sync is free.
 func (a *api) subscription(w http.ResponseWriter, r *http.Request, user auth.User) {
+	if a.billing == nil && a.syncOff {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"paid": false, "access": unavailableAccess, "subscription": nil, "payments": []any{},
+		})
+		return
+	}
 	if a.billing == nil {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"paid": false, "access": freeAccess, "subscription": nil, "payments": []any{},

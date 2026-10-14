@@ -231,6 +231,14 @@ describe("the subscription in the settings", () => {
     payments: [],
   };
 
+  it("offers no subscription in a language the server sells no sync in", async () => {
+    renderSubscription({ ...base, access: { state: "expired", until: null } }, [], () => null);
+    const section = await screen.findByRole("region", { name: "Subscription" });
+    expect(section).toHaveTextContent("This server does not offer sync in English.");
+    expect(section).not.toHaveTextContent("takes a subscription");
+    expect(within(section).queryByRole("radio")).not.toBeInTheDocument();
+  });
+
   it("offers the prices, asks to accept the terms and renewal, then goes to pay", async () => {
     const assign = vi.fn();
     vi.stubGlobal("location", {
@@ -417,7 +425,12 @@ describe("the terms and the privacy policy", () => {
     email: "help@example.com",
   };
 
-  function renderLegal(Component: () => React.ReactNode, locale: "en" | "ru", paid: boolean) {
+  function renderLegal(
+    Component: () => React.ReactNode,
+    locale: "en" | "ru",
+    paid: boolean,
+    sold = true,
+  ) {
     const Stub = createRoutesStub([
       {
         id: "root",
@@ -431,7 +444,9 @@ describe("the terms and the privacy policy", () => {
             loader: () => ({
               operator,
               host: "notes.example.com",
-              plans: paid ? plans : { paid: false, trial: "", grace: "", gateways: [] },
+              plans: paid
+                ? { ...plans, gateways: sold ? plans.gateways : [] }
+                : { paid: false, trial: "", grace: "", gateways: [] },
             }),
           },
         ],
@@ -468,6 +483,14 @@ describe("the terms and the privacy policy", () => {
     const page = await screen.findByRole("article");
     expect(page).toHaveTextContent("Sync on this server is free.");
     expect(page).not.toHaveTextContent("renews automatically");
+  });
+
+  it("makes no offer in a language the server sells no sync in", async () => {
+    renderLegal(Terms, "en", true, false);
+    const page = await screen.findByRole("article");
+    expect(page).toHaveTextContent("This server does not offer sync in English.");
+    expect(page).not.toHaveTextContent("renews automatically");
+    expect(page).not.toHaveTextContent("Sync on this server is free.");
   });
 
   it("lists every cookie the site sets", async () => {

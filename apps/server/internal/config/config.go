@@ -65,13 +65,26 @@ type Config struct {
 	// (KONSPECTER_LOGIN_PROVIDERS_EN, default "google,github,linkedin,x";
 	// KONSPECTER_LOGIN_PROVIDERS_RU, default "yandex,vk,github").
 	LoginProviders map[string][]string
-	// Billing makes sync paid; without it sync is free.
+	// Billing is how sync is offered, and the billing service that sells it.
 	Billing Billing
 }
 
-// Billing is the billing service that sells sync. Without it
-// sync is free.
+// SyncMode is how the server offers sync (KONSPECTER_SYNC_MODE).
+type SyncMode string
+
+const (
+	// SyncFree: sync is free, and the billing settings are ignored (the default).
+	SyncFree SyncMode = "free"
+	// SyncPaid: the billing service sells sync, per language; it is required.
+	SyncPaid SyncMode = "paid"
+	// SyncNone: no account starts syncing. With a billing service, time
+	// accounts have lasts while it sees their subscriptions out.
+	SyncNone SyncMode = "none"
+)
+
+// Billing is how sync is offered, and the billing service that sells it.
 type Billing struct {
+	Mode SyncMode
 	// URL is the service as the server reaches it, e.g. "http://billing:8081"
 	// (KONSPECTER_BILLING_URL).
 	URL string
@@ -80,8 +93,8 @@ type Billing struct {
 	Token string
 }
 
-// Paid reports whether sync costs anything.
-func (b Billing) Paid() bool { return b.URL != "" }
+// Service reports whether the server uses the billing service.
+func (b Billing) Service() bool { return b.URL != "" }
 
 // minTokenLength keeps the shared token out of guessing range.
 const minTokenLength = 32
@@ -169,11 +182,11 @@ func Load(getenv func(string) string) (Config, error) {
 		"ru": r.providers("KONSPECTER_LOGIN_PROVIDERS_RU", "yandex,vk,github"),
 	}
 	cfg.Billing = r.billing()
-	if cfg.Billing.Paid() && cfg.PublicURL == "" {
-		r.fail("paid sync (KONSPECTER_BILLING_URL) needs KONSPECTER_PUBLIC_URL: subscriptions are managed on the site")
+	if cfg.Billing.Service() && cfg.PublicURL == "" {
+		r.fail("the billing service (KONSPECTER_BILLING_URL) needs KONSPECTER_PUBLIC_URL: subscriptions are managed on the site")
 	}
-	if cfg.Billing.Paid() && !cfg.Mail.Enabled() {
-		r.fail("paid sync (KONSPECTER_BILLING_URL) needs email (KONSPECTER_SMTP_HOST): every payment is emailed")
+	if cfg.Billing.Service() && !cfg.Mail.Enabled() {
+		r.fail("the billing service (KONSPECTER_BILLING_URL) needs email (KONSPECTER_SMTP_HOST): every payment is emailed")
 	}
 	if cfg.Mail.Transport == "smtp" && cfg.Mail.Host != "" && cfg.Mail.From == "" {
 		r.fail("KONSPECTER_SMTP_FROM is required with KONSPECTER_SMTP_HOST")
@@ -298,11 +311,19 @@ func (r *reader) providers(name, fallback string) []string {
 	return ids
 }
 
+// billing reads the sync mode and the billing service: paid sync needs
+// it, sync that is off may keep it to see subscriptions out, and free sync
+// ignores it.
 func (r *reader) billing() Billing {
-	b := Billing{URL: strings.TrimSuffix(r.lookup("KONSPECTER_BILLING_URL"), "/"), Token: r.lookup("KONSPECTER_BILLING_TOKEN")}
+	mode := SyncMode(r.choice("KONSPECTER_SYNC_MODE", string(SyncFree), string(SyncPaid), string(SyncNone)))
+	if mode == SyncFree {
+		return Billing{Mode: mode}
+	}
+	b := Billing{Mode: mode, URL: strings.TrimSuffix(r.lookup("KONSPECTER_BILLING_URL"), "/"), Token: r.lookup("KONSPECTER_BILLING_TOKEN")}
 	switch {
+	case mode == SyncPaid && (b.URL == "" || b.Token == ""):
+		r.fail("paid sync (KONSPECTER_SYNC_MODE=paid) needs KONSPECTER_BILLING_URL and KONSPECTER_BILLING_TOKEN")
 	case b.URL == "" && b.Token == "":
-		return b
 	case b.URL == "" || b.Token == "":
 		r.fail("KONSPECTER_BILLING_URL and KONSPECTER_BILLING_TOKEN must be set together")
 	case len(b.Token) < minTokenLength:

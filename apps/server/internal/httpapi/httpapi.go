@@ -61,6 +61,7 @@ type api struct {
 	trusted   []netip.Prefix
 	accounts  *accountAPI
 	billing   *billingAPI
+	syncOff   bool
 	hub       *hub
 	heartbeat time.Duration
 }
@@ -77,6 +78,9 @@ type Options struct {
 	Accounts *Accounts
 	// Billing makes sync paid; nil leaves it free. It needs Accounts.
 	Billing *Billing
+	// SyncOff lets no account start syncing (KONSPECTER_SYNC_MODE=none).
+	// With Billing, time accounts already have lasts; without, none syncs.
+	SyncOff bool
 	// now overrides the clock of paid sync (tests).
 	now func() time.Time
 	// heartbeat overrides defaultHeartbeat (tests).
@@ -102,6 +106,7 @@ func NewHandler(repository NoteRepository, authenticator Authenticator, logger *
 		trusted:   options.TrustedProxies,
 		hub:       newHub(),
 		heartbeat: defaultHeartbeat,
+		syncOff:   options.SyncOff,
 	}
 	if options.heartbeat > 0 {
 		a.heartbeat = options.heartbeat

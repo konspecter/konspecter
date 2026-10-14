@@ -11,12 +11,15 @@ export type Account = { readonly id: string; readonly email: string };
 
 /**
  * Whether the account may sync (paid sync): "free" where sync costs
- * nothing, else the account's entitlement; "expired" waits for a payment.
+ * nothing, else the account's entitlement; "expired" waits for a payment,
+ * and "unavailable" means the server offers no sync to the account (off, or
+ * not sold in its language).
  * `until` is when sync stops by itself (an ISO 8601 time); an expired
  * account that never had any time has none.
  */
 export type SyncAccess = {
-  readonly state: "free" | "trialing" | "active" | "past_due" | "canceled" | "expired";
+  readonly state:
+    "free" | "trialing" | "active" | "past_due" | "canceled" | "expired" | "unavailable";
   readonly until: string | null;
 };
 
@@ -27,6 +30,7 @@ const ACCESS_STATES: readonly SyncAccess["state"][] = [
   "past_due",
   "canceled",
   "expired",
+  "unavailable",
 ];
 
 export type ChangesPage = {

@@ -96,6 +96,19 @@ function gateways(c: LegalContext): string {
   return c.plans.gateways.map((gateway) => gateway.name).join(", ");
 }
 
+/** The payment services named in brackets, after a space; nothing where the language has none. */
+function gatewaysAfter(c: LegalContext): string {
+  return c.plans.gateways.length > 0 ? ` (${gateways(c)})` : "";
+}
+
+/**
+ * Whether sync is sold in the page's language: paid sync, with a gateway.
+ * Where the server sells none in it, the terms make no offer.
+ */
+function sold(c: LegalContext): boolean {
+  return c.plans.paid && c.plans.gateways.length > 0;
+}
+
 const settings = <Link to="/settings#subscription">/settings</Link>;
 
 export function terms(c: LegalContext): LegalDocument {
@@ -108,7 +121,8 @@ export function privacy(c: LegalContext): LegalDocument {
 
 function termsEn(c: LegalContext): LegalDocument {
   const name = operatorName(c);
-  const { paid, trial, grace } = c.plans;
+  const { trial, grace } = c.plans;
+  const paid = sold(c);
   return {
     title: paid ? "Terms of service and subscription" : "Terms of service",
     lead: `These terms are an offer by ${name} to everyone who uses Konspecter on ${c.host}. Creating an account accepts them; paying for a subscription accepts them for the subscription too.`,
@@ -133,7 +147,9 @@ function termsEn(c: LegalContext): LegalDocument {
                 : "There is no free trial.",
               "The prices include every tax the operator must charge. A price may change; a subscriber is told by email at least 14 days before, and the new price applies from the next period after that.",
             ]
-          : ["Sync on this server is free. Nothing here is paid for."],
+          : c.plans.paid
+            ? ["This server does not offer sync in English."]
+            : ["Sync on this server is free. Nothing here is paid for."],
       },
       ...(paid
         ? [
@@ -210,7 +226,8 @@ function termsEn(c: LegalContext): LegalDocument {
 
 function termsRu(c: LegalContext): LegalDocument {
   const name = operatorName(c);
-  const { paid, trial, grace } = c.plans;
+  const { trial, grace } = c.plans;
+  const paid = sold(c);
   return {
     title: paid ? "Публичная оферта и условия использования" : "Условия использования",
     lead: paid
@@ -237,7 +254,9 @@ function termsRu(c: LegalContext): LegalDocument {
                 : "Пробного периода нет.",
               "Цены включают все налоги, которые обязан уплатить Исполнитель. Цена может измениться; подписчик узнаёт об этом по электронной почте не позднее чем за 14 дней, и новая цена действует со следующего после этого периода.",
             ]
-          : ["Синхронизация на этом сервере бесплатна. Здесь ничего не оплачивается."],
+          : c.plans.paid
+            ? ["Этот сервер не предлагает синхронизацию на русском языке."]
+            : ["Синхронизация на этом сервере бесплатна. Здесь ничего не оплачивается."],
       },
       ...(paid
         ? [
@@ -374,7 +393,7 @@ function privacyEn(c: LegalContext): LegalDocument {
         title: "3. Who else sees it",
         paragraphs: [
           paid
-            ? `The payment services (${gateways(c)}) get what a payment needs: the amount and your email address. They process your card under their own privacy policies.`
+            ? `The payment services${gatewaysAfter(c)} get what a payment needs: the amount and your email address. They process your card under their own privacy policies.`
             : "No payment service is involved.",
           "The email service that delivers the server's emails gets your address and those emails. A sign-in service you choose (Google and the others) tells the server your address.",
           "Nothing is sold or given to anyone else, unless the law requires it.",
@@ -456,7 +475,7 @@ function privacyRu(c: LegalContext): LegalDocument {
         title: "3. Кому передаются",
         paragraphs: [
           paid
-            ? `Платёжные сервисы (${gateways(c)}) получают то, что нужно для оплаты: сумму и адрес электронной почты. Карту они обрабатывают по своим политикам.`
+            ? `Платёжные сервисы${gatewaysAfter(c)} получают то, что нужно для оплаты: сумму и адрес электронной почты. Карту они обрабатывают по своим политикам.`
             : "Платёжные сервисы не используются.",
           "Почтовый сервис, через который сервер отправляет письма, получает ваш адрес и эти письма. Выбранный вами сервис входа (Google и другие) сообщает серверу ваш адрес.",
           "Больше данные никому не продаются и не передаются, кроме случаев, предусмотренных законом.",

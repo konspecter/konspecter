@@ -247,11 +247,12 @@ app or package does the same.
 Sync can be paid for through a private service, `konspecter-billing`, next to this one.
 **Its documentation lives only there**: the contract, the ADRs, the plans and the
 `billing-contract` skill. Do not add billing docs, plans, ADRs or skills here, and keep
-what this repository says to `KONSPECTER_BILLING_URL`, the `402 subscription_required` pause
-and `sync` in `/api/me`. Changes to the paid sync code (`internal/entitlements`,
-`internal/httpapi/billing.go`, `internal/mail/subscription.go`, the site's subscription
-section) are made from that repository. Without the service, sync is free, and nothing here
-may come to depend on it.
+what this repository says to `KONSPECTER_SYNC_MODE`, `KONSPECTER_BILLING_URL`, the
+`402 subscription_required` pause and `sync` in `/api/me`. Changes to the paid sync code
+(`internal/entitlements`, `internal/httpapi/billing.go`, `internal/mail/subscription.go`, the
+site's subscription section) are made from that repository. With `KONSPECTER_SYNC_MODE=free`
+(the default), sync is free and the service is not used, and nothing here may come to depend
+on it.
 
 ## Domains and search
 

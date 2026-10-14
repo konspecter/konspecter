@@ -132,10 +132,13 @@ function AccessNote({ status }: { status: SyncStatus }) {
 }
 
 /**
- * The server wants a subscription. Nothing is lost: the conspects are here
- * and on the server, and changes wait to be sent.
+ * The server wants a subscription, or offers no sync to the account (sync
+ * is off, or not sold in its language).
+ * Nothing is lost: the conspects are here and on the server, and changes
+ * wait to be sent.
  */
 function Unpaid({ sync, status }: { sync: SyncEngine; status: SyncStatus }) {
+  const unavailable = status.access?.state === "unavailable";
   return (
     <>
       <p className="setting-hint">
@@ -145,19 +148,25 @@ function Unpaid({ sync, status }: { sync: SyncEngine; status: SyncStatus }) {
         })}
       </p>
       <p role="status" className="sync-status">
-        {status.access?.until ? t("sync.paused") : t("sync.unpaid")}
+        {unavailable
+          ? t("sync.unavailable")
+          : status.access?.until
+            ? t("sync.paused")
+            : t("sync.unpaid")}
       </p>
       <p className="setting-hint">
         {status.pending > 0 ? tn("sync.unpaidPending", status.pending) : t("sync.unpaidKept")}
       </p>
       <div className="actions">
-        <button
-          type="button"
-          className="button button-primary"
-          onClick={() => void openInBrowser(subscriptionPage(status))}
-        >
-          {t("sync.subscribe")}
-        </button>
+        {!unavailable && (
+          <button
+            type="button"
+            className="button button-primary"
+            onClick={() => void openInBrowser(subscriptionPage(status))}
+          >
+            {t("sync.subscribe")}
+          </button>
+        )}
         <button type="button" className="button" onClick={() => void sync.syncNow()}>
           {t("sync.checkAgain")}
         </button>

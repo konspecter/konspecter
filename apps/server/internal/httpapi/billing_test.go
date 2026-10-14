@@ -65,7 +65,8 @@ func (f *fakeEntitlements) Recipient(_ context.Context, userID string) (string, 
 
 // fakeService is the billing service: it answers the entitlement the test
 // sets for a user (expired, with no time, if none), starts a trial when
-// asked to, and records every other request with a canned answer.
+// asked to, lists a gateway in its plans except in the unsold languages,
+// and records every other request with a canned answer.
 type fakeService struct {
 	mu           sync.Mutex
 	server       *httptest.Server
@@ -79,6 +80,7 @@ type fakeService struct {
 	bodies       []string
 	answer       string
 	down         bool
+	unsold       map[string]bool
 	clock        *time.Time
 }
 
@@ -88,7 +90,10 @@ type fakeGrant struct {
 }
 
 func newFakeService(t *testing.T, clock *time.Time) *fakeService {
-	f := &fakeService{entitlements: map[string]fakeGrant{}, forget: http.StatusNoContent, answer: `{"ok":true}`, clock: clock}
+	f := &fakeService{
+		entitlements: map[string]fakeGrant{}, forget: http.StatusNoContent, answer: `{"ok":true}`,
+		unsold: map[string]bool{}, clock: clock,
+	}
 	f.server = httptest.NewServer(http.HandlerFunc(f.serve))
 	t.Cleanup(f.server.Close)
 	return f
@@ -123,6 +128,14 @@ func (f *fakeService) serve(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"user_id": user, "status": grant.status, "until": grant.until, "version": f.version})
 	case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/internal/users/"):
 		w.WriteHeader(f.forget)
+	case r.Method == http.MethodGet && r.URL.Path == "/api/billing/plans":
+		f.requests = append(f.requests, r.Clone(context.Background()))
+		f.bodies = append(f.bodies, "")
+		gateways := []any{map[string]any{"id": "acme", "name": "Acme", "currency": "EUR", "prices": []any{}}}
+		if f.unsold[r.URL.Query().Get("locale")] {
+			gateways = []any{}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"paid": true, "gateways": gateways})
 	default:
 		body, _ := io.ReadAll(r.Body)
 		f.requests = append(f.requests, r.Clone(context.Background()))
@@ -167,6 +180,12 @@ type billingSetup struct {
 
 func newBillingServer(t *testing.T) billingSetup {
 	t.Helper()
+	return newBillingServerWith(t, false)
+}
+
+// newBillingServerWith is newBillingServer, with sync off (KONSPECTER_SYNC_MODE=none) or not.
+func newBillingServerWith(t *testing.T, syncOff bool) billingSetup {
+	t.Helper()
 	store, mailer, known := newFakeAccounts(), &fakeMailer{}, newFakeDevices()
 	store.deleted = known.dropUser
 	clock := time.Date(2026, 10, 6, 12, 0, 0, 0, time.UTC)
@@ -179,7 +198,7 @@ func newBillingServer(t *testing.T) billingSetup {
 	kept := &fakeEntitlements{kept: map[string]entitlements.Entitlement{}, accounts: store}
 	server, _, handler := newTestServerWith(t, Options{
 		Accounts: &config, Billing: &Billing{URL: service.server.URL, Token: billingToken, Store: kept},
-		now: func() time.Time { return clock },
+		SyncOff: syncOff, now: func() time.Time { return clock },
 	})
 	return billingSetup{
 		accountSetup: accountSetup{server: server, store: store, mailer: mailer, devices: known},
@@ -258,6 +277,61 @@ func TestSyncIsFreeWithoutABillingService(t *testing.T) {
 	}
 }
 
+func TestSyncThatIsOffWithoutABillingService(t *testing.T) {
+	server, _, _ := newTestServerWith(t, Options{SyncOff: true})
+	for _, path := range []string{"/api/notes", "/api/sync", "/api/events"} {
+		r := call(t, server, "GET", path, adaToken, "")
+		if r.status != http.StatusPaymentRequired || errorCode(r) != "sync_unavailable" {
+			t.Errorf("%s = %d %v", path, r.status, r.body)
+		}
+	}
+	if r := call(t, server, "GET", "/api/me", adaToken, ""); r.status != http.StatusOK || syncState(t, r) != "unavailable" {
+		t.Errorf("me = %d %v", r.status, r.body)
+	}
+	r := call(t, server, "GET", "/api/billing/plans", "", "")
+	if r.body["paid"] != true || len(r.body["gateways"].([]any)) != 0 {
+		t.Errorf("plans = %v", r.body)
+	}
+	if r := call(t, server, "POST", "/api/billing/webhooks/acme", "", "{}"); errorCode(r) != "billing_off" {
+		t.Errorf("webhook = %d %v", r.status, r.body)
+	}
+	if r := call(t, server, "DELETE", "/api/tokens/current", adaToken, ""); r.status != http.StatusNoContent {
+		t.Errorf("revoke = %d", r.status)
+	}
+}
+
+func TestSyncThatIsOffKeepsTheTimeAccountsHave(t *testing.T) {
+	s := newBillingServerWith(t, true)
+	s.service.trial = 14 * 24 * time.Hour
+	s.ann(t)
+	if r := call(t, s.server, "GET", "/api/sync", "ksp_ann", ""); r.status != http.StatusPaymentRequired || errorCode(r) != "sync_unavailable" {
+		t.Errorf("without time = %d %v", r.status, r.body)
+	}
+	if r := call(t, s.server, "GET", "/api/me", "ksp_ann", ""); syncState(t, r) != "unavailable" {
+		t.Errorf("me = %v", r.body)
+	}
+	if s.service.trials != 0 {
+		t.Errorf("a trial started: %d", s.service.trials)
+	}
+	// The plans are the server's own: nothing is sold, whatever the service says.
+	if r := call(t, s.server, "GET", "/api/billing/plans?locale=ru", "", ""); r.status != http.StatusOK || len(r.body["gateways"].([]any)) != 0 {
+		t.Errorf("plans = %d %v", r.status, r.body)
+	}
+
+	until := s.clock.Add(time.Hour)
+	s.service.grant(annID, entitlements.Canceled, &until)
+	if r := s.push(t, billingToken, map[string]any{"status": "canceled", "until": until, "version": 100}); r.status != http.StatusOK {
+		t.Fatalf("push = %d %v", r.status, r.body)
+	}
+	if r := call(t, s.server, "GET", "/api/notes", "ksp_ann", ""); r.status != http.StatusOK {
+		t.Errorf("with time = %d %v", r.status, r.body)
+	}
+	*s.clock = until
+	if r := call(t, s.server, "GET", "/api/notes", "ksp_ann", ""); errorCode(r) != "sync_unavailable" {
+		t.Errorf("after the time = %d %v", r.status, r.body)
+	}
+}
+
 func TestAccountsWithoutTimeCannotSync(t *testing.T) {
 	s := newBillingServer(t)
 	s.ann(t)
@@ -313,6 +387,57 @@ func TestTheFirstSyncStartsTheTrial(t *testing.T) {
 	}
 	if s.service.trials != 1 {
 		t.Errorf("a second trial: %d", s.service.trials)
+	}
+}
+
+func TestALanguageThatSellsNothingCannotStartSyncing(t *testing.T) {
+	s := newBillingServer(t)
+	s.service.trial = 14 * 24 * time.Hour
+	s.service.unsold["en"] = true
+	s.ann(t) // in English
+	for _, path := range []string{"/api/notes", "/api/sync", "/api/events"} {
+		r := call(t, s.server, "GET", path, "ksp_ann", "")
+		if r.status != http.StatusPaymentRequired || errorCode(r) != "sync_unavailable" {
+			t.Errorf("%s = %d %v", path, r.status, r.body)
+		}
+	}
+	if s.service.trials != 0 {
+		t.Errorf("a trial started: %d", s.service.trials)
+	}
+	r := call(t, s.server, "GET", "/api/me", "ksp_ann", "")
+	if syncState(t, r) != "unavailable" || r.body["sync"].(map[string]any)["until"] != nil {
+		t.Errorf("me = %v", r.body)
+	}
+	plans := 0
+	for _, req := range s.service.requests {
+		if req.URL.Path == "/api/billing/plans" {
+			plans++
+		}
+	}
+	if plans != 1 {
+		t.Errorf("asked about the language %d times within a minute", plans)
+	}
+
+	// Time the account has lasts, whatever its language.
+	until := s.clock.Add(time.Hour)
+	s.service.grant(annID, entitlements.Active, &until)
+	if r := s.push(t, billingToken, map[string]any{"status": "active", "until": until, "version": 100}); r.status != http.StatusOK {
+		t.Fatalf("push = %d %v", r.status, r.body)
+	}
+	if r := call(t, s.server, "GET", "/api/notes", "ksp_ann", ""); r.status != http.StatusOK {
+		t.Errorf("with time = %d %v", r.status, r.body)
+	}
+	if r := call(t, s.server, "GET", "/api/me", "ksp_ann", ""); syncState(t, r) != "active" {
+		t.Errorf("me = %v", r.body)
+	}
+
+	// In a language that sells, it starts its trial as usual.
+	if err := s.store.SetLocale(context.Background(), annID, "ru"); err != nil {
+		t.Fatal(err)
+	}
+	*s.clock = until
+	if r := call(t, s.server, "GET", "/api/sync", "ksp_ann", ""); r.status != http.StatusPaymentRequired || errorCode(r) != "subscription_required" {
+		t.Errorf("in Russian = %d %v", r.status, r.body)
 	}
 }
 
@@ -483,7 +608,7 @@ func TestPlansAndWebhooksArePassedOnAsTheyCame(t *testing.T) {
 	s := newBillingServer(t)
 	r := call(t, s.server, "GET", "/api/billing/plans?locale=ru", "", "")
 	passed, _ := s.service.last(t)
-	if r.status != http.StatusCreated || passed.URL.RequestURI() != "/api/billing/plans?locale=ru" || passed.Header.Get("X-Konspecter-User-Id") != "" {
+	if r.status != http.StatusOK || passed.URL.RequestURI() != "/api/billing/plans?locale=ru" || passed.Header.Get("X-Konspecter-User-Id") != "" {
 		t.Errorf("plans = %d, passed on %s %v", r.status, passed.URL.RequestURI(), passed.Header)
 	}
 

@@ -71,3 +71,30 @@ func TestForget(t *testing.T) {
 		t.Error("forgot with the service gone")
 	}
 }
+
+func TestSells(t *testing.T) {
+	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/billing/plans" || r.Header.Get("Authorization") != "Bearer secret" {
+			t.Errorf("%s %s", r.URL.Path, r.Header.Get("Authorization"))
+		}
+		switch r.URL.Query().Get("locale") {
+		case "ru":
+			_, _ = w.Write([]byte(`{"paid":true,"gateways":[{"id":"yookassa"}]}`))
+		case "en":
+			_, _ = w.Write([]byte(`{"paid":true,"gateways":[]}`))
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer service.Close()
+	client := &Client{BaseURL: service.URL, Token: "secret"}
+	if sells, err := client.Sells(context.Background(), "ru"); err != nil || !sells {
+		t.Errorf("ru = %v, %v", sells, err)
+	}
+	if sells, err := client.Sells(context.Background(), "en"); err != nil || sells {
+		t.Errorf("en = %v, %v", sells, err)
+	}
+	if _, err := client.Sells(context.Background(), "de"); err == nil {
+		t.Error("took a failure")
+	}
+}

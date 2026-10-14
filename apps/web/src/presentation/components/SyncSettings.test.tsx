@@ -275,3 +275,16 @@ it("asks for a subscription where the account never had one", async () => {
     "Sync on this server needs a subscription.",
   );
 });
+
+it("offers no subscription where the server offers no sync to the account", async () => {
+  const { server, engine } = await setup();
+  await engine.connect({ serverUrl: "https://sync.example.com", token: "ksp_ada" });
+  await engine.unlock(TEST_PASSPHRASE);
+  server.access = { state: "unavailable", until: null };
+  await engine.syncNow();
+  expect(await screen.findByRole("status")).toHaveTextContent(
+    "This server does not offer sync to your account.",
+  );
+  expect(screen.queryByRole("button", { name: "Subscribe" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Check again" })).toBeInTheDocument();
+});

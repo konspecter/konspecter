@@ -156,12 +156,24 @@ sign-in keeps the site's language, and emails use it.
 
 ### Paid sync
 
-Optional. With `KONSPECTER_BILLING_URL` set, a separate service decides whether an account
-may sync: the sync routes answer `402 subscription_required` when it may not, `GET /api/me`
-adds `sync: {state, until}`, and the site's `/api/billing/*` and `/api/subscription*`
-requests are passed on to it. Deleting an account then waits for that service to forget it
-(`502` keeps the account). With it empty, sync is free: the sync routes never answer 402,
-and `/api/billing/plans` says `paid: false`.
+`KONSPECTER_SYNC_MODE` is `free` (the default), `paid` or `none`.
+
+With `paid`, a separate service at `KONSPECTER_BILLING_URL` decides whether an account may
+sync: the sync routes answer `402 subscription_required` when
+it may not, `GET /api/me` adds `sync: {state, until}`, and the site's `/api/billing/*` and
+`/api/subscription*` requests are passed on to it. Sync is sold per language: an account
+whose language the service sells nothing in cannot start syncing (`402 sync_unavailable`,
+`sync.state: "unavailable"`), though time it already has lasts. Deleting an account then waits for that
+service to forget it (`502` keeps the account). The server refuses to start without
+`KONSPECTER_BILLING_URL` and `KONSPECTER_BILLING_TOKEN`.
+
+With `free`, sync is free and the billing settings are ignored: the sync routes never answer
+402, and `/api/billing/plans` says `paid: false`.
+
+With `none`, sync is off: no account starts syncing (`402 sync_unavailable`,
+`sync.state: "unavailable"`), and `/api/billing/plans` lists no gateway. With
+`KONSPECTER_BILLING_URL` set, time accounts already have lasts, as with `paid`, and the
+site's subscription requests are still passed on; without it, no account syncs.
 
 ### Devices
 
@@ -232,7 +244,8 @@ lists them all:
 | `KONSPECTER_LOGIN_PROVIDERS_EN`, `_RU`                                                    | the providers shown per language                 |
 | `KONSPECTER_TRUSTED_PROXIES`                                                              | proxies whose `X-Forwarded-For` names the client |
 | `KONSPECTER_RATE_LOGIN_PER_IP/_PER_EMAIL`, `_EMAIL_PER_ADDRESS/_PER_IP`, `_DEVICE_PER_IP` | abuse limits                                     |
-| `KONSPECTER_BILLING_URL`, `KONSPECTER_BILLING_TOKEN`                                      | paid sync (empty: free)                          |
+| `KONSPECTER_SYNC_MODE` (`free`, `paid`, `none`)                                           | how sync is offered (default `free`)             |
+| `KONSPECTER_BILLING_URL`, `KONSPECTER_BILLING_TOKEN`                                      | the billing service: required for `paid`         |
 
 ```sh
 KONSPECTER_DATABASE_URL=postgres://… ./server            # migrate + serve on :8080

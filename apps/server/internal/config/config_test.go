@@ -40,6 +40,7 @@ func TestLoadUsesDefaults(t *testing.T) {
 		Rates:            Rates{LoginFailuresPerIP: 20, LoginFailuresPerEmail: 10, EmailsPerAddress: 5, EmailsPerIP: 20, DeviceRequestsPerIP: 20},
 		OAuth:            map[string]OAuthClient{},
 		LoginProviders:   map[string][]string{"en": {"google", "github", "linkedin", "x"}, "ru": {"yandex", "vk", "github"}},
+		Billing:          Billing{Mode: SyncFree},
 	}
 	if !reflect.DeepEqual(cfg, want) {
 		t.Errorf("Load() = %+v, want %+v", cfg, want)
@@ -298,6 +299,7 @@ func paidSettings(extra map[string]string) map[string]string {
 	values := map[string]string{
 		"KONSPECTER_PUBLIC_URL":     "https://notes.example.com",
 		"KONSPECTER_MAIL_TRANSPORT": "log",
+		"KONSPECTER_SYNC_MODE":      "paid",
 		"KONSPECTER_BILLING_URL":    "http://billing:8081/",
 		"KONSPECTER_BILLING_TOKEN":  billingToken,
 	}
@@ -309,19 +311,42 @@ func paidSettings(extra map[string]string) map[string]string {
 
 func TestLoadReadsTheBillingService(t *testing.T) {
 	t.Chdir(t.TempDir())
-	cfg, err := Load(env(paidSettings(nil)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg.Billing != (Billing{URL: "http://billing:8081", Token: billingToken}) || !cfg.Billing.Paid() {
-		t.Errorf("billing = %+v", cfg.Billing)
+	for _, mode := range []SyncMode{SyncPaid, SyncNone} {
+		cfg, err := Load(env(paidSettings(map[string]string{"KONSPECTER_SYNC_MODE": string(mode)})))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.Billing != (Billing{Mode: mode, URL: "http://billing:8081", Token: billingToken}) || !cfg.Billing.Service() {
+			t.Errorf("%s: billing = %+v", mode, cfg.Billing)
+		}
 	}
 }
 
-func TestSyncIsFreeWithoutABillingService(t *testing.T) {
+func TestSyncIsFreeByDefault(t *testing.T) {
 	t.Chdir(t.TempDir())
 	cfg, err := Load(env(nil))
-	if err != nil || cfg.Billing.Paid() {
+	if err != nil || cfg.Billing != (Billing{Mode: SyncFree}) || cfg.Billing.Service() {
+		t.Errorf("Load = %+v, %v", cfg.Billing, err)
+	}
+}
+
+func TestFreeSyncIgnoresTheBillingSettings(t *testing.T) {
+	t.Chdir(t.TempDir())
+	for _, mode := range []string{"", "free", "FREE"} {
+		cfg, err := Load(env(paidSettings(map[string]string{
+			"KONSPECTER_SYNC_MODE":     mode,
+			"KONSPECTER_BILLING_TOKEN": "short",
+		})))
+		if err != nil || cfg.Billing != (Billing{Mode: SyncFree}) {
+			t.Errorf("KONSPECTER_SYNC_MODE=%q: Load = %+v, %v", mode, cfg.Billing, err)
+		}
+	}
+}
+
+func TestSyncThatIsOffNeedsNoBillingService(t *testing.T) {
+	t.Chdir(t.TempDir())
+	cfg, err := Load(env(map[string]string{"KONSPECTER_SYNC_MODE": "none"}))
+	if err != nil || cfg.Billing != (Billing{Mode: SyncNone}) || cfg.Billing.Service() {
 		t.Errorf("Load = %+v, %v", cfg.Billing, err)
 	}
 }
@@ -329,12 +354,15 @@ func TestSyncIsFreeWithoutABillingService(t *testing.T) {
 func TestLoadReportsBadBillingSettings(t *testing.T) {
 	t.Chdir(t.TempDir())
 	for name, settings := range map[string]map[string]string{
-		"KONSPECTER_PUBLIC_URL":    paidSettings(map[string]string{"KONSPECTER_PUBLIC_URL": ""}),
-		"email":                    paidSettings(map[string]string{"KONSPECTER_MAIL_TRANSPORT": "smtp"}),
-		"set together":             {"KONSPECTER_BILLING_URL": "http://billing:8081"},
-		"at least 32":              paidSettings(map[string]string{"KONSPECTER_BILLING_TOKEN": "short"}),
-		"must be an http(s) URL":   paidSettings(map[string]string{"KONSPECTER_BILLING_URL": "billing:8081"}),
-		"KONSPECTER_BILLING_TOKEN": {"KONSPECTER_BILLING_TOKEN": billingToken},
+		"KONSPECTER_PUBLIC_URL": paidSettings(map[string]string{"KONSPECTER_PUBLIC_URL": ""}),
+		"email":                 paidSettings(map[string]string{"KONSPECTER_MAIL_TRANSPORT": "smtp"}),
+		"paid sync (KONSPECTER_SYNC_MODE=paid) needs": {"KONSPECTER_SYNC_MODE": "paid"},
+		"needs KONSPECTER_BILLING_URL":                paidSettings(map[string]string{"KONSPECTER_BILLING_URL": ""}),
+		"set together":                                paidSettings(map[string]string{"KONSPECTER_SYNC_MODE": "none", "KONSPECTER_BILLING_TOKEN": ""}),
+		"KONSPECTER_SYNC_MODE must be one of":         {"KONSPECTER_SYNC_MODE": "maybe"},
+		"at least 32":                                 paidSettings(map[string]string{"KONSPECTER_BILLING_TOKEN": "short"}),
+		"must be an http(s) URL":                      paidSettings(map[string]string{"KONSPECTER_BILLING_URL": "billing:8081"}),
+		"KONSPECTER_BILLING_TOKEN":                    paidSettings(map[string]string{"KONSPECTER_BILLING_TOKEN": ""}),
 	} {
 		_, err := Load(env(settings))
 		if err == nil || !strings.Contains(err.Error(), name) {

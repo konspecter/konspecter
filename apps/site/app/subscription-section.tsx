@@ -17,7 +17,8 @@ import {
  * The subscription on the settings page (paid sync): how long sync works,
  * subscribing (with consent to the terms and to automatic renewal),
  * cancelling (a confirm step that says nothing is lost), resuming, and the
- * payments. Plain forms; the gateway's page is opened from the answer to
+ * payments. Where the server sells no sync in the page's language (no
+ * gateways), it says so instead of offering to subscribe. Plain forms; the gateway's page is opened from the answer to
  * subscribing (a link, followed at once when the page's script runs).
  */
 export function SubscriptionSection({
@@ -39,7 +40,7 @@ export function SubscriptionSection({
   return (
     <section className="settings-section" id="subscription" aria-labelledby="subscription-heading">
       <h2 id="subscription-heading">{t.t("subscription.title")}</h2>
-      <AccessText billing={billing} />
+      <AccessText billing={billing} sold={gateways.length > 0} />
       <FormMessage error={error} notice={notice} />
       {redirectUrl ? (
         <Checkout url={redirectUrl} />
@@ -58,7 +59,11 @@ export function SubscriptionSection({
               </div>
             </Form>
           )}
-          <Subscribe gateways={gateways} />
+          {gateways.length > 0 ? (
+            <Subscribe gateways={gateways} />
+          ) : (
+            <p className="settings-text">{t.t("subscription.unavailable")}</p>
+          )}
         </>
       )}
       {billing.payments.length > 0 && <Payments payments={billing.payments} />}
@@ -66,7 +71,7 @@ export function SubscriptionSection({
   );
 }
 
-function AccessText({ billing }: { billing: Billing }) {
+function AccessText({ billing, sold }: { billing: Billing; sold: boolean }) {
   const t = useT();
   const locale = useLocale();
   const { state, until } = billing.access;
@@ -95,8 +100,10 @@ function AccessText({ billing }: { billing: Billing }) {
     case "past_due":
       return <p className="settings-text">{t.t("subscription.state.past_due", { date })}</p>;
     case "expired":
-      // An account that had time is paused; one that never had any is asked to subscribe.
+      // An account that had time is paused; one that never had any is asked to
+      // subscribe, where the language sells sync.
       if (until) return <p className="settings-text">{t.t("subscription.state.paused")}</p>;
+      if (!sold) return null;
       return (
         <p className="settings-text">
           {billing.trial

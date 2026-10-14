@@ -403,6 +403,7 @@ export const en = {
   "subscription.state.paused":
     "Sync is paused. Your conspects are safe, on your devices and on the server; subscribe and sync carries on where it stopped.",
   "subscription.state.unpaid": "Sync on this server takes a subscription.",
+  "subscription.unavailable": "This server does not offer sync in English.",
   "subscription.state.unpaidTrial":
     "Sync on this server takes a subscription. The first {trial} are free: the trial starts when you connect an app.",
   "subscription.pending": "A payment was started but not finished. Choose again to start over.",

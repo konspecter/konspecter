@@ -63,6 +63,26 @@ func (c *Client) Fetch(ctx context.Context, userID string, startTrial bool) (Ent
 	return e, nil
 }
 
+// Sells asks the service whether it sells sync in a language: its price
+// list for the language names a payment gateway.
+func (c *Client) Sells(ctx context.Context, locale string) (bool, error) {
+	res, err := c.do(ctx, http.MethodGet, "/api/billing/plans?locale="+url.QueryEscape(locale))
+	if err != nil {
+		return false, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return false, failure(res)
+	}
+	var body struct {
+		Gateways []json.RawMessage `json:"gateways"`
+	}
+	if err := json.NewDecoder(io.LimitReader(res.Body, 64<<10)).Decode(&body); err != nil {
+		return false, fmt.Errorf("read plans: %w", err)
+	}
+	return len(body.Gateways) > 0, nil
+}
+
 // Forget has the service cancel the user's renewing subscription at its
 // gateway and delete what it keeps of the user: the account is about to be
 // deleted. ErrGateway means the gateway could not be reached.

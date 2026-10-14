@@ -356,6 +356,7 @@ source, or delete this conspect when you are done.
   "sync.state.unpaid": "Paused",
   "sync.paused": "Sync is paused: the subscription has ended.",
   "sync.unpaid": "Sync on this server needs a subscription.",
+  "sync.unavailable": "This server does not offer sync to your account.",
   "sync.unpaidKept":
     "Every conspect is safe, on this device and on the server. Sync carries on by itself once it is paid.",
   "sync.unpaidPending": {
