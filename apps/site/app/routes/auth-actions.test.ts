@@ -112,7 +112,7 @@ it("sends a code in the visitor's language and remembers the address", async () 
   const response = (await login(
     args(post("/login", { email: "ann@example.com", intent: "code" })),
   )) as Response;
-  expect(response.headers.get("Location")).toBe("/login/code?next=%2F");
+  expect(response.headers.get("Location")).toBe("/login/code?next=%2Fsettings");
   expect(response.headers.getSetCookie()[0]).toMatch(/^ksp_pending=login%3Aann%40example\.com;/);
   expect(calls[0]?.body).toEqual({ email: "ann@example.com", locale: "ru" });
 });
@@ -145,8 +145,8 @@ it("verifies the code for the remembered address and forgets it", async () => {
     data: unknown;
     init: { headers: Headers };
   };
-  // The page shows a tick, then goes on to `next` by itself.
-  expect(result.data).toEqual({ error: null, resent: false, next: "/" });
+  // The page shows a tick, then goes on by itself: to the settings, asked for no other page.
+  expect(result.data).toEqual({ error: null, resent: false, next: "/settings" });
   expect(result.init.headers.getSetCookie()).toEqual([
     session,
     expect.stringContaining("ksp_pending=; Path=/; Max-Age=0"),

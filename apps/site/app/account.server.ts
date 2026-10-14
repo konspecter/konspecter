@@ -18,9 +18,17 @@ export async function loadAccount(
   context.set(accountContext, await currentUser(request));
 }
 
-/** Where to go after signing in: the `next` parameter if it is a path on this site. */
+/** Where signing in leads when it was not asked to go back to a page. */
+const SIGNED_IN_HOME = "/settings";
+
+/**
+ * Where to go after signing in: the `next` parameter if it is a path on this
+ * site, else the account's settings.
+ */
 export function nextPath(request: Request): string {
-  return safeReturnPath(new URL(request.url).searchParams.get("next"));
+  const next = new URL(request.url).searchParams.get("next");
+  const path = safeReturnPath(next);
+  return path === "/" && next !== "/" ? SIGNED_IN_HOME : path;
 }
 
 /** The signed-in user, or a redirect to sign in that comes back to this page. */
