@@ -262,10 +262,12 @@ from the same parts as the app, so the two cannot drift apart:
   sections split by hairlines (name, connected devices, encryption, delete account), no
   cards. The single emphasised element of a page is the thing to check: the code to compare
   on `/activate`, the recovery key shown once.
-- **Pages:** `/` (landing, download buttons from `KONSPECTER_DOWNLOAD_*_URL`), `/login`
+- **Pages:** `/` (landing, download buttons from `KONSPECTER_DOWNLOAD_*_URL`), `/download`
+  (the same downloads, with installing help and links to the releases, the source and the
+  guides), `/markdown` (the cheatsheet), `/login`
   (password, email code or a provider), `/register`, `/login/code`, `/forgot`, `/reset`,
   `/complete` (an address for a provider that gave none), `/settings` and `/activate`.
-- **Search engines:** the public pages (`/`, `/markdown`, `/terms`, `/privacy`) are in
+- **Search engines:** the public pages (`/`, `/download`, `/markdown`, `/terms`, `/privacy`) are in
   English at those paths and in Russian under `/ru`, each with a canonical link and `hreflang`
   links, listed in `/sitemap.xml`; every other page is `noindex`
   ([ADR-026](decisions/ADR-026-canonical-domain.md)).

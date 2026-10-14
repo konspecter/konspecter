@@ -714,6 +714,72 @@ main {
   font-size: 14px;
 }
 
+.platform-more {
+  margin: 1rem 0 0;
+  font-size: 15px;
+}
+
+/* The download page: the platforms as on the landing page, then what helps
+   after downloading, in columns of short notes. */
+.download-page {
+  padding-block: clamp(2.5rem, 6vw, 4.5rem) 1rem;
+}
+
+.download-page h1 {
+  margin: 0;
+  font-size: clamp(2rem, 1.5rem + 2vw, 2.75rem);
+  font-weight: 720;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+}
+
+.download-page > .section-lead {
+  max-width: 44rem;
+  line-height: 1.6;
+}
+
+.download-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: clamp(1.75rem, 4vw, 2.5rem) clamp(2rem, 5vw, 3.5rem);
+  margin-top: clamp(2.5rem, 6vw, 3.5rem);
+}
+
+.download-info h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 640;
+  line-height: 1.35;
+}
+
+.download-info p,
+.download-info ol,
+.download-info ul {
+  margin: 0.6rem 0 0;
+  color: var(--color-muted);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.download-info ol,
+.download-info ul {
+  padding-left: 1.2rem;
+}
+
+.download-info li + li {
+  margin-top: 0.35rem;
+}
+
+.download-command {
+  margin: 0.6rem 0 0;
+  padding: 0.6rem 0.8rem;
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
 .message-page {
   padding-block: clamp(3rem, 8vw, 6rem);
 }

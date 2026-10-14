@@ -13,6 +13,7 @@ export const ru: Dictionary = {
   "site.toDark": "Включить тёмную тему",
   "site.sourceCode": "Konspecter на GitHub",
   "site.footerLinks": "О сайте",
+  "site.download": "Скачать",
   "site.markdown": "Шпаргалка по Markdown",
   "site.terms": "Условия и оферта",
   "site.privacy": "Конфиденциальность",
@@ -88,6 +89,7 @@ export const ru: Dictionary = {
   "home.sync.terms": "Цены и условия",
   "home.downloadsTitle": "Установить Konspecter",
   "home.downloadsLead": "Одно и то же приложение на компьютере, на телефоне и в браузере.",
+  "home.downloadsMore": "Помощь с установкой, все релизы и не только",
   "home.platform.macos": "macOS",
   "home.platform.windows": "Windows",
   "home.platform.linux": "Linux",
@@ -102,6 +104,37 @@ export const ru: Dictionary = {
     "Приложение для macOS пока не заверено Apple. В первый раз откройте его, затем нажмите «Всё равно открыть» в Системных настройках → Конфиденциальность и безопасность.",
   "home.get": "Скачать",
   "home.open": "Открыть",
+
+  "download.title": "Скачать Konspecter",
+  "download.lead":
+    "Одно и то же приложение на компьютере, на телефоне и в браузере. Бесплатно и без регистрации.",
+  "download.none": "Приложения лежат на {releases}.",
+  "download.releasesPage": "странице релизов на GitHub",
+  "download.macos.title": "Первый запуск на Mac",
+  "download.macos.why":
+    "Приложение пока не заверено Apple, поэтому при первом запуске macOS переспрашивает:",
+  "download.macos.step1":
+    "Перетащите Konspecter в «Программы» и откройте его. macOS скажет, что не может проверить приложение: нажмите «Готово».",
+  "download.macos.step2":
+    "Откройте «Системные настройки → Конфиденциальность и безопасность», найдите сообщение о Konspecter, нажмите «Всё равно открыть» и подтвердите.",
+  "download.macos.terminal": "Или один раз выполните в Терминале:",
+  "download.macos.keychain":
+    "Если macOS попросит пароль для входа, чтобы использовать «Konspecter WebCrypto Master Key», введите его и нажмите «Разрешать всегда». Достаточно одного раза, и после обновлений тоже.",
+  "download.android.title": "Установка на Android",
+  "download.android.text":
+    "Приложение скачивается файлом APK. Откройте его после загрузки; если Android спросит, разрешите браузеру устанавливать приложения и нажмите «Установить».",
+  "download.web.title": "В браузере",
+  "download.web.text":
+    "Веб-приложение работает в любом современном браузере, а после первого открытия — и без интернета. Чтобы оно стало отдельным приложением, нажмите «Установить» в адресной строке Chrome или Edge, а в Safari — «Добавить в Dock» или «На экран „Домой“».",
+  "download.library.title": "Где хранятся конспекты",
+  "download.library.text":
+    "На компьютере каждый конспект — файл Markdown в папке Konspecter в вашей домашней папке; другую можно выбрать в «Настройки → Библиотека → Сменить папку…». На телефоне и в браузере они хранятся внутри приложения, а «Настройки → Импорт и экспорт» переносит их туда и обратно.",
+  "download.more.title": "Ещё",
+  "download.more.releases": "Все релизы и что в них изменилось",
+  "download.more.source": "Исходный код на GitHub",
+  "download.more.cheatsheet": "Шпаргалка по Markdown",
+  "download.more.guide": "Почитать о Markdown",
+  "download.more.selfHosting": "Свой сервер синхронизации",
 
   "cheatsheet.title": "Шпаргалка по Markdown",
   "cheatsheet.lead":

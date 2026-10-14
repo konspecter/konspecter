@@ -16,6 +16,7 @@ export const en = {
   "site.toDark": "Switch to the dark theme",
   "site.sourceCode": "Konspecter on GitHub",
   "site.footerLinks": "About the site",
+  "site.download": "Download",
   "site.markdown": "Markdown cheatsheet",
   "site.terms": "Terms",
   "site.privacy": "Privacy",
@@ -91,6 +92,7 @@ export const en = {
   "home.sync.terms": "Prices and terms",
   "home.downloadsTitle": "Get Konspecter",
   "home.downloadsLead": "The same app on your computer, your phone and in the browser.",
+  "home.downloadsMore": "Installing help, every release and more",
   "home.platform.macos": "macOS",
   "home.platform.windows": "Windows",
   "home.platform.linux": "Linux",
@@ -105,6 +107,37 @@ export const en = {
     "The macOS app is not notarized by Apple yet. The first time, open it, then click Open Anyway in System Settings → Privacy & Security.",
   "home.get": "Download",
   "home.open": "Open",
+
+  "download.title": "Download Konspecter",
+  "download.lead":
+    "The same app on your computer, your phone and in the browser. Free, and no account needed.",
+  "download.none": "The apps are on the {releases}.",
+  "download.releasesPage": "releases page on GitHub",
+  "download.macos.title": "Opening the Mac app the first time",
+  "download.macos.why":
+    "The app is not notarized by Apple yet, so macOS asks before opening it the first time:",
+  "download.macos.step1":
+    "Drag Konspecter to Applications and open it. macOS says it could not verify the app: click Done.",
+  "download.macos.step2":
+    "Open System Settings → Privacy & Security, find the message about Konspecter, click Open Anyway and confirm.",
+  "download.macos.terminal": "Or run this in Terminal once:",
+  "download.macos.keychain":
+    "If macOS asks for your login password to use “Konspecter WebCrypto Master Key”, enter it and click Always Allow. Once is enough, updates included.",
+  "download.android.title": "Installing on Android",
+  "download.android.text":
+    "The app comes as an APK file. Open it once it has downloaded; if Android asks, allow your browser to install apps, then tap Install.",
+  "download.web.title": "In the browser",
+  "download.web.text":
+    "The web app works in any modern browser and keeps working without the internet after the first visit. To have it as an app of its own, click Install in the address bar of Chrome or Edge, or use Add to Dock or Add to Home Screen in Safari.",
+  "download.library.title": "Where your conspects are kept",
+  "download.library.text":
+    "On a computer, every conspect is a Markdown file in the Konspecter folder in your home folder; Settings → Library → Change folder… picks another one. On a phone and in the browser they are kept inside the app, and Settings → Import & export moves them in and out.",
+  "download.more.title": "More",
+  "download.more.releases": "Every release and what changed in it",
+  "download.more.source": "Source code on GitHub",
+  "download.more.cheatsheet": "Markdown cheatsheet",
+  "download.more.guide": "Learn Markdown",
+  "download.more.selfHosting": "Run a sync server of your own",
 
   "cheatsheet.title": "Markdown cheatsheet",
   "cheatsheet.lead":

@@ -1,10 +1,12 @@
 import { Link } from "react-router";
 import { callApi } from "../api.server";
 import { firstMarks, MARKDOWN_GUIDE } from "../cheatsheet";
-import { siteConfig } from "../config.server";
+import { downloadsFor } from "../downloads.server";
 import { useLocale, useT } from "../i18n/i18n";
+import { SELF_HOSTING } from "../links";
 import { useLocalePath } from "../pages";
-import { guessPlatform, PLATFORMS, type Platform } from "../platform";
+import type { Platform } from "../platform";
+import { PlatformList } from "../platform-list";
 import { readPreferences } from "../preferences.server";
 import { durationText, money, parsePlans, periodText } from "../subscription";
 import { SPECIMENS } from "../specimen";
@@ -12,8 +14,6 @@ import { SpecimenSlider } from "../specimen-slider";
 import type { Route } from "./+types/home";
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const { downloads } = siteConfig();
-  const guess = guessPlatform(request.headers.get("User-Agent"));
   const plans = parsePlans(
     (await callApi(request, `/api/billing/plans?locale=${readPreferences(request).locale}`)).data,
   );
@@ -33,11 +33,7 @@ export async function loader({ request }: Route.LoaderArgs) {
             trial: plans.trial,
           }
         : null,
-    downloads: PLATFORMS.flatMap((platform) => {
-      const url = downloads[platform];
-      return url ? [{ platform, url }] : [];
-    }),
-    suggested: guess && downloads[guess] ? guess : null,
+    ...downloadsFor(request),
   };
 }
 
@@ -66,8 +62,6 @@ const SYNC_TEXT = {
 function bySync(feature: (typeof FEATURES)[number]): feature is keyof typeof SYNC_TEXT {
   return Object.hasOwn(SYNC_TEXT, feature);
 }
-
-const SELF_HOSTING = "https://github.com/konspecter/konspecter/blob/main/docs/self-hosting.md";
 
 export default function Home({ loaderData }: Route.ComponentProps) {
   const translate = useT();
@@ -219,28 +213,10 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         <section id="download" className="downloads site-frame" aria-labelledby="download-title">
           <h2 id="download-title">{t("home.downloadsTitle")}</h2>
           <p className="section-lead">{t("home.downloadsLead")}</p>
-          <ul className="platform-list">
-            {downloads.map(({ platform, url }) => (
-              <li key={platform} className="platform">
-                <span className="platform-name">{platformName(platform)}</span>
-                <span className="platform-note">{t(`home.platformNote.${platform}`)}</span>
-                <a
-                  className={platform === suggested ? "button button-primary" : "button"}
-                  href={url}
-                  aria-label={
-                    platform === "web"
-                      ? t("home.openWeb")
-                      : t("home.download", { platform: platformName(platform) })
-                  }
-                >
-                  {platform === "web" ? t("home.open") : t("home.get")}
-                </a>
-                {platform === "macos" && (
-                  <p className="platform-footnote">{t("home.macosFirstOpen")}</p>
-                )}
-              </li>
-            ))}
-          </ul>
+          <PlatformList downloads={downloads} suggested={suggested} />
+          <p className="platform-more">
+            <Link to={localePath("/download")}>{t("home.downloadsMore")}</Link>
+          </p>
         </section>
       )}
     </>

@@ -3,11 +3,13 @@ import { index, prefix, route, type RouteConfig } from "@react-router/dev/routes
 export default [
   // The public pages (pages.ts): in English here, in Russian under /ru.
   index("routes/home.tsx"),
+  route("download", "routes/download.tsx"),
   route("markdown", "routes/markdown.tsx"),
   route("terms", "routes/terms.tsx"),
   route("privacy", "routes/privacy.tsx"),
   ...prefix("ru", [
     index("routes/home.tsx", { id: "ru/home" }),
+    route("download", "routes/download.tsx", { id: "ru/download" }),
     route("markdown", "routes/markdown.tsx", { id: "ru/markdown" }),
     route("terms", "routes/terms.tsx", { id: "ru/terms" }),
     route("privacy", "routes/privacy.tsx", { id: "ru/privacy" }),

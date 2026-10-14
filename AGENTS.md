@@ -129,8 +129,9 @@ apps/web/                 React + Vite web app (the shared UI for all clients)
   src/presentation/       UI: app/ (routes, styles), components/, editors/, hooks/, i18n/ (en, ru),
                           markdown/, pages/
 apps/site/                Account site: React Router (framework mode) with server rendering in
-                          Node: landing, Markdown cheatsheet, sign-in, settings (subscription, devices,
-                          encryption), /activate, terms and privacy, cookie notice; calls the Go API
+                          Node: landing, downloads, Markdown cheatsheet, sign-in, settings
+                          (subscription, devices, encryption), /activate, terms and privacy,
+                          cookie notice; calls the Go API
   app/routes/             one module per page (loader, action, component)
 apps/mobile/              Capacitor 8 Android app around apps/web (android/: generated Gradle project)
 apps/desktop/             Tauri 2 desktop shell around apps/web

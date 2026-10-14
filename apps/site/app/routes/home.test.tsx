@@ -54,6 +54,9 @@ it("shows the landing page with the configured downloads", async () => {
   );
   const downloads = screen.getByRole("region", { name: "Get Konspecter" });
   expect(within(downloads).getAllByRole("listitem")).toHaveLength(2);
+  expect(
+    within(downloads).getByRole("link", { name: "Installing help, every release and more" }),
+  ).toHaveAttribute("href", "/download");
   // The note on opening the macOS app sits in the macOS row.
   expect(within(downloads).getAllByRole("listitem")[0]).toHaveTextContent(
     "click Open Anyway in System Settings",
@@ -139,7 +142,7 @@ it("leaves out the downloads when none are configured", async () => {
   renderHome("en", []);
   await screen.findByRole("heading", { level: 1 });
   expect(screen.queryByRole("region", { name: "Get Konspecter" })).not.toBeInTheDocument();
-  expect(screen.queryByRole("link", { name: /Download/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: /Download for/ })).not.toBeInTheDocument();
 });
 
 it("speaks Russian, with the language dropdown and the other theme", async () => {
@@ -147,7 +150,10 @@ it("speaks Russian, with the language dropdown and the other theme", async () =>
   expect(
     await screen.findByRole("heading", { level: 1, name: "Познал. Сохранил. Вернулся." }),
   ).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "Скачать" })).toHaveAttribute("href", "#download");
+  // The hero's button leads to the downloads; the footer's link, to their page.
+  expect(
+    screen.getAllByRole("link", { name: "Скачать" }).map((link) => link.getAttribute("href")),
+  ).toEqual(["#download", "/ru/download"]);
   // The note on opening the macOS app comes only with a macOS download.
   expect(screen.queryByText(/Всё равно открыть/)).not.toBeInTheDocument();
   expect(screen.getByRole("combobox", { name: "Язык" })).toHaveValue("ru");

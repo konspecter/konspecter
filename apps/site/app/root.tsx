@@ -19,6 +19,7 @@ import {
 import { accountContext, loadAccount } from "./account.server";
 import { siteConfig } from "./config.server";
 import { LOCALE_NAMES, LOCALES, translator, useT, type Locale } from "./i18n/i18n";
+import { SOURCE_CODE } from "./links";
 import { expectedOrigin, isSameOriginRequest } from "./origin.server";
 import {
   alternates,
@@ -150,9 +151,6 @@ export function Layout({ children }: { children: ReactNode }) {
     </html>
   );
 }
-
-/** Where Konspecter's source code lives. */
-const SOURCE_CODE = "https://github.com/konspecter/konspecter";
 
 /**
  * The switches post to /preferences and come back here; plain forms, so no
@@ -294,6 +292,7 @@ function Footer() {
       <div className="site-frame site-footer-row">
         <p>{t("site.footer")}</p>
         <nav aria-label={t("site.footerLinks")} className="site-footer-links">
+          <Link to={localePath("/download")}>{t("site.download")}</Link>
           <Link to={localePath("/markdown")}>{t("site.markdown")}</Link>
           <Link to={localePath("/terms")}>{t("site.terms")}</Link>
           <Link to={localePath("/privacy")}>{t("site.privacy")}</Link>
