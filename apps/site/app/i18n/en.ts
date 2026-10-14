@@ -71,6 +71,7 @@ export const en = {
     "Konspecter needs no server: each device keeps its conspects itself. To have the same ones everywhere, sync them your own way.",
   "home.sync.free": "Free",
   "home.sync.own.title": "Your own way",
+  "home.sync.own.headline": "No account",
   "home.sync.own.folder":
     "On a computer, every conspect is a Markdown file in a folder. Keep that folder in iCloud Drive, Dropbox, Yandex Disk, Syncthing or Git (Settings → Library → Change folder…), and your computers share it.",
   "home.sync.own.transfer":

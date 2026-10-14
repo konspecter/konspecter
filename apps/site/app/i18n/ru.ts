@@ -68,6 +68,7 @@ export const ru: Dictionary = {
     "Konspecter не нужен сервер: каждое устройство хранит конспекты у себя. Чтобы они везде были одинаковыми, синхронизируйте их по-своему.",
   "home.sync.free": "Бесплатно",
   "home.sync.own.title": "По-своему",
+  "home.sync.own.headline": "Без аккаунта",
   "home.sync.own.folder":
     "На компьютере каждый конспект — файл Markdown в папке. Держите эту папку на Яндекс Диске, в iCloud Drive, Dropbox, Syncthing или Git («Настройки → Библиотека → Сменить папку…»), и все ваши компьютеры будут работать с ней.",
   "home.sync.own.transfer":

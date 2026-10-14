@@ -107,7 +107,8 @@ it("offers the free sync beside your own way, and speaks of both", async () => {
   const sync = await screen.findByRole("region", { name: "Sync between your devices" });
   expect(sync).toHaveTextContent("through Konspecter sync");
   expect(within(sync).getByRole("heading", { name: "Konspecter sync" })).toBeInTheDocument();
-  expect(within(sync).getAllByText("Free")).toHaveLength(2);
+  expect(within(sync).getByText("No account")).toBeInTheDocument();
+  expect(within(sync).getAllByText("Free")).toHaveLength(1);
   expect(within(sync).getByRole("link", { name: "Connect your devices" })).toHaveAttribute(
     "href",
     "/settings",

@@ -165,7 +165,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         <div className="price-table">
           <div className="price-plan">
             <h3>{t("home.sync.own.title")}</h3>
-            <p className="price-amount">{t("home.sync.free")}</p>
+            <p className="price-amount">{t("home.sync.own.headline")}</p>
             <ul className="sync-ways">
               <li>{t("home.sync.own.folder")}</li>
               <li>{t("home.sync.own.transfer")}</li>
