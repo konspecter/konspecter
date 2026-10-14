@@ -82,7 +82,7 @@ export class FolderSync implements SyncStore {
     const files = await this.#files.list();
     const present = new Set(files.map((file) => file.id));
     const linked = [...this.#links.values()].filter((link) => link.path !== null);
-    const foreign = state !== null && state.folder !== this.#folder;
+    const foreign = state !== null && plainPath(state.folder) !== plainPath(this.#folder);
     // A folder without any of its linked files is not one whose notes were all
     // deleted: it is another folder (or one not there yet). Nothing is deleted.
     const emptied = linked.length > 0 && linked.every((link) => !present.has(link.path ?? ""));
@@ -504,4 +504,14 @@ function parseState(value: unknown): State | null {
   if (typeof value !== "object" || value === null) return null;
   const { folder, adopting } = value as Record<string, unknown>;
   return typeof folder === "string" ? { folder, adopting: adopting === true } : null;
+}
+
+/**
+ * A Windows path without the verbatim prefix (`\\?\C:\…` reads `C:\…`): the
+ * desktop app once reported its folder that way, and it is the same folder.
+ */
+export function plainPath(path: string): string {
+  if (path.startsWith("\\\\?\\UNC\\")) return `\\\\${path.slice(8)}`;
+  if (path.startsWith("\\\\?\\")) return path.slice(4);
+  return path;
 }

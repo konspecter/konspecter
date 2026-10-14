@@ -107,7 +107,10 @@ impl Folder {
     }
 
     pub fn open(path: &Path) -> Result<Self, FolderError> {
-        let root = fs::canonicalize(path).map_err(|e| io("open folder", e))?;
+        // dunce, not fs: on Windows a real path reads `C:\…`, not `\\?\C:\…`,
+        // where people see it. Every real path here comes from it, so they
+        // compare with the root.
+        let root = dunce::canonicalize(path).map_err(|e| io("open folder", e))?;
         if !root.is_dir() {
             return Err(FolderError::InvalidPath(path.display().to_string()));
         }
@@ -191,10 +194,10 @@ impl Folder {
         // Symlinks must not lead outside the folder: check the real location
         // of the file, or of its parent for a file that does not exist yet.
         let real = if joined.exists() {
-            fs::canonicalize(&joined).map_err(|e| io("resolve", e))?
+            dunce::canonicalize(&joined).map_err(|e| io("resolve", e))?
         } else {
             let parent = joined.parent().ok_or_else(invalid)?;
-            let real_parent = fs::canonicalize(parent)
+            let real_parent = dunce::canonicalize(parent)
                 .map_err(|_| FolderError::NotFound(relative.to_string()))?;
             real_parent.join(joined.file_name().ok_or_else(invalid)?)
         };
@@ -337,7 +340,7 @@ impl Folder {
         for name in names.iter().take(names.len().saturating_sub(1)) {
             dir.push(name);
             if dir.exists() {
-                let real = fs::canonicalize(&dir).map_err(|e| io("make folder", e))?;
+                let real = dunce::canonicalize(&dir).map_err(|e| io("make folder", e))?;
                 if !real.starts_with(&self.root) || !real.is_dir() {
                     return Err(FolderError::InvalidPath(relative.to_string()));
                 }
@@ -362,7 +365,7 @@ impl Folder {
             let dir = names[..depth]
                 .iter()
                 .fold(self.root.clone(), |dir, name| dir.join(name));
-            let Ok(real) = fs::canonicalize(&dir) else {
+            let Ok(real) = dunce::canonicalize(&dir) else {
                 return Ok(());
             };
             if !real.starts_with(&self.root) || real == self.root || !real.is_dir() {
@@ -581,7 +584,7 @@ fn same_file(a: &Path, b: &Path) -> bool {
     }
     #[cfg(not(unix))]
     {
-        match (fs::canonicalize(a), fs::canonicalize(b)) {
+        match (dunce::canonicalize(a), dunce::canonicalize(b)) {
             (Ok(a), Ok(b)) => {
                 a.to_string_lossy().to_lowercase() == b.to_string_lossy().to_lowercase()
             }

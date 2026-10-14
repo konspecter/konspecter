@@ -2101,6 +2101,7 @@ dependencies = [
 name = "konspecter-desktop"
 version = "0.4.0"
 dependencies = [
+ "dunce",
  "ignore",
  "keyring",
  "notify-debouncer-mini",

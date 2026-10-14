@@ -23,6 +23,7 @@ notify-debouncer-mini = "0.7"
 open = "5"
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
 ignore = "0.4.33"
+dunce = "1"
 
 [profile.release]
 codegen-units = 1

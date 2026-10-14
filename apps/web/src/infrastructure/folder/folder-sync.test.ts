@@ -5,7 +5,7 @@ import { FakeServer, TEST_PASSPHRASE } from "../sync/fake-server";
 import { SyncEngine, type Scheduler } from "../sync/sync-engine";
 import { FakeFolder } from "./fake-folder";
 import { FolderStore } from "./folder-store";
-import { FolderSync } from "./folder-sync";
+import { FolderSync, plainPath } from "./folder-sync";
 
 const config = { serverUrl: "https://sync.example.com", token: "ksp_ada" };
 const date = new Date("2026-09-28T10:00:00Z");
@@ -267,5 +267,14 @@ describe("FolderSync", () => {
     expect(liveNotes(server)).toHaveLength(1);
     expect([...other.files.values()].map((file) => file.text)).toEqual(["# Java"]);
     moved.engine.stop();
+  });
+});
+
+describe("plainPath", () => {
+  it("drops the Windows verbatim prefix", () => {
+    expect(plainPath("\\\\?\\C:\\Users\\ada\\Konspecter")).toBe("C:\\Users\\ada\\Konspecter");
+    expect(plainPath("\\\\?\\UNC\\server\\share\\Notes")).toBe("\\\\server\\share\\Notes");
+    expect(plainPath("C:\\Users\\ada\\Konspecter")).toBe("C:\\Users\\ada\\Konspecter");
+    expect(plainPath(HOME)).toBe(HOME);
   });
 });
