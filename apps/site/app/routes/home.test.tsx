@@ -9,6 +9,7 @@ function renderHome(
   downloads: { platform: Platform; url: string }[],
   suggested: Platform | null = null,
   pricing: { amount: number; currency: string; period: string; trial: string } | null = null,
+  sync: "free" | "paid" | "none" = pricing ? "paid" : "free",
 ) {
   const Stub = createRoutesStub([
     {
@@ -20,7 +21,7 @@ function renderHome(
         {
           index: true,
           Component: Home as never,
-          loader: () => ({ downloads, suggested, pricing }),
+          loader: () => ({ downloads, suggested, pricing, sync }),
         },
       ],
     },
@@ -53,7 +54,10 @@ it("shows the landing page with the configured downloads", async () => {
   );
   const downloads = screen.getByRole("region", { name: "Get Konspecter" });
   expect(within(downloads).getAllByRole("listitem")).toHaveLength(2);
-  expect(downloads).toHaveTextContent("click Open Anyway in System Settings");
+  // The note on opening the macOS app sits in the macOS row.
+  expect(within(downloads).getAllByRole("listitem")[0]).toHaveTextContent(
+    "click Open Anyway in System Settings",
+  );
   expect(
     screen.getByRole("figure", { name: "A conspect as Konspecter stores it" }),
   ).toHaveTextContent("title: Grandma's apple pie");
@@ -86,6 +90,26 @@ it("shows what sync costs where it is paid, with a way to try it", async () => {
     "href",
     "/settings",
   );
+  expect(screen.getByText(/With a sync subscription, it catches up/)).toBeInTheDocument();
+  expect(screen.getByText(/With a sync subscription, connect your computer/)).toBeInTheDocument();
+  expect(screen.getByText(/With a sync subscription, they are locked/)).toBeInTheDocument();
+});
+
+it("promises catching up, connected devices and encryption where sync is free", async () => {
+  renderHome("en", []);
+  expect(await screen.findByText(/It catches up when you are back online/)).toBeInTheDocument();
+  expect(screen.getByText(/^Connect your computer, phone and browser/)).toBeInTheDocument();
+  expect(screen.getByText(/^Conspects are locked with a passphrase/)).toBeInTheDocument();
+});
+
+it("promises no catching up, connected devices or server where sync is off", async () => {
+  renderHome("ru", [], null, null, "none");
+  expect(await screen.findByText(/никуда не уходит/)).toBeInTheDocument();
+  expect(screen.queryByText(/когда сеть вернётся/)).not.toBeInTheDocument();
+  expect(screen.getByText(/экспортом и импортом обычных файлов Markdown/)).toBeInTheDocument();
+  expect(screen.queryByText(/QR-код/)).not.toBeInTheDocument();
+  expect(screen.getByText(/их не хранит никакой сервер/)).toBeInTheDocument();
+  expect(screen.queryByText(/шифруются паролем/)).not.toBeInTheDocument();
 });
 
 it("leaves out the downloads when none are configured", async () => {

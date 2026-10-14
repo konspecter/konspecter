@@ -46,12 +46,24 @@ export const en = {
   "home.feature.offline.title": "No internet? No problem",
   "home.feature.offline.text":
     "Everything is kept on your device, so Konspecter opens at once and works on a plane or underground. It catches up when you are back online.",
+  "home.feature.offline.textPaid":
+    "Everything is kept on your device, so Konspecter opens at once and works on a plane or underground. With a sync subscription, it catches up when you are back online.",
+  "home.feature.offline.textNone":
+    "Everything is kept on your device and goes nowhere else, so Konspecter opens at once and works the same on a plane, underground or with no network at all.",
   "home.feature.devices.title": "On all your devices",
   "home.feature.devices.text":
     "Connect your computer, phone and browser to one account, by scanning a QR code, and a conspect written on one shows up on the others.",
+  "home.feature.devices.textPaid":
+    "With a sync subscription, connect your computer, phone and browser to one account, by scanning a QR code, and a conspect written on one shows up on the others.",
+  "home.feature.devices.textNone":
+    "Konspecter runs on your computer, your phone and in the browser. Each keeps its own conspects, and you move them over by exporting and importing ordinary Markdown files.",
   "home.feature.private.title": "Private and yours",
   "home.feature.private.text":
     "Conspects are locked with a passphrase only you know before they leave your device: nobody else can read them, not even the server that keeps them. And each one is an ordinary text file you can open anywhere.",
+  "home.feature.private.textPaid":
+    "Conspects stay on your device. With a sync subscription, they are locked with a passphrase only you know before they leave it: nobody else can read them, not even the server that keeps them. And each one is an ordinary text file you can open anywhere.",
+  "home.feature.private.textNone":
+    "Conspects never leave your device: no server keeps them, and nobody but you can read them. And each one is an ordinary text file you can open anywhere.",
   "home.markdown.title": "Konspecter speaks Markdown",
   "home.markdown.text":
     "Every conspect is plain Markdown: a few simple marks, like # for a heading or ** for bold. You can write without them, the toolbar formats for you. To get the most out of Konspecter, spend ten minutes on Markdown: it works the same in many other editors and on GitHub.",

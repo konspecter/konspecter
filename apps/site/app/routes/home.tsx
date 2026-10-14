@@ -20,7 +20,10 @@ export async function loader({ request }: Route.LoaderArgs) {
   // Where sync is paid: its first price, and the trial.
   const gateway = plans.gateways[0];
   const price = gateway?.prices[0];
+  // Paid sync that the page's language has no gateway for is as good as off.
+  const sync: SyncOffer = !plans.paid ? "free" : gateway ? "paid" : "none";
   return {
+    sync,
     pricing:
       gateway && price
         ? {
@@ -38,14 +41,40 @@ export async function loader({ request }: Route.LoaderArgs) {
   };
 }
 
+/** How this server offers sync: free, for a subscription, or not at all. */
+type SyncOffer = "free" | "paid" | "none";
+
 const FEATURES = ["write", "find", "tags", "offline", "devices", "private"] as const;
+
+/** The features whose text follows how sync is offered. */
+const SYNC_TEXT = {
+  offline: {
+    free: "home.feature.offline.text",
+    paid: "home.feature.offline.textPaid",
+    none: "home.feature.offline.textNone",
+  },
+  devices: {
+    free: "home.feature.devices.text",
+    paid: "home.feature.devices.textPaid",
+    none: "home.feature.devices.textNone",
+  },
+  private: {
+    free: "home.feature.private.text",
+    paid: "home.feature.private.textPaid",
+    none: "home.feature.private.textNone",
+  },
+} as const;
+
+function bySync(feature: (typeof FEATURES)[number]): feature is keyof typeof SYNC_TEXT {
+  return Object.hasOwn(SYNC_TEXT, feature);
+}
 
 export default function Home({ loaderData }: Route.ComponentProps) {
   const translate = useT();
   const { t } = translate;
   const locale = useLocale();
   const localePath = useLocalePath();
-  const { downloads, suggested } = loaderData;
+  const { downloads, suggested, sync } = loaderData;
   const pricing = loaderData.pricing;
   const platformName = (platform: Platform) => t(`home.platform.${platform}`);
   const web = downloads.find((download) => download.platform === "web");
@@ -98,7 +127,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           {FEATURES.map((feature) => (
             <div key={feature} className="feature">
               <dt>{t(`home.feature.${feature}.title`)}</dt>
-              <dd>{t(`home.feature.${feature}.text`)}</dd>
+              <dd>
+                {t(bySync(feature) ? SYNC_TEXT[feature][sync] : `home.feature.${feature}.text`)}
+              </dd>
             </div>
           ))}
         </dl>
@@ -181,12 +212,12 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 >
                   {platform === "web" ? t("home.open") : t("home.get")}
                 </a>
+                {platform === "macos" && (
+                  <p className="platform-footnote">{t("home.macosFirstOpen")}</p>
+                )}
               </li>
             ))}
           </ul>
-          {downloads.some((download) => download.platform === "macos") && (
-            <p className="platform-footnote">{t("home.macosFirstOpen")}</p>
-          )}
         </section>
       )}
     </>
