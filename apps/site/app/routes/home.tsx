@@ -46,21 +46,19 @@ type SyncOffer = "free" | "paid" | "none";
 
 const FEATURES = ["write", "find", "tags", "offline", "devices", "private"] as const;
 
-/** The features whose text follows how sync is offered. */
+/**
+ * The features about sync speak of syncing your own way too; where this
+ * server offers no sync, of that way alone.
+ */
 const SYNC_TEXT = {
-  offline: {
-    free: "home.feature.offline.text",
-    paid: "home.feature.offline.textPaid",
-    none: "home.feature.offline.textNone",
-  },
   devices: {
     free: "home.feature.devices.text",
-    paid: "home.feature.devices.textPaid",
+    paid: "home.feature.devices.text",
     none: "home.feature.devices.textNone",
   },
   private: {
     free: "home.feature.private.text",
-    paid: "home.feature.private.textPaid",
+    paid: "home.feature.private.text",
     none: "home.feature.private.textNone",
   },
 } as const;
@@ -68,6 +66,8 @@ const SYNC_TEXT = {
 function bySync(feature: (typeof FEATURES)[number]): feature is keyof typeof SYNC_TEXT {
   return Object.hasOwn(SYNC_TEXT, feature);
 }
+
+const SELF_HOSTING = "https://github.com/konspecter/konspecter/blob/main/docs/self-hosting.md";
 
 export default function Home({ loaderData }: Route.ComponentProps) {
   const translate = useT();
@@ -157,40 +157,63 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         </ul>
       </section>
 
-      {pricing && (
-        <section className="pricing site-frame" aria-labelledby="pricing-title">
-          <h2 id="pricing-title">{t("home.price.title")}</h2>
-          <div className="price-table">
-            <div className="price-plan">
-              <h3>{t("home.price.appsTitle")}</h3>
-              <p className="price-amount">{t("home.price.free")}</p>
-              <p className="price-text">{t("home.price.appsText")}</p>
+      <section id="sync" className="pricing site-frame" aria-labelledby="sync-title">
+        <h2 id="sync-title">{t("home.sync.title")}</h2>
+        <p className="section-lead">
+          {t(sync === "none" ? "home.sync.leadNone" : "home.sync.lead")}
+        </p>
+        <div className="price-table">
+          <div className="price-plan">
+            <h3>{t("home.sync.own.title")}</h3>
+            <p className="price-amount">{t("home.sync.free")}</p>
+            <ul className="sync-ways">
+              <li>{t("home.sync.own.folder")}</li>
+              <li>{t("home.sync.own.transfer")}</li>
+              <li>{t("home.sync.own.server")}</li>
+            </ul>
+            <div className="actions">
+              <a className="button" href={SELF_HOSTING}>
+                {t("home.sync.own.guide")}
+              </a>
             </div>
+          </div>
+          {sync !== "none" && (
             <div className="price-plan">
-              <h3>{t("home.price.syncTitle")}</h3>
-              <p className="price-amount">
-                {money(pricing.amount, pricing.currency, locale)}{" "}
-                <span className="price-period">
-                  {t("home.price.every", { period: periodText(translate, pricing.period) })}
-                </span>
-              </p>
+              <h3>{t("home.sync.service.title")}</h3>
+              {pricing ? (
+                <p className="price-amount">
+                  {money(pricing.amount, pricing.currency, locale)}{" "}
+                  <span className="price-period">
+                    {t("home.sync.every", { period: periodText(translate, pricing.period) })}
+                  </span>
+                </p>
+              ) : (
+                <p className="price-amount">{t("home.sync.free")}</p>
+              )}
               <p className="price-text">
-                {t("home.price.syncText")}
-                {pricing.trial &&
-                  ` ${t("home.pricingTrial", { trial: durationText(translate, pricing.trial) })}`}
+                {t("home.sync.service.text")}
+                {pricing && ` ${t("home.sync.cancel")}`}
+                {pricing?.trial &&
+                  ` ${t("home.sync.trial", { trial: durationText(translate, pricing.trial) })}`}
               </p>
               <div className="actions">
                 <Link className="button button-primary" to="/settings">
-                  {pricing.trial ? t("home.price.try") : t("home.price.get")}
+                  {!pricing
+                    ? t("home.sync.connect")
+                    : pricing.trial
+                      ? t("home.sync.try")
+                      : t("home.sync.get")}
                 </Link>
-                <Link className="price-terms" to={localePath("/terms")}>
-                  {t("home.pricingTerms")}
-                </Link>
+                {pricing && (
+                  <Link className="price-terms" to={localePath("/terms")}>
+                    {t("home.sync.terms")}
+                  </Link>
+                )}
               </div>
             </div>
-          </div>
-        </section>
-      )}
+          )}
+        </div>
+      </section>
 
       {downloads.length > 0 && (
         <section id="download" className="downloads site-frame" aria-labelledby="download-title">

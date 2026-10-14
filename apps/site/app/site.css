@@ -586,13 +586,17 @@ main {
   font-size: 14px;
 }
 
-/* Where sync is paid: the free apps beside the sync, which is raised off the
-   page as the specimen is: the one thing here to buy. */
+/* Sync: your own way beside this server's sync, which is raised off the page
+   as the specimen is. Where the server offers none, your own way stands alone. */
 .price-table {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1.25rem;
   margin-top: 1.75rem;
+}
+
+.price-table:has(> .price-plan:only-child) {
+  grid-template-columns: minmax(0, 40rem);
 }
 
 .price-plan {
@@ -635,6 +639,19 @@ main {
   color: var(--color-muted);
   font-size: 16px;
   line-height: 1.6;
+}
+
+.sync-ways {
+  max-width: 30rem;
+  margin: 0.9rem 0 0;
+  padding-left: 1.1rem;
+  color: var(--color-muted);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.sync-ways li + li {
+  margin-top: 0.5rem;
 }
 
 .price-plan .actions {

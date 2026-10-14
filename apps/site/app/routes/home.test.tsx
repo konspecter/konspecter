@@ -75,41 +75,63 @@ it("shows the landing page with the configured downloads", async () => {
   );
 });
 
-it("shows what sync costs where it is paid, with a way to try it", async () => {
+it("offers your own way and the paid sync, with its price and a way to try it", async () => {
   renderHome("en", [{ platform: "web", url: "https://app.example.com/" }], null, {
     amount: 3,
     currency: "USD",
     period: "1m",
     trial: "14d",
   });
-  const pricing = await screen.findByRole("region", { name: "What it costs" });
-  expect(pricing).toHaveTextContent("The appsFree");
-  expect(pricing).toHaveTextContent("$3 every month");
-  expect(pricing).toHaveTextContent("The first 14 days are free.");
-  expect(within(pricing).getByRole("link", { name: "Try sync for free" })).toHaveAttribute(
+  const sync = await screen.findByRole("region", { name: "Sync between your devices" });
+  expect(within(sync).getByRole("heading", { name: "Your own way" })).toBeInTheDocument();
+  expect(sync).toHaveTextContent("Keep that folder in iCloud Drive");
+  expect(within(sync).getByRole("link", { name: "Self-hosting guide" })).toHaveAttribute(
+    "href",
+    "https://github.com/konspecter/konspecter/blob/main/docs/self-hosting.md",
+  );
+  expect(within(sync).getByRole("heading", { name: "Konspecter sync" })).toBeInTheDocument();
+  expect(sync).toHaveTextContent("$3 every month");
+  expect(sync).toHaveTextContent("Cancel any time. The first 14 days are free.");
+  expect(within(sync).getByRole("link", { name: "Try sync for free" })).toHaveAttribute(
     "href",
     "/settings",
   );
-  expect(screen.getByText(/With a sync subscription, it catches up/)).toBeInTheDocument();
-  expect(screen.getByText(/With a sync subscription, connect your computer/)).toBeInTheDocument();
-  expect(screen.getByText(/With a sync subscription, they are locked/)).toBeInTheDocument();
+  expect(within(sync).getByRole("link", { name: "Prices and terms" })).toHaveAttribute(
+    "href",
+    "/terms",
+  );
 });
 
-it("promises catching up, connected devices and encryption where sync is free", async () => {
+it("offers the free sync beside your own way, and speaks of both", async () => {
   renderHome("en", []);
-  expect(await screen.findByText(/It catches up when you are back online/)).toBeInTheDocument();
-  expect(screen.getByText(/^Connect your computer, phone and browser/)).toBeInTheDocument();
+  const sync = await screen.findByRole("region", { name: "Sync between your devices" });
+  expect(sync).toHaveTextContent("through Konspecter sync");
+  expect(within(sync).getByRole("heading", { name: "Konspecter sync" })).toBeInTheDocument();
+  expect(within(sync).getAllByText("Free")).toHaveLength(2);
+  expect(within(sync).getByRole("link", { name: "Connect your devices" })).toHaveAttribute(
+    "href",
+    "/settings",
+  );
+  expect(within(sync).queryByRole("link", { name: "Prices and terms" })).not.toBeInTheDocument();
+  expect(
+    screen.getByText(/^Connect your computer, phone and browser.*your own way/),
+  ).toBeInTheDocument();
   expect(screen.getByText(/^Conspects are locked with a passphrase/)).toBeInTheDocument();
 });
 
-it("promises no catching up, connected devices or server where sync is off", async () => {
+it("offers only your own way where the server has no sync", async () => {
   renderHome("ru", [], null, null, "none");
-  expect(await screen.findByText(/никуда не уходит/)).toBeInTheDocument();
-  expect(screen.queryByText(/когда сеть вернётся/)).not.toBeInTheDocument();
-  expect(screen.getByText(/экспортом и импортом обычных файлов Markdown/)).toBeInTheDocument();
+  const sync = await screen.findByRole("region", { name: "Синхронизация между устройствами" });
+  expect(within(sync).getByRole("heading", { name: "По-своему" })).toBeInTheDocument();
+  expect(
+    within(sync).queryByRole("heading", { name: "Синхронизация Konspecter" }),
+  ).not.toBeInTheDocument();
+  expect(sync).not.toHaveTextContent("через синхронизацию Konspecter");
   expect(screen.queryByText(/QR-код/)).not.toBeInTheDocument();
-  expect(screen.getByText(/их не хранит никакой сервер/)).toBeInTheDocument();
   expect(screen.queryByText(/шифруются паролем/)).not.toBeInTheDocument();
+  expect(
+    screen.getByText(/синхронизируйте их по-своему — через облачный диск/),
+  ).toBeInTheDocument();
 });
 
 it("leaves out the downloads when none are configured", async () => {
@@ -117,7 +139,6 @@ it("leaves out the downloads when none are configured", async () => {
   await screen.findByRole("heading", { level: 1 });
   expect(screen.queryByRole("region", { name: "Get Konspecter" })).not.toBeInTheDocument();
   expect(screen.queryByRole("link", { name: /Download/ })).not.toBeInTheDocument();
-  expect(screen.queryByRole("region", { name: "What it costs" })).not.toBeInTheDocument();
 });
 
 it("speaks Russian, with the language dropdown and the other theme", async () => {

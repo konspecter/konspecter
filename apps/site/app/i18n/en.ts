@@ -46,24 +46,16 @@ export const en = {
   "home.feature.offline.title": "No internet? No problem",
   "home.feature.offline.text":
     "Everything is kept on your device, so Konspecter opens at once and works on a plane or underground. It catches up when you are back online.",
-  "home.feature.offline.textPaid":
-    "Everything is kept on your device, so Konspecter opens at once and works on a plane or underground. With a sync subscription, it catches up when you are back online.",
-  "home.feature.offline.textNone":
-    "Everything is kept on your device and goes nowhere else, so Konspecter opens at once and works the same on a plane, underground or with no network at all.",
   "home.feature.devices.title": "On all your devices",
   "home.feature.devices.text":
-    "Connect your computer, phone and browser to one account, by scanning a QR code, and a conspect written on one shows up on the others.",
-  "home.feature.devices.textPaid":
-    "With a sync subscription, connect your computer, phone and browser to one account, by scanning a QR code, and a conspect written on one shows up on the others.",
+    "Connect your computer, phone and browser to one account by scanning a QR code, and a conspect written on one shows up on the others. Or sync them your own way, with a cloud drive or a server of your own.",
   "home.feature.devices.textNone":
-    "Konspecter runs on your computer, your phone and in the browser. Each keeps its own conspects, and you move them over by exporting and importing ordinary Markdown files.",
+    "Your computer, phone and browser can share the same conspects: sync them your own way, with a cloud drive, export and import, or a server of your own.",
   "home.feature.private.title": "Private and yours",
   "home.feature.private.text":
     "Conspects are locked with a passphrase only you know before they leave your device: nobody else can read them, not even the server that keeps them. And each one is an ordinary text file you can open anywhere.",
-  "home.feature.private.textPaid":
-    "Conspects stay on your device. With a sync subscription, they are locked with a passphrase only you know before they leave it: nobody else can read them, not even the server that keeps them. And each one is an ordinary text file you can open anywhere.",
   "home.feature.private.textNone":
-    "Conspects never leave your device: no server keeps them, and nobody but you can read them. And each one is an ordinary text file you can open anywhere.",
+    "Konspecter sends your conspects nowhere: they are ordinary text files that go only where you put them and open anywhere.",
   "home.markdown.title": "Konspecter speaks Markdown",
   "home.markdown.text":
     "Every conspect is plain Markdown: a few simple marks, like # for a heading or ** for bold. You can write without them, the toolbar formats for you. To get the most out of Konspecter, spend ten minutes on Markdown: it works the same in many other editors and on GitHub.",
@@ -72,19 +64,30 @@ export const en = {
   "home.markdown.guide": "Learn Markdown",
   "home.free": "Free, and no account needed.",
   "home.allPlatforms": "All platforms",
-  "home.price.title": "What it costs",
-  "home.price.appsTitle": "The apps",
-  "home.price.free": "Free",
-  "home.price.appsText":
-    "Writing, search, tags and work without the internet, on your computer, your phone and in the browser. No account needed.",
-  "home.price.syncTitle": "Sync between your devices",
-  "home.price.every": "every {period}",
-  "home.price.syncText":
-    "The same conspects on every device, encrypted before they leave it. Cancel any time.",
-  "home.price.try": "Try sync for free",
-  "home.price.get": "Get sync",
-  "home.pricingTrial": "The first {trial} are free.",
-  "home.pricingTerms": "Prices and terms",
+  "home.sync.title": "Sync between your devices",
+  "home.sync.lead":
+    "Konspecter needs no server: each device keeps its conspects itself. To have the same ones everywhere, sync them your own way or through Konspecter sync.",
+  "home.sync.leadNone":
+    "Konspecter needs no server: each device keeps its conspects itself. To have the same ones everywhere, sync them your own way.",
+  "home.sync.free": "Free",
+  "home.sync.own.title": "Your own way",
+  "home.sync.own.folder":
+    "On a computer, every conspect is a Markdown file in a folder. Keep that folder in iCloud Drive, Dropbox, Yandex Disk, Syncthing or Git (Settings → Library → Change folder…), and your computers share it.",
+  "home.sync.own.transfer":
+    "On a phone or in the browser, move conspects over as .md files, a folder or a ZIP archive in Settings → Import & export.",
+  "home.sync.own.server":
+    "Or run a Konspecter server of your own: it costs nothing and starts from ready-made images.",
+  "home.sync.own.guide": "Self-hosting guide",
+  "home.sync.service.title": "Konspecter sync",
+  "home.sync.service.text":
+    "Connect your computer, phone and browser to one account by scanning a QR code, and a conspect written on one shows up on the others. Conspects are locked with a passphrase only you know before they leave your device: not even the server can read them.",
+  "home.sync.every": "every {period}",
+  "home.sync.cancel": "Cancel any time.",
+  "home.sync.trial": "The first {trial} are free.",
+  "home.sync.connect": "Connect your devices",
+  "home.sync.try": "Try sync for free",
+  "home.sync.get": "Get sync",
+  "home.sync.terms": "Prices and terms",
   "home.downloadsTitle": "Get Konspecter",
   "home.downloadsLead": "The same app on your computer, your phone and in the browser.",
   "home.platform.macos": "macOS",
