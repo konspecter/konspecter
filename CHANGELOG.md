@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 — 2026-10-14
 
 - **The welcome shows the first keys:** new conspect, search, find in the conspect, the
   editor mode and the sidebar, with `?` for all of them. Touch screens leave them out.
