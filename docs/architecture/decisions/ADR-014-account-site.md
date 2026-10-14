@@ -13,7 +13,7 @@ lives there, in one language, with one set of tests.
 ## Decision
 
 1. **A separate web application, `apps/site`**, built with React Router in framework mode
-   and rendered on the server in Node (`@react-router/node`, `react-router-serve`). Pages
+   and rendered on the server in Node (`@react-router/node`, Express). Pages
    are HTML from the first request. Forms are plain posts to route actions, so they work
    before and without JavaScript. The one exception is the Encryption section, which must
    run in the browser ([ADR-017](ADR-017-end-to-end-encryption.md)).
