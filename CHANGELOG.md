@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **The pressed shade is only on the phone's island:** a click on any other button or link
+  no longer darkens it and fades back, in the app and on the site. The island's big buttons
+  keep it, so a tap there is seen.
+
 ## 0.3.0 — 2026-10-14
 
 - **Sync mode is chosen, not inferred (breaking):** `KONSPECTER_SYNC_MODE` is `free` (the

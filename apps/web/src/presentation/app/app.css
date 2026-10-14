@@ -1891,6 +1891,21 @@ kbd {
   cursor: pointer;
 }
 
+/*
+ * A pressed button of the island darkens at once and fades back over 200ms
+ * when let go, so a tap is seen: an inset shadow over any background and
+ * under the icon. Only here; elsewhere a click needs no such show.
+ */
+.island :is(button, a[href]) {
+  box-shadow: inset 0 0 0 100vmax transparent;
+  transition: box-shadow 200ms ease-out;
+}
+
+.island :is(button:not(:disabled), a[href]):active {
+  box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--color-fg) 12%, transparent);
+  transition: none;
+}
+
 .island-button[aria-expanded="true"] {
   background: var(--color-hover);
   color: var(--color-fg);
