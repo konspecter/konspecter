@@ -58,7 +58,8 @@ func SignInCode(locale Locale, siteURL, to, code string, ttl time.Duration, newA
 		l.title = "Код для регистрации"
 		l.intro = []string{"Ваш код для создания аккаунта Konspecter:"}
 		l.outro = []string{
-			fmt.Sprintf("Введите его на странице, где вы его запросили. Код действует %d мин.", minutes(ttl)),
+			"Введите его на странице, где вы его запросили.",
+			fmt.Sprintf("Код действует %d мин.", minutes(ttl)),
 			"Если вы не регистрировались в Konspecter, просто удалите это письмо.",
 		}
 	case locale == Russian:
@@ -66,8 +67,9 @@ func SignInCode(locale Locale, siteURL, to, code string, ttl time.Duration, newA
 		l.title = "Код для входа"
 		l.intro = []string{"Ваш код для входа в Konspecter:"}
 		l.outro = []string{
-			fmt.Sprintf("Введите его на странице, где вы его запросили. Код действует %d мин.", minutes(ttl)),
-			"Если вы не входили в Konspecter, просто удалите это письмо: без кода войти нельзя.",
+			"Введите его на странице, где вы его запросили.",
+			fmt.Sprintf("Код действует %d мин.", minutes(ttl)),
+			"Если вы не входили в Konspecter, просто удалите это письмо.",
 		}
 	case newAccount:
 		l.subject = fmt.Sprintf("Your Konspecter sign-up code: %s", code)
