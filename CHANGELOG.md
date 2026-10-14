@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.1 — 2026-10-15
 
 - **Signing in leads to the settings:** without a page to go back to, every way of signing in
   (a code, a password, Google and the others) now ends on the account's settings instead of
