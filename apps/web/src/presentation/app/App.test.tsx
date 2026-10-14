@@ -2113,6 +2113,24 @@ describe("onboarding", () => {
     const tree = await within(sidebar()).findByRole("navigation", { name: "Tags" });
     expect(await within(tree).findByRole("link", { name: "Konspecter" })).toBeInTheDocument();
   });
+
+  it("points to the settings in the case the sentence needs", async () => {
+    // As main.tsx does before the first render.
+    applyLanguage("ru");
+    try {
+      const store = await newStore();
+      renderApp(store, "/", { ...DEFAULT_SETTINGS, language: "ru" });
+
+      const welcome = await screen.findByRole("region", { name: "Добро пожаловать в Konspecter" });
+      expect(welcome).toHaveTextContent("или папку в Настройках, там же");
+      expect(within(welcome).getByRole("link", { name: "Настройках" })).toHaveAttribute(
+        "href",
+        "/settings",
+      );
+    } finally {
+      applyLanguage("system");
+    }
+  });
 });
 
 describe("keyboard shortcuts", () => {

@@ -314,7 +314,7 @@ function Welcome({ store }: { store: NoteRepository }) {
       <p className="setting-hint">
         {rich("welcome.import", {
           md: <code>.md</code>,
-          settings: <Link to="/settings">{t("sidebar.settings")}</Link>,
+          settings: <Link to="/settings">{t("welcome.settings")}</Link>,
         })}
       </p>
     </section>

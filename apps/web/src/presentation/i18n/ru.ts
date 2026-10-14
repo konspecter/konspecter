@@ -155,6 +155,7 @@ export const ru: Dictionary = {
   "welcome.example": "Добавить пример конспекта",
   "welcome.import":
     "Уже есть конспекты? Импортируйте файлы {md} или папку в {settings}, там же подключается синхронизация.",
+  "welcome.settings": "Настройках",
   "welcome.exampleNote": `# Добро пожаловать в Konspecter
 
 Каждый конспект — это документ **Markdown**. Этот показывает, что это даёт.

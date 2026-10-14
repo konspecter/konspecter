@@ -134,6 +134,7 @@ export const en = {
   "welcome.example": "Add an example conspect",
   "welcome.import":
     "Have conspects already? Import {md} files or a folder in {settings}, where you can also connect sync.",
+  "welcome.settings": "Settings",
   "welcome.exampleNote": `# Welcome to Konspecter
 
 Every conspect is a **Markdown** document. This one shows what that gives you.
