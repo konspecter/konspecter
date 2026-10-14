@@ -30,9 +30,7 @@ describe("FactoryResetSettings", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Reset Konspecter…" }));
     const dialog = await screen.findByRole("alertdialog", { name: "Reset Konspecter?" });
-    expect(dialog).toHaveTextContent(
-      "The settings, the sync connection and reading positions are erased.",
-    );
+    expect(dialog).toHaveTextContent("The settings and the sync connection are erased.");
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();

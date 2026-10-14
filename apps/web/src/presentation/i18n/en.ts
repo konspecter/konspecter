@@ -299,16 +299,16 @@ source, or delete this conspect when you are done.
 
   "reset.title": "Reset to factory settings",
   "reset.hint":
-    "Returns Konspecter to how it was when installed: settings, the sync connection, reading positions and the app library are erased. Markdown files are never touched, the desktop app's folder included.",
+    "Returns Konspecter to how it was when installed: settings, the sync connection and the app library are erased. Markdown files are never touched, the desktop app's folder included.",
   "reset.start": "Reset Konspecter…",
   "reset.confirmTitle": "Reset Konspecter?",
   "reset.confirm": {
-    one: "The {count} conspect in the app library is erased, with the settings, the sync connection and reading positions. Conspects synced to your account stay there and come back when you connect again; to keep a copy, export them first. Markdown files outside the app are not touched.",
+    one: "The {count} conspect in the app library is erased, with the settings and the sync connection. Conspects synced to your account stay there and come back when you connect again; to keep a copy, export them first. Markdown files outside the app are not touched.",
     other:
-      "The {count} conspects in the app library are erased, with the settings, the sync connection and reading positions. Conspects synced to your account stay there and come back when you connect again; to keep a copy, export them first. Markdown files outside the app are not touched.",
+      "The {count} conspects in the app library are erased, with the settings and the sync connection. Conspects synced to your account stay there and come back when you connect again; to keep a copy, export them first. Markdown files outside the app are not touched.",
   },
   "reset.confirmEmpty":
-    "The settings, the sync connection and reading positions are erased. Markdown files are not touched, the desktop app's folder included.",
+    "The settings and the sync connection are erased. Markdown files are not touched, the desktop app's folder included.",
   "reset.confirmButton": "Erase and reset",
   "reset.resetting": "Resetting…",
 
