@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1 — 2026-10-16
+
+- **A large import is fast again:** importing many `.md` files no longer redraws the sidebar
+  after each one. 2,000 conspects now take seconds instead of about half a minute, and so
+  does a first sync of a large library.
+
 ## 0.5.0 — 2026-10-16
 
 - **A signed Android release:** the APK is a release build signed with Konspecter's own key,
