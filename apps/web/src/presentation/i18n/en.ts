@@ -21,7 +21,7 @@ export const en = {
   "sidebar.settings": "Settings",
   "sidebar.allNotes": "All conspects",
   "sidebar.newNote": "New conspect",
-  "sidebar.tags": "Navigation",
+  "sidebar.tags": "Goto",
   "sidebar.noRecent": "No activity in 7 days",
   "sidebar.tagsHint": "Write {tag} or {nested} in a conspect.",
   "sidebar.recent": "Recent",

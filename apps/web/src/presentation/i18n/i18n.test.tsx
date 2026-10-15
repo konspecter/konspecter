@@ -72,7 +72,7 @@ it("shows the app in Russian", async () => {
   );
 
   const sidebar = screen.getByRole("complementary", { name: "Боковая панель" });
-  const tags = await within(sidebar).findByRole("navigation", { name: "Навигация" });
+  const tags = await within(sidebar).findByRole("navigation", { name: "Goto" });
   expect(await within(tags).findByRole("link", { name: "Новые технологии" })).toBeInTheDocument();
   expect(within(tags).getByLabelText("1 конспект")).toBeInTheDocument();
   expect(screen.getByRole("heading", { level: 1, name: "Конспекты" })).toBeInTheDocument();

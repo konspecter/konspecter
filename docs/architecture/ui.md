@@ -21,7 +21,7 @@ The interface speaks English and Russian ([i18n](i18n.md)). The account site sha
   height and scrolls on its own; the page scrolls under a sticky top bar (so the reading
   position keeps using the window's scroll). No app header, brand or menu.
 - **Sidebar** (`Sidebar.tsx`): toggle, Settings, New note; the tag tree, in the pane
-  titled Navigation (tags as folders, notes as documents inside them and untagged ones at the
+  titled Goto (tags as folders, notes as documents inside them and untagged ones at the
   root; a tag's name opens `/?q=#tag`, see [tags](tags.md)); recent notes, those created or edited in the last 7 days (`recentNotes`; "No activity in 7
   days" when there are none), most recently edited first, with the open
   one marked. Above them the pinned notes: on a note `Ctrl+1`…`Ctrl+0` pins it to that key

@@ -19,7 +19,7 @@ export const ru: Dictionary = {
   "sidebar.settings": "Настройки",
   "sidebar.allNotes": "Все конспекты",
   "sidebar.newNote": "Новый конспект",
-  "sidebar.tags": "Навигация",
+  "sidebar.tags": "Goto",
   "sidebar.noRecent": "Нет активности за 7 дней",
   "sidebar.tagsHint": "Напишите в конспекте {tag} или {nested}.",
   "sidebar.recent": "Недавние",

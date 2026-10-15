@@ -334,16 +334,16 @@ describe("sidebar panes", () => {
   it("folds each pane on its header, any number open, and remembers it", async () => {
     renderApp(await taggedStore(), "/conspects/java");
     await textEditor();
-    const tags = await within(sidebar()).findByRole("navigation", { name: "Navigation" });
+    const tags = await within(sidebar()).findByRole("navigation", { name: "Goto" });
     const javaTag = within(tags).getByRole("link", { name: "Java" });
     const recentNote = within(recentNav()).getByRole("link", { name: "Java Collections" });
     const details = within(sidebar()).getByRole("region", { name: "Details" });
-    for (const name of ["Navigation", "Recent", "Details"]) {
+    for (const name of ["Goto", "Recent", "Details"]) {
       expect(paneToggle(name)).toHaveAttribute("aria-expanded", "true");
     }
 
-    await userEvent.click(paneToggle("Navigation"));
-    expect(paneToggle("Navigation")).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(paneToggle("Goto"));
+    expect(paneToggle("Goto")).toHaveAttribute("aria-expanded", "false");
     expect(javaTag).not.toBeVisible();
     expect(recentNote).toBeVisible();
     expect(details).toBeVisible();
@@ -354,19 +354,19 @@ describe("sidebar panes", () => {
     cleanup();
     renderApp(await taggedStore(), "/conspects/java");
     await textEditor();
-    await within(sidebar()).findByRole("navigation", { name: "Navigation" });
-    expect(paneToggle("Navigation")).toHaveAttribute("aria-expanded", "false");
+    await within(sidebar()).findByRole("navigation", { name: "Goto" });
+    expect(paneToggle("Goto")).toHaveAttribute("aria-expanded", "false");
     expect(paneToggle("Recent")).toHaveAttribute("aria-expanded", "true");
     expect(paneToggle("Details")).toHaveAttribute("aria-expanded", "false");
-    await userEvent.click(paneToggle("Navigation"));
+    await userEvent.click(paneToggle("Goto"));
     expect(within(sidebar()).getByRole("link", { name: "Java" })).toBeVisible();
   });
 
   it("moves with ↑/↓ through the headers and the rows of open panes", async () => {
     renderApp(await taggedStore());
-    await within(sidebar()).findByRole("navigation", { name: "Navigation" });
+    await within(sidebar()).findByRole("navigation", { name: "Goto" });
     act(() => {
-      paneToggle("Navigation").focus();
+      paneToggle("Goto").focus();
     });
 
     await userEvent.keyboard("{ArrowDown}");
@@ -377,16 +377,16 @@ describe("sidebar panes", () => {
     expect(within(recentNav()).getByRole("link", { name: "Java Collections" })).toHaveFocus();
 
     // A folded pane's rows are skipped.
-    await userEvent.click(paneToggle("Navigation"));
+    await userEvent.click(paneToggle("Goto"));
     await userEvent.keyboard("{ArrowDown}");
     expect(paneToggle("Recent")).toHaveFocus();
     await userEvent.keyboard("{ArrowUp}");
-    expect(paneToggle("Navigation")).toHaveFocus();
+    expect(paneToggle("Goto")).toHaveFocus();
   });
 
   it("moves with ↑/↓ from a clicked row, also where a click does not focus it (WebKit)", async () => {
     renderApp(await taggedStore());
-    const tags = await within(sidebar()).findByRole("navigation", { name: "Navigation" });
+    const tags = await within(sidebar()).findByRole("navigation", { name: "Goto" });
     // A bare click event, as WebKit sends it: no focus of its own.
     const java = within(tags).getByRole("link", { name: "Java" });
     fireEvent.click(java);
@@ -400,13 +400,13 @@ describe("sidebar panes", () => {
 
   it("enters the sidebar with Ctrl+\\ on an open pane only", async () => {
     renderApp(await taggedStore(), "/conspects/java");
-    await within(sidebar()).findByRole("navigation", { name: "Navigation" });
+    await within(sidebar()).findByRole("navigation", { name: "Goto" });
     await userEvent.click(paneToggle("Recent"));
-    await userEvent.click(paneToggle("Navigation"));
+    await userEvent.click(paneToggle("Goto"));
     await userEvent.click(await textEditor());
 
     await userEvent.keyboard("{Control>}\\{/Control}{Control>}\\{/Control}");
-    expect(paneToggle("Navigation")).toHaveFocus();
+    expect(paneToggle("Goto")).toHaveFocus();
   });
 });
 
@@ -783,7 +783,7 @@ describe("tags", () => {
     await store.put(createNote("# Untagged", daysAgo(3), "plain"));
     return store;
   }
-  const tagTree = () => within(sidebar()).findByRole("navigation", { name: "Navigation" });
+  const tagTree = () => within(sidebar()).findByRole("navigation", { name: "Goto" });
 
   it("shows the tags as folders with their notes inside, with counts, collapsed", async () => {
     renderApp(await storeWithTaggedNotes());
@@ -1490,7 +1490,7 @@ describe("settings and the top bar", () => {
     await store.put(createNote("# N\n\n#новые_технологии", new Date(), "n"));
     renderWithSettings(store, "/settings");
 
-    const tree = await within(sidebar()).findByRole("navigation", { name: "Navigation" });
+    const tree = await within(sidebar()).findByRole("navigation", { name: "Goto" });
     expect(await within(tree).findByRole("link", { name: "Новые технологии" })).toBeInTheDocument();
     await userEvent.selectOptions(
       screen.getByRole("combobox", { name: "Tag names" }),
@@ -2298,7 +2298,7 @@ describe("onboarding", () => {
     });
     // The example opens in the text editor, and its tags reach the sidebar.
     expect(await textEditor()).toHaveTextContent("Headings and lists");
-    const tree = await within(sidebar()).findByRole("navigation", { name: "Navigation" });
+    const tree = await within(sidebar()).findByRole("navigation", { name: "Goto" });
     expect(await within(tree).findByRole("link", { name: "Konspecter" })).toBeInTheDocument();
   });
 
