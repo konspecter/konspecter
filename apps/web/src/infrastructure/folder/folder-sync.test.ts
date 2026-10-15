@@ -137,6 +137,34 @@ describe("FolderSync", () => {
     expect(await restarted.sync.get(synced?.id ?? "")).toMatchObject({ markdown: "# Java" });
   });
 
+  it("keeps an untitled file's note when the file takes its title's name", async () => {
+    const server = new FakeServer();
+    const d = await desktop(server);
+    const note = await d.files.create("- ", date);
+    expect(note.id).toBe("untitled.md");
+    await connected(d.engine);
+    const [synced] = liveNotes(server);
+
+    // Titled in the app: renamed at once.
+    await d.files.put(updateNote(note, "# Java", minutesLater(1)));
+    await d.engine.syncNow();
+    // Titled in another program: renamed when the folder next opens.
+    d.folder.move("java.md", "untitled.md");
+    d.folder.notify({ paths: ["java.md", "untitled.md"], rescan: false });
+    await vi.waitFor(async () => {
+      expect(await d.files.get("untitled.md")).toBeDefined();
+    });
+    await d.engine.syncNow();
+    const restarted = await desktop(server, { folder: d.folder, db: d.db });
+    await restarted.engine.start();
+
+    expect([...d.folder.files.keys()]).toEqual(["java.md"]);
+    expect(liveNotes(server)).toEqual([expect.objectContaining({ id: synced?.id })]);
+    expect(await restarted.sync.get(synced?.id ?? "")).toMatchObject({
+      markdown: expect.stringContaining("# Java") as unknown,
+    });
+  });
+
   it("deletes a trashed file's note, and trashes a file deleted elsewhere", async () => {
     const server = new FakeServer();
     const d = await desktop(server);

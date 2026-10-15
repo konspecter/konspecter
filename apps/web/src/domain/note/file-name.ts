@@ -72,6 +72,14 @@ const CYRILLIC: Readonly<Record<string, string>> = {
   ў: "u",
 };
 
+/** The stem of a note without a title yet ("untitled.md", "untitled-2.md" …). */
+export const UNTITLED = "untitled";
+
+/** Whether a file name stem is the one a note without a title gets. */
+export function isUntitledStem(stem: string): boolean {
+  return stemFitsSlug(stem, UNTITLED);
+}
+
 /**
  * The file name stem a title stands for when files follow their titles:
  * lower case, Cyrillic transliterated, accents dropped from Latin letters,
@@ -87,7 +95,7 @@ export function slugFor(title: string): string {
   const slug = latin.replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "");
   // Count code points, not UTF-16 units, so no character is cut in half.
   const cut = Array.from(slug).slice(0, 80).join("").replace(/-+$/, "");
-  return cut === "" ? "untitled" : cut;
+  return cut === "" ? UNTITLED : cut;
 }
 
 /** Whether a file name stem is the slug, or the slug made unique ("hello-mir-2"). */

@@ -197,6 +197,39 @@ describe("FolderStore", () => {
       expect([...folder.files.keys()]).toEqual(["hello.md"]);
     });
 
+    it("names an untitled file after its title once it has one, with the setting off", async () => {
+      const { folder, store } = await setup();
+      folder.edit("test.md", "- ");
+      const created = await store.create("- ", now);
+      expect(created.id).toBe("untitled.md");
+
+      // Saved in the middle of the title, then again: the name follows it to the end.
+      const typing = await store.put(updateNote(created, "# Ha", now));
+      const typed = await store.put(updateNote(typing, "# Hash maps\n\nBuckets", now));
+      expect([typing.id, typed.id]).toEqual(["ha.md", "hash-maps.md"]);
+      expect([...folder.files.keys()].sort()).toEqual(["hash-maps.md", "test.md"]);
+
+      // A file named otherwise keeps its name.
+      const kept = await store.put(updateNote(await mustGet(store, "test.md"), "# Test", now));
+      expect(kept.id).toBe("test.md");
+    });
+
+    it("renames untitled files that have titles when the folder opens", async () => {
+      const { folder, store } = await setup();
+      folder.edit("untitled.md", "# Hash maps");
+      folder.edit("go/untitled-2.md", "# Channels\n\n#go");
+      folder.edit("untitled-3.md", "\n");
+      folder.edit("drafts/Untitled.md", "# Named by another program\n\n#drafts");
+
+      expect((await store.list()).map((note) => note.id).sort()).toEqual([
+        "drafts/Untitled.md",
+        "go/channels.md",
+        "hash-maps.md",
+        "untitled-3.md",
+      ]);
+      expect(folder.files.get("go/channels.md")?.text).toBe("# Channels\n\n#go");
+    });
+
     it("ignores its own rename coming back from the watcher", async () => {
       const { folder, store } = await setup({ followTitles: true });
       folder.edit("test.md", "# Test");

@@ -1,6 +1,12 @@
 import type { NoteChange, NoteRepository } from "../../application/notes/note-repository";
 import { documentTitle, parseDocument } from "../../domain/document/document";
-import { slugFileNames, slugFor, stemFitsSlug } from "../../domain/note/file-name";
+import {
+  isUntitledStem,
+  slugFileNames,
+  slugFor,
+  stemFitsSlug,
+  UNTITLED,
+} from "../../domain/note/file-name";
 import { ignoreRules, type IgnoreRules } from "../../domain/note/ignore";
 import {
   chainFolder,
@@ -51,6 +57,11 @@ type CachedFile = {
  * The folder's `.konspecterignore` names what is not a note: such files are
  * not listed (the native side does not even walk into them), and no note is
  * made or moved into a folder it skips.
+ *
+ * A note saved before it had a title is "untitled.md" ("untitled-2.md" …).
+ * That name is a placeholder: the file takes its title's name once there is
+ * one, whether or not files follow their titles, and files found with it
+ * when the folder opens are renamed then.
  */
 export class FolderStore implements NoteRepository {
   readonly #folder: FolderBridge;
@@ -62,6 +73,12 @@ export class FolderStore implements NoteRepository {
   readonly #listeners = new Set<(change: NoteChange) => void>();
   /** Paths being renamed by this app: the watcher's reports of them are its own. */
   readonly #moving = new Set<string>();
+  /**
+   * Files renamed from "untitled" while their titles were being typed: they
+   * keep following their titles while the app runs, so a save in the middle
+   * of a title ("ha.md") does not name the file for good.
+   */
+  readonly #followingTitle = new Set<string>();
 
   readonly #graceMs: number;
   #followTitles: boolean;
@@ -275,6 +292,23 @@ export class FolderStore implements NoteRepository {
     this.#files.clear();
     for (const { entry, text } of contents) this.#remember(entry, text);
     this.#search = null;
+    for (const path of [...this.#files.keys()]) await this.#nameUntitled(path);
+  }
+
+  /** An "untitled" file whose note has a title now takes the title's name, in its folder. */
+  async #nameUntitled(path: string): Promise<void> {
+    const file = this.#files.get(path);
+    const slash = path.lastIndexOf("/") + 1;
+    const stem = path.slice(slash).replace(/\.md$/i, "");
+    if (!file || !isUntitledStem(stem)) return;
+    const slug = slugFor(titleOf(file.markdown));
+    if (slug === UNTITLED) return;
+    try {
+      const moved = await this.#move(path, path.slice(0, slash), slug);
+      this.#emit({ noteId: moved.id, source: "local", previousId: path });
+    } catch {
+      // A file that cannot be renamed keeps its name until it is saved.
+    }
   }
 
   #ensureLoaded(): Promise<void> {
@@ -373,9 +407,10 @@ export class FolderStore implements NoteRepository {
   /**
    * Moves a saved file where its note says it belongs, unless it is there:
    * into the folder of its first tag chain when the save changed that chain
-   * (from `previous`), and to its title's slug when files follow their
-   * titles and its name no longer fits. A file whose chain the save kept stays
-   * in its folder, so files left where they are (see `reformat`) stay there.
+   * (from `previous`), and to its title's slug when its name no longer fits
+   * and files follow their titles, or this one does (an "untitled" file, see
+   * `#followingTitle`). A file whose chain the save kept stays in its folder,
+   * so files left where they are (see `reformat`) stay there.
    */
   async #relocate(path: string, previous: string | undefined): Promise<Note | null> {
     const file = this.#files.get(path);
@@ -392,7 +427,9 @@ export class FolderStore implements NoteRepository {
       sameChain(before, chain) || inChainFolder(path, read)
         ? here
         : this.#notIgnored(chainFolder(chain, foldersOf(this.#files.keys())), here);
-    const slug = this.#followTitles ? slugFor(titleOf(file.markdown)) : stem;
+    if (isUntitledStem(stem)) this.#followingTitle.add(path);
+    const follows = this.#followTitles || this.#followingTitle.has(path);
+    const slug = follows ? slugFor(titleOf(file.markdown)) : stem;
     const name = stemFitsSlug(stem, slug) ? stem : slug;
     if (folder === here && name === stem) return null;
     return this.#move(path, folder, name);
@@ -412,6 +449,7 @@ export class FolderStore implements NoteRepository {
       );
       this.#files.delete(path);
       this.#search?.remove(path);
+      if (this.#followingTitle.delete(path)) this.#followingTitle.add(entry.path);
       const moved = this.#remember(entry, file.markdown);
       this.#moving.delete(entry.path);
       await this.#moveReadingState(path, entry.path);
@@ -523,6 +561,7 @@ export class FolderStore implements NoteRepository {
   async #trash(id: string, source: NoteChange["source"]): Promise<void> {
     await this.#folder.trash(id);
     this.#files.delete(id);
+    this.#followingTitle.delete(id);
     this.#search?.remove(id);
     await this.#removeIfEmpty(id);
     this.#emit({ noteId: id, source });
