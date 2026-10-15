@@ -90,19 +90,37 @@ function placeholder(text: string) {
   });
 }
 
-/** The tags in the text block at `pos`, as the tag rules say; none in code. */
-function blockTags(block: Node, pos: number): Decoration[] {
-  if (block.type === nodes.code_block) return [];
-  // The block's text, code replaced by spaces and breaks by newlines, so
-  // offsets match positions and code never looks like a tag.
+/**
+ * The text block's text, code replaced by spaces and breaks by newlines, so
+ * offsets match positions and code never looks like a tag or an address.
+ */
+function blockText(block: Node): string {
   let text = "";
   block.forEach((child) => {
     if (!child.isText) text += "\n";
     else if (marks.code.isInSet(child.marks)) text += " ".repeat(child.nodeSize);
     else text += child.text ?? "";
   });
-  return tagRanges(text).map(({ from, to }) =>
+  return text;
+}
+
+/** The tags in the text block at `pos`, as the tag rules say; none in code. */
+function blockTags(block: Node, pos: number): Decoration[] {
+  if (block.type === nodes.code_block) return [];
+  return tagRanges(blockText(block)).map(({ from, to }) =>
     Decoration.inline(pos + 1 + from, pos + 1 + to, { class: "md-tag" }),
+  );
+}
+
+/**
+ * The web addresses written out in the text block at `pos`: shown as links,
+ * as the reader shows them (GFM), while the Markdown keeps them as written.
+ * None in code.
+ */
+function blockAddresses(block: Node, pos: number): Decoration[] {
+  if (block.type === nodes.code_block) return [];
+  return writtenAddresses(blockText(block)).map(({ from, to }) =>
+    Decoration.inline(pos + 1 + from, pos + 1 + to, { class: "md-link" }),
   );
 }
 
@@ -111,18 +129,30 @@ export function tagDecorations(doc: Node): DecorationSet {
   return blockDecorations(doc, blockTags);
 }
 
-const tags: Plugin<DecorationSet> = new Plugin<DecorationSet>({
-  state: {
-    init: (_, state) => tagDecorations(state.doc),
-    apply: (tr, previous) =>
-      tr.docChanged ? updatedBlockDecorations(tr, previous, blockTags) : previous,
-  },
-  props: {
-    decorations(state) {
-      return this.getState(state) ?? null;
+/** The written web addresses in the document, marked for styling. */
+export function addressDecorations(doc: Node): DecorationSet {
+  return blockDecorations(doc, blockAddresses);
+}
+
+/** Decorations of the text blocks, made by `decorate` and kept up as the text changes. */
+function textDecorations(decorate: (block: Node, pos: number) => Decoration[]) {
+  const plugin: Plugin<DecorationSet> = new Plugin<DecorationSet>({
+    state: {
+      init: (_, state) => blockDecorations(state.doc, decorate),
+      apply: (tr, previous) =>
+        tr.docChanged ? updatedBlockDecorations(tr, previous, decorate) : previous,
     },
-  },
-});
+    props: {
+      decorations(state) {
+        return plugin.getState(state) ?? null;
+      },
+    },
+  });
+  return plugin;
+}
+
+const tags = textDecorations(blockTags);
+const addresses = textDecorations(blockAddresses);
 
 /** A search in the text (the top bar's, see `NoteFind`): its matches and the selected one. */
 type FindState = {
@@ -419,6 +449,7 @@ export function createTextEditorState(
       placeholder(t("editor.placeholder")),
       listItems,
       tags,
+      addresses,
       codeHighlighting(),
       find,
       typing(),
@@ -615,15 +646,23 @@ function trimAddress(address: string): string {
   return trimmed;
 }
 
+/** The web addresses written out in `text`: where each is and where it leads. */
+function writtenAddresses(text: string): { from: number; to: number; href: string }[] {
+  return [...text.matchAll(WRITTEN_ADDRESS)].map((match) => {
+    const address = trimAddress(match[0]);
+    return {
+      from: match.index,
+      to: match.index + address.length,
+      href: /^www\./i.test(address) ? `http://${address}` : address,
+    };
+  });
+}
+
 /** The web address written out in `text` around `offset` (at its ends too), if any. */
 export function writtenAddressAt(text: string, offset: number): string | null {
-  for (const match of text.matchAll(WRITTEN_ADDRESS)) {
-    const address = trimAddress(match[0]);
-    if (offset >= match.index && offset <= match.index + address.length) {
-      return /^www\./i.test(address) ? `http://${address}` : address;
-    }
-  }
-  return null;
+  return (
+    writtenAddresses(text).find(({ from, to }) => offset >= from && offset <= to)?.href ?? null
+  );
 }
 
 /**

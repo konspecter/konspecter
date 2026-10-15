@@ -5,6 +5,7 @@ import {
   findInDocument,
   findTransaction,
   foundMatches,
+  addressDecorations,
   linkAtCaret,
   tagDecorations,
   toolbarActions,
@@ -263,6 +264,41 @@ describe("tools in effect", () => {
       "tool.quote",
       "tool.bulletList",
     ]);
+  });
+});
+
+describe("written addresses", () => {
+  const linked = (markdown: string) => {
+    const state = createTextEditorState(textMarkdownParser.parse(markdown));
+    return addressDecorations(state.doc)
+      .find()
+      .map(({ from, to }) => state.doc.textBetween(from, to));
+  };
+
+  it("are shown as links, without the punctuation after them", () => {
+    expect(linked("See https://example.com/a, and www.example.org.")).toEqual([
+      "https://example.com/a",
+      "www.example.org",
+    ]);
+    expect(linked("- [ ] read https://example.com/(docs))")).toEqual([
+      "https://example.com/(docs)",
+    ]);
+  });
+
+  it("are none in code, and the Markdown keeps them as written", () => {
+    expect(linked("`https://example.com` and\n\n```\nhttps://example.com\n```")).toEqual([]);
+    const markdown = "Go to https://example.com now";
+    expect(textDocToMarkdown(textMarkdownParser.parse(markdown))).toBe(markdown);
+  });
+
+  it("are shown while typed", () => {
+    const { view, type } = editorWith("Go to");
+    // At the end of the paragraph each time.
+    for (const key of " www.example.com") {
+      const end = view.state.doc.content.size - 1;
+      type(end, key, key);
+    }
+    expect(view.dom.querySelector(".md-link")?.textContent).toBe("www.example.com");
   });
 });
 

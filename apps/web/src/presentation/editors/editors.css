@@ -198,6 +198,12 @@
   padding-left: 2.6em;
 }
 
+/* A web address written out looks like the links beside it, as the reader shows it. */
+.text-editor-content .md-link {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
+
 .text-editor-content .placeholder::before {
   content: attr(data-placeholder);
   float: left;
