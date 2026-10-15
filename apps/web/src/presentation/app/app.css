@@ -332,6 +332,10 @@ mark {
   font-size: 13px;
 }
 
+.recent-pane .sidebar-hint {
+  text-align: center;
+}
+
 /*
  * The last pane: the open note's details, rendered there by the note page.
  * Empty (and hidden) everywhere else. Smaller and quieter than the rest.
