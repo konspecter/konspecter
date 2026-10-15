@@ -199,29 +199,33 @@ the fetch error as its `cause`.
 ## Keyboard
 
 One registry, `presentation/app/shortcuts.ts`, used by the handlers and by the lists in the
-`?` dialog and in Settings. `Mod` is ⌘ on macOS and Ctrl elsewhere; the physical key is also
+`?` dialog and in Settings. `Mod` is ⌘ on macOS and Ctrl elsewhere, `Alt` is ⌥; the physical key is also
 matched, so the shortcuts work on Cyrillic layouts.
 
-| Keys    | Action                          | Where                          |
-| ------- | ------------------------------- | ------------------------------ |
-| `Mod+P` | Search                          | everywhere, also in editors    |
-| `Mod+F` | Search in the open note         | the note page, also in editors |
-| `Esc`   | Back (the list at the start)    | the list, a search, a note     |
-| `Mod+N` | New note                        | everywhere, also in editors    |
-| `Mod+,` | Settings                        | everywhere, also in editors    |
-| `Mod+\` | Show or hide the sidebar        | everywhere, also in editors    |
-| `Mod+/` | Switch text editor and Markdown | everywhere, also in editors    |
-| `Mod+←` | Back (the search box's ‹)       | outside text fields            |
-| `Mod+→` | Forward (the search box's ›)    | outside text fields            |
-| `Mod+S` | Save now                        | the editor                     |
-| `/` `n` | Search, new note                | outside text fields            |
-| `?`     | Show the shortcuts              | outside text fields            |
+| Keys        | Action                          | Where                          |
+| ----------- | ------------------------------- | ------------------------------ |
+| `Mod+P`     | Search                          | everywhere, also in editors    |
+| `Mod+F`     | Search in the open note         | the note page, also in editors |
+| `Esc`       | Back (the list at the start)    | the list, a search, a note     |
+| `Mod+N`     | New note                        | everywhere, also in editors    |
+| `Mod+,`     | Settings                        | everywhere, also in editors    |
+| `Mod+\`     | Show or hide the sidebar        | everywhere, also in editors    |
+| `Mod+/`     | Switch text editor and Markdown | everywhere, also in editors    |
+| `Mod+←`     | Back (the search box's ‹)       | outside text fields            |
+| `Mod+→`     | Forward (the search box's ›)    | outside text fields            |
+| `Mod+Alt+←` | Previous note in Recent         | everywhere, also in editors    |
+| `Mod+Alt+→` | Next note in Recent             | everywhere, also in editors    |
+| `Mod+S`     | Save now                        | the editor                     |
+| `/` `n`     | Search, new note                | outside text fields            |
+| `?`         | Show the shortcuts              | outside text fields            |
 
 Modifier shortcuts are caught in the capture phase, before editors and the browser (no print
 dialog on `Mod+P`), and go no further (CodeMirror's own `Mod-/` does not comment the line).
 `Mod+←`/`Mod+→` are the exception (`outsideText` in the registry): in text they keep moving the
 caret (to the line's ends on macOS, by words elsewhere), so they go back and forward only
 outside text fields, and only within the app's own history.
+`Mod+Alt+←`/`Mod+Alt+→` go round the sidebar's recent notes (the last 7 days, newest first): past the last to
+the first and back; from a page that is not a note, → opens the first and ← the last.
 `Esc` goes back, as `‹` does, from the list, a search and a note, also in the editor (at the
 start of the app's history it goes to the list, unless already there); in Settings and other
 pages it does nothing. It gives way where Escape already means something: an

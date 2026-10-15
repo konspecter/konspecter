@@ -170,6 +170,43 @@ describe("layout", () => {
     );
   });
 
+  it("goes round the recent notes with Mod+Alt+← and Mod+Alt+→, also while typing", async () => {
+    const store = await newStore();
+    await store.put(createNote("# Oldest\n\nOne.", daysAgo(3), "oldest"));
+    await store.put(createNote("# Middle\n\nTwo.", daysAgo(2), "middle"));
+    await store.put(createNote("# Newest\n\nThree.", daysAgo(1), "newest"));
+    renderApp(store);
+    await noteList();
+    const open = async () => {
+      await textEditor();
+      return within(recentNav()).getByRole("link", { current: "page" }).textContent;
+    };
+    const press = (arrow: "ArrowLeft" | "ArrowRight") =>
+      userEvent.keyboard(`{Control>}{Alt>}{${arrow}}{/Alt}{/Control}`);
+
+    // From the list: → opens the newest, ← the oldest.
+    await press("ArrowRight");
+    expect(await open()).toBe("Newest");
+    await userEvent.click(await textEditor());
+    await press("ArrowRight");
+    await waitFor(async () => {
+      expect(await open()).toBe("Middle");
+    });
+    await press("ArrowRight");
+    await waitFor(async () => {
+      expect(await open()).toBe("Oldest");
+    });
+    // Round from the last to the first, and back.
+    await press("ArrowRight");
+    await waitFor(async () => {
+      expect(await open()).toBe("Newest");
+    });
+    await press("ArrowLeft");
+    await waitFor(async () => {
+      expect(await open()).toBe("Oldest");
+    });
+  });
+
   it("hides and shows the sidebar with a sideways swipe", async () => {
     renderApp(await newStore());
     const swipe = (fromX: number, toX: number) => {

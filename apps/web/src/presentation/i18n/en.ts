@@ -67,6 +67,8 @@ export const en = {
   "shortcut.editorMode": "Switch between the text editor and Markdown",
   "shortcut.back": "Back (outside text fields)",
   "shortcut.forward": "Forward (outside text fields)",
+  "shortcut.previousRecent": "Previous conspect in Recent",
+  "shortcut.nextRecent": "Next conspect in Recent",
   "shortcut.help": "Show these shortcuts",
   "shortcuts.title": "Keyboard shortcuts",
   "shortcuts.or": "or",

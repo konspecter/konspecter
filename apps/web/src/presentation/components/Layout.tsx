@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Link, Outlet, useLocation, useMatch, useNavigate, useSearchParams } from "react-router";
 import { parseQuery } from "../../domain/search/query";
 import type { EditorMode, TagNames, Theme } from "../../domain/settings/settings";
-import type { NoteCatalog } from "../../application/notes/note-catalog";
+import { recentNotes, type NoteCatalog } from "../../application/notes/note-catalog";
 import type { NoteRepository } from "../../application/notes/note-repository";
 import type { SyncEngine } from "../../infrastructure/sync/sync-engine";
 import type { Activity } from "../app/activity";
@@ -222,6 +222,16 @@ export function Layout({
     focusSearch();
   };
   const newNote = () => void navigate("/conspects/new");
+  const openRecent = (step: 1 | -1) => {
+    const library = catalog.getSnapshot();
+    if (library.status !== "ready") return;
+    const id = recentStep(
+      recentNotes(library.notes, new Date()).map((note) => note.id),
+      currentNoteId,
+      step,
+    );
+    if (id !== null) void navigate(`/conspects/${encodeURIComponent(id)}`);
+  };
   useShortcuts({
     search: openSearch,
     quickSearch: openSearch,
@@ -248,6 +258,12 @@ export function Layout({
     },
     forward: () => {
       if (historySteps.forward) void navigate(1);
+    },
+    previousRecent: () => {
+      openRecent(-1);
+    },
+    nextRecent: () => {
+      openRecent(1);
     },
     help: () => {
       setShowShortcuts(true);
@@ -429,4 +445,22 @@ export function Layout({
       {showShortcuts && <ShortcutsDialog onClose={closeShortcuts} />}
     </div>
   );
+}
+
+/**
+ * The note `step` from `current` in the recent notes (newest first), round
+ * from the last to the first and back. Away from a note, the next is the
+ * first and the previous the last. Null when there is none to go to.
+ */
+export function recentStep(
+  ids: readonly string[],
+  current: string | null,
+  step: 1 | -1,
+): string | null {
+  if (ids.length === 0) return null;
+  const index = current === null ? -1 : ids.indexOf(current);
+  const next =
+    index === -1 ? (step === 1 ? 0 : ids.length - 1) : (index + step + ids.length) % ids.length;
+  const id = ids[next] ?? null;
+  return id === current ? null : id;
 }

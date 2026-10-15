@@ -4,7 +4,7 @@ import type { TextKey } from "../i18n/i18n";
  * Every keyboard shortcut in the app, in one place: the handlers (Layout and
  * the note page) and the lists shown to the user read the same table.
  *
- * `Mod` is ⌘ on macOS and Ctrl elsewhere. Modifier shortcuts work
+ * `Mod` is ⌘ on macOS and Ctrl elsewhere, `Alt` is ⌥. Modifier shortcuts work
  * everywhere, also while typing in an editor, unless they are `outsideText`
  * (in text ⌘←/⌘→ go to the line's ends, Ctrl+←/→ by words); single keys only
  * outside text fields, except Escape, which also works in the editors. Labels
@@ -21,6 +21,8 @@ export const SHORTCUTS = {
   editorMode: { keys: "Mod+/", label: "shortcut.editorMode" },
   back: { keys: "Mod+ArrowLeft", label: "shortcut.back", outsideText: true },
   forward: { keys: "Mod+ArrowRight", label: "shortcut.forward", outsideText: true },
+  previousRecent: { keys: "Mod+Alt+ArrowLeft", label: "shortcut.previousRecent" },
+  nextRecent: { keys: "Mod+Alt+ArrowRight", label: "shortcut.nextRecent" },
   quickSearch: { keys: "/", label: "shortcut.search" },
   quickNewNote: { keys: "n", label: "shortcut.newNote" },
   help: { keys: "?", label: "shortcut.help" },
@@ -53,16 +55,23 @@ export function isMac(): boolean {
 
 const ARROWS: Readonly<Record<string, string>> = { ArrowLeft: "←", ArrowRight: "→" };
 
+/** "Mod+Alt+ArrowLeft" as its parts: whether it has Alt, and the key. */
+function modifierKeys(keys: string): { alt: boolean; key: string } {
+  const rest = keys.slice(4);
+  return rest.startsWith("Alt+") ? { alt: true, key: rest.slice(4) } : { alt: false, key: rest };
+}
+
 /**
  * "Mod+P" as the user sees it: "⌘P" on macOS, "Ctrl+P" elsewhere; "Escape"
- * is "Esc", and arrow keys are arrows ("⌘←").
+ * is "Esc", and arrow keys are arrows ("⌘←", "⌥⌘←", "Ctrl+Alt+←").
  */
 export function formatKeys(keys: string, mac = isMac()): string {
   if (keys === "Escape") return "Esc";
   if (!keys.startsWith("Mod+")) return keys;
-  const key = keys.slice(4);
+  const { alt, key } = modifierKeys(keys);
   const shown = ARROWS[key] ?? key;
-  return mac ? `⌘${shown}` : `Ctrl+${shown}`;
+  if (mac) return `${alt ? "⌥" : ""}⌘${shown}`;
+  return `Ctrl+${alt ? "Alt+" : ""}${shown}`;
 }
 
 /** The physical key, for layouts where ⌘/Ctrl + key reports another character (Cyrillic). */
@@ -72,12 +81,13 @@ function keyCode(key: string): string | null {
   return codes[key] ?? null;
 }
 
-/** Whether `event` is the shortcut `keys` ("Mod+P", "?"). */
+/** Whether `event` is the shortcut `keys` ("Mod+P", "Mod+Alt+ArrowLeft", "?"). */
 export function matchesShortcut(keys: string, event: KeyboardEvent, mac = isMac()): boolean {
   if (keys.startsWith("Mod+")) {
     const mod = mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
-    if (!mod || event.altKey || event.shiftKey) return false;
-    const key = keys.slice(4).toLowerCase();
+    const { alt, key: name } = modifierKeys(keys);
+    if (!mod || event.altKey !== alt || event.shiftKey) return false;
+    const key = name.toLowerCase();
     return event.key.toLowerCase() === key || event.code === keyCode(key);
   }
   if (event.ctrlKey || event.metaKey || event.altKey) return false;

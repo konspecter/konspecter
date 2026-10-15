@@ -98,4 +98,20 @@ describe("arrow shortcuts", () => {
     expect(formatKeys("Mod+ArrowLeft", true)).toBe("⌘←");
     expect(formatKeys("Mod+ArrowRight", false)).toBe("Ctrl+→");
   });
+
+  it("tells Mod+Alt+arrows from Mod+arrows", () => {
+    const left = { key: "ArrowLeft" };
+    expect(
+      matchesShortcut("Mod+Alt+ArrowLeft", key({ ...left, metaKey: true, altKey: true }), true),
+    ).toBe(true);
+    expect(
+      matchesShortcut("Mod+Alt+ArrowLeft", key({ ...left, ctrlKey: true, altKey: true }), false),
+    ).toBe(true);
+    expect(matchesShortcut("Mod+Alt+ArrowLeft", key({ ...left, metaKey: true }), true)).toBe(false);
+    expect(
+      matchesShortcut("Mod+ArrowLeft", key({ ...left, metaKey: true, altKey: true }), true),
+    ).toBe(false);
+    expect(formatKeys("Mod+Alt+ArrowLeft", true)).toBe("⌥⌘←");
+    expect(formatKeys("Mod+Alt+ArrowRight", false)).toBe("Ctrl+Alt+→");
+  });
 });
