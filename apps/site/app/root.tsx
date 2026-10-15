@@ -3,7 +3,8 @@ import "@konspecter/ui/fonts.css";
 import "@konspecter/ui/tokens.css";
 import "@konspecter/ui/base.css";
 import "@konspecter/ui/controls.css";
-import type { ReactNode } from "react";
+import { stopFocusZoom } from "@konspecter/ui/viewport";
+import { useEffect, type ReactNode } from "react";
 import {
   data,
   isRouteErrorResponse,
@@ -131,6 +132,8 @@ export function Layout({ children }: { children: ReactNode }) {
   const preferences = useRouteLoaderData<RootData>("root");
   const locale = preferences?.locale ?? "en";
   const theme = preferences?.theme ?? "system";
+  // iOS Safari would zoom in on every field and stay zoomed (after hydration: the tag is React's).
+  useEffect(stopFocusZoom, []);
   return (
     <html lang={locale} {...(theme === "system" ? {} : { "data-theme": theme })}>
       <head>

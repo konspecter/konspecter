@@ -28,6 +28,7 @@ import type { LibraryControls } from "./presentation/app/library";
 import type { UpdateSource } from "./presentation/app/updates";
 import { isMac } from "./presentation/app/shortcuts";
 import { ErrorState } from "./presentation/components/ErrorState";
+import { stopFocusZoom } from "@konspecter/ui/viewport";
 import "@konspecter/ui/fonts.css";
 import "@konspecter/ui/tokens.css";
 import "@konspecter/ui/base.css";
@@ -43,6 +44,8 @@ const root = createRoot(rootElement);
 // On macOS the desktop window draws its content under the title bar
 // (tauri.conf.json); the window buttons then sit in the sidebar's top bar.
 if (isDesktop() && isMac()) document.documentElement.dataset.titlebar = "overlay";
+// iOS Safari would zoom in on every field and stay zoomed.
+stopFocusZoom();
 
 // The service worker precaches the app so it works offline, and reports when
 // a new version is waiting.

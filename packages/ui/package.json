@@ -4,15 +4,17 @@
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
-  "description": "The shared look of the app and the account site: palette, fonts, base rules, controls and icons.",
+  "description": "The shared look of the app and the account site: palette, fonts, base rules, controls, icons and the viewport.",
   "exports": {
     "./tokens.css": "./src/tokens.css",
     "./fonts.css": "./src/fonts.css",
     "./base.css": "./src/base.css",
     "./controls.css": "./src/controls.css",
-    "./icons": "./src/icons.tsx"
+    "./icons": "./src/icons.tsx",
+    "./viewport": "./src/viewport.ts"
   },
   "scripts": {
+    "test": "vitest run",
     "typecheck": "tsc -b"
   },
   "dependencies": {
@@ -24,6 +26,7 @@
   "devDependencies": {
     "@types/react": "^19.3.0",
     "react": "^19.3.0",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.2"
   }
 }
