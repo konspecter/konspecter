@@ -1655,6 +1655,14 @@ kbd {
   line-height: 1.45;
 }
 
+/*
+ * A server address, an account or a folder path has nowhere to break: it
+ * breaks anywhere rather than stick out of the panel and scroll the page.
+ */
+.setting-block :is(.setting-hint, .sync-status, .inline-error) {
+  overflow-wrap: anywhere;
+}
+
 /* Like the rows' controls, a block's buttons keep to the right edge, under its fields. */
 .setting-block .actions {
   justify-content: flex-end;

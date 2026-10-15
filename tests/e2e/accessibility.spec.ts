@@ -103,6 +103,30 @@ test("no screen overflows sideways on a phone", async ({ browser }) => {
   await context.close();
 });
 
+test("a long server address and account stay inside the sync settings on a phone", async ({
+  page,
+}) => {
+  // Addresses without a hyphen or a dot to break at for a long way.
+  const server = "https://syncserverwithanaddressfartoolongforaphone1234567890.example.com";
+  await page.route(`${server}/**`, (route) =>
+    route.request().url().endsWith("/api/me")
+      ? route.fulfill({
+          json: { id: "u1", email: "anaccountnamefartoolongforaphonescreen@example.com" },
+        })
+      : route.fulfill({ status: 500 }),
+  );
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto("/settings");
+  await page.getByRole("textbox", { name: "Server URL" }).fill(server);
+  await page.getByText("Advanced: connect with an access token").click();
+  await page.getByRole("textbox", { name: "Access token" }).fill("ksp_test");
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await expect(page.getByText(/^Connected to/)).toBeVisible();
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
+  ).toBeLessThanOrEqual(0);
+});
+
 test("the layout fills the window at any size", async ({ page }) => {
   for (const [width, height] of [
     [1400, 900],
