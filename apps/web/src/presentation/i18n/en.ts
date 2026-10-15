@@ -59,7 +59,7 @@ export const en = {
 
   "shortcut.search": "Search",
   "shortcut.find": "Search in the open conspect",
-  "shortcut.allNotes": "All conspects",
+  "shortcut.escapeBack": "Back from the list, a search or a conspect, also in the editor",
   "shortcut.newNote": "New conspect",
   "shortcut.settings": "Settings",
   "shortcut.save": "Save now (conspects also save as you type)",

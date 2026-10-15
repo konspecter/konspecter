@@ -67,7 +67,7 @@ export const ru: Dictionary = {
 
   "shortcut.search": "Поиск",
   "shortcut.find": "Поиск в открытом конспекте",
-  "shortcut.allNotes": "Все конспекты",
+  "shortcut.escapeBack": "Назад из списка, поиска или конспекта, также в редакторе",
   "shortcut.newNote": "Новый конспект",
   "shortcut.settings": "Настройки",
   "shortcut.save": "Сохранить сейчас (конспекты сохраняются и при наборе)",

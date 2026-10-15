@@ -228,7 +228,7 @@ describe("layout", () => {
     ).not.toBeInTheDocument();
     const allNotes = within(topBar()).getByRole("link", { name: "All conspects" });
     expect(allNotes).toHaveAttribute("href", "/");
-    expect(allNotes).toHaveAttribute("title", "All conspects (Esc)");
+    expect(allNotes).toHaveAttribute("title", "All conspects");
     expect(allNotes.parentElement?.nextElementSibling).toBe(within(topBar()).getByRole("search"));
     await userEvent.click(allNotes);
     expect(await listTitles()).toEqual(["Java Collections"]);
@@ -2390,13 +2390,43 @@ describe("keyboard shortcuts", () => {
     expect(await listTitles()).toHaveLength(1);
   });
 
-  it("goes to every note with Escape, also from the editor", async () => {
+  it("goes back with Escape from the list, a search and the editor", async () => {
+    const store = await newStore();
+    await store.put(javaNote);
+    renderApp(store);
+    await userEvent.click(searchBox());
+    await userEvent.keyboard("java");
+    await userEvent.click(within(await noteList()).getByRole("link", { name: /Java Collections/ }));
+    await userEvent.click(await textEditor());
+
+    // From the editor back to the search, from the search back to the list.
+    await userEvent.keyboard("{Escape}");
+    expect(await listTitles()).toEqual(["Java Collections"]);
+    await waitFor(() => {
+      expect(searchBox()).toHaveValue("java");
+    });
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => {
+      expect(searchBox()).toHaveValue("");
+    });
+  });
+
+  it("goes to the list with Escape from a note opened first, and not from settings", async () => {
     const store = await newStore();
     await store.put(javaNote);
     renderApp(store, "/conspects/java");
-    await userEvent.click(await textEditor());
+    await userEvent.click(within(sidebar()).getByRole("link", { name: "Settings" }));
+    await screen.findByRole("heading", { level: 1, name: "Settings" });
 
+    // Settings keeps Escape.
     await userEvent.keyboard("{Escape}");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Back" }));
+    await userEvent.click(await textEditor());
+    await userEvent.keyboard("{Escape}");
+    // Nowhere further back within the app: every note.
     expect(await listTitles()).toEqual(["Java Collections"]);
     expect(screen.queryByRole("textbox", { name: "Conspect text" })).not.toBeInTheDocument();
   });

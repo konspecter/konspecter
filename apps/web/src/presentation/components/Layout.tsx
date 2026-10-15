@@ -227,7 +227,14 @@ export function Layout({
     quickSearch: openSearch,
     // Elsewhere Mod+F stays the browser's.
     ...(onNote ? { find: openFind } : {}),
-    allNotes: () => void navigate("/"),
+    // Back, as ‹, from the list, a search or a note; at the start of the app's
+    // history, to the list (if not there yet). Settings and other pages keep it.
+    escapeBack: () => {
+      const onList = location.pathname === "/";
+      if (!onList && !onNote) return;
+      if (historySteps.back) void navigate(-1);
+      else if (!onList || location.search !== "") void navigate("/");
+    },
     newNote,
     quickNewNote: newNote,
     settings: () => void navigate("/settings"),
@@ -328,7 +335,7 @@ export function Layout({
                 to="/"
                 className="icon-button topbar-list"
                 aria-label={t("sidebar.allNotes")}
-                title={withShortcut(t("sidebar.allNotes"), SHORTCUTS.allNotes.keys)}
+                title={t("sidebar.allNotes")}
               >
                 <ListIcon />
               </Link>

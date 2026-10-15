@@ -206,7 +206,7 @@ matched, so the shortcuts work on Cyrillic layouts.
 | ------- | ------------------------------- | ------------------------------ |
 | `Mod+P` | Search                          | everywhere, also in editors    |
 | `Mod+F` | Search in the open note         | the note page, also in editors |
-| `Esc`   | All notes (the list, `/`)       | everywhere, also in editors    |
+| `Esc`   | Back (the list at the start)    | the list, a search, a note     |
 | `Mod+N` | New note                        | everywhere, also in editors    |
 | `Mod+,` | Settings                        | everywhere, also in editors    |
 | `Mod+\` | Show or hide the sidebar        | everywhere, also in editors    |
@@ -222,7 +222,9 @@ dialog on `Mod+P`), and go no further (CodeMirror's own `Mod-/` does not comment
 `Mod+←`/`Mod+→` are the exception (`outsideText` in the registry): in text they keep moving the
 caret (to the line's ends on macOS, by words elsewhere), so they go back and forward only
 outside text fields, and only within the app's own history.
-`Esc` leaves the editor for the list, but gives way where Escape already means something: an
+`Esc` goes back, as `‹` does, from the list, a search and a note, also in the editor (at the
+start of the app's history it goes to the list, unless already there); in Settings and other
+pages it does nothing. It gives way where Escape already means something: an
 open dialog closes, the search box and other form fields (CodeMirror's go-to-line field) let
 go of the focus. CodeMirror has no search panel of its own: `Mod+F` is the top bar's. `Mod+\` that shows the sidebar moves the focus into it, to the open note (else to what is
 current there, else to the first row); `Mod+\` from there hides it and gives the focus back to
