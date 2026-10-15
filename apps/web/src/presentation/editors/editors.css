@@ -177,13 +177,20 @@
   list-style: none;
 }
 
-/* The box takes the text's size and line height, so it is centred on the first line. */
+/*
+ * The box is sized in the text's em and centred on its first line (it takes
+ * the line height); out of the flow, it leaves the line height as it is. It
+ * keeps the same gap before the text at every size; on small screens (touch)
+ * it is larger still.
+ */
 .text-editor-content .task-box {
+  --task-box-size: 1.275em;
+
   position: absolute;
-  top: calc((1lh - 0.85em) / 2);
-  left: -1.45em;
-  width: 0.85em;
-  height: 0.85em;
+  top: calc((1lh - var(--task-box-size)) / 2);
+  left: calc(-1 * (var(--task-box-size) + 0.6em));
+  width: var(--task-box-size);
+  height: var(--task-box-size);
   margin: 0;
   font: inherit;
   accent-color: var(--color-accent);
@@ -274,6 +281,10 @@
 
   .text-editor-toolbar .toolbar-button {
     width: 28px;
+  }
+
+  .text-editor-content .task-box {
+    --task-box-size: 1.7em;
   }
 
   :root[data-editing-area="highlighted"] .note-editor {
