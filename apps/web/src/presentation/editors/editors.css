@@ -184,7 +184,7 @@
  * it is larger still.
  */
 .text-editor-content .task-box {
-  --task-box-size: 1.275em;
+  --task-box-size: 0.935em;
 
   position: absolute;
   top: calc((1lh - var(--task-box-size)) / 2);
@@ -284,7 +284,7 @@
   }
 
   .text-editor-content .task-box {
-    --task-box-size: 1.7em;
+    --task-box-size: 1.275em;
   }
 
   :root[data-editing-area="highlighted"] .note-editor {
