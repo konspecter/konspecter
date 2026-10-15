@@ -132,6 +132,7 @@ export const en = {
     "Your conspects as plain Markdown, kept on this device and working offline. Tag them anywhere with {tags}, find them with full-text search, and sync them with a server when you want to.",
   "welcome.create": "Create your first conspect",
   "welcome.example": "Add an example conspect",
+  "welcome.sync": "Sync",
   "welcome.import":
     "Have conspects already? Import {md} files or a folder in {settings}, where you can also connect sync.",
   "welcome.settings": "Settings",

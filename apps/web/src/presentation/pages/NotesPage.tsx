@@ -13,6 +13,7 @@ import { isEmptyQuery, parseQuery } from "../../domain/search/query";
 import { highlight, snippet, type SnippetPart } from "../../domain/search/snippet";
 import type { NoteCatalog, NoteSummary } from "../../application/notes/note-catalog";
 import type { NoteRepository } from "../../application/notes/note-repository";
+import { isNativeMobile } from "../../infrastructure/mobile/mobile";
 import type { SearchHit } from "../../infrastructure/search/search-index";
 import type { LibraryControls } from "../app/library";
 import type { ShortcutName } from "../app/shortcuts";
@@ -347,6 +348,12 @@ function Welcome({
         >
           {t("welcome.example")}
         </button>
+        {/* A phone usually joins notes kept elsewhere: sync is one tap away. */}
+        {isNativeMobile() && (
+          <Link to="/settings#sync" className="button">
+            {t("welcome.sync")}
+          </Link>
+        )}
       </div>
       {library && <WelcomeFolder library={library} />}
       <p className="setting-hint">

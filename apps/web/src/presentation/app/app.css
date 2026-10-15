@@ -1480,6 +1480,11 @@ kbd {
   padding-bottom: 2rem;
 }
 
+/* A group opened by its address (/settings#sync) clears the sticky top bar. */
+.settings-group {
+  scroll-margin-top: calc(var(--topbar-height) + env(safe-area-inset-top) + 1rem);
+}
+
 .settings-group-title {
   margin: 0 0 0.6rem;
   font-size: 17px;

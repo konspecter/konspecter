@@ -41,7 +41,7 @@ export function syncSummary(status: SyncStatus): string {
 export function SyncSettings({ sync }: { sync: SyncEngine }) {
   const status = useSyncExternalStore(sync.subscribe, sync.getStatus);
   return (
-    <section className="settings-group" aria-labelledby="sync-heading">
+    <section id="sync" className="settings-group" aria-labelledby="sync-heading">
       <h2 id="sync-heading" className="settings-group-title">
         {t("sync.title")}
       </h2>

@@ -1702,6 +1702,29 @@ describe("sync", () => {
     expect(await screen.findByRole("button", { name: "Connect" })).toBeInTheDocument();
   });
 
+  it("offers sync on the mobile app's welcome, opening settings on it", async () => {
+    vi.stubGlobal("Capacitor", { isNativePlatform: () => true });
+    const scrolled = vi.fn<(this: Element) => void>(function (this: Element) {});
+    Element.prototype.scrollIntoView = scrolled;
+    try {
+      const store = await newStore();
+      render(
+        <MemoryRouter>
+          <App store={store} sync={syncFor(store, new FakeServer())} />
+        </MemoryRouter>,
+      );
+
+      const welcome = await screen.findByRole("region", { name: "Welcome to Konspecter" });
+      await userEvent.click(within(welcome).getByRole("link", { name: "Sync" }));
+
+      const heading = await screen.findByRole("heading", { level: 2, name: "Sync" });
+      expect(scrolled.mock.contexts).toEqual([heading.closest("section")]);
+    } finally {
+      vi.unstubAllGlobals();
+      Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+    }
+  });
+
   it("explains a failed connection", async () => {
     const store = await newStore();
     render(
@@ -2161,6 +2184,8 @@ describe("onboarding", () => {
     expect(
       within(welcome).getByRole("link", { name: "Create your first conspect" }),
     ).toHaveAttribute("href", "/conspects/new");
+    // Sync is offered on the mobile app only.
+    expect(within(welcome).queryByRole("link", { name: "Sync" })).not.toBeInTheDocument();
     await userEvent.click(within(welcome).getByRole("button", { name: "Add an example conspect" }));
 
     await waitFor(() => {

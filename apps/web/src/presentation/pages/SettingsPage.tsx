@@ -1,5 +1,6 @@
 import { ChevronIcon } from "@konspecter/ui/icons";
-import { useCallback, useId, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useState, type ReactNode } from "react";
+import { useLocation } from "react-router";
 import type { ReadingPositionMode } from "../../domain/reading/reading";
 import {
   FONT_SCALES,
@@ -105,6 +106,12 @@ export function SettingsPage({
   const [saveError, setSaveError] = useState<unknown>(null);
   const saveErrorText = useErrorMessage(saveError);
   const choices = options();
+  const { hash } = useLocation();
+
+  // A link to a group (/settings#sync, from the welcome) opens on it.
+  useEffect(() => {
+    if (hash.length > 1) document.getElementById(hash.slice(1))?.scrollIntoView();
+  }, [hash]);
 
   function update<K extends keyof Settings>(key: K, value: Settings[K]) {
     setSaveError(null);
