@@ -147,6 +147,28 @@ test("the layout fills the window at any size", async ({ page }) => {
   }
 });
 
+test("the top bars move the desktop window from edge to edge", async ({ page }) => {
+  await page.setViewportSize({ width: 1300, height: 800 });
+  await page.goto("/conspects/new");
+  /** The points along the top bars that are neither a drag region nor a control. */
+  const dead = () =>
+    page.evaluate(() => {
+      // The room a permanent scrollbar takes (a mouse on macOS), which the main column mirrors.
+      document.documentElement.style.setProperty("--scrollbar-gutter", "15px");
+      const points: string[] = [];
+      for (let x = 0; x < window.innerWidth; x += 1) {
+        const element = document.elementFromPoint(x, 20);
+        if (!element || element.hasAttribute("data-tauri-drag-region")) continue;
+        if (element.closest("button, a, input, svg, .search-box, .antenna")) continue;
+        points.push(`${String(x)}: ${element.tagName}.${element.className}`);
+      }
+      return points;
+    });
+  expect(await dead(), "sidebar open").toEqual([]);
+  await page.getByRole("button", { name: "Hide sidebar" }).click();
+  expect(await dead(), "sidebar closed").toEqual([]);
+});
+
 test("the sidebar's panes stay inside it, whatever the titles", async ({ page }) => {
   await page.goto("/conspects/new");
   await page.getByRole("textbox", { name: "Conspect text" }).click();

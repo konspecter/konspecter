@@ -188,7 +188,9 @@ mark {
   align-items: center;
   gap: 2px;
   height: calc(var(--topbar-height) + env(safe-area-inset-top));
-  padding: env(safe-area-inset-top) 10px 0 calc(10px + var(--titlebar-inset));
+  /* Over the sidebar's border too, so the window moves from right up to the top bar. */
+  margin-right: -1px;
+  padding: env(safe-area-inset-top) 11px 0 calc(10px + var(--titlebar-inset));
 }
 
 .sidebar-bar-space,
@@ -511,7 +513,13 @@ mark {
   align-items: center;
   gap: 12px;
   height: calc(var(--topbar-height) + env(safe-area-inset-top));
-  padding: env(safe-area-inset-top) max(12px, env(safe-area-inset-right)) 0 12px;
+  /*
+   * Over the main column's room for the scrollbar too (the padding gives it
+   * back): the bar moves the desktop window, and so must all of its strip.
+   */
+  margin-left: calc(-1 * var(--scrollbar-gutter, 0px));
+  padding: env(safe-area-inset-top) max(12px, env(safe-area-inset-right)) 0
+    calc(12px + var(--scrollbar-gutter, 0px));
   background: var(--color-bg);
   font-family: var(--font-ui);
 }
