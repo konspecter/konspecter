@@ -23,7 +23,8 @@ The interface speaks English and Russian ([i18n](i18n.md)). The account site sha
 - **Sidebar** (`Sidebar.tsx`): toggle, Settings, New note; the tag tree (tags as folders,
   notes as documents inside them; a tag's name opens `/?q=#tag`, see [tags](tags.md)); recent notes, most recently edited first, with the open
   one marked. These and the details are panes, as in VS Code's side bar: each header (a chevron
-  and the title, a button with `aria-expanded`) folds or opens its pane, any number open at once;
+  and the title, a button with `aria-expanded`) folds or opens its pane (its height animated
+  over 160 ms, `useFold`; at once with reduced motion), any number open at once;
   the open panes share the height, each scrolling on its own and taking no more than its content
   needs. The tags keep to the top and the details to the bottom; folded, the recent notes drop
   down to the details. ↑/↓ move through the headers and the rows of open panes as one list. What is folded is

@@ -23,6 +23,7 @@ import { formatKeys, SHORTCUTS } from "../app/shortcuts";
 import { ChevronIcon, GearIcon, NewNoteIcon, SidebarIcon } from "@konspecter/ui/icons";
 import { summaryTitle } from "./note-title";
 import { TagTreeView } from "./TagTreeView";
+import { useFold } from "../hooks/use-fold";
 import { isNarrow } from "../hooks/use-narrow";
 import { t } from "../i18n/i18n";
 import { rich } from "../i18n/rich";
@@ -41,7 +42,7 @@ type SidebarProps = {
   onNavigate: () => void;
   toggleRef?: Ref<HTMLButtonElement>;
   /** Receives the footer element where the open page shows its details. */
-  detailsRef?: Ref<HTMLDivElement>;
+  detailsRef?: (element: HTMLDivElement | null) => void;
 };
 
 /** The rows of the panes: the tag folders and notes of the tree, then the recent notes. */
@@ -251,13 +252,14 @@ type SidebarPaneProps = {
   landmark?: boolean;
   className: string;
   /** Receives the body element (pages render the details into it). */
-  bodyRef?: Ref<HTMLDivElement> | undefined;
+  bodyRef?: ((element: HTMLDivElement | null) => void) | undefined;
   children?: ReactNode;
 };
 
 /**
  * A foldable block of the sidebar, as in VS Code's side bar: a header that
  * folds or opens it, and a body that scrolls on its own. Any number are open.
+ * Folding and opening are animated (`useFold`).
  */
 function SidebarPane({
   title,
@@ -270,6 +272,15 @@ function SidebarPane({
 }: SidebarPaneProps) {
   const headingId = useId();
   const bodyId = useId();
+  const [body, setBodyElement] = useState<HTMLDivElement | null>(null);
+  const shown = useFold(body, open);
+  const setBody = useCallback(
+    (element: HTMLDivElement | null) => {
+      setBodyElement(element);
+      bodyRef?.(element);
+    },
+    [bodyRef],
+  );
   const Pane = landmark ? "nav" : "div";
   return (
     <Pane
@@ -288,7 +299,7 @@ function SidebarPane({
           {title}
         </button>
       </h2>
-      <div ref={bodyRef} id={bodyId} className="sidebar-pane-body" hidden={!open}>
+      <div ref={setBody} id={bodyId} className="sidebar-pane-body" hidden={!shown}>
         {children}
       </div>
     </Pane>
