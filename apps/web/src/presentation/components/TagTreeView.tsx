@@ -11,13 +11,8 @@ import { Link } from "react-router";
 import type { NoteSummary } from "../../application/notes/note-catalog";
 import type { PinKey } from "../../application/notes/note-pins";
 import { tagTreeContains, type Tag, type TagNode } from "../../domain/tag/tags";
-import {
-  ChevronIcon,
-  DocumentIcon,
-  FolderIcon,
-  FolderOpenIcon,
-  ListIcon,
-} from "@konspecter/ui/icons";
+import { ChevronIcon, DocumentIcon, FolderIcon, FolderOpenIcon } from "@konspecter/ui/icons";
+import { isMac } from "../app/shortcuts";
 import { summaryTitle } from "./note-title";
 import { t, tn } from "../i18n/i18n";
 
@@ -200,7 +195,8 @@ function TagFolder({ node, depth, parent, activeTag, currentNoteId, loadNotes }:
 
 /**
  * A note in the tree, and in the recent notes: its icon and title, opening it.
- * A pinned note (Recent) has a list icon and its key after the title.
+ * A pinned note (Recent) shows its key as a keycap before the icon, where a
+ * folder has its chevron.
  */
 export const TreeDocument = memo(function TreeDocument({
   note,
@@ -215,7 +211,7 @@ export const TreeDocument = memo(function TreeDocument({
   current: boolean;
   /** Another class for the row (`recent-link`). */
   className?: string;
-  /** The key the note is pinned to (Ctrl+1…0). */
+  /** The key the note is pinned to (Mod+Alt+1…0 pins it, Mod+1…0 opens it). */
   pin?: PinKey;
   /** ← in a folder goes to the folder's name. */
   onKeyDown?: (event: KeyboardEvent) => void;
@@ -228,15 +224,17 @@ export const TreeDocument = memo(function TreeDocument({
         style={indent(depth)}
         {...(current ? { "aria-current": "page" } : {})}
         {...(onKeyDown ? { onKeyDown } : {})}
-        {...(pin === undefined ? {} : { "aria-keyshortcuts": `Control+${pin}` })}
+        {...(pin === undefined
+          ? {}
+          : { "aria-keyshortcuts": `${isMac() ? "Meta" : "Control"}+${pin}` })}
       >
-        {pin === undefined ? <DocumentIcon /> : <ListIcon />}
-        <span className="tree-label">{summaryTitle(note)}</span>
         {pin !== undefined && (
           <span className="tree-pin" aria-hidden="true">
             {pin}
           </span>
         )}
+        <DocumentIcon />
+        <span className="tree-label">{summaryTitle(note)}</span>
       </Link>
     </li>
   );

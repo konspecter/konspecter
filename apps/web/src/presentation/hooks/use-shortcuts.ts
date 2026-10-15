@@ -1,8 +1,12 @@
 import { useEffect, useRef } from "react";
 import { matchesShortcut, SHORTCUTS, type ShortcutName } from "../app/shortcuts";
 
-/** A handler gets the key event (`Ctrl+Digit` reads its digit with `pinKeyOf`). */
-export type ShortcutHandlers = Partial<Record<ShortcutName, (event: KeyboardEvent) => void>>;
+/**
+ * A handler gets the key event (`Digit` shortcuts read their digit with
+ * `pinKeyOf`). It returns `false` when the keys are not for it this time:
+ * they go on to the editor and the browser.
+ */
+export type ShortcutHandlers = Partial<Record<ShortcutName, (event: KeyboardEvent) => unknown>>;
 
 function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -25,8 +29,7 @@ function escapeTaken(target: EventTarget | null): boolean {
 function blocked(name: ShortcutName, target: EventTarget | null): boolean {
   const shortcut: { keys: string; outsideText?: boolean } = SHORTCUTS[name];
   const { keys } = shortcut;
-  const modifier = keys.startsWith("Mod+") || keys.startsWith("Ctrl+");
-  if (modifier) return shortcut.outsideText === true && isTyping(target);
+  if (keys.startsWith("Mod+")) return shortcut.outsideText === true && isTyping(target);
   return keys === "Escape" ? escapeTaken(target) : isTyping(target);
 }
 
@@ -49,10 +52,10 @@ export function useShortcuts(handlers: ShortcutHandlers): void {
         const { keys } = SHORTCUTS[name as ShortcutName];
         if (!matchesShortcut(keys, event)) continue;
         if (blocked(name as ShortcutName, event.target)) return;
+        if (handler(event) === false) return;
         // Ours alone: an editor's own binding for the keys (CodeMirror's Mod-/) does not run.
         event.preventDefault();
         event.stopPropagation();
-        handler(event);
         return;
       }
     };

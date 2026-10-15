@@ -236,6 +236,16 @@ export function Layout({
     );
     if (id !== null) void navigate(`/conspects/${encodeURIComponent(id)}`);
   };
+  // The note on the key. A key with no note (or one that is gone) stays the browser's.
+  const openPinned = (event: KeyboardEvent): false | undefined => {
+    const key = pinKeyOf(event);
+    const library = catalog.getSnapshot();
+    const id = key === null ? undefined : pins.getSnapshot()[key];
+    if (id === undefined || library.status !== "ready") return false;
+    if (!library.notes.some((note) => note.id === id)) return false;
+    if (id !== currentNoteId) void navigate(`/conspects/${encodeURIComponent(id)}`);
+    return undefined;
+  };
   useShortcuts({
     search: openSearch,
     quickSearch: openSearch,
@@ -269,7 +279,7 @@ export function Layout({
     nextRecent: () => {
       openRecent(1);
     },
-    // On a note only: elsewhere Ctrl+1…0 stay the browser's.
+    // On a note only: elsewhere Mod+Alt+1…0 stay the browser's.
     ...(currentNoteId === null
       ? {}
       : {
@@ -278,6 +288,7 @@ export function Layout({
             if (key !== null) pins.toggle(key, currentNoteId);
           },
         }),
+    openPinned,
     help: () => {
       setShowShortcuts(true);
     },

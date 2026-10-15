@@ -117,20 +117,53 @@ describe("arrow shortcuts", () => {
 });
 
 describe("pin shortcuts", () => {
-  it("are Ctrl with a digit on every system, by the physical key", () => {
-    expect(pinKeyOf(key({ key: "1", code: "Digit1", ctrlKey: true }))).toBe("1");
-    expect(pinKeyOf(key({ key: "&", code: "Digit1", ctrlKey: true }))).toBe("1");
-    expect(pinKeyOf(key({ key: "0", code: "Numpad0", ctrlKey: true }))).toBe("0");
-    expect(pinKeyOf(key({ key: "1", code: "Digit1", metaKey: true }))).toBeNull();
-    expect(pinKeyOf(key({ key: "1", code: "Digit1", ctrlKey: true, shiftKey: true }))).toBeNull();
-    expect(pinKeyOf(key({ key: "1", code: "Digit1" }))).toBeNull();
+  it("pin with Mod+Alt and a digit, open with Mod and a digit, by the physical key", () => {
     const ctrl5 = key({ key: "5", code: "Digit5", ctrlKey: true });
-    expect(matchesShortcut("Ctrl+Digit", ctrl5, true)).toBe(true);
-    expect(matchesShortcut("Ctrl+Digit", ctrl5, false)).toBe(true);
-    expect(matchesShortcut("Ctrl+Digit", key({ key: "p", code: "KeyP", ctrlKey: true }))).toBe(
-      false,
-    );
-    expect(formatKeys("Ctrl+Digit", true)).toBe("⌃1…0");
-    expect(formatKeys("Ctrl+Digit", false)).toBe("Ctrl+1…0");
+    const cmd5 = key({ key: "5", code: "Digit5", metaKey: true });
+    // ⌥5 on macOS reports "∞": the physical key decides.
+    const cmdOpt5 = key({ key: "∞", code: "Digit5", metaKey: true, altKey: true });
+    const ctrlAlt5 = key({ key: "5", code: "Digit5", ctrlKey: true, altKey: true });
+    expect(matchesShortcut("Mod+Digit", cmd5, true)).toBe(true);
+    expect(matchesShortcut("Mod+Digit", ctrl5, true)).toBe(false);
+    expect(matchesShortcut("Mod+Digit", ctrl5, false)).toBe(true);
+    expect(matchesShortcut("Mod+Digit", cmd5, false)).toBe(false);
+    expect(matchesShortcut("Mod+Digit", cmdOpt5, true)).toBe(false);
+    expect(matchesShortcut("Mod+Alt+Digit", cmdOpt5, true)).toBe(true);
+    expect(matchesShortcut("Mod+Alt+Digit", ctrlAlt5, false)).toBe(true);
+    expect(matchesShortcut("Mod+Alt+Digit", ctrl5, false)).toBe(false);
+    expect(
+      matchesShortcut("Mod+Digit", key({ key: "&", code: "Digit1", ctrlKey: true }), false),
+    ).toBe(true);
+    expect(
+      matchesShortcut("Mod+Digit", key({ key: "0", code: "Numpad0", ctrlKey: true }), false),
+    ).toBe(true);
+    expect(
+      matchesShortcut(
+        "Mod+Digit",
+        key({ key: "%", code: "Digit5", ctrlKey: true, shiftKey: true }),
+        false,
+      ),
+    ).toBe(false);
+    expect(
+      matchesShortcut("Mod+Digit", key({ key: "p", code: "KeyP", ctrlKey: true }), false),
+    ).toBe(false);
+    expect(matchesShortcut("Mod+Digit", key({ key: "1", code: "Digit1" }), false)).toBe(false);
+    expect(pinKeyOf(key({ key: "0", code: "Numpad0", ctrlKey: true }))).toBe("0");
+    expect(pinKeyOf(key({ key: "a", code: "KeyA", ctrlKey: true }))).toBeNull();
+    expect(formatKeys("Mod+Digit", true)).toBe("⌘1…0");
+    expect(formatKeys("Mod+Digit", false)).toBe("Ctrl+1…0");
+    expect(formatKeys("Mod+Alt+Digit", true)).toBe("⌥⌘1…0");
+    expect(formatKeys("Mod+Alt+Digit", false)).toBe("Ctrl+Alt+1…0");
+  });
+
+  it("leave AltGr with a digit to typing (`{` on a German layout)", () => {
+    const altGr7 = new KeyboardEvent("keydown", {
+      key: "{",
+      code: "Digit7",
+      ctrlKey: true,
+      altKey: true,
+      modifierAltGraph: true,
+    });
+    expect(matchesShortcut("Mod+Alt+Digit", altGr7, false)).toBe(false);
   });
 });

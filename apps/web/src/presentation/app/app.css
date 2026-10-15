@@ -1172,11 +1172,28 @@ kbd {
   font-weight: 550;
 }
 
-/* The key a pinned note in Recent is on (Ctrl+1…0): light, after the title. */
+/*
+ * The key a pinned note in Recent is on (Mod+Alt+1…0 pins, Mod+1…0 opens): a
+ * keycap before the icon, in the chevron's place, so it reads as a key and
+ * not as a count like the folders' on the right. The icon stays in line.
+ */
+.tree-document:has(> .tree-pin) {
+  padding-left: calc(var(--tree-pad) + var(--depth) * var(--tree-indent));
+}
+
 .tree-pin {
+  display: inline-grid;
   flex-shrink: 0;
-  color: var(--color-faint);
-  font-size: 0.8rem;
+  place-items: center;
+  box-sizing: border-box;
+  width: calc(var(--tree-twistie) - 2px);
+  height: calc(var(--tree-twistie) - 2px);
+  border: 1px solid color-mix(in srgb, currentcolor 45%, transparent);
+  border-radius: 3px;
+  color: var(--color-muted);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 

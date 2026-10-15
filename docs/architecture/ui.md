@@ -24,9 +24,11 @@ The interface speaks English and Russian ([i18n](i18n.md)). The account site sha
   titled Goto (tags as folders, notes as documents inside them and untagged ones at the
   root; a tag's name opens `/?q=#tag`, see [tags](tags.md)); recent notes, those created or edited in the last 7 days (`recentNotes`; "No activity in 7
   days" when there are none), most recently edited first, with the open
-  one marked. Above them the pinned notes: on a note `Ctrl+1`…`Ctrl+0` pins it to that key
-  (the same keys again unpin it), listed by key (1…9, then 0) as a list icon, the title
-  and the key in light grey; a key holds one note and a note one key. Pins belong to the device
+  one marked. Above them the pinned notes, as StarCraft's unit groups: on a note
+  `Mod+Alt+1`…`Mod+Alt+0` pins it to that key (the same keys again unpin it), and `Mod+1`…`Mod+0`
+  opens it from any page, also in the editors. They are listed by key (1…9, then 0): the key as a small keycap where a
+  folder has its chevron (not on the right, where the folders' counts are), then the document
+  icon and the title; a key holds one note and a note one key. Pins belong to the device
   (`NotePins` in `application/notes/note-pins.ts`, kept in localStorage like the folded panes,
   following File Mode renames), and a pin whose note is gone is not shown. These and the details are panes, as in VS Code's side bar: each header (a chevron
   and the title, a button with `aria-expanded`) folds or opens its pane (its height animated
@@ -207,23 +209,24 @@ One registry, `presentation/app/shortcuts.ts`, used by the handlers and by the l
 `?` dialog and in Settings. `Mod` is ⌘ on macOS and Ctrl elsewhere, `Alt` is ⌥; the physical key is also
 matched, so the shortcuts work on Cyrillic layouts.
 
-| Keys        | Action                          | Where                          |
-| ----------- | ------------------------------- | ------------------------------ |
-| `Mod+P`     | Search                          | everywhere, also in editors    |
-| `Mod+F`     | Search in the open note         | the note page, also in editors |
-| `Esc`       | Back (the list at the start)    | the list, a search, a note     |
-| `Mod+N`     | New note                        | everywhere, also in editors    |
-| `Mod+,`     | Settings                        | everywhere, also in editors    |
-| `Mod+\`     | Show or hide the sidebar        | everywhere, also in editors    |
-| `Mod+/`     | Switch text editor and Markdown | everywhere, also in editors    |
-| `Mod+←`     | Back (the search box's ‹)       | outside text fields            |
-| `Mod+→`     | Forward (the search box's ›)    | outside text fields            |
-| `Mod+Alt+←` | Previous note in Recent         | everywhere, also in editors    |
-| `Mod+Alt+→` | Next note in Recent             | everywhere, also in editors    |
-| `Ctrl+1…0`  | Pin the note to Recent, unpin   | the note page, also in editors |
-| `Mod+S`     | Save now                        | the editor                     |
-| `/` `n`     | Search, new note                | outside text fields            |
-| `?`         | Show the shortcuts              | outside text fields            |
+| Keys          | Action                          | Where                          |
+| ------------- | ------------------------------- | ------------------------------ |
+| `Mod+P`       | Search                          | everywhere, also in editors    |
+| `Mod+F`       | Search in the open note         | the note page, also in editors |
+| `Esc`         | Back (the list at the start)    | the list, a search, a note     |
+| `Mod+N`       | New note                        | everywhere, also in editors    |
+| `Mod+,`       | Settings                        | everywhere, also in editors    |
+| `Mod+\`       | Show or hide the sidebar        | everywhere, also in editors    |
+| `Mod+/`       | Switch text editor and Markdown | everywhere, also in editors    |
+| `Mod+←`       | Back (the search box's ‹)       | outside text fields            |
+| `Mod+→`       | Forward (the search box's ›)    | outside text fields            |
+| `Mod+Alt+←`   | Previous note in Recent         | everywhere, also in editors    |
+| `Mod+Alt+→`   | Next note in Recent             | everywhere, also in editors    |
+| `Mod+Alt+1…0` | Pin the note to Recent, unpin   | the note page, also in editors |
+| `Mod+1…0`     | Open the note pinned to the key | everywhere, also in editors    |
+| `Mod+S`       | Save now                        | the editor                     |
+| `/` `n`       | Search, new note                | outside text fields            |
+| `?`           | Show the shortcuts              | outside text fields            |
 
 Modifier shortcuts are caught in the capture phase, before editors and the browser (no print
 dialog on `Mod+P`), and go no further (CodeMirror's own `Mod-/` does not comment the line).
@@ -232,9 +235,12 @@ caret (to the line's ends on macOS, by words elsewhere), so they go back and for
 outside text fields, and only within the app's own history.
 `Mod+Alt+←`/`Mod+Alt+→` go round the sidebar's recent notes (the last 7 days, newest first): past the last to
 the first and back; from a page that is not a note, → opens the first and ← the last; the
-pinned notes come first, as listed. `Ctrl+1…0` is Ctrl on every system (`⌃` on macOS, where ⌘ with a digit switches the browser's
-tabs) and is matched by the physical key (`Digit1`, `Numpad1`), so AZERTY's top row pins too.
-Away from a note the keys stay the browser's.
+pinned notes come first, as listed. `Mod+1…0` and `Mod+Alt+1…0` are matched by the physical key
+(`Digit1`, `Numpad1`), so AZERTY's top row and ⌥ (which types `¡` with 1 on macOS) work too.
+Keys that are not ours stay the browser's (`Mod+1…0` switch its tabs): `Mod+1…0` with no note
+on the key (a handler returns `false` to let the keys go on), and `Mod+Alt+1…0` away from a
+note. AltGr with a digit, which Windows reports as Ctrl+Alt and which types `{` and `[` on a
+German layout, is not a pin.
 `Esc` goes back, as `‹` does, from the list, a search and a note, also in the editor (at the
 start of the app's history it goes to the list, unless already there); in Settings and other
 pages it does nothing. It gives way where Escape already means something: an
