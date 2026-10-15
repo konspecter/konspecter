@@ -1280,6 +1280,15 @@ main {
   text-align: center;
 }
 
+/* A page that only reports (device connected, email sent): room around the notice. */
+.auth-card > .form-notice {
+  margin-block: 1.25rem;
+}
+
+.auth-card > .form-notice:last-child {
+  margin-bottom: 0;
+}
+
 @media (min-width: 720px) {
   .auth-ways {
     display: grid;
