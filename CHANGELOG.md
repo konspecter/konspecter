@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 — 2026-10-16
 
 - **A signed Android release:** the APK is a release build signed with Konspecter's own key,
   the same in every release, so each update installs over the previous one. It is no longer
