@@ -143,7 +143,10 @@ test("register, encrypt, connect two devices, disconnect one, delete the account
   // 5. A second device pulls and decrypts it.
   const phone = await connectApp(browser, phoneAgent, session);
   await expect(
-    phone.app.getByRole("complementary", { name: "Sidebar" }).getByRole("link", { name: title }),
+    phone.app
+      .getByRole("complementary", { name: "Sidebar" })
+      .getByRole("navigation", { name: "Recent" })
+      .getByRole("link", { name: title }),
   ).toBeVisible({ timeout: 15_000 });
 
   // 6. Disconnect the laptop on the site: it says so and keeps the conspect.
@@ -157,7 +160,10 @@ test("register, encrypt, connect two devices, disconnect one, delete the account
   await stopped.click();
   await expect(laptop.app.getByText(/This device was disconnected from/)).toBeVisible();
   await expect(
-    laptop.app.getByRole("complementary", { name: "Sidebar" }).getByRole("link", { name: title }),
+    laptop.app
+      .getByRole("complementary", { name: "Sidebar" })
+      .getByRole("navigation", { name: "Recent" })
+      .getByRole("link", { name: title }),
   ).toBeVisible();
 
   // 7. Delete the account: the server's copies and devices go with it.
@@ -169,7 +175,10 @@ test("register, encrypt, connect two devices, disconnect one, delete the account
   expect(gone.status()).toBe(401);
   // The phone keeps its copy too; its next sync finds the account gone.
   await expect(
-    phone.app.getByRole("complementary", { name: "Sidebar" }).getByRole("link", { name: title }),
+    phone.app
+      .getByRole("complementary", { name: "Sidebar" })
+      .getByRole("navigation", { name: "Recent" })
+      .getByRole("link", { name: title }),
   ).toBeVisible();
 
   await Promise.all([person.close(), laptop.context.close(), phone.context.close()]);

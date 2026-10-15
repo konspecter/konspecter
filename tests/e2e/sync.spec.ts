@@ -69,6 +69,9 @@ test("a note written on one device reaches the server and another device", async
   // The other device decrypts it: the title shows among its recent conspects.
   const b = await device(browser);
   await expect(
-    b.getByRole("complementary", { name: "Sidebar" }).getByRole("link", { name: title }),
+    b
+      .getByRole("complementary", { name: "Sidebar" })
+      .getByRole("navigation", { name: "Recent" })
+      .getByRole("link", { name: title }),
   ).toBeVisible();
 });
