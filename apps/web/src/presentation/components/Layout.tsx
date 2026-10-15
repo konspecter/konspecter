@@ -10,7 +10,7 @@ import type { Activity } from "../app/activity";
 import { rememberLocation } from "../app/last-location";
 import { pinKeyOf, SHORTCUTS } from "../app/shortcuts";
 import type { UpdateSource } from "../app/updates";
-import { useHistorySteps } from "../hooks/use-history-steps";
+import { stepsBack, useHistorySteps } from "../hooks/use-history-steps";
 import { useShortcuts } from "../hooks/use-shortcuts";
 import { useSwipe } from "../hooks/use-swipe";
 import { Antenna } from "./Antenna";
@@ -27,6 +27,8 @@ import { UpdateBanner } from "./UpdateBanner";
 import { t } from "../i18n/i18n";
 import { isNarrow, useNarrow } from "../hooks/use-narrow";
 import { useScrollbarGutter } from "../hooks/use-scrollbar-gutter";
+
+const SETTINGS_PATH = "/settings";
 
 type LayoutProps = {
   store: NoteRepository;
@@ -106,6 +108,7 @@ export function Layout({
   const matchedId = noteMatch?.params.id;
   const currentNoteId = matchedId === undefined || matchedId === "new" ? null : matchedId;
   const onNote = noteMatch !== null;
+  const onSettings = location.pathname === SETTINGS_PATH;
   const [sidebarOpen, setSidebarOpen] = useState(initialSidebarOpen);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [detailsSlot, setDetailsSlot] = useState<HTMLDivElement | null>(null);
@@ -251,17 +254,19 @@ export function Layout({
     quickSearch: openSearch,
     // Elsewhere Mod+F stays the browser's.
     ...(onNote ? { find: openFind } : {}),
-    // Back, as ‹, from the list, a search or a note; at the start of the app's
-    // history, to the list (if not there yet). Settings and other pages keep it.
+    // Back, as ‹, from the list, a search, a note or Settings, but never into
+    // Settings (back past it); with nothing further back in the app's
+    // history, to the list (if not there yet). Other pages keep it.
     escapeBack: () => {
       const onList = location.pathname === "/";
-      if (!onList && !onNote) return;
-      if (historySteps.back) void navigate(-1);
+      if (!onList && !onNote && !onSettings) return;
+      const delta = stepsBack(historySteps.steps, (path) => path === SETTINGS_PATH);
+      if (delta !== null) void navigate(delta);
       else if (!onList || location.search !== "") void navigate("/");
     },
     newNote,
     quickNewNote: newNote,
-    settings: () => void navigate("/settings"),
+    settings: () => void navigate(SETTINGS_PATH),
     toggleSidebar: toggleSidebarByKey,
     editorMode: () => {
       onModeChange(mode === "markdown" ? "text" : "markdown");
@@ -456,7 +461,7 @@ export function Layout({
                 <NewNoteIcon />
               </Link>
               <Link
-                to="/settings"
+                to={SETTINGS_PATH}
                 className="island-button island-settings"
                 aria-label={t("sidebar.settings")}
                 onClick={closeSidebarOnNarrow}
