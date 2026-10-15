@@ -223,24 +223,28 @@ mark {
  * leaves the rest to the recent notes (a flex column with max-height:
  * max-content would too, but WebKit sizes those to nothing). What is left
  * over sits above the details, which keep to the bottom; the tags keep to the
- * top, and the recent notes, folded, drop down to the details.
+ * top, and the recent notes, folded, drop down to the details. They slide
+ * there and back as they fold and open: the space moves from below them to
+ * above (`0fr` and `1fr` blend, as `0` and `1fr` would not), in step with
+ * their body (`useFold`).
  */
 .sidebar-panes {
   display: grid;
   flex: 1;
   grid-template:
     "tags" minmax(0, max-content)
-    "." 0
+    "." 0fr
     "recent" minmax(0, max-content)
     "." 1fr
     "details" minmax(0, max-content)
     / minmax(0, 1fr);
   min-height: 0;
   padding-bottom: env(safe-area-inset-bottom);
+  transition: grid-template-rows 160ms ease-out;
 }
 
 .sidebar-panes[data-recent="folded"] {
-  grid-template-rows: minmax(0, max-content) 1fr minmax(0, max-content) 0 minmax(0, max-content);
+  grid-template-rows: minmax(0, max-content) 1fr minmax(0, max-content) 0fr minmax(0, max-content);
 }
 
 .sidebar-pane {
@@ -2164,7 +2168,8 @@ kbd {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pane-toggle .icon {
+  .pane-toggle .icon,
+  .sidebar-panes {
     transition: none;
   }
 }

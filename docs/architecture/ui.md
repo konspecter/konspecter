@@ -30,10 +30,11 @@ The interface speaks English and Russian ([i18n](i18n.md)). The account site sha
   (`NotePins` in `application/notes/note-pins.ts`, kept in localStorage like the folded panes,
   following File Mode renames), and a pin whose note is gone is not shown. These and the details are panes, as in VS Code's side bar: each header (a chevron
   and the title, a button with `aria-expanded`) folds or opens its pane (its height animated
-  over 160 ms, `useFold`; at once with reduced motion), any number open at once;
+  over 160 ms, `useFold`, the content still under the moving edge, so the details keep it at
+  the bottom; at once with reduced motion), any number open at once;
   the open panes share the height, each scrolling on its own and taking no more than its content
-  needs. The tags keep to the top and the details to the bottom; folded, the recent notes drop
-  down to the details. ↑/↓ move through the headers and the rows of open panes as one list. What is folded is
+  needs. The tags keep to the top and the details to the bottom; folded, the recent notes slide
+  down to the details (and back up as they open). ↑/↓ move through the headers and the rows of open panes as one list. What is folded is
   remembered per device (`localStorage`, `konspecter.sidebar.folded`); at first everything is
   open, except the details on small screens. Hidden or shown per device (`localStorage`); while it is hidden, its toggle and New note sit at the start of the top bar; on small screens it starts hidden
   and covers the whole screen when opened (see [Small screens](#small-screens)).

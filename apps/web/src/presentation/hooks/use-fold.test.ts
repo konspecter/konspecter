@@ -70,6 +70,35 @@ describe("useFold", () => {
     expect(result.current).toBe(true);
   });
 
+  it("keeps the content at the bottom edge of a body held at the bottom", () => {
+    const element = document.createElement("div");
+    vi.spyOn(element, "getBoundingClientRect").mockReturnValue({ height: 120 } as DOMRect);
+    const { finish } = fakeAnimations(element);
+    const { rerender } = renderHook(({ open }) => useFold(element, open, "bottom"), {
+      initialProps: { open: true },
+    });
+
+    rerender({ open: false });
+    expect(element.style.overflow).toBe("hidden");
+    expect(element.style.justifyContent).toBe("flex-end");
+    finish();
+    expect(element.style.display).toBe("");
+    expect(element.style.justifyContent).toBe("");
+  });
+
+  it("keeps the content at the top by default", () => {
+    const element = document.createElement("div");
+    vi.spyOn(element, "getBoundingClientRect").mockReturnValue({ height: 120 } as DOMRect);
+    fakeAnimations(element);
+    const { rerender } = renderHook(({ open }) => useFold(element, open), {
+      initialProps: { open: true },
+    });
+
+    rerender({ open: false });
+    expect(element.style.overflow).toBe("hidden");
+    expect(element.style.justifyContent).toBe("");
+  });
+
   it("folds at once without animations", () => {
     const element = document.createElement("div");
     const { result, rerender } = renderHook(({ open }) => useFold(element, open), {

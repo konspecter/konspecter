@@ -25,7 +25,7 @@ import type { TagNames } from "../../domain/settings/settings";
 import { formatKeys, SHORTCUTS } from "../app/shortcuts";
 import { ChevronIcon, GearIcon, NewNoteIcon, SidebarIcon } from "@konspecter/ui/icons";
 import { TagTreeView, TreeDocument } from "./TagTreeView";
-import { useFold } from "../hooks/use-fold";
+import { useFold, type FoldEdge } from "../hooks/use-fold";
 import { isNarrow } from "../hooks/use-narrow";
 import { t } from "../i18n/i18n";
 import { rich } from "../i18n/rich";
@@ -266,6 +266,7 @@ export const Sidebar = memo(function Sidebar({
         <SidebarPane
           title={t("details.title")}
           className="details-pane"
+          edge="bottom"
           bodyRef={detailsRef}
           open={!folded.has("details")}
           onToggle={() => {
@@ -284,6 +285,8 @@ type SidebarPaneProps = {
   /** A navigation landmark named by the title (the tags, the recent notes). */
   landmark?: boolean;
   className: string;
+  /** The edge its body keeps to as it folds and opens: the bottom for the pane at the foot. */
+  edge?: FoldEdge;
   /** Receives the body element (pages render the details into it). */
   bodyRef?: ((element: HTMLDivElement | null) => void) | undefined;
   children?: ReactNode;
@@ -300,13 +303,14 @@ function SidebarPane({
   onToggle,
   landmark = false,
   className,
+  edge = "top",
   bodyRef,
   children,
 }: SidebarPaneProps) {
   const headingId = useId();
   const bodyId = useId();
   const [body, setBodyElement] = useState<HTMLDivElement | null>(null);
-  const shown = useFold(body, open);
+  const shown = useFold(body, open, edge);
   const setBody = useCallback(
     (element: HTMLDivElement | null) => {
       setBodyElement(element);
