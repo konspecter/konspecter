@@ -46,6 +46,24 @@ describe("text editor quotes", () => {
   });
 });
 
+describe("moving rows in the text editor", () => {
+  it("moves the row at the caret with Alt+↑ and Alt+↓", () => {
+    const { view } = editorWith("one\n\ntwo\n\nthree");
+    // In "two".
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 7)));
+    const press = (key: string) =>
+      view.someProp("handleKeyDown", (handle) =>
+        handle(view, new KeyboardEvent("keydown", { key, altKey: true })),
+      );
+
+    expect(press("ArrowUp")).toBe(true);
+    expect(textDocToMarkdown(view.state.doc)).toBe("two\n\none\n\nthree");
+    press("ArrowDown");
+    press("ArrowDown");
+    expect(textDocToMarkdown(view.state.doc)).toBe("one\n\nthree\n\ntwo");
+  });
+});
+
 describe("paired characters in the text editor", () => {
   /** Selects [from, to] and types `key`, the system inserting `inserted`. */
   const typeOver = (markdown: string, from: number, to: number, key: string, inserted = key) => {

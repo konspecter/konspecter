@@ -8,7 +8,7 @@ import { DEFAULT_SETTINGS, type Settings } from "../../domain/settings/settings"
 import { DEFAULT_IGNORE } from "../../domain/note/ignore";
 import { createNote, type Note } from "../../domain/note/note";
 import { openNoteStore, type NoteStore } from "../../infrastructure/storage/note-store";
-import { setSourceValue, sourceValue } from "../editors/test-helpers";
+import { setSourceValue, sourceValue, sourceView } from "../editors/test-helpers";
 import { FakeFolder } from "../../infrastructure/folder/fake-folder";
 import { FolderStore } from "../../infrastructure/folder/folder-store";
 import { FakeServer, TEST_PASSPHRASE } from "../../infrastructure/sync/fake-server";
@@ -594,6 +594,28 @@ describe("a note", () => {
         screen.getByRole("heading", { level: 1, name: "Java Collections, revised" }),
       ).toBeInTheDocument();
     });
+  });
+
+  it("moves lines with Alt+↑ and Alt+↓ in the Markdown editor", async () => {
+    const store = await newStore();
+    await store.put(javaNote);
+    renderApp(store, "/conspects/java");
+    await textEditor();
+    const editor = await markdownEditor();
+    const view = sourceView(editor);
+    const at = view.state.doc.toString().indexOf("ArrayList");
+    view.dispatch({ selection: { anchor: at } });
+    const press = (key: string) => {
+      view.contentDOM.dispatchEvent(
+        new KeyboardEvent("keydown", { key, altKey: true, bubbles: true, cancelable: true }),
+      );
+    };
+
+    press("ArrowUp");
+    // Past the blank line above it.
+    expect(sourceValue(editor)).toMatch(/# Java Collections\nArrayList — dynamic array\.\n$/);
+    press("ArrowDown");
+    expect(sourceValue(editor)).toBe(javaNote.markdown);
   });
 
   it("moves to the top of Recent as soon as it is edited", async () => {

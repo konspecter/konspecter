@@ -29,6 +29,7 @@ import { findMatches, type Match } from "../../domain/search/find";
 import { tagRanges } from "../../domain/tag/tags";
 import { blockDecorations, updatedBlockDecorations } from "./block-decorations";
 import { codeHighlighting } from "./code-highlight";
+import { moveRow } from "./move-rows";
 import { ListItemView, splitItem, taskInputRule, toggleTask, untask } from "./task-items";
 import { textSchema } from "./text-schema";
 import { diffSequences, offsets } from "./diff";
@@ -410,6 +411,8 @@ export function createTextEditorState(
         "Mod-[": liftListItem(nodes.list_item),
         "Mod-]": sinkListItem(nodes.list_item),
         "Shift-Enter": chainCommands(exitCode, insertHardBreak),
+        "Alt-ArrowUp": moveRow(-1),
+        "Alt-ArrowDown": moveRow(1),
         Backspace: chainCommands(undoInputRule, untask),
       }),
       keymap(baseKeymap),

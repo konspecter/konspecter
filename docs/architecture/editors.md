@@ -62,6 +62,11 @@ with a contextual formatting toolbar and Markdown-style shortcuts.
 - **Shortcuts:** typing `#`–`######` + space makes a heading, `>` a quote, `-`/`*`/`+` a
   list, `1.` a numbered list, and ` ```lang ` + space a code block (any info string: `c++`, `c#`). Backspace right
   after a shortcut undoes it. `Mod-B/I/\`` toggle marks, `Mod-Z`/`Mod-Shift-Z`undo and redo,`Mod-[`/`Mod-]`outdent and indent list items, and`Shift-Enter` inserts a line break.
+- **Moving rows:** `Alt-↑`/`Alt-↓` (⌥ on macOS) move the row at the caret, or the rows the
+  selection covers, one row up or down, as the Markdown editor moves lines (`move-rows.ts`).
+  A row is a text block, or the list item it starts (with its nested items), so an item moves
+  within its own list and a paragraph moves past a whole list, quote or code block. In a code
+  block the lines of its code move instead. Nothing moves past the first or the last row.
 - **Task lists:** GFM task items (`- [ ] todo`, `- [x] done`) are list items with a
   checkbox where the bullet would be; clicking it ticks or unticks the task, as an edit. The
   schema (`text-schema.ts`) is the CommonMark one with a `checked` attribute on list items
@@ -141,7 +146,8 @@ CodeMirror 6 over the whole document, frontmatter included (`MarkdownSourceEdito
   and `autocapitalize` are off.
 - **Editing:** undo and redo, Tab indents, and long lines wrap. Searching is the top bar's
   (`Mod+F`, [ui](ui.md)), in every mode; CodeMirror keeps its selection commands (`Mod-D`,
-  `Mod-Shift-L`) and go to line (`Mod-Alt-G`), but not its search and replace panel.
+  `Mod-Shift-L`), go to line (`Mod-Alt-G`) and moving lines (`Alt-↑`/`Alt-↓`), but not its
+  search and replace panel.
 - **Paired characters:** typing an opening character over a selection wraps it instead of
   replacing it, and the text stays selected (`*` twice makes `**bold**`): `()`, `[]`, `{}`,
   `<>`, `""`, `''`, backticks, `**`, `__`, `~~` and the typographic `«»`, `“”`, `‘’` (the
