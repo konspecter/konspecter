@@ -384,50 +384,55 @@ describe("sidebar panes", () => {
     const javaTag = within(tags).getByRole("link", { name: "Java" });
     const recentNote = within(recentNav()).getByRole("link", { name: "Java Collections" });
     const details = within(sidebar()).getByRole("region", { name: "Details" });
-    for (const name of ["Goto", "Recent", "Details"]) {
+    for (const name of ["Recent", "Details"]) {
       expect(paneToggle(name)).toHaveAttribute("aria-expanded", "true");
     }
 
-    await userEvent.click(paneToggle("Goto"));
-    expect(paneToggle("Goto")).toHaveAttribute("aria-expanded", "false");
-    expect(javaTag).not.toBeVisible();
-    expect(recentNote).toBeVisible();
+    await userEvent.click(paneToggle("Recent"));
+    expect(paneToggle("Recent")).toHaveAttribute("aria-expanded", "false");
+    expect(recentNote).not.toBeVisible();
+    expect(javaTag).toBeVisible();
     expect(details).toBeVisible();
     await userEvent.click(paneToggle("Details"));
     expect(details).not.toBeVisible();
-    expect(recentNote).toBeVisible();
+    expect(javaTag).toBeVisible();
 
     cleanup();
     renderApp(await taggedStore(), "/conspects/java");
     await textEditor();
     await within(sidebar()).findByRole("navigation", { name: "Goto" });
-    expect(paneToggle("Goto")).toHaveAttribute("aria-expanded", "false");
-    expect(paneToggle("Recent")).toHaveAttribute("aria-expanded", "true");
+    expect(paneToggle("Recent")).toHaveAttribute("aria-expanded", "false");
     expect(paneToggle("Details")).toHaveAttribute("aria-expanded", "false");
-    await userEvent.click(paneToggle("Goto"));
-    expect(within(sidebar()).getByRole("link", { name: "Java" })).toBeVisible();
+    await userEvent.click(paneToggle("Recent"));
+    expect(within(recentNav()).getByRole("link", { name: "Java Collections" })).toBeVisible();
   });
 
-  it("moves with ↑/↓ through the headers and the rows of open panes", async () => {
+  it("keeps the tag tree open, with no header to fold it", async () => {
     renderApp(await taggedStore());
-    await within(sidebar()).findByRole("navigation", { name: "Goto" });
+    const tags = await within(sidebar()).findByRole("navigation", { name: "Goto" });
+    expect(within(sidebar()).queryByRole("button", { name: "Goto" })).not.toBeInTheDocument();
+    expect(within(tags).getByRole("link", { name: "Java" })).toBeVisible();
+  });
+
+  it("moves with ↑/↓ through the tree, the headers and the rows of open panes", async () => {
+    renderApp(await taggedStore());
+    const tags = await within(sidebar()).findByRole("navigation", { name: "Goto" });
+    const java = within(tags).getByRole("link", { name: "Java" });
     act(() => {
-      paneToggle("Goto").focus();
+      java.focus();
     });
 
-    await userEvent.keyboard("{ArrowDown}");
-    expect(within(sidebar()).getByRole("link", { name: "Java" })).toHaveFocus();
     await userEvent.keyboard("{ArrowDown}");
     expect(paneToggle("Recent")).toHaveFocus();
     await userEvent.keyboard("{ArrowDown}");
     expect(within(recentNav()).getByRole("link", { name: "Java Collections" })).toHaveFocus();
 
     // A folded pane's rows are skipped.
-    await userEvent.click(paneToggle("Goto"));
+    await userEvent.click(paneToggle("Recent"));
+    await userEvent.keyboard("{ArrowUp}");
+    expect(java).toHaveFocus();
     await userEvent.keyboard("{ArrowDown}");
     expect(paneToggle("Recent")).toHaveFocus();
-    await userEvent.keyboard("{ArrowUp}");
-    expect(paneToggle("Goto")).toHaveFocus();
   });
 
   it("moves with ↑/↓ from a clicked row, also where a click does not focus it (WebKit)", async () => {
@@ -446,13 +451,12 @@ describe("sidebar panes", () => {
 
   it("enters the sidebar with Ctrl+\\ on an open pane only", async () => {
     renderApp(await taggedStore(), "/conspects/java");
-    await within(sidebar()).findByRole("navigation", { name: "Goto" });
+    const tags = await within(sidebar()).findByRole("navigation", { name: "Goto" });
     await userEvent.click(paneToggle("Recent"));
-    await userEvent.click(paneToggle("Goto"));
     await userEvent.click(await textEditor());
 
     await userEvent.keyboard("{Control>}\\{/Control}{Control>}\\{/Control}");
-    expect(paneToggle("Goto")).toHaveFocus();
+    expect(tags).toContainElement(document.activeElement as HTMLElement);
   });
 });
 

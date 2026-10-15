@@ -20,8 +20,8 @@ The interface speaks English and Russian ([i18n](i18n.md)). The account site sha
 - Two panels over the whole window (`components/Layout.tsx`): the sidebar is sticky at full
   height and scrolls on its own; the page scrolls under a sticky top bar (so the reading
   position keeps using the window's scroll). No app header, brand or menu.
-- **Sidebar** (`Sidebar.tsx`): toggle, Settings, New note; the tag tree, in the pane
-  titled Goto (tags as folders, notes as documents inside them and untagged ones at the
+- **Sidebar** (`Sidebar.tsx`): toggle, Settings, New note; the tag tree, always open and
+  without a header (a navigation landmark named Goto; tags as folders, notes as documents inside them and untagged ones at the
   root; a tag's name opens `/?q=#tag`, see [tags](tags.md)); recent notes, those created or edited in the last 7 days (`recentNotes`; "No activity in 7
   days" when there are none), most recently edited first, with the open
   one marked. Above them the pinned notes, as StarCraft's unit groups: on a note
@@ -35,8 +35,8 @@ The interface speaks English and Russian ([i18n](i18n.md)). The account site sha
   over 160 ms, `useFold`, the content still under the moving edge, so the details keep it at
   the bottom; at once with reduced motion), any number open at once;
   the open panes share the height, each scrolling on its own and taking no more than its content
-  needs. The tags keep to the top and the details to the bottom; folded, the recent notes slide
-  down to the details (and back up as they open). ↑/↓ move through the headers and the rows of open panes as one list. What is folded is
+  needs; the tree above them scrolls the same way but never folds. The tags keep to the top and the details to the bottom; folded, the recent notes slide
+  down to the details (and back up as they open). ↑/↓ move through the tree's rows, the headers and the rows of open panes as one list. What is folded is
   remembered per device (`localStorage`, `konspecter.sidebar.folded`); at first everything is
   open, except the details on small screens. Hidden or shown per device (`localStorage`); while it is hidden, its toggle and New note sit at the start of the top bar; on small screens it starts hidden
   and covers the whole screen when opened (see [Small screens](#small-screens)).

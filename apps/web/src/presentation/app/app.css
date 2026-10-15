@@ -217,9 +217,10 @@ mark {
 }
 
 /*
- * The panes, after VS Code's side bar: each folds to its header, and the open
- * ones share the height, each scrolling on its own. The grid shares the height
- * equally but gives a pane no more than its content, so a short tag list
+ * The tag tree, then the panes, after VS Code's side bar: each pane folds to
+ * its header (the tree has none and stays open), and the open ones share the
+ * height, each scrolling on its own. The grid shares the height equally but
+ * gives a pane no more than its content, so a short tag list
  * leaves the rest to the recent notes (a flex column with max-height:
  * max-content would too, but WebKit sizes those to nothing). What is left
  * over sits above the details, which keep to the bottom; the tags keep to the
@@ -229,6 +230,10 @@ mark {
  * their body (`useFold`).
  */
 .sidebar-panes {
+  /* Where the headers' chevrons are: the tree's chevrons line up under them. */
+  --twistie-start: 4px;
+  --pane-twistie: 16px;
+
   display: grid;
   flex: 1;
   grid-template:
@@ -255,6 +260,11 @@ mark {
 
 .tags-pane {
   grid-area: tags;
+}
+
+/* No header above the tree: a little room under the bar instead. */
+.tags-pane > .sidebar-pane-body {
+  padding-top: 4px;
 }
 
 .recent-pane {
@@ -296,7 +306,7 @@ mark {
   gap: 2px;
   width: 100%;
   min-height: 24px;
-  padding: 0 8px 0 4px;
+  padding: 0 8px 0 var(--twistie-start);
   border: 0;
   background: none;
   color: inherit;
@@ -317,8 +327,8 @@ mark {
 
 .pane-toggle .icon {
   flex-shrink: 0;
-  width: 16px;
-  height: 16px;
+  width: var(--pane-twistie);
+  height: var(--pane-twistie);
   transition: transform 120ms ease;
 }
 
@@ -1060,8 +1070,9 @@ kbd {
 .tree {
   --tree-row: 24px;
   --tree-indent: 12px;
-  --tree-pad: 12px;
   --tree-twistie: 16px;
+  /* The root chevrons centred under the panes' header chevrons. */
+  --tree-pad: calc(var(--twistie-start) + (var(--pane-twistie) - var(--tree-twistie)) / 2);
 
   margin: 0 -8px;
   padding: 0;
@@ -2101,14 +2112,18 @@ kbd {
     font-size: 14px;
   }
 
-  .pane-toggle {
-    min-height: 36px;
-    padding: 0 12px 0 8px;
+  .tags-pane > .sidebar-pane-body {
+    padding-top: 8px;
   }
 
-  .pane-toggle .icon {
-    width: 18px;
-    height: 18px;
+  .sidebar-panes {
+    --twistie-start: 8px;
+    --pane-twistie: 18px;
+  }
+
+  .pane-toggle {
+    min-height: 36px;
+    padding-right: 12px;
   }
 
   .details-pane > .sidebar-pane-body {

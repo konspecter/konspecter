@@ -93,9 +93,9 @@ function focusClickedRow(event: MouseEvent<HTMLElement>): void {
   rowOf(event.target)?.focus({ focusVisible: false, preventScroll: true });
 }
 
-type PaneId = "tags" | "recent" | "details";
+type PaneId = "recent" | "details";
 
-const PANES: readonly PaneId[] = ["tags", "recent", "details"];
+const PANES: readonly PaneId[] = ["recent", "details"];
 
 const FOLDED_KEY = "konspecter.sidebar.folded";
 
@@ -130,9 +130,9 @@ export function withShortcut(label: string, keys: string): string {
 }
 
 /**
- * The left panel: controls, then three foldable panes: the tag tree, the
- * recently edited notes and the open note's details (rendered there by the
- * note page). What is folded is remembered on the device.
+ * The left panel: controls, the tag tree (always open, without a header), then
+ * two foldable panes: the recently edited notes and the open note's details
+ * (rendered there by the note page). What is folded is remembered on the device.
  */
 export const Sidebar = memo(function Sidebar({
   store,
@@ -221,10 +221,6 @@ export const Sidebar = memo(function Sidebar({
           activeTag={activeTag}
           currentNoteId={currentNoteId}
           tagNames={tagNames}
-          open={!folded.has("tags")}
-          onToggle={() => {
-            toggle("tags");
-          }}
         />
         <SidebarPane
           title={t("sidebar.recent")}
@@ -352,10 +348,9 @@ type SidebarTagsProps = {
   activeTag: string | null;
   currentNoteId: string | null;
   tagNames: TagNames;
-  open: boolean;
-  onToggle: () => void;
 };
 
+/** The tag tree: not a pane, so neither folded nor titled; it scrolls on its own. */
 function SidebarTags({
   store,
   library,
@@ -363,8 +358,6 @@ function SidebarTags({
   activeTag,
   currentNoteId,
   tagNames,
-  open,
-  onToggle,
 }: SidebarTagsProps) {
   const [tree, setTree] = useState<readonly TagNode[] | null>(null);
   // A new loader for every change, so open folders read their notes again.
@@ -392,27 +385,26 @@ function SidebarTags({
 
   if (tree === null) return null;
   return (
-    <SidebarPane
-      title={t("sidebar.tags")}
-      className="tags-pane"
-      landmark
-      open={open}
-      onToggle={onToggle}
-    >
-      {/* The hint is for an empty library only: tagged or not, any note is listed instead. */}
-      {tree.length === 0 && untagged.length === 0 ? (
-        <p className="sidebar-hint">
-          {rich("sidebar.tagsHint", { tag: <code>#tag</code>, nested: <code>#parent#child</code> })}
-        </p>
-      ) : (
-        <TagTreeView
-          nodes={tree}
-          notes={untagged}
-          activeTag={activeTag}
-          currentNoteId={currentNoteId}
-          loadNotes={loadNotes}
-        />
-      )}
-    </SidebarPane>
+    <nav className="sidebar-pane tags-pane" aria-label={t("sidebar.tags")}>
+      <div className="sidebar-pane-body">
+        {/* The hint is for an empty library only: tagged or not, any note is listed instead. */}
+        {tree.length === 0 && untagged.length === 0 ? (
+          <p className="sidebar-hint">
+            {rich("sidebar.tagsHint", {
+              tag: <code>#tag</code>,
+              nested: <code>#parent#child</code>,
+            })}
+          </p>
+        ) : (
+          <TagTreeView
+            nodes={tree}
+            notes={untagged}
+            activeTag={activeTag}
+            currentNoteId={currentNoteId}
+            loadNotes={loadNotes}
+          />
+        )}
+      </div>
+    </nav>
   );
 }
