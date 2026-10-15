@@ -5,6 +5,9 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { parseDocument } from "../../domain/document/document";
 import { createNote } from "../../domain/note/note";
 import type { EditorMode } from "../../domain/settings/settings";
+import type { NoteRepository } from "../../application/notes/note-repository";
+import { FakeFolder } from "../../infrastructure/folder/fake-folder";
+import { FolderStore } from "../../infrastructure/folder/folder-store";
 import { openNoteStore, type NoteStore } from "../../infrastructure/storage/note-store";
 import { Activity } from "../app/activity";
 import { DetailsSlot } from "../components/details-slot";
@@ -39,7 +42,7 @@ function WithDetails({ children }: { children: ReactNode }) {
 
 /** Both routes render one element, as in App, so a saved new note keeps its editor. */
 function renderNotePage(
-  store: NoteStore,
+  store: NoteRepository,
   path: string,
   activity = new Activity(),
   mode: EditorMode = "text",
@@ -267,6 +270,31 @@ describe("an existing note", () => {
       }
       cleanup();
     }
+  });
+
+  it("keeps its editor and the focus while a tag being typed moves the file again and again", async () => {
+    const folder = new FakeFolder();
+    folder.edit("java.md", "# Java\n\nBody");
+    const store = new FolderStore(folder, await newStore(), { graceMs: 5 });
+    renderNotePage(store, "/conspects/java.md");
+
+    const box = await textBox();
+    await userEvent.click(box);
+    caretAtEnd(box);
+    // Each pause saves, and the file follows the tag typed so far.
+    for (const [typed, path] of [
+      [" #l", "l/java.md"],
+      ["an", "lan/java.md"],
+      ["g", "lang/java.md"],
+    ] as const) {
+      await userEvent.keyboard(typed);
+      await waitFor(() => {
+        expect(location()).toHaveTextContent(`/conspects/${encodeURIComponent(path)}`);
+      });
+      expect(await textBox()).toBe(box);
+      expect(box).toHaveFocus();
+    }
+    expect(folder.files.get("lang/java.md")?.text).toContain("Body #lang");
   });
 
   it("shows not found for an unknown note", async () => {

@@ -32,8 +32,17 @@ type NotePageProps = {
   readingPosition?: ReadingPositionMode;
 };
 
-/** A session that started under another URL and continues as `id` (see `adopt`). */
-type Adopted = { readonly id: string; readonly key: string; readonly note: Note };
+/**
+ * A session that started under another URL and continues as `id` (see
+ * `adopt`). `from` is the id it had before: the URL still names it until the
+ * navigation to `id` lands, a render after the state changed.
+ */
+type Adopted = {
+  readonly id: string;
+  readonly from: string | undefined;
+  readonly key: string;
+  readonly note: Note;
+};
 
 /**
  * A new note (/conspects/new) or an existing one (/conspects/:id), open in the
@@ -46,7 +55,8 @@ export function NotePage({ store, mode, activity, readingPosition = "restore" }:
   const location = useLocation();
   const navigate = useNavigate();
   const [adopted, setAdopted] = useState<Adopted | null>(null);
-  const continued = id !== undefined && adopted?.id === id ? adopted : null;
+  const continued =
+    id !== undefined && (adopted?.id === id || adopted?.from === id) ? adopted : null;
 
   const target = id !== undefined && continued === null ? id : null;
   // After any save of the note still running (the editor just left it), so
@@ -69,12 +79,19 @@ export function NotePage({ store, mode, activity, readingPosition = "restore" }:
 
   const sessionKey =
     id === undefined ? `new:${location.key}` : continued ? continued.key : `note:${id}`;
+  // A session adopts every id its note gets: a file can move again and again
+  // (each pause while a tag is typed saves it into that tag's folder).
   const adopt = useCallback(
     (note: Note) => {
-      setAdopted({ id: note.id, key: sessionKey, note });
+      setAdopted((previous) => ({
+        id: note.id,
+        from: previous?.key === sessionKey ? previous.id : id,
+        key: sessionKey,
+        note,
+      }));
       void navigate(`/conspects/${encodeURIComponent(note.id)}`, { replace: true });
     },
-    [sessionKey, navigate],
+    [sessionKey, id, navigate],
   );
 
   let note: Note | null;
