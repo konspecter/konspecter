@@ -182,6 +182,23 @@ mark {
   display: none;
 }
 
+/*
+ * The sidebar and the top bar are controls, not text: a drag or a double
+ * click there selects nothing (WebKit, the desktop and iOS, needs the prefix).
+ * Fields in them still select their own text.
+ */
+.sidebar,
+.topbar {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.sidebar :is(input, textarea, [contenteditable="true"]),
+.topbar :is(input, textarea, [contenteditable="true"]) {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 .sidebar-bar {
   display: flex;
   flex-shrink: 0;
