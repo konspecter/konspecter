@@ -399,12 +399,12 @@ function SidebarTags({
       open={open}
       onToggle={onToggle}
     >
-      {tree.length === 0 && (
+      {/* The hint is for an empty library only: tagged or not, any note is listed instead. */}
+      {tree.length === 0 && untagged.length === 0 ? (
         <p className="sidebar-hint">
           {rich("sidebar.tagsHint", { tag: <code>#tag</code>, nested: <code>#parent#child</code> })}
         </p>
-      )}
-      {(tree.length > 0 || untagged.length > 0) && (
+      ) : (
         <TagTreeView
           nodes={tree}
           notes={untagged}

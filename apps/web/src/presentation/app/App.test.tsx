@@ -977,11 +977,21 @@ describe("tags", () => {
     );
   });
 
-  it("explains tags when no note has one", async () => {
+  it("explains tags only while there are no notes at all", async () => {
     renderApp(await newStore());
 
     const tree = await tagTree();
     expect(tree).toHaveTextContent("Write #tag or #parent#child in a conspect.");
+  });
+
+  it("shows no tag hint once there is a note, even without tags", async () => {
+    const store = await newStore();
+    await store.put(createNote("# Plain\n\nNo tags here.", daysAgo(1), "plain"));
+    renderApp(store);
+
+    const tree = await tagTree();
+    expect(await within(tree).findByRole("link", { name: "Plain" })).toBeInTheDocument();
+    expect(tree).not.toHaveTextContent("Write #tag");
   });
 
   it("filters the list by a tag, including child tags, until the filter is removed", async () => {
