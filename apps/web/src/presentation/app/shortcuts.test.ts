@@ -1,4 +1,4 @@
-import { formatKeys, matchesShortcut, shortcutGroups } from "./shortcuts";
+import { formatKeys, matchesShortcut, pinKeyOf, shortcutGroups } from "./shortcuts";
 
 const key = (init: KeyboardEventInit) => new KeyboardEvent("keydown", init);
 
@@ -113,5 +113,24 @@ describe("arrow shortcuts", () => {
     ).toBe(false);
     expect(formatKeys("Mod+Alt+ArrowLeft", true)).toBe("⌥⌘←");
     expect(formatKeys("Mod+Alt+ArrowRight", false)).toBe("Ctrl+Alt+→");
+  });
+});
+
+describe("pin shortcuts", () => {
+  it("are Ctrl with a digit on every system, by the physical key", () => {
+    expect(pinKeyOf(key({ key: "1", code: "Digit1", ctrlKey: true }))).toBe("1");
+    expect(pinKeyOf(key({ key: "&", code: "Digit1", ctrlKey: true }))).toBe("1");
+    expect(pinKeyOf(key({ key: "0", code: "Numpad0", ctrlKey: true }))).toBe("0");
+    expect(pinKeyOf(key({ key: "1", code: "Digit1", metaKey: true }))).toBeNull();
+    expect(pinKeyOf(key({ key: "1", code: "Digit1", ctrlKey: true, shiftKey: true }))).toBeNull();
+    expect(pinKeyOf(key({ key: "1", code: "Digit1" }))).toBeNull();
+    const ctrl5 = key({ key: "5", code: "Digit5", ctrlKey: true });
+    expect(matchesShortcut("Ctrl+Digit", ctrl5, true)).toBe(true);
+    expect(matchesShortcut("Ctrl+Digit", ctrl5, false)).toBe(true);
+    expect(matchesShortcut("Ctrl+Digit", key({ key: "p", code: "KeyP", ctrlKey: true }))).toBe(
+      false,
+    );
+    expect(formatKeys("Ctrl+Digit", true)).toBe("⌃1…0");
+    expect(formatKeys("Ctrl+Digit", false)).toBe("Ctrl+1…0");
   });
 });

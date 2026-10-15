@@ -15,12 +15,12 @@ import { Link } from "react-router";
 import { tagTree, type TagNode } from "../../domain/tag/tags";
 import {
   notesInFolder,
-  recentNotes,
   untaggedNotes,
   type NoteCatalog,
   type NoteSummary,
 } from "../../application/notes/note-catalog";
 import type { NoteRepository } from "../../application/notes/note-repository";
+import { recentWithPins, type NotePins } from "../../application/notes/note-pins";
 import type { TagNames } from "../../domain/settings/settings";
 import { formatKeys, SHORTCUTS } from "../app/shortcuts";
 import { ChevronIcon, GearIcon, NewNoteIcon, SidebarIcon } from "@konspecter/ui/icons";
@@ -33,6 +33,8 @@ import { rich } from "../i18n/rich";
 type SidebarProps = {
   store: NoteRepository;
   catalog: NoteCatalog;
+  /** The notes pinned to Ctrl+1…0: at the top of Recent. */
+  pins: NotePins;
   open: boolean;
   /** The note open in the main area, if any. */
   currentNoteId: string | null;
@@ -135,6 +137,7 @@ export function withShortcut(label: string, keys: string): string {
 export const Sidebar = memo(function Sidebar({
   store,
   catalog,
+  pins,
   open,
   currentNoteId,
   activeTag,
@@ -147,8 +150,13 @@ export const Sidebar = memo(function Sidebar({
   const library = useSyncExternalStore(catalog.subscribe, catalog.getSnapshot);
   const notes = library.status === "ready" ? library.notes : null;
   const untagged = useMemo(() => untaggedNotes(notes ?? []), [notes]);
+  const pinned = useSyncExternalStore(pins.subscribe, pins.getSnapshot);
   // Read again with every change to the notes, so the week moves on with them.
-  const recent = useMemo(() => (notes ? recentNotes(notes, new Date()) : null), [notes]);
+  const recent = useMemo(
+    () => (notes ? recentWithPins(notes, pinned, new Date()) : null),
+    [notes, pinned],
+  );
+  const recentCount = recent ? recent.pinned.length + recent.recent.length : 0;
   const [folded, setFolded] = useState(initialFolded);
   const toggle = (pane: PaneId) => {
     const next = new Set(folded);
@@ -228,12 +236,22 @@ export const Sidebar = memo(function Sidebar({
           }}
         >
           {notes && notes.length === 0 && <p className="sidebar-hint">{t("sidebar.noNotes")}</p>}
-          {notes && notes.length > 0 && recent?.length === 0 && (
+          {notes && notes.length > 0 && recentCount === 0 && (
             <p className="sidebar-hint">{t("sidebar.noRecent")}</p>
           )}
-          {recent && recent.length > 0 && (
+          {recent && recentCount > 0 && (
             <ul className="tree">
-              {recent.map((note) => (
+              {recent.pinned.map(({ key, note }) => (
+                <TreeDocument
+                  key={note.id}
+                  note={note}
+                  depth={0}
+                  current={note.id === currentNoteId}
+                  className="recent-link"
+                  pin={key}
+                />
+              ))}
+              {recent.recent.map((note) => (
                 <TreeDocument
                   key={note.id}
                   note={note}

@@ -69,6 +69,7 @@ export const en = {
   "shortcut.forward": "Forward (outside text fields)",
   "shortcut.previousRecent": "Previous conspect in Recent",
   "shortcut.nextRecent": "Next conspect in Recent",
+  "shortcut.pinNote": "Pin the open conspect to the top of Recent under this key; again to unpin",
   "shortcut.help": "Show these shortcuts",
   "shortcuts.title": "Keyboard shortcuts",
   "shortcuts.or": "or",

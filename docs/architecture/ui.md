@@ -24,7 +24,11 @@ The interface speaks English and Russian ([i18n](i18n.md)). The account site sha
   titled Navigation (tags as folders, notes as documents inside them and untagged ones at the
   root; a tag's name opens `/?q=#tag`, see [tags](tags.md)); recent notes, those created or edited in the last 7 days (`recentNotes`; "No activity in 7
   days" when there are none), most recently edited first, with the open
-  one marked. These and the details are panes, as in VS Code's side bar: each header (a chevron
+  one marked. Above them the pinned notes: on a note `Ctrl+1`…`Ctrl+0` pins it to that key
+  (the same keys again unpin it), listed by key (1…9, then 0) as a list icon, the title
+  and the key in light grey; a key holds one note and a note one key. Pins belong to the device
+  (`NotePins` in `application/notes/note-pins.ts`, kept in localStorage like the folded panes,
+  following File Mode renames), and a pin whose note is gone is not shown. These and the details are panes, as in VS Code's side bar: each header (a chevron
   and the title, a button with `aria-expanded`) folds or opens its pane (its height animated
   over 160 ms, `useFold`; at once with reduced motion), any number open at once;
   the open panes share the height, each scrolling on its own and taking no more than its content
@@ -215,6 +219,7 @@ matched, so the shortcuts work on Cyrillic layouts.
 | `Mod+→`     | Forward (the search box's ›)    | outside text fields            |
 | `Mod+Alt+←` | Previous note in Recent         | everywhere, also in editors    |
 | `Mod+Alt+→` | Next note in Recent             | everywhere, also in editors    |
+| `Ctrl+1…0`  | Pin the note to Recent, unpin   | the note page, also in editors |
 | `Mod+S`     | Save now                        | the editor                     |
 | `/` `n`     | Search, new note                | outside text fields            |
 | `?`         | Show the shortcuts              | outside text fields            |
@@ -225,7 +230,10 @@ dialog on `Mod+P`), and go no further (CodeMirror's own `Mod-/` does not comment
 caret (to the line's ends on macOS, by words elsewhere), so they go back and forward only
 outside text fields, and only within the app's own history.
 `Mod+Alt+←`/`Mod+Alt+→` go round the sidebar's recent notes (the last 7 days, newest first): past the last to
-the first and back; from a page that is not a note, → opens the first and ← the last.
+the first and back; from a page that is not a note, → opens the first and ← the last; the
+pinned notes come first, as listed. `Ctrl+1…0` is Ctrl on every system (`⌃` on macOS, where ⌘ with a digit switches the browser's
+tabs) and is matched by the physical key (`Digit1`, `Numpad1`), so AZERTY's top row pins too.
+Away from a note the keys stay the browser's.
 `Esc` goes back, as `‹` does, from the list, a search and a note, also in the editor (at the
 start of the app's history it goes to the list, unless already there); in Settings and other
 pages it does nothing. It gives way where Escape already means something: an

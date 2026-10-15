@@ -207,6 +207,37 @@ describe("layout", () => {
     });
   });
 
+  it("pins the open note to the top of Recent with Ctrl+1…0, and unpins it", async () => {
+    const store = await newStore();
+    await store.put(createNote("# Old\n\nA month ago.", daysAgo(30), "old"));
+    await store.put(createNote("# Middle\n\nTwo.", daysAgo(2), "middle"));
+    await store.put(createNote("# Newest\n\nThree.", daysAgo(1), "newest"));
+    renderApp(store, "/conspects/old");
+    await userEvent.click(await textEditor());
+    await waitFor(() => {
+      expect(recentTitles()).toEqual(["Newest", "Middle"]);
+    });
+
+    // Also while typing; the key is shown after the title.
+    await userEvent.keyboard("{Control>}3{/Control}");
+    expect(recentTitles()).toEqual(["Old3", "Newest", "Middle"]);
+    const pinned = within(recentNav()).getByRole("link", { name: "Old" });
+    expect(pinned).toHaveAttribute("aria-keyshortcuts", "Control+3");
+    expect(pinned).toHaveAttribute("aria-current", "page");
+
+    // Pinned notes come before the week's, by key; a pinned note leaves the week.
+    await userEvent.click(within(recentNav()).getByRole("link", { name: "Middle" }));
+    await textEditor();
+    await userEvent.keyboard("{Control>}1{/Control}");
+    expect(recentTitles()).toEqual(["Middle1", "Old3", "Newest"]);
+
+    // The same key again unpins.
+    await userEvent.keyboard("{Control>}1{/Control}");
+    expect(recentTitles()).toEqual(["Old3", "Newest", "Middle"]);
+    // Kept on the device.
+    expect(JSON.parse(localStorage.getItem("konspecter.pins") ?? "")).toEqual({ 3: "old" });
+  });
+
   it("hides and shows the sidebar with a sideways swipe", async () => {
     renderApp(await newStore());
     const swipe = (fromX: number, toX: number) => {

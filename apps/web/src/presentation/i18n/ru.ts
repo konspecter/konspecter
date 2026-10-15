@@ -77,6 +77,8 @@ export const ru: Dictionary = {
   "shortcut.forward": "Вперёд (вне текстовых полей)",
   "shortcut.previousRecent": "Предыдущий конспект в «Недавних»",
   "shortcut.nextRecent": "Следующий конспект в «Недавних»",
+  "shortcut.pinNote":
+    "Закрепить открытый конспект вверху «Недавних» под этой клавишей; повторно — открепить",
   "shortcut.help": "Показать эти сочетания клавиш",
   "shortcuts.title": "Сочетания клавиш",
   "shortcuts.or": "или",

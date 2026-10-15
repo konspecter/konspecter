@@ -2,12 +2,13 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Link, Outlet, useLocation, useMatch, useNavigate, useSearchParams } from "react-router";
 import { parseQuery } from "../../domain/search/query";
 import type { EditorMode, TagNames, Theme } from "../../domain/settings/settings";
-import { recentNotes, type NoteCatalog } from "../../application/notes/note-catalog";
+import type { NoteCatalog } from "../../application/notes/note-catalog";
+import { recentWithPins, type NotePins } from "../../application/notes/note-pins";
 import type { NoteRepository } from "../../application/notes/note-repository";
 import type { SyncEngine } from "../../infrastructure/sync/sync-engine";
 import type { Activity } from "../app/activity";
 import { rememberLocation } from "../app/last-location";
-import { SHORTCUTS } from "../app/shortcuts";
+import { pinKeyOf, SHORTCUTS } from "../app/shortcuts";
 import type { UpdateSource } from "../app/updates";
 import { useHistorySteps } from "../hooks/use-history-steps";
 import { useShortcuts } from "../hooks/use-shortcuts";
@@ -30,6 +31,7 @@ import { useScrollbarGutter } from "../hooks/use-scrollbar-gutter";
 type LayoutProps = {
   store: NoteRepository;
   catalog: NoteCatalog;
+  pins: NotePins;
   activity: Activity;
   theme: Theme;
   onThemeChange: (theme: Theme) => void;
@@ -87,6 +89,7 @@ function sidebarEntry(): HTMLElement | null {
 export function Layout({
   store,
   catalog,
+  pins,
   activity,
   theme,
   onThemeChange,
@@ -225,8 +228,9 @@ export function Layout({
   const openRecent = (step: 1 | -1) => {
     const library = catalog.getSnapshot();
     if (library.status !== "ready") return;
+    const { pinned, recent } = recentWithPins(library.notes, pins.getSnapshot(), new Date());
     const id = recentStep(
-      recentNotes(library.notes, new Date()).map((note) => note.id),
+      [...pinned.map(({ note }) => note.id), ...recent.map((note) => note.id)],
       currentNoteId,
       step,
     );
@@ -265,6 +269,15 @@ export function Layout({
     nextRecent: () => {
       openRecent(1);
     },
+    // On a note only: elsewhere Ctrl+1…0 stay the browser's.
+    ...(currentNoteId === null
+      ? {}
+      : {
+          pinNote: (event: KeyboardEvent) => {
+            const key = pinKeyOf(event);
+            if (key !== null) pins.toggle(key, currentNoteId);
+          },
+        }),
     help: () => {
       setShowShortcuts(true);
     },
@@ -309,6 +322,7 @@ export function Layout({
       <Sidebar
         store={store}
         catalog={catalog}
+        pins={pins}
         open={sidebarOpen}
         currentNoteId={currentNoteId}
         activeTag={activeTag}
@@ -448,7 +462,7 @@ export function Layout({
 }
 
 /**
- * The note `step` from `current` in the recent notes (newest first), round
+ * The note `step` from `current` in Recent (the pins, then newest first), round
  * from the last to the first and back. Away from a note, the next is the
  * first and the previous the last. Null when there is none to go to.
  */

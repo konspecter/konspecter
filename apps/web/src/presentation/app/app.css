@@ -1168,6 +1168,14 @@ kbd {
   font-weight: 550;
 }
 
+/* The key a pinned note in Recent is on (Ctrl+1…0): light, after the title. */
+.tree-pin {
+  flex-shrink: 0;
+  color: var(--color-faint);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .tree-count {
   flex-shrink: 0;
   color: var(--color-muted);

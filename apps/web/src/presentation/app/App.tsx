@@ -7,6 +7,7 @@ import {
   type Theme,
 } from "../../domain/settings/settings";
 import { NoteCatalog } from "../../application/notes/note-catalog";
+import { NotePins } from "../../application/notes/note-pins";
 import type { NoteRepository } from "../../application/notes/note-repository";
 import type { SyncEngine } from "../../infrastructure/sync/sync-engine";
 import { Layout } from "../components/Layout";
@@ -38,6 +39,15 @@ type AppProps = {
   reset?: FactoryReset | undefined;
 };
 
+/** The device's storage, or none where reading it is refused (blocked site data). */
+function deviceStorage(): Storage | null {
+  try {
+    return localStorage;
+  } catch {
+    return null;
+  }
+}
+
 /** Runs `task` once the browser has nothing more urgent to do. */
 function whenIdle(task: () => void): () => void {
   if (typeof requestIdleCallback === "function") {
@@ -63,6 +73,7 @@ export function App({
 }: AppProps) {
   const [settings, setSettings] = useState(initialSettings);
   const [catalog] = useState(() => new NoteCatalog(store));
+  const [pins] = useState(() => new NotePins(deviceStorage()));
   const [activity] = useState(() => new Activity());
 
   // Theme and font scale apply to the whole document, outside React's tree.
@@ -74,6 +85,7 @@ export function App({
   }, [settings.theme, settings.fontScale, settings.editingArea]);
 
   useEffect(() => catalog.start(), [catalog]);
+  useEffect(() => pins.follow(store), [pins, store]);
 
   // Nothing waits for these; they only make the first note (rich text or
   // rendered) and the first search immediate.
@@ -133,6 +145,7 @@ export function App({
             <Layout
               store={store}
               catalog={catalog}
+              pins={pins}
               activity={activity}
               theme={settings.theme}
               onThemeChange={setTheme}
