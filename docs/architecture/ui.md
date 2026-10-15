@@ -130,9 +130,9 @@ breakpoint in the CSS), in the browser, the PWA and the Android app alike.
   filters the list (words and `#tag` filters, [search](search.md)), keeping the recent-edit
   order. Matches are marked in titles and snippets like a highlighter pen (`highlight` and
   `snippet` in `domain/search/snippet.ts`, Unicode-aware, so Cyrillic works). The previous
-  results stay while the next search runs, so typing never blanks the list. ↓ moves into the
-  results, the arrow keys move between them (↑ on the first row returns to the box), Enter opens the
-  first. Neither the list nor the results have a visible heading.
+  results stay while the next search runs, so typing never blanks the list. ↓ or Tab moves into
+  the results, the arrow keys or Tab move between them (↑ or Shift+Tab on the first returns to the
+  box), Enter opens the first. Neither the list nor the results have a visible heading.
 - **Search in the note** (`note-find.ts`): on the note page (new or existing) the box searches
   the open note instead, unless it was opened with `Mod+P` or `/` (the library, as above, until
   the box loses the focus). Every match is marked like the list's, the selected one stronger

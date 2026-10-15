@@ -181,8 +181,14 @@ export function NotesPage({ store, catalog, library: controls }: NotesPageProps)
  * The arrow keys move through the grid: ↑ and ↓ a row, ← and → a column
  * (one column on small screens). ↑ on the first row goes back to the search
  * box (whose ↓ comes here); ↓ under a short last row goes to its last note.
+ * Tab goes from note to note as links do; Shift+Tab on the first one goes
+ * back to the search box too (whose Tab comes here).
  */
 function moveFocus(event: KeyboardEvent<HTMLOListElement>) {
+  if (event.key === "Tab") {
+    backToSearch(event);
+    return;
+  }
   const step = { ArrowDown: 1, ArrowUp: -1, ArrowRight: 1, ArrowLeft: -1 }[event.key];
   if (step === undefined) return;
   if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
@@ -201,6 +207,16 @@ function moveFocus(event: KeyboardEvent<HTMLOListElement>) {
   }
   event.preventDefault();
   target?.focus();
+}
+
+/** Shift+Tab on the first note: back to the search box. */
+function backToSearch(event: KeyboardEvent<HTMLOListElement>) {
+  if (!event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return;
+  const first = event.currentTarget.querySelector<HTMLAnchorElement>(".note-result-title");
+  const search = document.querySelector<HTMLInputElement>("[role=search] input");
+  if (first !== document.activeElement || !search) return;
+  event.preventDefault();
+  search.focus();
 }
 
 /** How many columns the list's grid has now (one where there is no layout). */

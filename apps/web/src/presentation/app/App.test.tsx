@@ -1144,6 +1144,28 @@ describe("search", () => {
     await userEvent.keyboard("{ArrowDown}{ArrowDown}{Enter}");
     expect(await textEditor()).toHaveTextContent("TCP handshakes.");
   });
+
+  it("moves through the results with Tab, back to the search box with Shift+Tab", async () => {
+    renderApp(await storeWithNotes());
+    const list = await noteList();
+    const link = (name: string) => within(list).getByRole("link", { name });
+
+    await userEvent.click(searchBox());
+    await userEvent.keyboard("ha");
+    const [first = "", second = ""] = await waitFor(async () => {
+      const titles = await listTitles();
+      expect(titles).toHaveLength(2);
+      return titles;
+    });
+    await userEvent.tab();
+    expect(link(first)).toHaveFocus();
+    await userEvent.tab();
+    expect(link(second)).toHaveFocus();
+    await userEvent.tab({ shift: true });
+    expect(link(first)).toHaveFocus();
+    await userEvent.tab({ shift: true });
+    expect(searchBox()).toHaveFocus();
+  });
 });
 
 describe("search in the note", () => {

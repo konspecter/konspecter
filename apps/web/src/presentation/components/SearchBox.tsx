@@ -56,8 +56,8 @@ type SearchBoxProps = {
  * `/?q=`). Tag filters are chips inside
  * the field, before the text: a tag becomes one when a space follows it, a
  * tag chosen elsewhere (the sidebar) arrives as one, × or Backspace at the
- * start removes one. ↓ moves into the results (↑ and ↓ move on there, see
- * `NotesPage`) and Enter opens the first one.
+ * start removes one. ↓ or Tab moves into the results (↑ and ↓ move on there,
+ * see `NotesPage`) and Enter opens the first one.
  *
  * With `find`, it searches the open note instead: no chips, no list; the
  * count and ↑/↓ at its end; the ↓ and ↑ keys (or Enter and Shift+Enter)
@@ -189,7 +189,14 @@ export function SearchBox({
             find.onStep(
               event.key === "ArrowUp" || (event.key === "Enter" && event.shiftKey) ? -1 : 1,
             );
-          } else if (event.key === "ArrowDown") {
+          } else if (
+            event.key === "ArrowDown" ||
+            (event.key === "Tab" &&
+              !event.shiftKey &&
+              !event.altKey &&
+              !event.ctrlKey &&
+              !event.metaKey)
+          ) {
             const result = firstResult();
             if (result) {
               event.preventDefault();
