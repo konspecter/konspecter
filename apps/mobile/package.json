@@ -7,6 +7,7 @@
   "scripts": {
     "sync": "pnpm --filter @konspecter/web build && cap sync android",
     "android:debug": "pnpm run sync && cd android && ./gradlew assembleDebug",
+    "android:release": "pnpm run sync && cd android && ./gradlew assembleRelease",
     "android:open": "cap open android"
   },
   "dependencies": {

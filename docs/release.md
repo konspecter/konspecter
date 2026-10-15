@@ -29,7 +29,7 @@
    | `konspecter-site-vX.tar.gz` (account site: SSR build and its dependencies)         | `pnpm --filter @konspecter/site build` |
    | `konspecter-server-vX-<os>-<arch>.tar.gz` (Linux, macOS, Windows)                  | `go build` with the version stamped in |
    | desktop `.dmg` (Apple Silicon and Intel), `.msi`/`.exe`, `.AppImage`/`.deb`/`.rpm` | `tauri-action`                         |
-   | `konspecter-vX-debug.apk`                                                          | Gradle (debug build)                   |
+   | `konspecter-vX.apk` (signed with the release key)                                  | Gradle (`assembleRelease`)             |
    | `konspecter-deploy-vX.tar.gz` (`compose.yaml`, `Caddyfile`, `.env.example`)        | `deploy/`, registry and version set    |
    | `Konspecter-{macos-arm64,macos-x64}.dmg`, `Konspecter-windows-x64-setup.exe`,      | `publish`: copies of the downloads     |
    | `Konspecter-linux-x64.AppImage`, `Konspecter-android.apk` (no version in the name) |                                        |
@@ -107,13 +107,37 @@ passphrase. So, before upgrading the server:
 
 ## Signing (secrets to add before a public release)
 
-| Platform                   | Secrets                                                                                                                    | Notes                                                                             |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| macOS (Developer ID)       | `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | signs and notarizes: Gatekeeper opens the app without a warning                   |
-| macOS (self-signed)        | `MACOS_CERTIFICATE`, `MACOS_CERTIFICATE_PASSWORD`                                                                          | until there is a Developer ID; see below. Ignored once `APPLE_CERTIFICATE` is set |
-| Windows                    | code-signing certificate (`tauri.conf.json` `bundle.windows`)                                                              | unsigned builds trigger SmartScreen                                               |
-| Android                    | a keystore (`KEYSTORE_BASE64`, passwords) for `assembleRelease`                                                            | the workflows ship a debug APK until one exists                                   |
-| Desktop updates (optional) | `TAURI_SIGNING_PRIVATE_KEY`                                                                                                | only if the Tauri updater is enabled                                              |
+| Platform                   | Secrets                                                                                                                    | Notes                                                                               |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| macOS (Developer ID)       | `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | signs and notarizes: Gatekeeper opens the app without a warning                     |
+| macOS (self-signed)        | `MACOS_CERTIFICATE`, `MACOS_CERTIFICATE_PASSWORD`                                                                          | until there is a Developer ID; see below. Ignored once `APPLE_CERTIFICATE` is set   |
+| Windows                    | code-signing certificate (`tauri.conf.json` `bundle.windows`)                                                              | unsigned builds trigger SmartScreen                                                 |
+| Android (required)         | `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`                                                                     | the release key; see below. Without it the Android build, and so the release, fails |
+| Desktop updates (optional) | `TAURI_SIGNING_PRIVATE_KEY`                                                                                                | only if the Tauri updater is enabled                                                |
+
+### The Android release key
+
+Android installs an update only when it is signed with the same key as the installed app, so
+every release is signed with one key that never changes. It is made once, locally; no Google
+Play account is needed:
+
+```sh
+keytool -genkeypair -keystore konspecter-release.keystore -alias konspecter \
+  -keyalg RSA -keysize 4096 -validity 36500 -dname "CN=Konspecter"
+base64 -i konspecter-release.keystore | tr -d '\n'   # the value of ANDROID_KEYSTORE_BASE64
+```
+
+The password `keytool` asks for is `ANDROID_KEYSTORE_PASSWORD` (a PKCS12 keystore has one
+password for the store and the key; the alias is `konspecter`, or
+`KONSPECTER_ANDROID_KEY_ALIAS`). **Keep the keystore and its password safe, outside the
+repository:** losing either means the app can never be updated again, only installed afresh.
+A signed APK on your own machine: `KONSPECTER_ANDROID_KEYSTORE=/path/to/konspecter-release.keystore
+KONSPECTER_ANDROID_KEYSTORE_PASSWORD=… pnpm --filter @konspecter/mobile android:release`
+(without the variables, `android:release` builds an unsigned APK).
+
+Releases up to 0.4.1 shipped a debug APK, signed with the build machine's debug key. The
+first signed release cannot install over one of those: uninstall it first (the app's
+conspects go with it, so sync them, or export them, before).
 
 The app identifiers (`app.konspecter.desktop`, `app.konspecter.mobile`) are placeholders.
 Change them to a domain you control before the first public release. They cannot change

@@ -411,11 +411,21 @@ release-android:
   image: $NODE_IMAGE
   script:
     - pnpm --filter @konspecter/mobile sync
-    # A store-ready release build needs a signing keystore (docs/release.md);
-    # the debug APK installs directly for testing.
-    - (cd apps/mobile/android && ./gradlew assembleDebug)
+    # Signed with the release key (docs/release.md), the same in every release, so an
+    # update installs over the previous version. No key fails the release.
+    - |
+      if [ -z "$ANDROID_KEYSTORE_BASE64" ] || [ -z "$ANDROID_KEYSTORE_PASSWORD" ]; then
+        echo "ANDROID_KEYSTORE_BASE64 and ANDROID_KEYSTORE_PASSWORD are not set (docs/release.md, Signing)"
+        exit 1
+      fi
+    - export KONSPECTER_ANDROID_KEYSTORE="$(mktemp)" KONSPECTER_ANDROID_KEYSTORE_PASSWORD="$ANDROID_KEYSTORE_PASSWORD"
+    - printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$KONSPECTER_ANDROID_KEYSTORE"
+    - (cd apps/mobile/android && ./gradlew assembleRelease)
+    - rm "$KONSPECTER_ANDROID_KEYSTORE"
+    - apk=apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+    - '"$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner" verify --print-certs "$apk"'
     - mkdir -p release
-    - cp apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk "release/konspecter-${CI_COMMIT_TAG}-debug.apk"
+    - cp "$apk" "release/konspecter-${CI_COMMIT_TAG}.apk"
   artifacts:
     paths: [release/]
 

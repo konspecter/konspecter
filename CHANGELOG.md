@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **A signed Android release:** the APK is a release build signed with Konspecter's own key,
+  the same in every release, so each update installs over the previous one. It is no longer
+  a debug build (`konspecter-vX.apk`, without `-debug`). The APKs of earlier releases were
+  signed with another key: uninstall such an app once (sync or export the conspects first),
+  then install this one.
+
 ## 0.4.1 — 2026-10-15
 
 - **Signing in leads to the settings:** without a page to go back to, every way of signing in

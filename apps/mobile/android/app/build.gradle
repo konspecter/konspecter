@@ -1,5 +1,9 @@
 apply plugin: 'com.android.application'
 
+// The release key comes from the environment (docs/release.md). Without it, assembleRelease
+// builds an unsigned APK.
+def releaseKeystore = System.getenv("KONSPECTER_ANDROID_KEYSTORE")
+
 android {
     namespace = "app.konspecter.mobile"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,8 +20,22 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (releaseKeystore) {
+            release {
+                storeFile file(releaseKeystore)
+                // A PKCS12 keystore, as keytool makes, has one password for the store and the key.
+                storePassword System.getenv("KONSPECTER_ANDROID_KEYSTORE_PASSWORD")
+                keyPassword System.getenv("KONSPECTER_ANDROID_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("KONSPECTER_ANDROID_KEY_ALIAS") ?: "konspecter"
+            }
+        }
+    }
     buildTypes {
         release {
+            if (releaseKeystore) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

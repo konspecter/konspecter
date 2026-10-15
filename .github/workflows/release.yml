@@ -233,15 +233,30 @@ jobs:
           java-version: 21
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @konspecter/mobile sync
-      # A store-ready release build needs a signing keystore (docs/release.md);
-      # the debug APK installs directly for testing.
-      - working-directory: apps/mobile/android
-        run: ./gradlew assembleDebug
-      - run: cp apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk "konspecter-${GITHUB_REF_NAME}-debug.apk"
+      # Signed with the release key (docs/release.md), the same in every release, so an
+      # update installs over the previous version. No key fails the release.
+      - name: Build a signed release APK
+        working-directory: apps/mobile/android
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ] || [ -z "$KONSPECTER_ANDROID_KEYSTORE_PASSWORD" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 and ANDROID_KEYSTORE_PASSWORD are not set (docs/release.md, Signing)"
+            exit 1
+          fi
+          export KONSPECTER_ANDROID_KEYSTORE="$RUNNER_TEMP/release.keystore"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$KONSPECTER_ANDROID_KEYSTORE"
+          ./gradlew assembleRelease
+          rm "$KONSPECTER_ANDROID_KEYSTORE"
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KONSPECTER_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      - run: |
+          apk=apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          "$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner" verify --print-certs "$apk"
+          cp "$apk" "konspecter-${GITHUB_REF_NAME}.apk"
       - uses: softprops/action-gh-release@v2
         with:
           draft: true
-          files: konspecter-*-debug.apk
+          files: konspecter-*.apk
 
   # A failed build leaves the draft, to be fixed or published by hand.
   publish:
@@ -257,12 +272,12 @@ jobs:
           gh release download "$GITHUB_REF_NAME" \
             -p "Konspecter_${version}_aarch64.dmg" -p "Konspecter_${version}_x64.dmg" \
             -p "Konspecter_${version}_x64-setup.exe" -p "Konspecter_${version}_amd64.AppImage" \
-            -p "konspecter-${GITHUB_REF_NAME}-debug.apk"
+            -p "konspecter-${GITHUB_REF_NAME}.apk"
           mv "Konspecter_${version}_aarch64.dmg" Konspecter-macos-arm64.dmg
           mv "Konspecter_${version}_x64.dmg" Konspecter-macos-x64.dmg
           mv "Konspecter_${version}_x64-setup.exe" Konspecter-windows-x64-setup.exe
           mv "Konspecter_${version}_amd64.AppImage" Konspecter-linux-x64.AppImage
-          mv "konspecter-${GITHUB_REF_NAME}-debug.apk" Konspecter-android.apk
+          mv "konspecter-${GITHUB_REF_NAME}.apk" Konspecter-android.apk
           gh release upload "$GITHUB_REF_NAME" ./* --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

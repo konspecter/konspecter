@@ -103,6 +103,7 @@ apps/mobile/
 - **Building:** `pnpm --filter @konspecter/mobile android:debug` produces
   `android/app/build/outputs/apk/debug/app-debug.apk`. It needs JDK 21 (`brew install
 openjdk@21`) and the Android SDK (`ANDROID_HOME`). CI builds the debug APK on every push and
-  uploads it as an artifact.
+  uploads it as an artifact. A release builds `android:release` instead, signed with the
+  release key from `KONSPECTER_ANDROID_KEYSTORE` (see `docs/release.md`).
 - **iOS** is not set up (decision pending). `npx cap add ios` would add it with the same web
   build.

@@ -371,6 +371,10 @@ while the folder is empty.
 
 Download the APK from the [latest release](https://github.com/konspecter/konspecter/releases).
 
+An APK from a release up to 0.4.1 was a debug build, signed with another key, so a newer one
+does not install over it: sync or export your conspects, uninstall the old app, then install
+the new one.
+
 ---
 
 ## Keyboard shortcuts
