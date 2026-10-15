@@ -32,6 +32,11 @@ export type CatalogState =
 
 const EXCERPT_SOURCE = 800;
 const EXCERPT_LENGTH = 200;
+/**
+ * Within a burst of changes (an import, a first sync) the list is published at
+ * most this often: each publish sorts every note and re-renders the sidebar.
+ */
+const PUBLISH_INTERVAL = 100;
 
 export function summarize(note: Note): NoteSummary {
   const read = readNote(note);
@@ -111,7 +116,8 @@ export function untaggedNotes(notes: readonly NoteSummary[]): NoteSummary[] {
  * Every note's summary, most recently edited first, for the sidebar and the
  * note list. Loaded once, then kept current one note at a time from the
  * repository's change events (local edits and remote ones), so a save does
- * not re-read the whole library. An external store for useSyncExternalStore.
+ * not re-read the whole library. A lone change shows at once; a burst of them
+ * shows every PUBLISH_INTERVAL. An external store for useSyncExternalStore.
  */
 export class NoteCatalog {
   readonly #store: NoteRepository;
@@ -123,6 +129,8 @@ export class NoteCatalog {
   #loading: Promise<void> | null = null;
   #reloadAfterLoad = false;
   #readCount = 0;
+  #publishedAt = Number.NEGATIVE_INFINITY;
+  #publishTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(store: NoteRepository) {
     this.#store = store;
@@ -134,7 +142,11 @@ export class NoteCatalog {
       this.#apply(change);
     });
     void this.reload();
-    return stop;
+    return () => {
+      stop();
+      clearTimeout(this.#publishTimer);
+      this.#publishTimer = undefined;
+    };
   }
 
   subscribe = (listener: () => void): (() => void) => {
@@ -177,7 +189,7 @@ export class NoteCatalog {
       return;
     }
     if (change.previousId !== undefined && this.#notes.delete(change.previousId)) {
-      this.#publish();
+      this.#publishSoon();
     }
     const id = change.noteId;
     const read = (this.#readCount += 1);
@@ -188,7 +200,7 @@ export class NoteCatalog {
         this.#reads.delete(id);
         if (note) this.#notes.set(id, summarize(note));
         else this.#notes.delete(id);
-        this.#publish();
+        this.#publishSoon();
       },
       () => {
         if (this.#reads.get(id) === read) this.#reads.delete(id);
@@ -197,7 +209,21 @@ export class NoteCatalog {
     );
   }
 
+  /** Publishes now, or, if the last publish was under PUBLISH_INTERVAL ago, then. */
+  #publishSoon(): void {
+    if (this.#publishTimer !== undefined) return;
+    const wait = this.#publishedAt + PUBLISH_INTERVAL - Date.now();
+    if (wait <= 0) this.#publish();
+    else
+      this.#publishTimer = setTimeout(() => {
+        this.#publish();
+      }, wait);
+  }
+
   #publish(): void {
+    clearTimeout(this.#publishTimer);
+    this.#publishTimer = undefined;
+    this.#publishedAt = Date.now();
     this.#state = { status: "ready", notes: [...this.#notes.values()].sort(byMostRecentSummary) };
     this.#notify();
   }

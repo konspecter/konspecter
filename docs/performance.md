@@ -25,7 +25,7 @@ cd apps/desktop/src-tauri && cargo test --release -- --ignored # File Mode file 
 | open a 200 KB note in the editor       | 220 ms | 5 s    |
 | type 22 characters in the 200 KB note  | 97 ms  |        |
 | open the app on a note (load → editor) | 245 ms | 2 s    |
-| import 2,001 files through the UI      | 17 s   |        |
+| import 2,001 files through the UI      | 2.5 s  |        |
 
 Medians of eight runs on the machine above, after the account site package. Earlier figures
 (a 1.4 s cold start, 0.85 s for the first search) timed Playwright as much as the app: a trace
@@ -34,6 +34,11 @@ too. Playwright measures every element for a snapshot, and with 2,001 rows that 
 `content-visibility: auto` each measurement forces a layout, so one snapshot blocked the page
 for seconds: the cold start read 2.9 s on the laptop and 9 s in CI. The test now runs without
 a trace and waits for its timed steps with `locator.waitFor()`, which takes no snapshot.
+
+The import took 17 s, then 23 s once the sidebar listed every note, and 88 s in CI: after each
+imported note the catalog sorted all of them and the sidebar re-rendered its whole tree. The
+catalog now publishes a lone change at once and a burst (an import, a first sync) at most every
+100 ms, so the import takes 2.5 s.
 
 ### Core logic (`core.perf.ts`, Node + fake-indexeddb)
 

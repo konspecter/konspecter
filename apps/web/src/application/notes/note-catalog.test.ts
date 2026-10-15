@@ -135,6 +135,21 @@ describe("NoteCatalog", () => {
     stop();
   });
 
+  it("publishes a burst of changes a few times, not once per note", async () => {
+    const store = await newStore();
+    const catalog = new NoteCatalog(store);
+    const stop = catalog.start();
+    await ready(catalog);
+    const listener = vi.fn();
+    catalog.subscribe(listener);
+
+    for (let i = 0; i < 50; i += 1) await store.put(createNote(`# N${String(i)}`, new Date()));
+    await ready(catalog, (notes) => notes.length === 50);
+
+    expect(listener.mock.calls.length).toBeLessThan(10);
+    stop();
+  });
+
   it("reports a failed load and recovers on reload", async () => {
     const store = await newStore();
     await store.put(createNote("# A", new Date("2020-01-01"), "a"));
