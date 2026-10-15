@@ -1,6 +1,13 @@
 import { createNote } from "../../domain/note/note";
 import { openNoteStore } from "../../infrastructure/storage/note-store";
-import { NoteCatalog, notesInFolder, summarize, type NoteSummary } from "./note-catalog";
+import {
+  NoteCatalog,
+  notesInFolder,
+  recentNotes,
+  summarize,
+  untaggedNotes,
+  type NoteSummary,
+} from "./note-catalog";
 
 let count = 0;
 const newStore = () => openNoteStore(`catalog-test-${String((count += 1))}`);
@@ -44,6 +51,42 @@ describe("summarize", () => {
       cover: null,
       tags: [],
     });
+  });
+});
+
+describe("recentNotes", () => {
+  it("keeps the notes created or edited in the last 7 days, in their order", () => {
+    const note = (id: string, updated: string | null) =>
+      ({ id, updated }) as unknown as NoteSummary;
+    const now = new Date("2026-10-15T12:00:00Z");
+    expect(
+      recentNotes(
+        [
+          note("today", "2026-10-15T09:00:00Z"),
+          note("week", "2026-10-08T12:00:00Z"),
+          note("older", "2026-10-08T11:59:59Z"),
+          note("undated", null),
+        ],
+        now,
+      ).map(({ id }) => id),
+    ).toEqual(["today", "week"]);
+  });
+});
+
+describe("untaggedNotes", () => {
+  it("keeps the notes without a tag, by title, untitled last", () => {
+    const note = (id: string, title: string, tags: string[] = []) =>
+      ({ id, title, tags }) as unknown as NoteSummary;
+    expect(
+      untaggedNotes([
+        note("1", "b"),
+        note("2", "Tagged", ["java"]),
+        note("3", ""),
+        note("4", "A"),
+        note("5", "item 10"),
+        note("6", "item 9"),
+      ]).map(({ id }) => id),
+    ).toEqual(["4", "1", "6", "5", "3"]);
   });
 });
 

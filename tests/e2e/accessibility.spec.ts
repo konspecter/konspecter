@@ -180,7 +180,7 @@ test("the sidebar's panes stay inside it, whatever the titles", async ({ page })
   await expect(recent.getByRole("link", { name: /far too long/ })).toBeVisible();
   const right =
     ((await sidebar.boundingBox())?.x ?? 0) + ((await sidebar.boundingBox())?.width ?? 0);
-  for (const name of ["Tags", "Recent", "Details"]) {
+  for (const name of ["Navigation", "Recent", "Details"]) {
     const header = await sidebar.getByRole("button", { name, exact: true }).boundingBox();
     expect((header?.x ?? 0) + (header?.width ?? 0), name).toBeLessThanOrEqual(right);
   }

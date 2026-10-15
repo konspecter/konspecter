@@ -93,8 +93,10 @@ is matched only against plain text tokens. The `text_join` rule is disabled so a
   A folder counts the notes in it and in the folders below it, each once. This is the tree
   only: the note's tags (Details, search, filters) are still each tag of the chain. An open
   folder lists its child tags, then its notes, both by name. Folders start closed; the active tag's
-  folders and those above them start open. The tags are read again whenever a note changes,
-  and so are the notes of every open folder.
+  folders and those above them start open. The notes without a tag are documents at the
+  root, after the top folders, by title (A to z, untitled last; `untaggedNotes`), so every
+  note is in the tree. The tags are read again whenever a note changes, and so are the notes
+  of every open folder.
 - **Tree labels:** a folder shows its tag as written, with `_` shown as a space and, by
   default, a capital first letter (setting "Tag names"; "As written" keeps the case)
   (`tagLabel`: `#Java#Linked_List` → `Java` › `Linked List`). When notes spell a

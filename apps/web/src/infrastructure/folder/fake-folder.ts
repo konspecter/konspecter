@@ -64,7 +64,8 @@ export class FakeFolder implements FolderBridge {
     this.files.delete(from);
     this.files.set(to, { ...file, modifiedMs: (this.#clock += 1000) });
   }
-  #clock = Date.parse("2026-01-01T00:00:00Z");
+  // From now on, so the files count as recently edited.
+  #clock = Date.now();
 
   /** A change made by another program. */
   edit(path: string, text: string): void {

@@ -60,7 +60,7 @@ test("Markdown → index → search, and Markdown → tags → navigation", asyn
   await search.fill("#net");
   await expect(list(page).getByRole("link")).toHaveText(["Networking"]);
 
-  const tags = page.getByRole("navigation", { name: "Tags" });
+  const tags = page.getByRole("navigation", { name: "Navigation" });
   await tags.getByRole("link", { name: "Java" }).click();
   await expect(list(page).getByRole("link")).toHaveText(["Hash maps"]);
   // The tag is a chip in the search box.

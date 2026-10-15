@@ -87,6 +87,26 @@ export async function notesInFolder(
     .sort(byTitleSummary);
 }
 
+/** How far back the sidebar's recent notes go. */
+const RECENT_DAYS = 7;
+
+/**
+ * The notes created or edited in the last week before `now`, in their order
+ * (newest first): the sidebar's recent notes. Undated notes are not recent.
+ */
+export function recentNotes(notes: readonly NoteSummary[], now: Date): NoteSummary[] {
+  const since = now.getTime() - RECENT_DAYS * 24 * 60 * 60 * 1000;
+  return notes.filter((note) => note.updated !== null && Date.parse(note.updated) >= since);
+}
+
+/**
+ * The notes without a tag, by title: the documents at the root of the tag
+ * tree, beside the tag folders.
+ */
+export function untaggedNotes(notes: readonly NoteSummary[]): NoteSummary[] {
+  return notes.filter((note) => note.tags.length === 0).sort(byTitleSummary);
+}
+
 /**
  * Every note's summary, most recently edited first, for the sidebar and the
  * note list. Loaded once, then kept current one note at a time from the

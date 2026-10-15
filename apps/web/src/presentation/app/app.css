@@ -329,44 +329,6 @@ mark {
 }
 
 /*
- * Every note, yet each row is laid out: with `content-visibility: auto` the
- * macOS app's WebKit did not repaint a row whose focus or current state
- * changed (the open note vanished, the focused one showed no ring).
- */
-.recent-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.recent-link {
-  display: block;
-  overflow: hidden;
-  padding: 5px 8px;
-  border-radius: 7px;
-  color: var(--color-fg);
-  line-height: 22px;
-  text-decoration: none;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.recent-link:hover {
-  background: var(--color-hover);
-}
-
-.recent-link[aria-current="page"] {
-  background: var(--color-active);
-  font-weight: 550;
-}
-
-/* Inside the row, as in the tree, with the row's own rounding, like the active note. */
-.recent-link:focus-visible {
-  outline: 1px solid var(--color-focus-row);
-  outline-offset: -1px;
-}
-
-/*
  * The last pane: the open note's details, rendered there by the note page.
  * Empty (and hidden) everywhere else. Smaller and quieter than the rest.
  */
@@ -2114,10 +2076,6 @@ kbd {
   .pane-toggle .icon {
     width: 18px;
     height: 18px;
-  }
-
-  .recent-link {
-    padding: 9px 8px;
   }
 
   .details-pane > .sidebar-pane-body {

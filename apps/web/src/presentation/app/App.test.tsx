@@ -87,6 +87,14 @@ const javaNote = createNote(
   new Date("2020-09-28T10:15:00.000Z"),
   "java",
 );
+/** A moment `days` ago: notes edited then are still in Recent (the last week). */
+const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+/** javaNote, edited yesterday: in Recent. */
+const recentJavaNote = createNote(
+  "# Java Collections\n\nArrayList — dynamic array.",
+  daysAgo(1),
+  "java",
+);
 const emptyNote = createNote("", new Date("2020-09-27T08:00:00.000Z"), "empty");
 const brokenNote: Note = { id: "broken", markdown: "---\ntitle: [\n---\n\nStill here." };
 
@@ -237,7 +245,7 @@ describe("layout", () => {
 
   it("opens a conspect at /conspects/:id, and an old /notes/ link there too", async () => {
     const store = await newStore();
-    await store.put(javaNote);
+    await store.put(recentJavaNote);
     renderApp(store, "/notes/java");
 
     expect(await textEditor()).toHaveTextContent("Java Collections");
@@ -258,16 +266,16 @@ describe("sidebar panes", () => {
   it("folds each pane on its header, any number open, and remembers it", async () => {
     renderApp(await taggedStore(), "/conspects/java");
     await textEditor();
-    const tags = await within(sidebar()).findByRole("navigation", { name: "Tags" });
+    const tags = await within(sidebar()).findByRole("navigation", { name: "Navigation" });
     const javaTag = within(tags).getByRole("link", { name: "Java" });
     const recentNote = within(recentNav()).getByRole("link", { name: "Java Collections" });
     const details = within(sidebar()).getByRole("region", { name: "Details" });
-    for (const name of ["Tags", "Recent", "Details"]) {
+    for (const name of ["Navigation", "Recent", "Details"]) {
       expect(paneToggle(name)).toHaveAttribute("aria-expanded", "true");
     }
 
-    await userEvent.click(paneToggle("Tags"));
-    expect(paneToggle("Tags")).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(paneToggle("Navigation"));
+    expect(paneToggle("Navigation")).toHaveAttribute("aria-expanded", "false");
     expect(javaTag).not.toBeVisible();
     expect(recentNote).toBeVisible();
     expect(details).toBeVisible();
@@ -278,19 +286,19 @@ describe("sidebar panes", () => {
     cleanup();
     renderApp(await taggedStore(), "/conspects/java");
     await textEditor();
-    await within(sidebar()).findByRole("navigation", { name: "Tags" });
-    expect(paneToggle("Tags")).toHaveAttribute("aria-expanded", "false");
+    await within(sidebar()).findByRole("navigation", { name: "Navigation" });
+    expect(paneToggle("Navigation")).toHaveAttribute("aria-expanded", "false");
     expect(paneToggle("Recent")).toHaveAttribute("aria-expanded", "true");
     expect(paneToggle("Details")).toHaveAttribute("aria-expanded", "false");
-    await userEvent.click(paneToggle("Tags"));
+    await userEvent.click(paneToggle("Navigation"));
     expect(within(sidebar()).getByRole("link", { name: "Java" })).toBeVisible();
   });
 
   it("moves with ↑/↓ through the headers and the rows of open panes", async () => {
     renderApp(await taggedStore());
-    await within(sidebar()).findByRole("navigation", { name: "Tags" });
+    await within(sidebar()).findByRole("navigation", { name: "Navigation" });
     act(() => {
-      paneToggle("Tags").focus();
+      paneToggle("Navigation").focus();
     });
 
     await userEvent.keyboard("{ArrowDown}");
@@ -301,16 +309,16 @@ describe("sidebar panes", () => {
     expect(within(recentNav()).getByRole("link", { name: "Java Collections" })).toHaveFocus();
 
     // A folded pane's rows are skipped.
-    await userEvent.click(paneToggle("Tags"));
+    await userEvent.click(paneToggle("Navigation"));
     await userEvent.keyboard("{ArrowDown}");
     expect(paneToggle("Recent")).toHaveFocus();
     await userEvent.keyboard("{ArrowUp}");
-    expect(paneToggle("Tags")).toHaveFocus();
+    expect(paneToggle("Navigation")).toHaveFocus();
   });
 
   it("moves with ↑/↓ from a clicked row, also where a click does not focus it (WebKit)", async () => {
     renderApp(await taggedStore());
-    const tags = await within(sidebar()).findByRole("navigation", { name: "Tags" });
+    const tags = await within(sidebar()).findByRole("navigation", { name: "Navigation" });
     // A bare click event, as WebKit sends it: no focus of its own.
     const java = within(tags).getByRole("link", { name: "Java" });
     fireEvent.click(java);
@@ -324,13 +332,13 @@ describe("sidebar panes", () => {
 
   it("enters the sidebar with Ctrl+\\ on an open pane only", async () => {
     renderApp(await taggedStore(), "/conspects/java");
-    await within(sidebar()).findByRole("navigation", { name: "Tags" });
+    await within(sidebar()).findByRole("navigation", { name: "Navigation" });
     await userEvent.click(paneToggle("Recent"));
-    await userEvent.click(paneToggle("Tags"));
+    await userEvent.click(paneToggle("Navigation"));
     await userEvent.click(await textEditor());
 
     await userEvent.keyboard("{Control>}\\{/Control}{Control>}\\{/Control}");
-    expect(paneToggle("Tags")).toHaveFocus();
+    expect(paneToggle("Navigation")).toHaveFocus();
   });
 });
 
@@ -351,7 +359,9 @@ describe("the note list", () => {
     // A row is the cover, title, date and tags, and the start of the text.
     expect(within(list).getByText(/ArrayList — dynamic array\./)).toBeInTheDocument();
     expect(list.querySelector("time")).toHaveAttribute("datetime", "2020-09-28T10:15:00Z");
-    expect(recentTitles()).toEqual(["Java Collections", "Untitled", "Unreadable conspect"]);
+    // None of them was created or edited in the last week: Recent says so.
+    expect(recentTitles()).toEqual([]);
+    expect(sidebar()).toHaveTextContent("No activity in 7 days");
   });
 
   it("shows each note's cover, tags and text, and a letter where there is no cover", async () => {
@@ -406,7 +416,7 @@ describe("the note list", () => {
 
     await store.applyRemote({
       id: "r1",
-      markdown: "# From the server",
+      markdown: `---\nupdated: ${daysAgo(0).toISOString()}\n---\n# From the server`,
       revision: 1,
       deleted: false,
     });
@@ -620,8 +630,10 @@ describe("a note", () => {
 
   it("moves to the top of Recent as soon as it is edited", async () => {
     const store = await newStore();
-    await store.put(javaNote);
-    await store.put(createNote("# Newer", new Date("2021-01-01T00:00:00Z"), "newer"));
+    await store.put(
+      createNote("# Java Collections\n\nArrayList — dynamic array.", daysAgo(2), "java"),
+    );
+    await store.put(createNote("# Newer", daysAgo(1), "newer"));
     renderApp(store, "/conspects/java");
 
     const box = await textEditor();
@@ -698,14 +710,12 @@ describe("a note", () => {
 describe("tags", () => {
   async function storeWithTaggedNotes() {
     const store = await newStore();
-    await store.put(createNote("# Lists\n\n#java#collections", new Date("2020-01-03"), "lists"));
-    await store.put(
-      createNote("# Streams\n\n#java#streams #fp", new Date("2020-01-02"), "streams"),
-    );
-    await store.put(createNote("# Untagged", new Date("2020-01-01"), "plain"));
+    await store.put(createNote("# Lists\n\n#java#collections", daysAgo(1), "lists"));
+    await store.put(createNote("# Streams\n\n#java#streams #fp", daysAgo(2), "streams"));
+    await store.put(createNote("# Untagged", daysAgo(3), "plain"));
     return store;
   }
-  const tagTree = () => within(sidebar()).findByRole("navigation", { name: "Tags" });
+  const tagTree = () => within(sidebar()).findByRole("navigation", { name: "Navigation" });
 
   it("shows the tags as folders with their notes inside, with counts, collapsed", async () => {
     renderApp(await storeWithTaggedNotes());
@@ -743,7 +753,32 @@ describe("tags", () => {
           .map((link) => link.getAttribute("href")),
       ).toEqual(["/conspects/streams", "/?q=%23streams"]);
     });
-    expect(within(tree).queryByRole("link", { name: "Untagged" })).not.toBeInTheDocument();
+    // A note without a tag is at the root, after the folders.
+    const untagged = within(tree).getByRole("link", { name: "Untagged" });
+    expect(untagged).toHaveAttribute("href", "/conspects/plain");
+    expect(untagged.closest("li")?.parentElement).toBe(tree.querySelector(".tree"));
+  });
+
+  it("lists the notes without a tag at the root, A to z, after the folders", async () => {
+    const store = await newStore();
+    await store.put(createNote("# Lists\n\n#java", new Date("2020-01-04"), "lists"));
+    await store.put(createNote("# banana", new Date("2020-01-03"), "banana"));
+    await store.put(createNote("cherry pie", new Date("2020-01-02"), "cherry"));
+    await store.put(createNote("# Apple", new Date("2020-01-01"), "apple"));
+    renderApp(store);
+
+    const tree = await tagTree();
+    await waitFor(() => {
+      expect(
+        [...tree.querySelectorAll(".tree > li > :is(.tree-row, a)")].map((row) =>
+          row.textContent.trim(),
+        ),
+      ).toEqual(["Java1", "Apple", "banana", "cherry pie"]);
+    });
+    expect(within(tree).getByRole("link", { name: "Apple" })).toHaveAttribute(
+      "href",
+      "/conspects/apple",
+    );
   });
 
   it("walks the tree with the arrow keys: ↑/↓ row by row, → into a folder, ← out of it", async () => {
@@ -784,8 +819,10 @@ describe("tags", () => {
     await userEvent.keyboard("{ArrowUp}");
     expect(within(tree).getByRole("link", { name: "Fp" })).toHaveFocus();
 
-    // Past the tree, the recent notes' header and the notes: one list.
+    // The untagged note at the tree's root, then the recent notes' header and the notes: one list.
     await userEvent.keyboard("{ArrowDown}{ArrowLeft}{ArrowDown}");
+    expect(within(tree).getByRole("link", { name: "Untagged" })).toHaveFocus();
+    await userEvent.keyboard("{ArrowDown}");
     expect(within(sidebar()).getByRole("button", { name: "Recent" })).toHaveFocus();
     await userEvent.keyboard("{ArrowDown}");
     expect(within(recentNav()).getByRole("link", { name: "Lists" })).toHaveFocus();
@@ -1385,7 +1422,7 @@ describe("settings and the top bar", () => {
     await store.put(createNote("# N\n\n#новые_технологии", new Date(), "n"));
     renderWithSettings(store, "/settings");
 
-    const tree = await within(sidebar()).findByRole("navigation", { name: "Tags" });
+    const tree = await within(sidebar()).findByRole("navigation", { name: "Navigation" });
     expect(await within(tree).findByRole("link", { name: "Новые технологии" })).toBeInTheDocument();
     await userEvent.selectOptions(
       screen.getByRole("combobox", { name: "Tag names" }),
@@ -1604,7 +1641,7 @@ describe("note details", () => {
     await store.put(
       createNote(
         "---\nauthor: Ann\n---\n# Maps\n\nHash maps and trees. #java#collections",
-        new Date("2026-09-01T10:00:00Z"),
+        daysAgo(1),
         "maps",
       ),
     );
@@ -2100,7 +2137,7 @@ describe("import and export", () => {
 
   it("exports the library as a ZIP and a note as a .md file", async () => {
     const store = await newStore();
-    await store.put(javaNote);
+    await store.put(recentJavaNote);
     const downloads: string[] = [];
     vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
       this: HTMLAnchorElement,
@@ -2193,7 +2230,7 @@ describe("onboarding", () => {
     });
     // The example opens in the text editor, and its tags reach the sidebar.
     expect(await textEditor()).toHaveTextContent("Headings and lists");
-    const tree = await within(sidebar()).findByRole("navigation", { name: "Tags" });
+    const tree = await within(sidebar()).findByRole("navigation", { name: "Navigation" });
     expect(await within(tree).findByRole("link", { name: "Konspecter" })).toBeInTheDocument();
   });
 
@@ -2287,7 +2324,7 @@ describe("keyboard shortcuts", () => {
 
   it("toggles the sidebar with Ctrl+\\: in to the open note when shown, back to the editor", async () => {
     const store = await newStore();
-    await store.put(javaNote);
+    await store.put(recentJavaNote);
     renderApp(store, "/conspects/java");
     await userEvent.click(await textEditor());
 

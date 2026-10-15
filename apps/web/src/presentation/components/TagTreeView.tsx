@@ -1,4 +1,5 @@
 import {
+  memo,
   useEffect,
   useRef,
   useState,
@@ -15,6 +16,8 @@ import { t, tn } from "../i18n/i18n";
 
 type TagTreeViewProps = {
   nodes: readonly TagNode[];
+  /** The notes at the root, after the folders: those without a tag. */
+  notes?: readonly NoteSummary[];
   /** The tag the note list is filtered by; its folders and the ones above them start open. */
   activeTag?: string | null;
   /** The note open in the main area; marked where it appears. */
@@ -35,10 +38,11 @@ function tagPath(tag: Tag): string {
  * The tags as a project tree: each tag is a folder holding its child tags,
  * then its notes; a tag with several parents is a folder under each, holding
  * the notes whose chains lead there. A folder's name opens its filtered note
- * list.
+ * list. The notes without a tag are at the root, after the folders.
  */
 export function TagTreeView({
   nodes,
+  notes = [],
   activeTag = null,
   currentNoteId = null,
   loadNotes,
@@ -54,6 +58,9 @@ export function TagTreeView({
           currentNoteId={currentNoteId}
           loadNotes={loadNotes}
         />
+      ))}
+      {notes.map((note) => (
+        <TreeDocument key={note.id} note={note} depth={0} current={note.id === currentNoteId} />
       ))}
     </ul>
   );
@@ -170,21 +177,48 @@ function TagFolder({ node, depth, parent, activeTag, currentNoteId, loadNotes }:
             />
           ))}
           {notes.map((note) => (
-            <li key={note.id}>
-              <Link
-                to={`/conspects/${encodeURIComponent(note.id)}`}
-                className="tree-row tree-document"
-                style={indent(depth + 1)}
-                {...(note.id === currentNoteId ? { "aria-current": "page" } : {})}
-                onKeyDown={onNoteKey}
-              >
-                <DocumentIcon />
-                <span className="tree-label">{summaryTitle(note)}</span>
-              </Link>
-            </li>
+            <TreeDocument
+              key={note.id}
+              note={note}
+              depth={depth + 1}
+              current={note.id === currentNoteId}
+              onKeyDown={onNoteKey}
+            />
           ))}
         </ul>
       )}
     </li>
   );
 }
+
+/** A note in the tree, and in the recent notes: its icon and title, opening it. */
+export const TreeDocument = memo(function TreeDocument({
+  note,
+  depth,
+  current,
+  className,
+  onKeyDown,
+}: {
+  note: NoteSummary;
+  depth: number;
+  current: boolean;
+  /** Another class for the row (`recent-link`). */
+  className?: string;
+  /** ← in a folder goes to the folder's name. */
+  onKeyDown?: (event: KeyboardEvent) => void;
+}) {
+  return (
+    <li>
+      <Link
+        to={`/conspects/${encodeURIComponent(note.id)}`}
+        className={className ? `tree-row tree-document ${className}` : "tree-row tree-document"}
+        style={indent(depth)}
+        {...(current ? { "aria-current": "page" } : {})}
+        {...(onKeyDown ? { onKeyDown } : {})}
+      >
+        <DocumentIcon />
+        <span className="tree-label">{summaryTitle(note)}</span>
+      </Link>
+    </li>
+  );
+});

@@ -3,6 +3,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useMemo,
   useState,
   useSyncExternalStore,
   type KeyboardEvent,
@@ -14,6 +15,8 @@ import { Link } from "react-router";
 import { tagTree, type TagNode } from "../../domain/tag/tags";
 import {
   notesInFolder,
+  recentNotes,
+  untaggedNotes,
   type NoteCatalog,
   type NoteSummary,
 } from "../../application/notes/note-catalog";
@@ -21,8 +24,7 @@ import type { NoteRepository } from "../../application/notes/note-repository";
 import type { TagNames } from "../../domain/settings/settings";
 import { formatKeys, SHORTCUTS } from "../app/shortcuts";
 import { ChevronIcon, GearIcon, NewNoteIcon, SidebarIcon } from "@konspecter/ui/icons";
-import { summaryTitle } from "./note-title";
-import { TagTreeView } from "./TagTreeView";
+import { TagTreeView, TreeDocument } from "./TagTreeView";
 import { useFold } from "../hooks/use-fold";
 import { isNarrow } from "../hooks/use-narrow";
 import { t } from "../i18n/i18n";
@@ -144,6 +146,9 @@ export const Sidebar = memo(function Sidebar({
 }: SidebarProps) {
   const library = useSyncExternalStore(catalog.subscribe, catalog.getSnapshot);
   const notes = library.status === "ready" ? library.notes : null;
+  const untagged = useMemo(() => untaggedNotes(notes ?? []), [notes]);
+  // Read again with every change to the notes, so the week moves on with them.
+  const recent = useMemo(() => (notes ? recentNotes(notes, new Date()) : null), [notes]);
   const [folded, setFolded] = useState(initialFolded);
   const toggle = (pane: PaneId) => {
     const next = new Set(folded);
@@ -204,6 +209,7 @@ export const Sidebar = memo(function Sidebar({
         <SidebarTags
           store={store}
           library={library}
+          untagged={untagged}
           activeTag={activeTag}
           currentNoteId={currentNoteId}
           tagNames={tagNames}
@@ -222,10 +228,19 @@ export const Sidebar = memo(function Sidebar({
           }}
         >
           {notes && notes.length === 0 && <p className="sidebar-hint">{t("sidebar.noNotes")}</p>}
-          {notes && notes.length > 0 && (
-            <ul className="recent-list">
-              {notes.map((note) => (
-                <RecentNote key={note.id} note={note} current={note.id === currentNoteId} />
+          {notes && notes.length > 0 && recent?.length === 0 && (
+            <p className="sidebar-hint">{t("sidebar.noRecent")}</p>
+          )}
+          {recent && recent.length > 0 && (
+            <ul className="tree">
+              {recent.map((note) => (
+                <TreeDocument
+                  key={note.id}
+                  note={note}
+                  depth={0}
+                  current={note.id === currentNoteId}
+                  className="recent-link"
+                />
               ))}
             </ul>
           )}
@@ -306,30 +321,12 @@ function SidebarPane({
   );
 }
 
-const RecentNote = memo(function RecentNote({
-  note,
-  current,
-}: {
-  note: NoteSummary;
-  current: boolean;
-}) {
-  return (
-    <li>
-      <Link
-        to={`/conspects/${encodeURIComponent(note.id)}`}
-        className="recent-link"
-        {...(current ? { "aria-current": "page" } : {})}
-      >
-        {summaryTitle(note)}
-      </Link>
-    </li>
-  );
-});
-
 type SidebarTagsProps = {
   store: NoteRepository;
   /** Changes whenever a note changes: the tags are read again then. */
   library: unknown;
+  /** The notes without a tag, by title: at the tree's root. */
+  untagged: readonly NoteSummary[];
   activeTag: string | null;
   currentNoteId: string | null;
   tagNames: TagNames;
@@ -340,6 +337,7 @@ type SidebarTagsProps = {
 function SidebarTags({
   store,
   library,
+  untagged,
   activeTag,
   currentNoteId,
   tagNames,
@@ -379,13 +377,15 @@ function SidebarTags({
       open={open}
       onToggle={onToggle}
     >
-      {tree.length === 0 ? (
+      {tree.length === 0 && (
         <p className="sidebar-hint">
           {rich("sidebar.tagsHint", { tag: <code>#tag</code>, nested: <code>#parent#child</code> })}
         </p>
-      ) : (
+      )}
+      {(tree.length > 0 || untagged.length > 0) && (
         <TagTreeView
           nodes={tree}
+          notes={untagged}
           activeTag={activeTag}
           currentNoteId={currentNoteId}
           loadNotes={loadNotes}
