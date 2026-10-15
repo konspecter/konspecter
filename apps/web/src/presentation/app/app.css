@@ -311,16 +311,15 @@ mark {
   font-size: 13px;
 }
 
+/*
+ * Every note, yet each row is laid out: with `content-visibility: auto` the
+ * macOS app's WebKit did not repaint a row whose focus or current state
+ * changed (the open note vanished, the focused one showed no ring).
+ */
 .recent-list {
   margin: 0;
   padding: 0;
   list-style: none;
-}
-
-.recent-list li {
-  /* Thousands of notes: rows off screen are not laid out. */
-  content-visibility: auto;
-  contain-intrinsic-size: auto 32px;
 }
 
 .recent-link {
@@ -344,10 +343,7 @@ mark {
   font-weight: 550;
 }
 
-/*
- * Inside the row, as in the tree (the item's containment clips anything
- * outside it), with the row's own rounding, like the active note.
- */
+/* Inside the row, as in the tree, with the row's own rounding, like the active note. */
 .recent-link:focus-visible {
   outline: 1px solid var(--color-focus-row);
   outline-offset: -1px;
