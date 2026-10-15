@@ -1225,6 +1225,19 @@ kbd {
   }
 }
 
+/* A touch screen has no keyboard for the keys: the pinned notes lose their keycaps. */
+@media (hover: none) and (pointer: coarse) {
+  .tree-pin {
+    display: none;
+  }
+
+  .tree-document:has(> .tree-pin) {
+    padding-left: calc(
+      var(--tree-pad) + var(--depth) * var(--tree-indent) + var(--tree-twistie) + 2px
+    );
+  }
+}
+
 /* --- Page content -------------------------------------------------------- */
 
 .page-title {
