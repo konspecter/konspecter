@@ -1,6 +1,7 @@
 import { translator } from "./i18n/i18n";
 import {
   day,
+  discounts,
   durationText,
   FREE,
   money,
@@ -112,6 +113,31 @@ describe("formatting", () => {
     expect(durationText(ru, "14d")).toBe("14 дней");
     expect(durationText(ru, "3d")).toBe("3 дня");
     expect(periodText(en, "x")).toBe("x");
+  });
+
+  it("works out what a longer period saves", () => {
+    expect(
+      discounts([
+        { period: "1m", amount: 3 },
+        { period: "3m", amount: 8 },
+        { period: "1y", amount: 30 },
+      ]),
+    ).toEqual([0, 11, 17]);
+    // Against the dearest month, whichever comes first; never below nothing.
+    expect(
+      discounts([
+        { period: "12m", amount: 2990 },
+        { period: "1m", amount: 299 },
+        { period: "1q", amount: 897 },
+      ]),
+    ).toEqual([17, 0, 0]);
+    expect(discounts([{ period: "1m", amount: 3 }])).toEqual([0]);
+    expect(
+      discounts([
+        { period: "x", amount: 3 },
+        { period: "1m", amount: 0 },
+      ]),
+    ).toEqual([0, 0]);
   });
 
   it("writes days", () => {

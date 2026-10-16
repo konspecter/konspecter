@@ -188,6 +188,31 @@ export function parsePeriod(
   return { count: Number(match[1]), unit: UNITS[match[2] as keyof typeof UNITS] };
 }
 
+/** Months in each unit: a year is 12, a day 12/365.25 of a month. */
+const MONTHS = {
+  day: 12 / 365.25,
+  week: (7 * 12) / 365.25,
+  month: 1,
+  quarter: 3,
+  year: 12,
+} as const;
+
+/**
+ * What each price saves against the dearest month among them, in whole
+ * percent (0 for none): `[0, 17]` for $3 a month and $30 a year. The prices
+ * are in one currency (one gateway's).
+ */
+export function discounts(prices: readonly Price[]): number[] {
+  const monthly = prices.map((price) => {
+    const parsed = parsePeriod(price.period);
+    return parsed && price.amount > 0 ? price.amount / (parsed.count * MONTHS[parsed.unit]) : null;
+  });
+  const dearest = Math.max(0, ...monthly.map((value) => value ?? 0));
+  return monthly.map((value) =>
+    value === null || dearest === 0 ? 0 : Math.max(0, Math.round((1 - value / dearest) * 100)),
+  );
+}
+
 /** How long a period is, in words: "month", "3 months", "14 days". */
 export function periodText(t: SiteTranslator, period: string): string {
   const parsed = parsePeriod(period);

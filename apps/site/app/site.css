@@ -666,6 +666,40 @@ main {
   font-size: 15px;
 }
 
+/* Buying sync on the home page: the periods, the consent and the buttons
+   fill the card under its price. */
+.price-buy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.price-buy .price-options {
+  margin-top: 1.25rem;
+}
+
+.price-buy .consent {
+  margin-top: 1rem;
+}
+
+.price-buy .inline-error {
+  margin: 1rem 0 0;
+}
+
+/* What a longer period saves: a little orange "−17%". */
+.price-discount {
+  flex: none;
+  margin-left: auto;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--color-offer);
+  color: var(--color-raised);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+
 .price-terms {
   color: var(--color-muted);
   font-size: 15px;

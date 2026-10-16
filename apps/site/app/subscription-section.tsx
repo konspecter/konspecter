@@ -24,12 +24,15 @@ import {
 export function SubscriptionSection({
   billing,
   gateways,
+  plan,
   error,
   notice,
   redirectUrl,
 }: {
   billing: Billing;
   gateways: readonly GatewayPlan[];
+  /** The plan ("gateway:period") to offer first; the first one when it is not on sale. */
+  plan: string;
   error: FormError | null;
   notice: string | null;
   redirectUrl: string | null;
@@ -60,7 +63,7 @@ export function SubscriptionSection({
             </Form>
           )}
           {gateways.length > 0 ? (
-            <Subscribe gateways={gateways} />
+            <Subscribe gateways={gateways} plan={plan} />
           ) : (
             <p className="settings-text">{t.t("subscription.unavailable")}</p>
           )}
@@ -116,7 +119,7 @@ function AccessText({ billing, sold }: { billing: Billing; sold: boolean }) {
   }
 }
 
-function Subscribe({ gateways }: { gateways: readonly GatewayPlan[] }) {
+function Subscribe({ gateways, plan }: { gateways: readonly GatewayPlan[]; plan: string }) {
   const t = useT();
   const locale = useLocale();
   const consentId = useId();
@@ -124,6 +127,10 @@ function Subscribe({ gateways }: { gateways: readonly GatewayPlan[] }) {
     gateway.prices.map((price) => ({ gateway, price })),
   );
   if (options.length === 0) return null;
+  const chosen = Math.max(
+    0,
+    options.findIndex(({ gateway, price }) => `${gateway.id}:${price.period}` === plan),
+  );
   const several = gateways.length > 1;
   return (
     <Form method="post" className="settings-form subscribe-form">
@@ -140,7 +147,7 @@ function Subscribe({ gateways }: { gateways: readonly GatewayPlan[] }) {
                 type="radio"
                 name="plan"
                 value={`${gateway.id}:${price.period}`}
-                defaultChecked={index === 0}
+                defaultChecked={index === chosen}
                 required
               />
               <span>

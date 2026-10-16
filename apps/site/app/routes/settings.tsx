@@ -3,6 +3,7 @@ import { data, Form, redirect, useActionData, useLoaderData, useNavigation } fro
 import { requireUser, signInPath } from "../account.server";
 import { callApi, withCookies, type ApiResult } from "../api.server";
 import { Field, FormMessage, formError, Submit, textField, type FormError } from "../auth-form";
+import { startCheckout } from "../checkout.server";
 import { ConnectApp, parseConnectCode, type ConnectCode } from "../connect-app";
 import { parseDevices, timeAgo, type Device } from "../devices";
 import { Encryption } from "../encryption";
@@ -59,6 +60,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     // Shown only where sync is paid.
     billing: subscription?.paid ? subscription : null,
     gateways: parsePlans(plans.data).gateways,
+    // The plan chosen on the home page before signing in.
+    plan: new URL(request.url).searchParams.get("plan") ?? "",
     now: Date.now(),
   };
 }
@@ -128,22 +131,10 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   if (intent === "subscribe") {
-    const [gateway = "", period = ""] = textField(form, "plan").split(":");
-    const result = await callApi<{ redirect_url?: unknown }>(request, "/api/subscription", {
-      method: "POST",
-      body: {
-        gateway,
-        period,
-        locale: readPreferences(request).locale,
-        accept: textField(form, "accept") === "yes",
-      },
-    });
+    const { url, result } = await startCheckout(request, form);
     signInAgainOn401(request, result);
-    const redirectUrl = result.data?.redirect_url;
-    if (result.error || typeof redirectUrl !== "string" || !/^https:\/\//.test(redirectUrl)) {
-      return failed("subscribe", result);
-    }
-    return { intent: "subscribe", error: null, redirectUrl } satisfies ActionResult;
+    if (!url) return failed("subscribe", result);
+    return { intent: "subscribe", error: null, redirectUrl: url } satisfies ActionResult;
   }
 
   if (intent === "cancel" || intent === "resume") {
@@ -168,7 +159,7 @@ export async function action({ request }: Route.ActionArgs) {
 
 export default function Settings() {
   const { t } = useT();
-  const { account, devices, devicesFailed, billing, gateways, now } =
+  const { account, devices, devicesFailed, billing, gateways, plan, now } =
     useLoaderData<typeof loader>();
   const result = useActionData<ActionResult>();
   const errorOf = (intent: Intent) => (result?.intent === intent ? result.error : null);
@@ -193,6 +184,7 @@ export default function Settings() {
           <SubscriptionSection
             billing={billing}
             gateways={gateways}
+            plan={plan}
             error={billingIntent ? result.error : null}
             notice={
               result?.error

@@ -1,5 +1,10 @@
-import { Link } from "react-router";
+import { richText } from "@konspecter/i18n/rich";
+import { useId, useState } from "react";
+import { data, Form, Link, redirect, useActionData } from "react-router";
+import { accountContext } from "../account.server";
 import { callApi } from "../api.server";
+import { formError, FormMessage, Submit, textField, type FormError } from "../auth-form";
+import { startCheckout } from "../checkout.server";
 import { firstMarks, MARKDOWN_GUIDE } from "../cheatsheet";
 import { downloadsFor } from "../downloads.server";
 import { useLocale, useT } from "../i18n/i18n";
@@ -8,7 +13,7 @@ import { useLocalePath } from "../pages";
 import type { Platform } from "../platform";
 import { PlatformList } from "../platform-list";
 import { readPreferences } from "../preferences.server";
-import { durationText, money, parsePlans, periodText } from "../subscription";
+import { discounts, durationText, money, parsePlans, periodText } from "../subscription";
 import { SPECIMENS } from "../specimen";
 import { SpecimenSlider } from "../specimen-slider";
 import type { Route } from "./+types/home";
@@ -17,24 +22,45 @@ export async function loader({ request }: Route.LoaderArgs) {
   const plans = parsePlans(
     (await callApi(request, `/api/billing/plans?locale=${readPreferences(request).locale}`)).data,
   );
-  // Where sync is paid: its first price, and the trial.
-  const gateway = plans.gateways[0];
-  const price = gateway?.prices[0];
+  // Where sync is paid: every price on sale, each with what it saves, and the trial.
+  const options = plans.gateways.flatMap((gateway) => {
+    const saves = discounts(gateway.prices);
+    return gateway.prices.map((price, index) => ({
+      plan: `${gateway.id}:${price.period}`,
+      gateway: gateway.name,
+      amount: price.amount,
+      currency: gateway.currency,
+      period: price.period,
+      discount: saves[index] ?? 0,
+    }));
+  });
   // Paid sync that the page's language has no gateway for is as good as off.
-  const sync: SyncOffer = !plans.paid ? "free" : gateway ? "paid" : "none";
+  const sync: SyncOffer = !plans.paid ? "free" : options.length > 0 ? "paid" : "none";
   return {
     sync,
     pricing:
-      gateway && price
-        ? {
-            amount: price.amount,
-            currency: gateway.currency,
-            period: price.period,
-            trial: plans.trial,
-          }
+      options.length > 0
+        ? { options, several: plans.gateways.length > 1, trial: plans.trial }
         : null,
     ...downloadsFor(request),
   };
+}
+
+/**
+ * Buying sync from the home page: the chosen period, straight to the
+ * gateway's page. A signed-out visitor signs in first and lands on the
+ * settings page with that period chosen.
+ */
+export async function action({ request, context }: Route.ActionArgs) {
+  const form = await request.formData();
+  const settings = `/settings?plan=${encodeURIComponent(textField(form, "plan"))}#subscription`;
+  const signIn = `/login?next=${encodeURIComponent(settings)}`;
+  if (!context.get(accountContext).user) throw redirect(signIn);
+  const { url, result } = await startCheckout(request, form);
+  if (result.status === 401) throw redirect(signIn);
+  if (url) return redirect(url);
+  const error = result.error ?? { code: "internal" };
+  return data({ error: formError(error.code, result.retryAfter) }, result.status);
 }
 
 /** How this server offers sync: free, for a subscription, or not at all. */
@@ -70,6 +96,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   const localePath = useLocalePath();
   const { downloads, suggested, sync } = loaderData;
   const pricing = loaderData.pricing;
+  const actionData = useActionData<typeof action>();
   const platformName = (platform: Platform) => t(`home.platform.${platform}`);
   const web = downloads.find((download) => download.platform === "web");
   const apps = downloads.filter((download) => download.platform !== "web");
@@ -121,6 +148,47 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         <SpecimenSlider specimens={SPECIMENS[locale]} />
       </section>
 
+      <section id="sync" className="pricing site-frame" aria-labelledby="sync-title">
+        <h2 id="sync-title">{t("home.sync.title")}</h2>
+        <p className="section-lead">
+          {t(sync === "none" ? "home.sync.leadNone" : "home.sync.lead")}
+        </p>
+        <div className="price-table">
+          <div className="price-plan">
+            <h3>{t("home.sync.own.title")}</h3>
+            <p className="price-amount">{t("home.sync.own.headline")}</p>
+            <ul className="sync-ways">
+              <li>{t("home.sync.own.folder")}</li>
+              <li>{t("home.sync.own.transfer")}</li>
+              <li>{t("home.sync.own.server")}</li>
+            </ul>
+            <div className="actions">
+              <a className="button" href={SELF_HOSTING}>
+                {t("home.sync.own.guide")}
+              </a>
+            </div>
+          </div>
+          {sync !== "none" && (
+            <div className="price-plan">
+              <h3>{t("home.sync.service.title")}</h3>
+              {pricing ? (
+                <BuySync pricing={pricing} error={actionData?.error ?? null} />
+              ) : (
+                <>
+                  <p className="price-amount">{t("home.sync.free")}</p>
+                  <p className="price-text">{t("home.sync.service.text")}</p>
+                  <div className="actions">
+                    <Link className="button button-primary" to="/settings">
+                      {t("home.sync.connect")}
+                    </Link>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+
       <section className="features site-frame" aria-labelledby="features-title">
         <h2 id="features-title">{t("home.featuresTitle")}</h2>
         <dl className="feature-list">
@@ -157,64 +225,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         </ul>
       </section>
 
-      <section id="sync" className="pricing site-frame" aria-labelledby="sync-title">
-        <h2 id="sync-title">{t("home.sync.title")}</h2>
-        <p className="section-lead">
-          {t(sync === "none" ? "home.sync.leadNone" : "home.sync.lead")}
-        </p>
-        <div className="price-table">
-          <div className="price-plan">
-            <h3>{t("home.sync.own.title")}</h3>
-            <p className="price-amount">{t("home.sync.own.headline")}</p>
-            <ul className="sync-ways">
-              <li>{t("home.sync.own.folder")}</li>
-              <li>{t("home.sync.own.transfer")}</li>
-              <li>{t("home.sync.own.server")}</li>
-            </ul>
-            <div className="actions">
-              <a className="button" href={SELF_HOSTING}>
-                {t("home.sync.own.guide")}
-              </a>
-            </div>
-          </div>
-          {sync !== "none" && (
-            <div className="price-plan">
-              <h3>{t("home.sync.service.title")}</h3>
-              {pricing ? (
-                <p className="price-amount">
-                  {money(pricing.amount, pricing.currency, locale)}{" "}
-                  <span className="price-period">
-                    {t("home.sync.every", { period: periodText(translate, pricing.period) })}
-                  </span>
-                </p>
-              ) : (
-                <p className="price-amount">{t("home.sync.free")}</p>
-              )}
-              <p className="price-text">
-                {t("home.sync.service.text")}
-                {pricing && ` ${t("home.sync.cancel")}`}
-                {pricing?.trial &&
-                  ` ${t("home.sync.trial", { trial: durationText(translate, pricing.trial) })}`}
-              </p>
-              <div className="actions">
-                <Link className="button button-primary" to="/settings">
-                  {!pricing
-                    ? t("home.sync.connect")
-                    : pricing.trial
-                      ? t("home.sync.try")
-                      : t("home.sync.get")}
-                </Link>
-                {pricing && (
-                  <Link className="price-terms" to={localePath("/terms")}>
-                    {t("home.sync.terms")}
-                  </Link>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </section>
-
       {downloads.length > 0 && (
         <section id="download" className="downloads site-frame" aria-labelledby="download-title">
           <h2 id="download-title">{t("home.downloadsTitle")}</h2>
@@ -226,5 +236,92 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         </section>
       )}
     </>
+  );
+}
+
+type Pricing = NonNullable<Route.ComponentProps["loaderData"]["pricing"]>;
+
+/**
+ * Sync for a subscription: every period on sale with what it saves, the
+ * consent, and buying the chosen one at once. The price on top follows the
+ * choice; the trial, where there is one, starts from the settings page.
+ */
+function BuySync({ pricing, error }: { pricing: Pricing; error: FormError | null }) {
+  const translate = useT();
+  const { t } = translate;
+  const locale = useLocale();
+  const localePath = useLocalePath();
+  const consentId = useId();
+  const { options, several, trial } = pricing;
+  const [chosen, setChosen] = useState(0);
+  const option = options[chosen] ?? options[0];
+  if (!option) return null;
+  const every = (period: string) => t("home.sync.every", { period: periodText(translate, period) });
+  return (
+    <Form method="post" className="price-buy">
+      <p className="price-amount">
+        {money(option.amount, option.currency, locale)}{" "}
+        <span className="price-period">{every(option.period)}</span>
+      </p>
+      <p className="price-text">
+        {t("home.sync.service.text")} {t("home.sync.cancel")}
+        {trial && ` ${t("home.sync.trial", { trial: durationText(translate, trial) })}`}
+      </p>
+      {options.length > 1 ? (
+        <fieldset className="price-options">
+          <legend>{t("subscription.choose")}</legend>
+          {options.map((item, index) => (
+            <label key={item.plan} className="price-option">
+              <input
+                type="radio"
+                name="plan"
+                value={item.plan}
+                checked={index === chosen}
+                onChange={() => {
+                  setChosen(index);
+                }}
+              />
+              <span>
+                {money(item.amount, item.currency, locale)} {every(item.period)}
+                {several && (
+                  <span className="price-gateway">
+                    {t("subscription.via", { gateway: item.gateway })}
+                  </span>
+                )}
+              </span>
+              {item.discount > 0 && " "}
+              {item.discount > 0 && (
+                <span className="price-discount">
+                  {new Intl.NumberFormat(locale, { style: "percent" }).format(-item.discount / 100)}
+                </span>
+              )}
+            </label>
+          ))}
+        </fieldset>
+      ) : (
+        <input type="hidden" name="plan" value={option.plan} />
+      )}
+      <div className="consent">
+        <input id={consentId} type="checkbox" name="accept" value="yes" required />
+        <label htmlFor={consentId}>
+          {richText(t("subscription.consent"), {
+            terms: <Link to={localePath("/terms")}>{t("subscription.consentTerms")}</Link>,
+            privacy: <Link to={localePath("/privacy")}>{t("subscription.consentPrivacy")}</Link>,
+          })}
+        </label>
+      </div>
+      <FormMessage error={error} />
+      <div className="actions">
+        <Submit>{t("home.sync.buy")}</Submit>
+        {trial && (
+          <Link className="button" to="/settings">
+            {t("home.sync.try")}
+          </Link>
+        )}
+        <Link className="price-terms" to={localePath("/terms")}>
+          {t("home.sync.terms")}
+        </Link>
+      </div>
+    </Form>
   );
 }

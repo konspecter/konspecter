@@ -85,7 +85,7 @@ export const ru: Dictionary = {
   "home.sync.trial": "Первые {trial} бесплатно.",
   "home.sync.connect": "Подключить устройства",
   "home.sync.try": "Попробовать бесплатно",
-  "home.sync.get": "Подключить синхронизацию",
+  "home.sync.buy": "Купить синхронизацию",
   "home.sync.terms": "Цены и условия",
   "home.downloadsTitle": "Установить Konspecter",
   "home.downloadsLead": "Одно и то же приложение на компьютере, на телефоне и в браузере.",

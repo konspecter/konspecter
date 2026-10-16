@@ -88,7 +88,7 @@ export const en = {
   "home.sync.trial": "The first {trial} are free.",
   "home.sync.connect": "Connect your devices",
   "home.sync.try": "Try sync for free",
-  "home.sync.get": "Get sync",
+  "home.sync.buy": "Buy sync",
   "home.sync.terms": "Prices and terms",
   "home.downloadsTitle": "Get Konspecter",
   "home.downloadsLead": "The same app on your computer, your phone and in the browser.",

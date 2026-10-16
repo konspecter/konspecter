@@ -192,6 +192,7 @@ describe("the subscription in the settings", () => {
     billing: Billing,
     gateways: readonly GatewayPlan[],
     action: () => unknown,
+    plan = "",
   ) {
     const Stub = createRoutesStub([
       {
@@ -209,6 +210,7 @@ describe("the subscription in the settings", () => {
               devicesFailed: false,
               billing,
               gateways,
+              plan,
               now: Date.parse("2026-10-06T12:00:00Z"),
             }),
             action,
@@ -231,12 +233,16 @@ describe("the subscription in the settings", () => {
     payments: [],
   };
 
-  it("offers no subscription in a language the server sells no sync in", async () => {
-    renderSubscription({ ...base, access: { state: "expired", until: null } }, [], () => null);
+  it("has the period chosen on the home page picked", async () => {
+    renderSubscription(base, gateways, () => null, "acme:1y");
     const section = await screen.findByRole("region", { name: "Subscription" });
-    expect(section).toHaveTextContent("This server does not offer sync in English.");
-    expect(section).not.toHaveTextContent("takes a subscription");
-    expect(within(section).queryByRole("radio")).not.toBeInTheDocument();
+    expect(within(section).getByRole("radio", { name: "$30 every year" })).toBeChecked();
+  });
+
+  it("picks the first period when the chosen one is not on sale", async () => {
+    renderSubscription(base, gateways, () => null, "acme:5y");
+    const section = await screen.findByRole("region", { name: "Subscription" });
+    expect(within(section).getByRole("radio", { name: "$3 every month" })).toBeChecked();
   });
 
   it("offers the prices, asks to accept the terms and renewal, then goes to pay", async () => {
