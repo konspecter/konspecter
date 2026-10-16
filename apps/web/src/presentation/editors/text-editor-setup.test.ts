@@ -104,9 +104,84 @@ describe("paired characters in the text editor", () => {
   });
 
   it("replaces the selection with other characters, and closes nothing without one", () => {
-    expect(typeOver("a word here", 3, 7, "*").handled).toBe(false);
+    expect(typeOver("a word here", 3, 7, "-").handled).toBe(false);
     expect(typeOver("a word here", 3, 7, "[").handled).toBe(false);
     expect(typeOver("a word here", 3, 3, "(").handled).toBe(false);
+    expect(typeOver("a word here", 3, 3, "*").handled).toBe(false);
+  });
+
+  it.each([
+    ["a word here", "`", "a `word` here"],
+    ["a `word` here", "`", "a word here"],
+    ["a word here", "*", "a *word* here"],
+    ["a word here", "_", "a *word* here"],
+    ["a *word* here", "*", "a **word** here"],
+    ["a **word** here", "*", "a ***word*** here"],
+  ])("marks the selection in %s with a typed %s, keeping it selected", (from, key, markdown) => {
+    const start = from.indexOf("word") - (from.length - from.replace(/[`*]/g, "").length) / 2;
+    expect(typeOver(from, start + 1, start + 5, key)).toEqual({
+      handled: true,
+      markdown,
+      selected: "word",
+    });
+  });
+
+  it("types a marker over a selection in code as it is", () => {
+    expect(typeOver("```\nword\n```", 1, 5, "*").handled).toBe(false);
+    expect(typeOver("`word`", 1, 5, "*").handled).toBe(false);
+  });
+});
+
+describe("Markdown marks typed in the text editor", () => {
+  /** Types `text` at `at` (the end of the document by default), a character at a time. */
+  const typed = (markdown: string, text: string, at?: number) => {
+    const { view, type } = editorWith(markdown);
+    const { doc } = view.state;
+    view.dispatch(
+      view.state.tr.setSelection(
+        at === undefined ? TextSelection.atEnd(doc) : TextSelection.create(doc, at),
+      ),
+    );
+    for (const character of text) type(view.state.selection.from, character, character);
+    return view;
+  };
+  const written = (markdown: string, text: string) =>
+    textDocToMarkdown(typed(markdown, text).state.doc);
+
+  it.each([
+    ["`code`", "`code`"],
+    ["*italic*", "*italic*"],
+    ["_italic_", "*italic*"],
+    ["**bold**", "**bold**"],
+    ["__bold__", "**bold**"],
+    ["[site](https://example.com)", "[site](https://example.com)"],
+  ])("turns %s into its mark as the closing marker is typed", (text, markdown) => {
+    const view = typed("a", ` ${text}`);
+    expect(view.state.doc.textContent).toBe(`a ${text.replace(/[`*_]|\[|\]\(.*\)/g, "")}`);
+    expect(textDocToMarkdown(view.state.doc)).toBe(`a ${markdown}`);
+  });
+
+  it("goes on typing without the mark", () => {
+    expect(written("a", " `code` and *em* then")).toBe("a `code` and *em* then");
+  });
+
+  it("leaves markers that do not pair as text", () => {
+    const view = typed("", "2 * 3 * 4, snake_case_name, * x*");
+    expect(view.state.doc.textContent).toBe("2 * 3 * 4, snake_case_name, * x*");
+  });
+
+  it("does not mark inside code", () => {
+    expect(typed("```\nx\n```", " *y*").state.doc.textContent).toBe("x *y*");
+    // Inside "x z", after the x.
+    expect(typed("a `x z`", " *y*", 4).state.doc.textContent).toBe("a x *y* z");
+  });
+
+  it("gives the markers back with Backspace", () => {
+    const view = typed("a", " *em*");
+    view.someProp("handleKeyDown", (handle) =>
+      handle(view, new KeyboardEvent("keydown", { key: "Backspace" })),
+    );
+    expect(view.state.doc.textContent).toBe("a *em*");
   });
 });
 

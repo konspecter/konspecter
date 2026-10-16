@@ -8,6 +8,7 @@ import {
 } from "prosemirror-commands";
 import { history, redo, undo } from "prosemirror-history";
 import {
+  InputRule,
   inputRules,
   textblockTypeInputRule,
   undoInputRule,
@@ -42,8 +43,65 @@ const insertHardBreak: Command = (state, dispatch) => {
   return true;
 };
 
+/**
+ * An inline mark written in Markdown turns into the mark as its closing
+ * marker is typed: `code`, *em*, **strong**. The markers go, the text keeps
+ * the mark, and what is typed next does not. Backspace gives the markers
+ * back. Never in code, nor over a selection (see `typing`).
+ */
+function markInputRule(pattern: RegExp, type: MarkType): InputRule {
+  return new InputRule(
+    pattern,
+    (state, match, start, end) => {
+      const [whole, inner] = match;
+      if (inner === undefined) return null;
+      // The typed character is the match's last; `end` is past the selection it replaces.
+      const typedAt = start + whole.length - 1;
+      if (typedAt !== end || state.doc.rangeHasMark(start, end, marks.code)) return null;
+      const marker = (whole.length - inner.length) / 2;
+      const from = start + marker;
+      const to = from + inner.length;
+      const tr = state.tr.delete(to, end).addMark(from, to, type.create()).delete(start, from);
+      return tr.removeStoredMark(type);
+    },
+    { inCodeMark: false },
+  );
+}
+
+/**
+ * `[text](address)` turns into a link as its `)` is typed, as the marks
+ * above do. Not after `!` (an image).
+ */
+const linkInputRule = new InputRule(
+  /(?<![\\!])\[([^\]￼]+)\]\(([^()\s￼]+)\)$/,
+  (state, match, start, end) => {
+    const [whole, text, href] = match;
+    if (text === undefined || href === undefined) return null;
+    if (start + whole.length - 1 !== end || state.doc.rangeHasMark(start, end, marks.code)) {
+      return null;
+    }
+    const from = start + 1;
+    const to = from + text.length;
+    const tr = state.tr
+      .delete(to, end)
+      .addMark(from, to, marks.link.create({ href }))
+      .delete(start, from);
+    return tr.removeStoredMark(marks.link);
+  },
+  { inCodeMark: false },
+);
+
+/** Text between markers, as CommonMark's emphasis takes it: no space just inside them. */
+const EMPHASIZED = String.raw`([^\s￼]|[^\s￼][^￼]*?[^\s￼])`;
+
 const markdownInputRules = inputRules({
   rules: [
+    markInputRule(/(?<![`\\])`([^`￼]+)`$/, marks.code),
+    markInputRule(new RegExp(String.raw`(?<![*\\])\*\*${EMPHASIZED}\*\*$`), marks.strong),
+    markInputRule(new RegExp(String.raw`(?<![_\w\\])__${EMPHASIZED}__$`), marks.strong),
+    markInputRule(new RegExp(String.raw`(?<![*\\])\*(?!\*)${EMPHASIZED}(?<!\*)\*$`), marks.em),
+    markInputRule(new RegExp(String.raw`(?<![_\w\\])_(?!_)${EMPHASIZED}(?<!_)_$`), marks.em),
+    linkInputRule,
     textblockTypeInputRule(/^(#{1,6})\s$/, nodes.heading, (match) => ({
       level: match[1]?.length ?? 1,
     })),
@@ -248,6 +306,29 @@ const PAIRS: ReadonlyMap<string, string> = new Map([
 ]);
 
 /**
+ * What typing a Markdown marker over a selection makes of it, as writing the
+ * marker on both sides would: `` ` `` toggles code; `*` and `_` add one
+ * more marker, so plain text turns italic, italic bold, and bold both.
+ */
+function markSelection(state: EditorState, marker: string, from: number, to: number) {
+  const { doc } = state;
+  const tr = state.tr;
+  const has = (type: MarkType) => doc.rangeHasMark(from, to, type);
+  if (marker === "`") {
+    return has(marks.code)
+      ? tr.removeMark(from, to, marks.code)
+      : tr.addMark(from, to, marks.code.create());
+  }
+  if ((marker !== "*" && marker !== "_") || has(marks.code)) return null;
+  const em = has(marks.em);
+  const strong = has(marks.strong);
+  if (em && strong) return tr;
+  if (strong) return tr.addMark(from, to, marks.em.create());
+  if (em) return tr.removeMark(from, to, marks.em).addMark(from, to, marks.strong.create());
+  return tr.addMark(from, to, marks.em.create());
+}
+
+/**
  * The selection as the page shows it: when a typed key replaces it, the
  * editor has not always taken in a selection just made with the keyboard.
  */
@@ -263,9 +344,10 @@ function shownSelection(view: EditorView): { anchor: number; head: number } | nu
 }
 
 /**
- * The typed text, with two rules. Typing `(` or a quote over a selection wraps
+ * The typed text, with three rules. Typing `(` or a quote over a selection wraps
  * it instead of replacing it, and the text stays selected; with no selection
- * nothing is closed for you. Straight quotes in code stay straight: when the
+ * nothing is closed for you. Typing a Markdown marker over a selection marks
+ * it instead (see `markSelection`). Straight quotes in code stay straight: when the
  * system replaces a typed `"` or `'` with a typographic quote (macOS smart
  * quotes, «» in Russian), the replacement is undone in code blocks and inline
  * code. Text keeps it.
@@ -293,17 +375,29 @@ function typing(): Plugin {
           Boolean(marks.code.isInSet(state.storedMarks ?? $from.marks()));
         const insert = quote !== null && smart && inCode ? text.replace(smart, quote) : text;
         const close = PAIRS.get(insert);
-        if (
-          close !== undefined &&
+        // The selection the typed text replaces, as the page shows it.
+        const over =
           range !== null &&
           Math.min(range.anchor, range.head) === from &&
           Math.max(range.anchor, range.head) === to
-        ) {
+            ? range
+            : null;
+        const marked =
+          over && $from.parent.type !== nodes.code_block
+            ? markSelection(state, insert, from, to)
+            : null;
+        if (over && marked) {
+          view.dispatch(
+            marked.setSelection(TextSelection.create(marked.doc, over.anchor, over.head)),
+          );
+          return true;
+        }
+        if (close !== undefined && over) {
           const tr = state.tr.insertText(close, to).insertText(insert, from);
           const shift = insert.length;
           view.dispatch(
             tr
-              .setSelection(TextSelection.create(tr.doc, range.anchor + shift, range.head + shift))
+              .setSelection(TextSelection.create(tr.doc, over.anchor + shift, over.head + shift))
               .scrollIntoView(),
           );
           return true;
