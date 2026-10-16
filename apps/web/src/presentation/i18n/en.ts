@@ -380,6 +380,8 @@ source, or delete this conspect when you are done.
   "sync.checkAgain": "Check again",
   "sync.manageSubscription": "Manage subscription",
   "sync.access.trialing": "Free trial until {date}.",
+  "sync.access.granted": "Sync is free for you until {date}.",
+  "sync.access.lifetime": "Sync is yours for life.",
   "sync.access.active": "The subscription renews automatically.",
   "sync.access.canceled": "The subscription does not renew. Sync works until {date}.",
   "sync.access.past_due": "The last payment did not go through. Sync works until {date}.",

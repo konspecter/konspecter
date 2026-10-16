@@ -433,6 +433,8 @@ Map<String, Integer> counts = new HashMap<>();
   "sync.checkAgain": "Проверить снова",
   "sync.manageSubscription": "Управлять подпиской",
   "sync.access.trialing": "Пробный период до {date}.",
+  "sync.access.granted": "Синхронизация бесплатна для вас до {date}.",
+  "sync.access.lifetime": "Синхронизация ваша навсегда.",
   "sync.access.active": "Подписка продлевается автоматически.",
   "sync.access.canceled": "Подписка не продлевается. Синхронизация работает до {date}.",
   "sync.access.past_due": "Последний платёж не прошёл. Синхронизация работает до {date}.",

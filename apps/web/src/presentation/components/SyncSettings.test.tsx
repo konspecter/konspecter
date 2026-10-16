@@ -231,6 +231,18 @@ it("says when the trial ends, and links to the subscription", async () => {
   expect(opened).toEqual(["https://sync.example.com/settings#subscription"]);
 });
 
+it.each([
+  { state: "granted", until: "2026-10-20T12:00:00Z", text: /Sync is free for you until/ },
+  { state: "lifetime", until: "9999-12-31T00:00:00Z", text: /Sync is yours for life\./ },
+])("says how long free sync given lasts: $state", async ({ state, until, text }) => {
+  const server = new FakeServer();
+  server.access = { state, until };
+  const { engine } = await setup(server);
+  await engine.connect({ serverUrl: "https://sync.example.com", token: "ksp_ada" });
+  await engine.unlock(TEST_PASSPHRASE);
+  expect(await screen.findByText(text)).toBeInTheDocument();
+});
+
 it("pauses when the subscription ends, keeps everything and checks again on request", async () => {
   const { server, engine, opened } = await setup();
   await engine.connect({ serverUrl: "https://sync.example.com", token: "ksp_ada" });

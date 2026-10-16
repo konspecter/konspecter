@@ -115,10 +115,13 @@ function subscriptionPage(status: SyncStatus): string {
 /** Paid sync: how long the account's time lasts (nothing where sync is free). */
 function AccessNote({ status }: { status: SyncStatus }) {
   const access = status.access;
-  if (access?.state === "active") return <p className="setting-hint">{t("sync.access.active")}</p>;
+  if (access?.state === "active" || access?.state === "lifetime") {
+    return <p className="setting-hint">{t(`sync.access.${access.state}`)}</p>;
+  }
   if (!access?.until) return null;
   switch (access.state) {
     case "trialing":
+    case "granted":
     case "canceled":
     case "past_due":
       return (

@@ -19,13 +19,23 @@ export type Account = { readonly id: string; readonly email: string };
  */
 export type SyncAccess = {
   readonly state:
-    "free" | "trialing" | "active" | "past_due" | "canceled" | "expired" | "unavailable";
+    | "free"
+    | "trialing"
+    | "granted"
+    | "lifetime"
+    | "active"
+    | "past_due"
+    | "canceled"
+    | "expired"
+    | "unavailable";
   readonly until: string | null;
 };
 
 const ACCESS_STATES: readonly SyncAccess["state"][] = [
   "free",
   "trialing",
+  "granted",
+  "lifetime",
   "active",
   "past_due",
   "canceled",
