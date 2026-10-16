@@ -150,6 +150,8 @@ test("the layout fills the window at any size", async ({ page }) => {
 test("the top bars move the desktop window from edge to edge", async ({ page }) => {
   await page.setViewportSize({ width: 1300, height: 800 });
   await page.goto("/conspects/new");
+  // The bars are probed point by point, which does not wait: let them render first.
+  await expect(page.getByRole("button", { name: "Hide sidebar" })).toBeVisible();
   /** The points along the top bars that are neither a drag region nor a control. */
   const dead = () =>
     page.evaluate(() => {
