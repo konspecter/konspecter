@@ -32,11 +32,16 @@ func TestEntitlementsKeepTheLatestVersion(t *testing.T) {
 	if put(entitlements.Entitlement{Status: entitlements.Expired, Version: 4}) || put(entitlements.Entitlement{Status: entitlements.Expired, Version: 5}) {
 		t.Error("an older version was kept")
 	}
-	if !put(entitlements.Entitlement{Status: entitlements.Expired, Version: 6}) {
+	forever := time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)
+	if !put(entitlements.Entitlement{Status: entitlements.Granted, Until: &until, Version: 6}) ||
+		!put(entitlements.Entitlement{Status: entitlements.Lifetime, Until: &forever, Version: 7}) {
+		t.Error("free sync given was not kept")
+	}
+	if !put(entitlements.Entitlement{Status: entitlements.Expired, Version: 8}) {
 		t.Error("a newer version was not kept")
 	}
 	e, err := db.Entitlement(ctx, user.ID)
-	if err != nil || e.Status != entitlements.Expired || e.Until != nil || e.Version != 6 || e.UserID != user.ID {
+	if err != nil || e.Status != entitlements.Expired || e.Until != nil || e.Version != 8 || e.UserID != user.ID {
 		t.Errorf("entitlement = %+v, %v", e, err)
 	}
 

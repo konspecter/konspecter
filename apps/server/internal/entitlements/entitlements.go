@@ -24,12 +24,16 @@ const (
 	Canceled Status = "canceled"
 	// Expired: no time left; sync waits for a payment.
 	Expired Status = "expired"
+	// Granted: free sync given for a while.
+	Granted Status = "granted"
+	// Lifetime: sync given for life (its time is far away, not missing).
+	Lifetime Status = "lifetime"
 )
 
 // Valid reports whether s is one of the statuses.
 func (s Status) Valid() bool {
 	switch s {
-	case Trialing, Active, PastDue, Canceled, Expired:
+	case Trialing, Active, PastDue, Canceled, Expired, Granted, Lifetime:
 		return true
 	}
 	return false

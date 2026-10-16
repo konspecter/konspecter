@@ -18,6 +18,9 @@ func TestAllowed(t *testing.T) {
 		{Entitlement{Status: Active, Until: later}, true, false},
 		{Entitlement{Status: PastDue, Until: later}, true, false},
 		{Entitlement{Status: Canceled, Until: later}, true, false},
+		{Entitlement{Status: Granted, Until: later}, true, false},
+		{Entitlement{Status: Lifetime, Until: at(time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC))}, true, false},
+		{Entitlement{Status: Granted, Until: earlier}, false, true},
 		{Entitlement{Status: Active, Until: earlier}, false, true},
 		{Entitlement{Status: Canceled, Until: at(now)}, false, true},
 		{Entitlement{Status: Expired, Until: later}, false, false},
@@ -40,6 +43,8 @@ func TestCheck(t *testing.T) {
 		{Status: Active, Until: until, Version: 1},
 		{Status: Expired, Version: 2},
 		{Status: Expired, Until: until, Version: 3},
+		{Status: Granted, Until: until, Version: 4},
+		{Status: Lifetime, Until: until, Version: 5},
 	} {
 		if err := ok.Check(); err != nil {
 			t.Errorf("%+v: %v", ok, err)
@@ -49,6 +54,7 @@ func TestCheck(t *testing.T) {
 		{Status: "paused", Until: until, Version: 1},
 		{Status: Active, Until: until},
 		{Status: Trialing, Version: 1},
+		{Status: Lifetime, Version: 1},
 	} {
 		if err := bad.Check(); err == nil {
 			t.Errorf("%+v passed", bad)

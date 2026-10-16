@@ -284,7 +284,9 @@ func TestSubscriptionLetters(t *testing.T) {
 			PaymentFailed(locale, site, "a@example.com", charge), Canceled(locale, site, "a@example.com", until),
 			Canceled(locale, site, "a@example.com", time.Time{}), Resumed(locale, site, "a@example.com", charge),
 			GraceStarted(locale, site, "a@example.com", until), Paused(locale, site, "a@example.com"),
-			Refunded(locale, site, "a@example.com", charge),
+			Refunded(locale, site, "a@example.com", charge), SyncGranted(locale, site, "a@example.com", until),
+			LifetimeGranted(locale, site, "a@example.com"), GrantEnded(locale, site, "a@example.com", until),
+			GrantEnded(locale, site, "a@example.com", time.Time{}),
 		}
 		for _, m := range letters {
 			if m.Subject == "" || m.HTML == "" || strings.Contains(m.HTML, "<no value>") || !strings.Contains(m.Text, site+"/settings#subscription") {
@@ -308,6 +310,15 @@ func TestSubscriptionLetters(t *testing.T) {
 	}
 	if got := period(Russian, "2y"); got != "2 года" {
 		t.Errorf("2y = %q", got)
+	}
+	if got := SyncGranted(English, site, "a@example.com", until).Text; !strings.Contains(got, "free of charge, until 6 November 2026.") {
+		t.Errorf("sync granted = %q", got)
+	}
+	if got := GrantEnded(Russian, site, "a@example.com", until).Text; !strings.Contains(got, "Синхронизация работает до 6 ноября 2026 г.") {
+		t.Errorf("grant ended with time left = %q", got)
+	}
+	if got := GrantEnded(English, site, "a@example.com", time.Time{}).Text; !strings.Contains(got, "Sync is paused.") {
+		t.Errorf("grant ended = %q", got)
 	}
 	if !strings.Contains(Paused(English, site, "a@example.com").Text, "Your conspects are safe") {
 		t.Error("the paused email does not say the notes are safe")

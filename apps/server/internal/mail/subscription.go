@@ -218,6 +218,70 @@ func Refunded(locale Locale, siteURL, to string, c Charge) Message {
 	return l.message(to)
 }
 
+// SyncGranted: free sync was turned on for the account until until.
+func SyncGranted(locale Locale, siteURL, to string, until time.Time) Message {
+	l := subscriptionLetter(locale, siteURL)
+	if locale == Russian {
+		l.subject = "Синхронизация Konspecter включена"
+		l.title = "Синхронизация включена"
+		l.intro = []string{fmt.Sprintf("Мы бесплатно включили вам синхронизацию до %s.", date(locale, until))}
+	} else {
+		l.subject = "Konspecter sync is on for you"
+		l.title = "Sync is on"
+		l.intro = []string{fmt.Sprintf("We have turned sync on for you, free of charge, until %s.", date(locale, until))}
+	}
+	l.outro = []string{notesKept(locale)}
+	return l.message(to)
+}
+
+// LifetimeGranted: sync is the account's for life.
+func LifetimeGranted(locale Locale, siteURL, to string) Message {
+	l := subscriptionLetter(locale, siteURL)
+	if locale == Russian {
+		l.subject = "Синхронизация Konspecter теперь ваша навсегда"
+		l.title = "Поздравляем!"
+		l.intro = []string{
+			"Синхронизация теперь бесплатна для вас навсегда: конспекты будут на всех ваших устройствах, и платить ничего не нужно.",
+			"Если у вас оформлена подписка, её можно отменить в настройках.",
+		}
+	} else {
+		l.subject = "Konspecter sync is yours for life"
+		l.title = "Congratulations!"
+		l.intro = []string{
+			"Sync is now free for you for life: your conspects are on all your devices, with nothing to pay.",
+			"If you have a subscription, you can cancel it in the settings.",
+		}
+	}
+	return l.message(to)
+}
+
+// GrantEnded: the free sync given to the account is over. until is when
+// sync stops on the time the account has besides (zero: it is paused).
+func GrantEnded(locale Locale, siteURL, to string, until time.Time) Message {
+	l := subscriptionLetter(locale, siteURL)
+	if locale == Russian {
+		l.subject = "Бесплатная синхронизация Konspecter закончилась"
+		l.title = "Бесплатная синхронизация закончилась"
+		l.intro = []string{"Бесплатная синхронизация, которую мы вам включали, закончилась."}
+		if until.IsZero() {
+			l.intro = append(l.intro, "Синхронизация приостановлена. Чтобы продолжить, оформите подписку.")
+		} else {
+			l.intro = append(l.intro, fmt.Sprintf("Синхронизация работает до %s.", date(locale, until)))
+		}
+	} else {
+		l.subject = "Your free Konspecter sync has ended"
+		l.title = "Free sync has ended"
+		l.intro = []string{"The free sync we turned on for you has ended."}
+		if until.IsZero() {
+			l.intro = append(l.intro, "Sync is paused. Subscribe to carry on.")
+		} else {
+			l.intro = append(l.intro, fmt.Sprintf("Sync keeps working until %s.", date(locale, until)))
+		}
+	}
+	l.outro = []string{notesKept(locale)}
+	return l.message(to)
+}
+
 var russianMonths = [...]string{
 	"января", "февраля", "марта", "апреля", "мая", "июня",
 	"июля", "августа", "сентября", "октября", "ноября", "декабря",
@@ -304,6 +368,7 @@ type Notice struct {
 var NoticeKinds = []string{
 	"trial_started", "trial_ended", "subscribed", "renewed", "payment_failed",
 	"canceled", "resumed", "grace_started", "paused", "refunded",
+	"sync_granted", "lifetime_granted", "grant_ended",
 }
 
 // BillingNotice is the email that tells of a billing event; false for a
@@ -335,6 +400,12 @@ func BillingNotice(locale Locale, siteURL, to string, n Notice) (Message, bool) 
 		return Paused(locale, siteURL, to), true
 	case "refunded":
 		return Refunded(locale, siteURL, to, charge), true
+	case "sync_granted":
+		return SyncGranted(locale, siteURL, to, until), true
+	case "lifetime_granted":
+		return LifetimeGranted(locale, siteURL, to), true
+	case "grant_ended":
+		return GrantEnded(locale, siteURL, to, until), true
 	}
 	return Message{}, false
 }

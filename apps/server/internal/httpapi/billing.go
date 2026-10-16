@@ -23,15 +23,16 @@ import (
 // though time it already has lasts. The site's subscription
 // requests, the price list and the gateways' webhooks are passed on to the
 // service, the signed-in user named in headers the server sets itself. The
-// service pushes entitlements to the internal routes, and has the server
-// email billing events.
+// service pushes entitlements to the internal routes, has the server
+// email billing events, and finds a user by email.
 
-// EntitlementStore keeps the accounts' entitlements, and finds where to
-// email an account.
+// EntitlementStore keeps the accounts' entitlements, finds where to email
+// an account, and finds a user by email.
 type EntitlementStore interface {
 	Entitlement(ctx context.Context, userID string) (entitlements.Entitlement, error)
 	PutEntitlement(ctx context.Context, e entitlements.Entitlement) (bool, error)
 	Recipient(ctx context.Context, userID string) (email, locale string, err error)
+	UserByEmail(ctx context.Context, email string) (auth.User, error)
 }
 
 // Billing makes sync paid: a billing service sells it. It needs Accounts.
@@ -99,6 +100,7 @@ func (a *api) registerBillingRoutes(mux *http.ServeMux) {
 	if a.billing != nil {
 		mux.Handle("PUT /internal/entitlements/{user}", a.internal(a.putEntitlement))
 		mux.Handle("POST /internal/users/{user}/notices", a.internal(a.sendNotice))
+		mux.Handle("GET /internal/users", a.internal(a.findUser))
 	}
 }
 
@@ -473,6 +475,26 @@ func (a *api) sendNotice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"sent": true})
+}
+
+// findUser is the billing service asking for the id of the user with an
+// email address (?email=): it knows accounts by id only.
+func (a *api) findUser(w http.ResponseWriter, r *http.Request) {
+	email, err := auth.NormalizeEmail(r.URL.Query().Get("email"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_email", "give ?email= a valid address")
+		return
+	}
+	user, err := a.billing.Store.UserByEmail(r.Context(), email)
+	if errors.Is(err, auth.ErrUserNotFound) {
+		writeError(w, http.StatusNotFound, "unknown_user", "no such user")
+		return
+	}
+	if err != nil {
+		a.internalError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"id": user.ID})
 }
 
 // forgetBilling has the billing service cancel a renewing subscription at

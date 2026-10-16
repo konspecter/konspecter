@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"konspecter/server/internal/auth"
 	"konspecter/server/internal/devices"
 	"konspecter/server/internal/entitlements"
 )
@@ -61,6 +62,16 @@ func (f *fakeEntitlements) Recipient(_ context.Context, userID string) (string, 
 		locale = "en"
 	}
 	return u.user.Email, locale, nil
+}
+
+func (f *fakeEntitlements) UserByEmail(_ context.Context, email string) (auth.User, error) {
+	f.accounts.mu.Lock()
+	defer f.accounts.mu.Unlock()
+	u, ok := f.accounts.users[email]
+	if !ok {
+		return auth.User{}, auth.ErrUserNotFound
+	}
+	return u.user, nil
 }
 
 // fakeService is the billing service: it answers the entitlement the test
@@ -665,5 +676,28 @@ func TestTheAccountKeepsItsLanguage(t *testing.T) {
 	}
 	if r := siteCall(t, s.server.URL, http.MethodPatch, "/api/account", session, map[string]any{"locale": "de"}); r.status != http.StatusBadRequest {
 		t.Errorf("unknown locale = %d", r.status)
+	}
+}
+
+func TestTheBillingServiceFindsUsersByEmail(t *testing.T) {
+	s := newBillingServer(t)
+	s.ann(t)
+	find := func(token, query string) response {
+		t.Helper()
+		req, _ := http.NewRequest(http.MethodGet, s.server.URL+"/internal/users"+query, nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		return send(t, req)
+	}
+	if r := find(billingToken, "?email=Ann%40Example.com"); r.status != http.StatusOK || r.body["id"] != annID {
+		t.Errorf("ann = %d %v", r.status, r.body)
+	}
+	if r := find(billingToken, "?email=bob%40example.com"); r.status != http.StatusNotFound || errorCode(r) != "unknown_user" {
+		t.Errorf("bob = %d %v", r.status, r.body)
+	}
+	if r := find(billingToken, "?email=not-an-address"); r.status != http.StatusBadRequest || errorCode(r) != "invalid_email" {
+		t.Errorf("a bad address = %d %v", r.status, r.body)
+	}
+	if r := find("wrong", "?email=ann%40example.com"); r.status != http.StatusUnauthorized {
+		t.Errorf("without the token = %d %v", r.status, r.body)
 	}
 }
