@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.0 — 2026-10-16
+
+- **Formatting as you type:** in Text mode, typing the closing marker of `` `code` ``, `*em*`,
+  `**strong**` or a `[text](url)` link turns it into formatting, and typing `` ` ``, `*` or `_`
+  over a selection marks it. Never inside code.
+- **Try sync at once:** Try sync for free on the home page and in the account's settings starts
+  the trial straight away, without connecting an app first. Signed out, the trial starts after
+  sign-in.
+- **Pay for one period:** untick Auto renew to pay for a single period that does not renew.
+  Nothing is charged again: an email reminds you before the period ends and links to buying the
+  next one, and so do the emails when it is over.
+
 ## 0.6.1 — 2026-10-16
 
 - **Buying waits for the terms:** Buy sync on the home page and Subscribe in the settings stay
