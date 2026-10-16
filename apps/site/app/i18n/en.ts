@@ -460,6 +460,7 @@ export const en = {
   "subscription.unavailable": "This server does not offer sync in English.",
   "subscription.state.unpaidTrial":
     "Sync on this server takes a subscription. The first {trial} are free: the trial starts when you connect an app.",
+  "subscription.try": "Try sync for free",
   "subscription.pending": "A payment was started but not finished. Choose again to start over.",
   "subscription.resumeLead": "Resume it to renew automatically again, with the same card.",
   "subscription.resume": "Resume subscription",

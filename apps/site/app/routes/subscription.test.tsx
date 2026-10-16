@@ -368,8 +368,12 @@ describe("the subscription in the settings", () => {
     expect(section).toHaveTextContent("Sync is paused.");
     cleanup();
     renderSubscription({ ...base, access: { state: "expired", until: null } }, gateways, noAction);
-    expect(await screen.findByRole("region", { name: "Subscription" })).toHaveTextContent(
-      "The first 14 days are free",
+    const unpaid = await screen.findByRole("region", { name: "Subscription" });
+    expect(unpaid).toHaveTextContent("The first 14 days are free");
+    // Trying sync is connecting an app: the trial starts with its first sync.
+    expect(within(unpaid).getByRole("link", { name: "Try sync for free" })).toHaveAttribute(
+      "href",
+      "#connect",
     );
   });
 

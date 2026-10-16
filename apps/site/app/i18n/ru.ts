@@ -464,6 +464,7 @@ export const ru: Dictionary = {
   "subscription.unavailable": "Этот сервер не предлагает синхронизацию на русском языке.",
   "subscription.state.unpaidTrial":
     "Синхронизация на этом сервере работает по подписке. Первые {trial} бесплатно: пробный период начнётся, когда вы подключите приложение.",
+  "subscription.try": "Попробовать бесплатно",
   "subscription.pending":
     "Оплата была начата, но не завершена. Выберите период снова, чтобы начать заново.",
   "subscription.resumeLead":

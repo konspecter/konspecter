@@ -111,12 +111,21 @@ function AccessText({ billing, sold }: { billing: Billing; sold: boolean }) {
       // subscribe, where the language sells sync.
       if (until) return <p className="settings-text">{t.t("subscription.state.paused")}</p>;
       if (!sold) return null;
+      if (!billing.trial) {
+        return <p className="settings-text">{t.t("subscription.state.unpaid")}</p>;
+      }
+      // The trial starts with the first sync: trying it is connecting an app.
       return (
-        <p className="settings-text">
-          {billing.trial
-            ? t.t("subscription.state.unpaidTrial", { trial: durationText(t, billing.trial) })
-            : t.t("subscription.state.unpaid")}
-        </p>
+        <>
+          <p className="settings-text">
+            {t.t("subscription.state.unpaidTrial", { trial: durationText(t, billing.trial) })}
+          </p>
+          <div className="actions">
+            <a className="button" href="#connect">
+              {t.t("subscription.try")}
+            </a>
+          </div>
+        </>
       );
     default:
       return null;
