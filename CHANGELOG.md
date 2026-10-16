@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.1 — 2026-10-16
+
+- **Buying waits for the terms:** Buy sync on the home page and Subscribe in the settings stay
+  disabled until the terms are accepted.
+- **Your own way, full width:** where the server sells no sync, the "Your own way" card spans
+  the whole sync section.
+- **Clearer Russian text:** how sync encrypts conspects, and prices read "300 ₽ в месяц".
+
 ## 0.6.0 — 2026-10-16
 
 - **Buy sync from the home page:** every price is listed with what it saves against paying
