@@ -587,7 +587,8 @@ main {
 }
 
 /* Sync: your own way beside this server's sync, which is raised off the page
-   as the specimen is. Where the server offers none, your own way stands alone. */
+   as the specimen is. Where the server offers none, your own way stands alone
+   across the whole width. */
 .price-table {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -596,7 +597,7 @@ main {
 }
 
 .price-table:has(> .price-plan:only-child) {
-  grid-template-columns: minmax(0, 40rem);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .price-plan {
