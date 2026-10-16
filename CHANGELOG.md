@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.0 — 2026-10-16
+
+- **Buy sync from the home page:** every price is listed with what it saves against paying
+  monthly, and choosing one goes straight to payment. Signed out, the choice is kept through
+  sign-in and picked on the settings page.
+- **Free sync, and sync for life:** the apps and the account's settings show sync given free
+  until a day, or for life (with nothing offered to buy). The account is emailed when it starts
+  and when it ends.
+- **Price change emails:** a subscriber is emailed when their subscription's price changes,
+  with the old and the new price and the day it takes effect.
+
 ## 0.5.1 — 2026-10-16
 
 - **A large import is fast again:** importing many `.md` files no longer redraws the sidebar
