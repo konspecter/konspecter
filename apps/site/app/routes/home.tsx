@@ -252,6 +252,7 @@ function BuySync({ pricing, error }: { pricing: Pricing; error: FormError | null
   const locale = useLocale();
   const localePath = useLocalePath();
   const consentId = useId();
+  const [accepted, setAccepted] = useState(false);
   const { options, several, trial } = pricing;
   const [chosen, setChosen] = useState(0);
   const option = options[chosen] ?? options[0];
@@ -302,7 +303,17 @@ function BuySync({ pricing, error }: { pricing: Pricing; error: FormError | null
         <input type="hidden" name="plan" value={option.plan} />
       )}
       <div className="consent">
-        <input id={consentId} type="checkbox" name="accept" value="yes" required />
+        <input
+          id={consentId}
+          type="checkbox"
+          name="accept"
+          value="yes"
+          required
+          checked={accepted}
+          onChange={(event) => {
+            setAccepted(event.target.checked);
+          }}
+        />
         <label htmlFor={consentId}>
           {richText(t("subscription.consent"), {
             terms: <Link to={localePath("/terms")}>{t("subscription.consentTerms")}</Link>,
@@ -312,7 +323,7 @@ function BuySync({ pricing, error }: { pricing: Pricing; error: FormError | null
       </div>
       <FormMessage error={error} />
       <div className="actions">
-        <Submit>{t("home.sync.buy")}</Submit>
+        <Submit disabled={!accepted}>{t("home.sync.buy")}</Submit>
         {trial && (
           <Link className="button" to="/settings">
             {t("home.sync.try")}

@@ -137,8 +137,15 @@ it("offers your own way and the paid sync, every period with what it saves", asy
   expect(year).toBeChecked();
   expect(quarter).not.toBeChecked();
   expect(price).toHaveTextContent("$30 every year");
-  expect(within(sync).getByRole("checkbox", { name: /I accept the terms/ })).toBeRequired();
-  expect(within(sync).getByRole("button", { name: "Buy sync" })).toBeInTheDocument();
+  // Buying waits for the consent.
+  const consent = within(sync).getByRole("checkbox", { name: /I accept the terms/ });
+  expect(consent).toBeRequired();
+  const buy = within(sync).getByRole("button", { name: "Buy sync" });
+  expect(buy).toBeDisabled();
+  await userEvent.click(consent);
+  expect(buy).toBeEnabled();
+  await userEvent.click(consent);
+  expect(buy).toBeDisabled();
   expect(within(sync).getByRole("link", { name: "Try sync for free" })).toHaveAttribute(
     "href",
     "/settings",

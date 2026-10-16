@@ -300,9 +300,13 @@ describe("the subscription in the settings", () => {
     expect(consent).toBeRequired();
     expect(within(section).getByRole("link", { name: "terms" })).toHaveAttribute("href", "/terms");
 
+    // Subscribing waits for the consent.
+    const subscribe = within(section).getByRole("button", { name: "Subscribe" });
+    expect(subscribe).toBeDisabled();
     const user = userEvent.setup();
     await user.click(consent);
-    await user.click(within(section).getByRole("button", { name: "Subscribe" }));
+    expect(subscribe).toBeEnabled();
+    await user.click(subscribe);
     expect(await screen.findByRole("link", { name: "Continue to payment" })).toHaveAttribute(
       "href",
       "https://pay.example.com/approve?ba=1",

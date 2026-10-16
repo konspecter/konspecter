@@ -1,5 +1,5 @@
 import { richText } from "@konspecter/i18n/rich";
-import { useEffect, useId } from "react";
+import { useEffect, useId, useState } from "react";
 import { Form, Link } from "react-router";
 import { FormMessage, Submit, type FormError } from "./auth-form";
 import { useLocale, useT } from "./i18n/i18n";
@@ -127,6 +127,7 @@ function Subscribe({ gateways, plan }: { gateways: readonly GatewayPlan[]; plan:
   const t = useT();
   const locale = useLocale();
   const consentId = useId();
+  const [accepted, setAccepted] = useState(false);
   const options = gateways.flatMap((gateway) =>
     gateway.prices.map((price) => ({ gateway, price })),
   );
@@ -167,7 +168,17 @@ function Subscribe({ gateways, plan }: { gateways: readonly GatewayPlan[]; plan:
         })}
       </fieldset>
       <div className="consent">
-        <input id={consentId} type="checkbox" name="accept" value="yes" required />
+        <input
+          id={consentId}
+          type="checkbox"
+          name="accept"
+          value="yes"
+          required
+          checked={accepted}
+          onChange={(event) => {
+            setAccepted(event.target.checked);
+          }}
+        />
         <label htmlFor={consentId}>
           {richText(t.t("subscription.consent"), {
             terms: <Link to="/terms">{t.t("subscription.consentTerms")}</Link>,
@@ -181,7 +192,9 @@ function Subscribe({ gateways, plan }: { gateways: readonly GatewayPlan[]; plan:
           : t.t("subscription.payHint", { gateway: gateways[0]?.name ?? "" })}
       </p>
       <div className="actions">
-        <Submit intent="subscribe">{t.t("subscription.subscribe")}</Submit>
+        <Submit disabled={!accepted} intent="subscribe">
+          {t.t("subscription.subscribe")}
+        </Submit>
       </div>
     </Form>
   );

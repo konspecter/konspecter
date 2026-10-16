@@ -158,18 +158,23 @@ export function Field({
   );
 }
 
-/** A submit button that says "One moment…" while its own form is being sent. */
+/**
+ * A submit button that says "One moment…" while its own form is being sent;
+ * `disabled` holds it back until the form may be sent.
+ */
 export function Submit({
   children,
   intent,
   primary = true,
   formNoValidate,
+  disabled = false,
   ref,
 }: {
   children: string;
   intent?: string;
   primary?: boolean;
   formNoValidate?: boolean;
+  disabled?: boolean;
   ref?: Ref<HTMLButtonElement>;
 }) {
   const { t } = useT();
@@ -182,7 +187,7 @@ export function Submit({
       ref={ref}
       type="submit"
       className={primary ? "button button-primary" : "button"}
-      disabled={navigation.state === "submitting"}
+      disabled={disabled || navigation.state === "submitting"}
       {...(intent ? { name: "intent", value: intent } : {})}
       {...(formNoValidate ? { formNoValidate: true } : {})}
     >
