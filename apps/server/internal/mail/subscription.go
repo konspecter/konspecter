@@ -2,6 +2,7 @@ package mail
 
 import (
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -20,7 +21,15 @@ type Charge struct {
 	Period string
 	// Until is when the paid time ends, or the next charge.
 	Until time.Time
+	// Gateway took the payment; with Period, the email links to buying the
+	// same period again.
+	Gateway string
+	// Once: paid for one period, which does not renew.
+	Once bool
 }
+
+// renewable reports whether the email can link to buying the period again.
+func (c Charge) renewable() bool { return c.Gateway != "" && c.Period != "" }
 
 func subscriptionLetter(locale Locale, siteURL string) letter {
 	l := letter{locale: locale, siteURL: siteURL, account: true}
@@ -30,6 +39,17 @@ func subscriptionLetter(locale Locale, siteURL string) letter {
 	}
 	l.link = &button{URL: siteURL + "/settings#subscription", Label: label}
 	return l
+}
+
+// renewLink has the email's button buy c's period again, once: the
+// settings page with that period chosen and auto-renewal off.
+func (l *letter) renewLink(c Charge) {
+	plan := url.QueryEscape(c.Gateway + ":" + c.Period)
+	label := "Renew for " + periodFor(l.locale, c.Period)
+	if l.locale == Russian {
+		label = "Продлить на " + periodFor(l.locale, c.Period)
+	}
+	l.link = &button{URL: l.siteURL + "/settings?plan=" + plan + "&renew=once#subscription", Label: label}
 }
 
 func notesKept(locale Locale) string {
@@ -72,17 +92,33 @@ func TrialEnded(locale Locale, siteURL, to string) Message {
 	return l.message(to)
 }
 
-// Subscribed: the first payment of a subscription went through.
+// Subscribed: the first payment of a subscription went through, or the
+// payment for one period (c.Once).
 func Subscribed(locale Locale, siteURL, to string, c Charge) Message {
 	l := subscriptionLetter(locale, siteURL)
-	if locale == Russian {
+	switch {
+	case c.Once && locale == Russian:
+		l.subject = "Синхронизация Konspecter оплачена"
+		l.title = "Спасибо за оплату"
+		l.intro = []string{
+			fmt.Sprintf("Оплата %s прошла. Синхронизация оплачена на %s, до %s.", money(locale, c.Amount, c.Currency), periodFor(locale, c.Period), date(locale, c.Until)),
+			"Она не продлевается сама: мы напомним, когда время будет подходить к концу.",
+		}
+	case c.Once:
+		l.subject = "Your Konspecter sync is paid"
+		l.title = "Thank you for your payment"
+		l.intro = []string{
+			fmt.Sprintf("We received %s. Sync is paid for %s, until %s.", money(locale, c.Amount, c.Currency), periodFor(locale, c.Period), date(locale, c.Until)),
+			"It does not renew by itself: we will remind you before it ends.",
+		}
+	case locale == Russian:
 		l.subject = "Подписка на синхронизацию Konspecter оформлена"
 		l.title = "Подписка оформлена"
 		l.intro = []string{
 			fmt.Sprintf("Оплата %s прошла. Синхронизация оплачена до %s.", money(locale, c.Amount, c.Currency), date(locale, c.Until)),
 			fmt.Sprintf("Подписка продлевается автоматически раз в %s. Отменить её можно в любой момент в настройках.", period(locale, c.Period)),
 		}
-	} else {
+	default:
 		l.subject = "You have subscribed to Konspecter sync"
 		l.title = "Thank you for subscribing"
 		l.intro = []string{
@@ -171,33 +207,80 @@ func Resumed(locale Locale, siteURL, to string, c Charge) Message {
 	return l.message(to)
 }
 
-// GraceStarted: the paid time is over; sync keeps working until until.
-func GraceStarted(locale Locale, siteURL, to string, until time.Time) Message {
+// RenewalDue: the period paid for once ends soon (c.Until) and does not
+// renew; the email links to buying it again.
+func RenewalDue(locale Locale, siteURL, to string, c Charge) Message {
 	l := subscriptionLetter(locale, siteURL)
 	if locale == Russian {
-		l.subject = "Оплаченное время синхронизации Konspecter закончилось"
-		l.title = "Оплаченное время закончилось"
-		l.intro = []string{fmt.Sprintf("Мы оставили синхронизацию включённой до %s бесплатно. Чтобы она не остановилась, оформите подписку.", date(locale, until))}
+		l.subject = "Оплаченное время синхронизации Konspecter скоро закончится"
+		l.title = "Синхронизация скоро закончится"
+		l.intro = []string{fmt.Sprintf("Синхронизация оплачена до %s и сама не продлевается. Продлите её ещё на %s, чтобы она не остановилась.",
+			date(locale, c.Until), periodFor(locale, c.Period))}
 	} else {
-		l.subject = "Your paid Konspecter sync time is over"
-		l.title = "Your paid time is over"
-		l.intro = []string{fmt.Sprintf("We keep sync on for free until %s. Subscribe so that it does not pause.", date(locale, until))}
+		l.subject = "Your paid Konspecter sync time ends soon"
+		l.title = "Sync ends soon"
+		l.intro = []string{fmt.Sprintf("Sync is paid until %s and does not renew by itself. Renew it for another %s so that it does not pause.",
+			date(locale, c.Until), period(locale, c.Period))}
+	}
+	if c.renewable() {
+		l.renewLink(c)
 	}
 	l.outro = []string{notesKept(locale)}
 	return l.message(to)
 }
 
-// Paused: the account's time ran out and sync paused.
-func Paused(locale Locale, siteURL, to string) Message {
+// GraceStarted: the paid time is over; sync keeps working until c.Until.
+// For a period paid once (c.Gateway and c.Period), the email links to
+// buying it again.
+func GraceStarted(locale Locale, siteURL, to string, c Charge) Message {
 	l := subscriptionLetter(locale, siteURL)
+	renew := c.renewable()
+	if locale == Russian {
+		l.subject = "Оплаченное время синхронизации Konspecter закончилось"
+		l.title = "Оплаченное время закончилось"
+		action := "оформите подписку"
+		if renew {
+			action = "продлите её"
+		}
+		l.intro = []string{fmt.Sprintf("Мы оставили синхронизацию включённой до %s бесплатно. Чтобы она не остановилась, %s.", date(locale, c.Until), action)}
+	} else {
+		l.subject = "Your paid Konspecter sync time is over"
+		l.title = "Your paid time is over"
+		action := "Subscribe"
+		if renew {
+			action = "Renew it"
+		}
+		l.intro = []string{fmt.Sprintf("We keep sync on for free until %s. %s so that it does not pause.", date(locale, c.Until), action)}
+	}
+	if renew {
+		l.renewLink(c)
+	}
+	l.outro = []string{notesKept(locale)}
+	return l.message(to)
+}
+
+// Paused: the account's time ran out and sync paused. For a period paid
+// once (c.Gateway and c.Period), the email links to buying it again.
+func Paused(locale Locale, siteURL, to string, c Charge) Message {
+	l := subscriptionLetter(locale, siteURL)
+	renew := c.renewable()
 	if locale == Russian {
 		l.subject = "Синхронизация Konspecter приостановлена"
 		l.title = "Синхронизация приостановлена"
 		l.intro = []string{"Оплаченное время закончилось. Оформите подписку, и синхронизация продолжится с того же места."}
+		if renew {
+			l.intro = []string{"Оплаченное время закончилось. Продлите синхронизацию, и она продолжится с того же места."}
+		}
 	} else {
 		l.subject = "Konspecter sync is paused"
 		l.title = "Sync is paused"
 		l.intro = []string{"Your paid time is over. Subscribe, and sync carries on where it stopped."}
+		if renew {
+			l.intro = []string{"Your paid time is over. Renew it, and sync carries on where it stopped."}
+		}
+	}
+	if renew {
+		l.renewLink(c)
 	}
 	l.outro = []string{notesKept(locale)}
 	return l.message(to)
@@ -373,6 +456,16 @@ func period(locale Locale, value string) string {
 	return fmt.Sprintf("%d %ss", count, name)
 }
 
+// periodFor writes a period paid for: "a month", "3 months"; in Russian
+// after "на": "месяц", "3 месяца".
+func periodFor(locale Locale, value string) string {
+	written := period(locale, value)
+	if locale != Russian && !strings.ContainsAny(written, "0123456789") && written != "" {
+		return "a " + written
+	}
+	return written
+}
+
 // russianPlural picks the form for a count: 0 for 1, 21; 1 for 2–4; 2 for 5–20.
 func russianPlural(n int) int {
 	switch {
@@ -396,13 +489,18 @@ type Notice struct {
 	Period string
 	// Until is when the paid time ends, or the next charge.
 	Until *time.Time
+	// Gateway took the payment ("yookassa").
+	Gateway string
+	// Once: the payment was for one period, which does not renew
+	// (subscribed: auto_renew false).
+	Once bool
 }
 
 // NoticeKinds are the kinds of billing events there is an email for.
 var NoticeKinds = []string{
 	"trial_started", "trial_ended", "subscribed", "renewed", "payment_failed",
 	"canceled", "resumed", "grace_started", "paused", "refunded",
-	"sync_granted", "lifetime_granted", "grant_ended", "price_changed",
+	"sync_granted", "lifetime_granted", "grant_ended", "price_changed", "renewal_due",
 }
 
 // BillingNotice is the email that tells of a billing event; false for a
@@ -412,7 +510,7 @@ func BillingNotice(locale Locale, siteURL, to string, n Notice) (Message, bool) 
 	if n.Until != nil {
 		until = *n.Until
 	}
-	charge := Charge{Amount: n.Amount, Currency: n.Currency, Period: n.Period, Until: until}
+	charge := Charge{Amount: n.Amount, Currency: n.Currency, Period: n.Period, Until: until, Gateway: n.Gateway, Once: n.Once}
 	switch n.Kind {
 	case "trial_started":
 		return TrialStarted(locale, siteURL, to, until), true
@@ -429,9 +527,9 @@ func BillingNotice(locale Locale, siteURL, to string, n Notice) (Message, bool) 
 	case "resumed":
 		return Resumed(locale, siteURL, to, charge), true
 	case "grace_started":
-		return GraceStarted(locale, siteURL, to, until), true
+		return GraceStarted(locale, siteURL, to, charge), true
 	case "paused":
-		return Paused(locale, siteURL, to), true
+		return Paused(locale, siteURL, to, charge), true
 	case "refunded":
 		return Refunded(locale, siteURL, to, charge), true
 	case "sync_granted":
@@ -442,6 +540,8 @@ func BillingNotice(locale Locale, siteURL, to string, n Notice) (Message, bool) 
 		return GrantEnded(locale, siteURL, to, until), true
 	case "price_changed":
 		return PriceChanged(locale, siteURL, to, charge, n.PreviousAmount), true
+	case "renewal_due":
+		return RenewalDue(locale, siteURL, to, charge), true
 	}
 	return Message{}, false
 }

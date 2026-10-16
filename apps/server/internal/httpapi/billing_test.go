@@ -286,6 +286,9 @@ func TestSyncIsFreeWithoutABillingService(t *testing.T) {
 	if r := siteCall(t, s.server.URL, http.MethodPost, "/api/subscription/cancel", session, nil); errorCode(r) != "billing_off" {
 		t.Errorf("cancel = %v", r.body)
 	}
+	if r := siteCall(t, s.server.URL, http.MethodPost, "/api/subscription/trial", session, nil); r.status != http.StatusNotFound || errorCode(r) != "billing_off" {
+		t.Errorf("trial = %d %v", r.status, r.body)
+	}
 }
 
 func TestSyncThatIsOffWithoutABillingService(t *testing.T) {
@@ -398,6 +401,50 @@ func TestTheFirstSyncStartsTheTrial(t *testing.T) {
 	}
 	if s.service.trials != 1 {
 		t.Errorf("a second trial: %d", s.service.trials)
+	}
+}
+
+func TestTheSiteStartsTheTrial(t *testing.T) {
+	s := newBillingServer(t)
+	s.service.trial = 14 * 24 * time.Hour
+	session := s.ann(t)
+	if r := siteCall(t, s.server.URL, http.MethodPost, "/api/subscription/trial", nil, nil); r.status != http.StatusUnauthorized {
+		t.Errorf("signed out = %d", r.status)
+	}
+	r := siteCall(t, s.server.URL, http.MethodPost, "/api/subscription/trial", session, nil)
+	if r.status != http.StatusOK || syncState(t, r) != "trialing" || r.body["sync"].(map[string]any)["until"] != "2026-10-20T12:00:00Z" {
+		t.Fatalf("trial = %d %v", r.status, r.body)
+	}
+	// The app may sync at once, and asking again starts nothing more.
+	if r := call(t, s.server, "GET", "/api/sync", "ksp_ann", ""); r.status != http.StatusOK {
+		t.Errorf("sync = %d %v", r.status, r.body)
+	}
+	if r := siteCall(t, s.server.URL, http.MethodPost, "/api/subscription/trial", session, nil); syncState(t, r) != "trialing" {
+		t.Errorf("again = %v", r.body)
+	}
+	if s.service.trials != 1 {
+		t.Errorf("trials = %d", s.service.trials)
+	}
+
+	// After the trial, none again: the account is asked to subscribe.
+	*s.clock = s.clock.Add(15 * 24 * time.Hour)
+	s.service.grant(annID, entitlements.Expired, nil)
+	if r := siteCall(t, s.server.URL, http.MethodPost, "/api/subscription/trial", session, nil); r.status != http.StatusOK || syncState(t, r) != "expired" {
+		t.Errorf("after the trial = %d %v", r.status, r.body)
+	}
+	if s.service.trials != 1 {
+		t.Errorf("a second trial: %d", s.service.trials)
+	}
+}
+
+func TestTheSiteStartsNoTrialWhereNothingIsSold(t *testing.T) {
+	s := newBillingServer(t)
+	s.service.trial = 14 * 24 * time.Hour
+	s.service.unsold["en"] = true
+	session := s.ann(t)
+	r := siteCall(t, s.server.URL, http.MethodPost, "/api/subscription/trial", session, nil)
+	if r.status != http.StatusPaymentRequired || errorCode(r) != "sync_unavailable" || s.service.trials != 0 {
+		t.Errorf("trial = %d %v, trials = %d", r.status, r.body, s.service.trials)
 	}
 }
 
@@ -571,6 +618,15 @@ func TestBillingNoticesAreEmailedInTheAccountsLanguage(t *testing.T) {
 	r = notice(annID, `{"id":"e4","kind":"price_changed","amount":"349.00","previous_amount":"299.00","currency":"RUB","period":"1m","gateway":"acme","until":"2026-11-06T12:00:00Z"}`)
 	if m := s.mailer.last(t); r.status != http.StatusOK || !strings.Contains(m.Text, "349 ₽") || !strings.Contains(m.Text, "вместо 299 ₽") {
 		t.Errorf("price changed = %d %q", r.status, m.Text)
+	}
+	// A payment for one period, and the reminder that links to buying it again.
+	r = notice(annID, `{"id":"e5","kind":"subscribed","amount":"299.00","currency":"RUB","period":"1m","gateway":"acme","until":"2026-11-06T12:00:00Z","auto_renew":false}`)
+	if m := s.mailer.last(t); r.status != http.StatusOK || !strings.Contains(m.Text, "оплачена на месяц") || strings.Contains(m.Text, "автоматически") {
+		t.Errorf("paid once = %d %q", r.status, m.Text)
+	}
+	r = notice(annID, `{"id":"e6","kind":"renewal_due","amount":"299.00","currency":"RUB","period":"1m","gateway":"acme","until":"2026-11-06T12:00:00Z"}`)
+	if m := s.mailer.last(t); r.status != http.StatusOK || !strings.Contains(m.Text, site+"/settings?plan=acme%3A1m&renew=once#subscription") {
+		t.Errorf("renewal due = %d %q", r.status, m.Text)
 	}
 	if r := notice(annID, `{"id":"e2","kind":"cancelled"}`); r.status != http.StatusBadRequest || errorCode(r) != "unknown_kind" {
 		t.Errorf("unknown kind = %d %v", r.status, r.body)

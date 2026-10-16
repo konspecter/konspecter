@@ -91,6 +91,7 @@ func (a *api) registerBillingRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/billing/plans", a.plans)
 	mux.HandleFunc("POST /api/billing/webhooks/{gateway}", a.webhook)
 	mux.Handle("GET /api/subscription", a.withSession(a.subscription))
+	mux.Handle("POST /api/subscription/trial", a.withSession(a.startTrial))
 	for _, route := range []string{
 		"POST /api/subscription", "GET /api/subscription/checkouts/{id}",
 		"POST /api/subscription/cancel", "POST /api/subscription/resume",
@@ -348,6 +349,33 @@ func (a *api) subscription(w http.ResponseWriter, r *http.Request, user auth.Use
 	a.passOn(w, r, &user)
 }
 
+// startTrial is the site starting the account's trial, as its first sync
+// would, and answering how its sync stands as /api/me does. An account
+// that has time keeps it; one that has had a trial gets none again (the
+// billing service decides).
+func (a *api) startTrial(w http.ResponseWriter, r *http.Request, user auth.User) {
+	if a.billing == nil && a.syncOff {
+		syncUnavailable(w)
+		return
+	}
+	if a.billingOff(w) {
+		return
+	}
+	held, err := a.entitlement(r.Context(), user.ID, false)
+	if err != nil || !held.Allowed(a.billing.now()) {
+		if sells, known := a.sells(r.Context(), user.ID); known && !sells {
+			syncUnavailable(w)
+			return
+		}
+		if _, err := a.entitlement(r.Context(), user.ID, true); err != nil {
+			a.logger.ErrorContext(r.Context(), "the billing service did not start a trial", "error", err)
+			writeError(w, http.StatusServiceUnavailable, "billing_unavailable", "the trial cannot be started now; try again later")
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"sync": a.access(r, user.ID)})
+}
+
 // subscriptionChange passes the site's subscribing, checkout, cancelling
 // or resuming on to the billing service. The account's entitlement is
 // asked again after it, so the apps can sync at once after paying.
@@ -446,6 +474,8 @@ func (a *api) sendNotice(w http.ResponseWriter, r *http.Request) {
 		Period         string     `json:"period"`
 		Gateway        string     `json:"gateway"`
 		Until          *time.Time `json:"until"`
+		// AutoRenew is false for a payment for one period (absent: true).
+		AutoRenew *bool `json:"auto_renew"`
 	}
 	if !a.decode(w, r, &body) {
 		return
@@ -461,7 +491,7 @@ func (a *api) sendNotice(w http.ResponseWriter, r *http.Request) {
 	}
 	message, ok := mail.BillingNotice(mail.ParseLocale(locale), a.accounts.PublicURL, email, mail.Notice{
 		Kind: body.Kind, Amount: body.Amount, PreviousAmount: body.PreviousAmount, Currency: body.Currency,
-		Period: body.Period, Until: body.Until,
+		Period: body.Period, Until: body.Until, Gateway: body.Gateway, Once: body.AutoRenew != nil && !*body.AutoRenew,
 	})
 	if !ok {
 		writeError(w, http.StatusBadRequest, "unknown_kind", "no email for that kind of event")

@@ -277,20 +277,24 @@ func TestSubscriptionLetters(t *testing.T) {
 	const site = "https://notes.example.com"
 	until := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
 	charge := Charge{Amount: "299.00", Currency: "RUB", Period: "3m", Until: until}
+	once := Charge{Amount: "299.00", Currency: "RUB", Period: "1m", Until: until, Gateway: "yookassa", Once: true}
 	for _, locale := range []Locale{English, Russian} {
 		letters := []Message{
 			TrialStarted(locale, site, "a@example.com", until), TrialEnded(locale, site, "a@example.com"),
 			Subscribed(locale, site, "a@example.com", charge), Renewed(locale, site, "a@example.com", charge),
 			PaymentFailed(locale, site, "a@example.com", charge), Canceled(locale, site, "a@example.com", until),
 			Canceled(locale, site, "a@example.com", time.Time{}), Resumed(locale, site, "a@example.com", charge),
-			GraceStarted(locale, site, "a@example.com", until), Paused(locale, site, "a@example.com"),
+			GraceStarted(locale, site, "a@example.com", charge), Paused(locale, site, "a@example.com", Charge{}),
+			Subscribed(locale, site, "a@example.com", once), RenewalDue(locale, site, "a@example.com", once),
+			GraceStarted(locale, site, "a@example.com", once), Paused(locale, site, "a@example.com", once),
 			Refunded(locale, site, "a@example.com", charge), SyncGranted(locale, site, "a@example.com", until),
 			LifetimeGranted(locale, site, "a@example.com"), GrantEnded(locale, site, "a@example.com", until),
 			GrantEnded(locale, site, "a@example.com", time.Time{}),
 			PriceChanged(locale, site, "a@example.com", charge, "249.00"), PriceChanged(locale, site, "a@example.com", charge, ""),
 		}
 		for _, m := range letters {
-			if m.Subject == "" || m.HTML == "" || strings.Contains(m.HTML, "<no value>") || !strings.Contains(m.Text, site+"/settings#subscription") {
+			if m.Subject == "" || m.HTML == "" || strings.Contains(m.HTML, "<no value>") ||
+				(!strings.Contains(m.Text, site+"/settings#subscription") && !strings.Contains(m.Text, site+"/settings?plan=")) {
 				t.Errorf("%s letter %q: %q", locale, m.Subject, m.Text)
 			}
 			if !strings.Contains(m.HTML, "Konspecter account on notes.example.com") && !strings.Contains(m.HTML, "аккаунт Konspecter на notes.example.com") {
@@ -332,8 +336,40 @@ func TestSubscriptionLetters(t *testing.T) {
 	if got := GrantEnded(English, site, "a@example.com", time.Time{}).Text; !strings.Contains(got, "Sync is paused.") {
 		t.Errorf("grant ended = %q", got)
 	}
-	if !strings.Contains(Paused(English, site, "a@example.com").Text, "Your conspects are safe") {
+	if !strings.Contains(Paused(English, site, "a@example.com", Charge{}).Text, "Your conspects are safe") {
 		t.Error("the paused email does not say the notes are safe")
+	}
+}
+
+func TestOneTimePaymentLettersLinkToRenewing(t *testing.T) {
+	const site = "https://notes.example.com"
+	until := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
+	once := Charge{Amount: "299.00", Currency: "RUB", Period: "1m", Until: until, Gateway: "yookassa", Once: true}
+	renew := site + "/settings?plan=yookassa%3A1m&renew=once#subscription"
+
+	paid := Subscribed(English, site, "a@example.com", once).Text
+	if !strings.Contains(paid, "Sync is paid for a month, until 6 November 2026.") || strings.Contains(paid, "renews automatically") {
+		t.Errorf("paid once = %q", paid)
+	}
+	if got := Subscribed(Russian, site, "a@example.com", once).Text; !strings.Contains(got, "оплачена на месяц, до 6 ноября 2026 г.") {
+		t.Errorf("russian paid once = %q", got)
+	}
+	due := RenewalDue(English, site, "a@example.com", once)
+	if !strings.Contains(due.Text, "Sync is paid until 6 November 2026 and does not renew by itself.") ||
+		!strings.Contains(due.Text, "Renew it for another month") || !strings.Contains(due.HTML, "Renew for a month") || !strings.Contains(due.Text, renew) {
+		t.Errorf("renewal due = %q", due.Text)
+	}
+	if got := RenewalDue(Russian, site, "a@example.com", Charge{Period: "3m", Until: until, Gateway: "yookassa"}).HTML; !strings.Contains(got, "Продлить на 3 месяца") {
+		t.Errorf("russian renewal due = %q", got)
+	}
+	for _, m := range []Message{GraceStarted(English, site, "a@example.com", once), Paused(English, site, "a@example.com", once)} {
+		if !strings.Contains(m.Text, renew) || !strings.Contains(m.Text, "Renew it") {
+			t.Errorf("%q = %q", m.Subject, m.Text)
+		}
+	}
+	// A subscription that ended is asked to subscribe, as before.
+	if got := Paused(English, site, "a@example.com", Charge{}).Text; !strings.Contains(got, "Subscribe, and sync carries on") || strings.Contains(got, "renew=once") {
+		t.Errorf("paused = %q", got)
 	}
 }
 
@@ -351,7 +387,7 @@ func TestBillingNotices(t *testing.T) {
 	if len(subjects) != len(NoticeKinds) {
 		t.Errorf("subjects = %v", subjects)
 	}
-	if m, _ := BillingNotice(Russian, site, "a@example.com", Notice{Kind: "paused"}); m.Subject != Paused(Russian, site, "a@example.com").Subject {
+	if m, _ := BillingNotice(Russian, site, "a@example.com", Notice{Kind: "paused"}); m.Subject != Paused(Russian, site, "a@example.com", Charge{}).Subject {
 		t.Errorf("russian = %q", m.Subject)
 	}
 	if _, ok := BillingNotice(English, site, "a@example.com", Notice{Kind: "cancelled"}); ok {
