@@ -181,6 +181,8 @@ export const en = {
   "settings.leadNamed": "Hello, {name}. You are signed in as {email}.",
   "settings.sections": "Settings sections",
   "settings.status.trialing": "Trial until {date}",
+  "settings.status.granted": "Free until {date}",
+  "settings.status.lifetime": "For life",
   "settings.status.active": "Active",
   "settings.status.past_due": "Payment failed",
   "settings.status.canceled": "Ends {date}",
@@ -442,6 +444,9 @@ export const en = {
   "subscription.title": "Subscription",
   "subscription.state.trialing":
     "Sync is free during the trial, until {date}. Subscribe to keep it after that.",
+  "subscription.state.granted":
+    "Sync is free for you until {date}. Subscribe to keep it after that.",
+  "subscription.state.lifetime": "Sync is yours for life: there is nothing to pay.",
   "subscription.state.active":
     "Subscribed: {price} every {period}, through {gateway}. The next payment is on {date}.",
   "subscription.state.paidUntil": "Sync is paid until {date}.",

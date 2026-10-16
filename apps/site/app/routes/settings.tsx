@@ -326,7 +326,7 @@ function SectionNav({ billing, devices }: { billing: Billing | null; devices: nu
   const until = access?.until ? shortDay(access.until, locale) : "";
   const subscription =
     access && access.state !== "free"
-      ? access.state === "trialing" || access.state === "canceled"
+      ? access.state === "trialing" || access.state === "granted" || access.state === "canceled"
         ? t(`settings.status.${access.state}`, { date: until })
         : t(`settings.status.${access.state}`)
       : null;

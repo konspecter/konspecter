@@ -34,7 +34,8 @@ export interface Plans {
 export const FREE: Plans = { paid: false, trial: "", grace: "", gateways: [] };
 
 /** The account's entitlement ("free" where sync costs nothing). */
-export type AccessState = "free" | "trialing" | "active" | "past_due" | "canceled" | "expired";
+export type AccessState =
+  "free" | "trialing" | "granted" | "lifetime" | "active" | "past_due" | "canceled" | "expired";
 
 export type SubscriptionStatus = "pending" | "active" | "past_due" | "canceled" | "ended";
 
@@ -75,6 +76,8 @@ export interface Billing {
 const ACCESS: readonly AccessState[] = [
   "free",
   "trialing",
+  "granted",
+  "lifetime",
   "active",
   "past_due",
   "canceled",

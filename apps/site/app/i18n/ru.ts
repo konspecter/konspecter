@@ -178,6 +178,8 @@ export const ru: Dictionary = {
   "settings.leadNamed": "Здравствуйте, {name}. Вы вошли как {email}.",
   "settings.sections": "Разделы настроек",
   "settings.status.trialing": "Пробный период до {date}",
+  "settings.status.granted": "Бесплатно до {date}",
+  "settings.status.lifetime": "Навсегда",
   "settings.status.active": "Активна",
   "settings.status.past_due": "Платёж не прошёл",
   "settings.status.canceled": "До {date}",
@@ -446,6 +448,9 @@ export const ru: Dictionary = {
   "subscription.title": "Подписка",
   "subscription.state.trialing":
     "Во время пробного периода, до {date}, синхронизация бесплатна. Оформите подписку, чтобы она работала и дальше.",
+  "subscription.state.granted":
+    "Синхронизация бесплатна для вас до {date}. Оформите подписку, чтобы она работала и дальше.",
+  "subscription.state.lifetime": "Синхронизация ваша навсегда: платить ничего не нужно.",
   "subscription.state.active":
     "Подписка оформлена: {price} раз в {period} через {gateway}. Следующий платёж — {date}.",
   "subscription.state.paidUntil": "Синхронизация оплачена до {date}.",

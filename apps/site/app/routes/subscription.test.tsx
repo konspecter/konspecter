@@ -233,6 +233,36 @@ describe("the subscription in the settings", () => {
     payments: [],
   };
 
+  it("says until when free sync given lasts, and still offers to subscribe", async () => {
+    renderSubscription(
+      { ...base, access: { state: "granted", until: "2026-10-20T12:00:00Z" } },
+      gateways,
+      () => null,
+    );
+    const section = await screen.findByRole("region", { name: "Subscription" });
+    expect(section).toHaveTextContent(/Sync is free for you until .*2026\. Subscribe/);
+    expect(within(section).getAllByRole("radio").length).toBeGreaterThan(0);
+  });
+
+  it("offers nothing to buy to an account given sync for life", async () => {
+    renderSubscription(
+      { ...base, access: { state: "lifetime", until: "9999-12-31T00:00:00Z" } },
+      gateways,
+      () => null,
+    );
+    const section = await screen.findByRole("region", { name: "Subscription" });
+    expect(section).toHaveTextContent("Sync is yours for life");
+    expect(within(section).queryByRole("radio")).not.toBeInTheDocument();
+  });
+
+  it("offers no subscription in a language the server sells no sync in", async () => {
+    renderSubscription({ ...base, access: { state: "expired", until: null } }, [], () => null);
+    const section = await screen.findByRole("region", { name: "Subscription" });
+    expect(section).toHaveTextContent("This server does not offer sync in English.");
+    expect(section).not.toHaveTextContent("takes a subscription");
+    expect(within(section).queryByRole("radio")).not.toBeInTheDocument();
+  });
+
   it("has the period chosen on the home page picked", async () => {
     renderSubscription(base, gateways, () => null, "acme:1y");
     const section = await screen.findByRole("region", { name: "Subscription" });

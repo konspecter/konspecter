@@ -62,7 +62,7 @@ export function SubscriptionSection({
               </div>
             </Form>
           )}
-          {gateways.length > 0 ? (
+          {billing.access.state === "lifetime" ? null : gateways.length > 0 ? (
             <Subscribe gateways={gateways} plan={plan} />
           ) : (
             <p className="settings-text">{t.t("subscription.unavailable")}</p>
@@ -83,6 +83,10 @@ function AccessText({ billing, sold }: { billing: Billing; sold: boolean }) {
   switch (state) {
     case "trialing":
       return <p className="settings-text">{t.t("subscription.state.trialing", { date })}</p>;
+    case "granted":
+      return <p className="settings-text">{t.t("subscription.state.granted", { date })}</p>;
+    case "lifetime":
+      return <p className="settings-text">{t.t("subscription.state.lifetime")}</p>;
     case "active":
       return (
         <p className="settings-text">
