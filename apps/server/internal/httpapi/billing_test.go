@@ -568,6 +568,10 @@ func TestBillingNoticesAreEmailedInTheAccountsLanguage(t *testing.T) {
 	if m.To != "ann@example.com" || !strings.Contains(m.Subject, "Konspecter") || !strings.Contains(m.Text, "299 ₽") || !strings.Contains(m.Text, "6 ноября 2026") {
 		t.Errorf("email = %q %q", m.Subject, m.Text)
 	}
+	r = notice(annID, `{"id":"e4","kind":"price_changed","amount":"349.00","previous_amount":"299.00","currency":"RUB","period":"1m","gateway":"acme","until":"2026-11-06T12:00:00Z"}`)
+	if m := s.mailer.last(t); r.status != http.StatusOK || !strings.Contains(m.Text, "349 ₽") || !strings.Contains(m.Text, "вместо 299 ₽") {
+		t.Errorf("price changed = %d %q", r.status, m.Text)
+	}
 	if r := notice(annID, `{"id":"e2","kind":"cancelled"}`); r.status != http.StatusBadRequest || errorCode(r) != "unknown_kind" {
 		t.Errorf("unknown kind = %d %v", r.status, r.body)
 	}

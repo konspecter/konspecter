@@ -287,6 +287,7 @@ func TestSubscriptionLetters(t *testing.T) {
 			Refunded(locale, site, "a@example.com", charge), SyncGranted(locale, site, "a@example.com", until),
 			LifetimeGranted(locale, site, "a@example.com"), GrantEnded(locale, site, "a@example.com", until),
 			GrantEnded(locale, site, "a@example.com", time.Time{}),
+			PriceChanged(locale, site, "a@example.com", charge, "249.00"), PriceChanged(locale, site, "a@example.com", charge, ""),
 		}
 		for _, m := range letters {
 			if m.Subject == "" || m.HTML == "" || strings.Contains(m.HTML, "<no value>") || !strings.Contains(m.Text, site+"/settings#subscription") {
@@ -316,6 +317,17 @@ func TestSubscriptionLetters(t *testing.T) {
 	}
 	if got := GrantEnded(Russian, site, "a@example.com", until).Text; !strings.Contains(got, "Синхронизация работает до 6 ноября 2026 г.") {
 		t.Errorf("grant ended with time left = %q", got)
+	}
+	if got := PriceChanged(English, site, "a@example.com", charge, "249.00").Text; !strings.Contains(got,
+		"From 6 November 2026, the subscription costs 299 ₽ every 3 months instead of 249 ₽.") {
+		t.Errorf("price changed = %q", got)
+	}
+	if got := PriceChanged(Russian, site, "a@example.com", Charge{Amount: "4.00", Currency: "USD", Period: "1m", Until: until}, "3.00").Text; !strings.Contains(got,
+		"С 6 ноября 2026 г. подписка будет стоить $4 раз в месяц вместо $3.") {
+		t.Errorf("russian price changed = %q", got)
+	}
+	if got := PriceChanged(English, site, "a@example.com", charge, "").Text; strings.Contains(got, "instead of") || strings.Contains(got, "cancel") {
+		t.Errorf("price taken back = %q", got)
 	}
 	if got := GrantEnded(English, site, "a@example.com", time.Time{}).Text; !strings.Contains(got, "Sync is paused.") {
 		t.Errorf("grant ended = %q", got)

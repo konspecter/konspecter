@@ -282,6 +282,38 @@ func GrantEnded(locale Locale, siteURL, to string, until time.Time) Message {
 	return l.message(to)
 }
 
+// PriceChanged: from c.Until, the subscription costs c.Amount every
+// c.Period. previous is what it costs until then; with none, the price
+// stays what it is (a change told before is taken back).
+func PriceChanged(locale Locale, siteURL, to string, c Charge, previous string) Message {
+	l := subscriptionLetter(locale, siteURL)
+	price, every := money(locale, c.Amount, c.Currency), period(locale, c.Period)
+	if locale == Russian {
+		l.subject = "Цена синхронизации Konspecter меняется"
+		l.title = "Цена подписки меняется"
+		if previous == "" {
+			l.intro = []string{fmt.Sprintf("С %s подписка стоит %s раз в %s.", date(locale, c.Until), price, every)}
+		} else {
+			l.intro = []string{
+				fmt.Sprintf("С %s подписка будет стоить %s раз в %s вместо %s.", date(locale, c.Until), price, every, money(locale, previous, c.Currency)),
+				"До этого всё остаётся как есть. Если вы не хотите продолжать по новой цене, отмените подписку в настройках до этого дня.",
+			}
+		}
+	} else {
+		l.subject = "The price of Konspecter sync is changing"
+		l.title = "Your subscription's price is changing"
+		if previous == "" {
+			l.intro = []string{fmt.Sprintf("From %s, the subscription costs %s every %s.", date(locale, c.Until), price, every)}
+		} else {
+			l.intro = []string{
+				fmt.Sprintf("From %s, the subscription costs %s every %s instead of %s.", date(locale, c.Until), price, every, money(locale, previous, c.Currency)),
+				"Until then, nothing changes. If you do not want to go on at the new price, cancel the subscription in the settings before that day.",
+			}
+		}
+	}
+	return l.message(to)
+}
+
 var russianMonths = [...]string{
 	"января", "февраля", "марта", "апреля", "мая", "июня",
 	"июля", "августа", "сентября", "октября", "ноября", "декабря",
@@ -355,9 +387,11 @@ func russianPlural(n int) int {
 // Notice is a billing event the billing service has the server email: its
 // kind, and what its email tells.
 type Notice struct {
-	Kind     string
-	Amount   string
-	Currency string
+	Kind   string
+	Amount string
+	// PreviousAmount is the price a subscription moves from (price_changed).
+	PreviousAmount string
+	Currency       string
 	// Period is the subscription's, {N}{d|w|m|q|y} ("1m").
 	Period string
 	// Until is when the paid time ends, or the next charge.
@@ -368,7 +402,7 @@ type Notice struct {
 var NoticeKinds = []string{
 	"trial_started", "trial_ended", "subscribed", "renewed", "payment_failed",
 	"canceled", "resumed", "grace_started", "paused", "refunded",
-	"sync_granted", "lifetime_granted", "grant_ended",
+	"sync_granted", "lifetime_granted", "grant_ended", "price_changed",
 }
 
 // BillingNotice is the email that tells of a billing event; false for a
@@ -406,6 +440,8 @@ func BillingNotice(locale Locale, siteURL, to string, n Notice) (Message, bool) 
 		return LifetimeGranted(locale, siteURL, to), true
 	case "grant_ended":
 		return GrantEnded(locale, siteURL, to, until), true
+	case "price_changed":
+		return PriceChanged(locale, siteURL, to, charge, n.PreviousAmount), true
 	}
 	return Message{}, false
 }

@@ -438,13 +438,14 @@ func (a *api) putEntitlement(w http.ResponseWriter, r *http.Request) {
 // event, in the account's language.
 func (a *api) sendNotice(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		ID       string     `json:"id"`
-		Kind     string     `json:"kind"`
-		Amount   string     `json:"amount"`
-		Currency string     `json:"currency"`
-		Period   string     `json:"period"`
-		Gateway  string     `json:"gateway"`
-		Until    *time.Time `json:"until"`
+		ID             string     `json:"id"`
+		Kind           string     `json:"kind"`
+		Amount         string     `json:"amount"`
+		PreviousAmount string     `json:"previous_amount"`
+		Currency       string     `json:"currency"`
+		Period         string     `json:"period"`
+		Gateway        string     `json:"gateway"`
+		Until          *time.Time `json:"until"`
 	}
 	if !a.decode(w, r, &body) {
 		return
@@ -459,7 +460,8 @@ func (a *api) sendNotice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	message, ok := mail.BillingNotice(mail.ParseLocale(locale), a.accounts.PublicURL, email, mail.Notice{
-		Kind: body.Kind, Amount: body.Amount, Currency: body.Currency, Period: body.Period, Until: body.Until,
+		Kind: body.Kind, Amount: body.Amount, PreviousAmount: body.PreviousAmount, Currency: body.Currency,
+		Period: body.Period, Until: body.Until,
 	})
 	if !ok {
 		writeError(w, http.StatusBadRequest, "unknown_kind", "no email for that kind of event")
