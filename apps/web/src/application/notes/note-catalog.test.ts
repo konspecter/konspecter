@@ -143,8 +143,15 @@ describe("NoteCatalog", () => {
     const listener = vi.fn();
     catalog.subscribe(listener);
 
-    for (let i = 0; i < 50; i += 1) await store.put(createNote(`# N${String(i)}`, new Date()));
-    await ready(catalog, (notes) => notes.length === 50);
+    // The publish interval runs on the clock, not on how fast this machine
+    // writes: the burst takes no time, and waiting moves the clock on.
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    try {
+      for (let i = 0; i < 50; i += 1) await store.put(createNote(`# N${String(i)}`, new Date()));
+      await ready(catalog, (notes) => notes.length === 50);
+    } finally {
+      vi.useRealTimers();
+    }
 
     expect(listener.mock.calls.length).toBeLessThan(10);
     stop();
