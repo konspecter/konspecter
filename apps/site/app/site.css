@@ -1673,6 +1673,14 @@ main {
   margin-top: 0.25rem;
 }
 
+/* Auto renew, beside the button that buys: unticked, one period is paid once. */
+.auto-renew {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 15px;
+}
+
 .cancel-subscription {
   margin-top: 1.1rem;
 }

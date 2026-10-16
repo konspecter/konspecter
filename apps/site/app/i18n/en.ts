@@ -84,6 +84,7 @@ export const en = {
   "home.sync.service.text":
     "Connect your computer, phone and browser to one account by scanning a QR code, and a conspect written on one shows up on the others. Conspects are locked with a passphrase only you know before they leave your device: not even the server can read them.",
   "home.sync.every": "every {period}",
+  "home.sync.for": "for {period}",
   "home.sync.cancel": "Cancel any time.",
   "home.sync.trial": "The first {trial} are free.",
   "home.sync.connect": "Connect your devices",
@@ -434,6 +435,8 @@ export const en = {
   "authError.not_subscribed": "There is no renewing subscription to cancel. Reload the page.",
   "authError.not_resumable": "This subscription cannot be resumed. Subscribe again instead.",
   "authError.billing_off": "Sync is free on this server.",
+  "authError.sync_unavailable": "This server does not offer sync in your language.",
+  "authError.billing_unavailable": "Sync cannot be started right now. Try again in a minute.",
   "authError.unknown": "Something went wrong on the server. Try again in a moment.",
 
   "error.title": "Page not found",
@@ -452,6 +455,8 @@ export const en = {
   "subscription.state.paidUntil": "Sync is paid until {date}.",
   "subscription.state.canceled":
     "The subscription is cancelled and will not renew. Sync works until {date}.",
+  "subscription.state.paidOnce":
+    "Sync is paid for {period}, until {date}. It does not renew by itself: buy the next period whenever you like.",
   "subscription.state.past_due":
     "The last payment did not go through; it is tried again. Sync works until {date}.",
   "subscription.state.paused":
@@ -459,22 +464,26 @@ export const en = {
   "subscription.state.unpaid": "Sync on this server takes a subscription.",
   "subscription.unavailable": "This server does not offer sync in English.",
   "subscription.state.unpaidTrial":
-    "Sync on this server takes a subscription. The first {trial} are free: the trial starts when you connect an app.",
+    "Sync on this server takes a subscription. The first {trial} are free: start the trial here, or connect an app.",
   "subscription.try": "Try sync for free",
   "subscription.pending": "A payment was started but not finished. Choose again to start over.",
   "subscription.resumeLead": "Resume it to renew automatically again, with the same card.",
   "subscription.resume": "Resume subscription",
   "subscription.choose": "Choose a period",
   "subscription.option": "{price} every {period}",
+  "subscription.optionOnce": "{price} for {period}",
+  "subscription.autoRenew": "Auto renew",
   "subscription.via": " via {gateway}",
   "subscription.consent":
     "I accept the {terms} and the {privacy}. The subscription renews automatically every period until I cancel it.",
+  "subscription.consentOnce": "I accept the {terms} and the {privacy}.",
   "subscription.consentTerms": "terms",
   "subscription.consentPrivacy": "privacy policy",
   "subscription.payHint": "You pay on {gateway}'s page; your card details never reach this site.",
   "subscription.payHintSeveral":
     "You pay on the payment service's page; your card details never reach this site.",
   "subscription.subscribe": "Subscribe",
+  "subscription.pay": "Pay",
   "subscription.continue": "Continue to payment",
   "subscription.cancel": "Cancel subscription",
   "subscription.cancelLead":
@@ -503,6 +512,7 @@ export const en = {
   "checkout.paidTitle": "Thank you",
   "checkout.paid": "The subscription is paid. Sync works until {date} and renews by itself.",
   "checkout.paidNoDate": "The subscription is paid.",
+  "checkout.paidOnce": "Sync is paid until {date}. It does not renew by itself.",
   "checkout.waitingTitle": "Waiting for the payment",
   "checkout.waiting":
     "The payment service has not confirmed the payment yet. This page looks again by itself every few seconds.",

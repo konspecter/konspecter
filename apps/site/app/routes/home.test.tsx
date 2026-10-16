@@ -146,13 +146,33 @@ it("offers your own way and the paid sync, every period with what it saves", asy
   expect(buy).toBeEnabled();
   await userEvent.click(consent);
   expect(buy).toBeDisabled();
-  expect(within(sync).getByRole("link", { name: "Try sync for free" })).toHaveAttribute(
-    "href",
-    "/settings",
+  expect(within(sync).getByRole("button", { name: "Try sync for free" })).toHaveAttribute(
+    "formnovalidate",
   );
   expect(within(sync).getByRole("link", { name: "Prices and terms" })).toHaveAttribute(
     "href",
     "/terms",
+  );
+});
+
+it("prices one period, paid once, with Auto renew unticked", async () => {
+  renderHome("ru", [], null, PRICING);
+  const sync = await screen.findByRole("region", { name: "Синхронизация между устройствами" });
+  const renew = within(sync).getByRole("checkbox", { name: "Автопродление" });
+  expect(renew).toBeChecked();
+  expect(sync).toHaveTextContent("Отменить можно в любой момент.");
+  await userEvent.click(renew);
+  const periods = within(sync).getByRole("group", { name: "Выберите период" });
+  const labels = within(periods)
+    .getAllByRole("radio")
+    .map((radio) => radio.closest("label")?.textContent ?? "");
+  expect(labels).toHaveLength(3);
+  ["за 1 месяц", "за 3 месяца", "за 1 год"].forEach((period, index) => {
+    expect(labels[index]).toContain(period);
+  });
+  expect(sync).not.toHaveTextContent("Отменить можно в любой момент.");
+  expect(within(sync).getByRole("checkbox", { name: /Я принимаю/ })).not.toHaveAccessibleName(
+    /продлевается/,
   );
 });
 
@@ -318,22 +338,78 @@ describe("buying sync", () => {
       "POST /api/subscription": () =>
         Response.json({ redirect_url: "https://pay.example.com/c/1" }, { status: 201 }),
     });
-    const response = (await homeAction(args(buy({ plan: "acme:1y", accept: "yes" })))) as Response;
+    const response = (await homeAction(
+      args(buy({ plan: "acme:1y", accept: "yes", auto_renew: "yes" })),
+    )) as Response;
     expect(response.status).toBe(302);
     expect(response.headers.get("Location")).toBe("https://pay.example.com/c/1");
-    expect(calls[0]?.body).toEqual({ gateway: "acme", period: "1y", locale: "en", accept: true });
+    expect(calls[0]?.body).toEqual({
+      gateway: "acme",
+      period: "1y",
+      locale: "en",
+      accept: true,
+      auto_renew: true,
+    });
   });
 
   it("sends a signed-out visitor to sign in, then to settings with the period chosen", async () => {
     const calls = stubApi({});
     await expect(
-      homeAction(args(buy({ plan: "acme:1y", accept: "yes" }), false)),
+      homeAction(args(buy({ plan: "acme:1y", accept: "yes", auto_renew: "yes" }), false)),
     ).rejects.toSatisfy(
       (response: Response) =>
         response.headers.get("Location") ===
         `/login?next=${encodeURIComponent("/settings?plan=acme%3A1y#subscription")}`,
     );
     expect(calls).toEqual([]);
+  });
+
+  it("pays for one period without auto-renewal, and keeps that through signing in", async () => {
+    const calls = stubApi({
+      "POST /api/subscription": () =>
+        Response.json({ redirect_url: "https://pay.example.com/c/2" }, { status: 201 }),
+    });
+    const response = (await homeAction(args(buy({ plan: "acme:1m", accept: "yes" })))) as Response;
+    expect(response.headers.get("Location")).toBe("https://pay.example.com/c/2");
+    expect(calls[0]?.body).toMatchObject({ gateway: "acme", period: "1m", auto_renew: false });
+    await expect(
+      homeAction(args(buy({ plan: "acme:1m", accept: "yes" }), false)),
+    ).rejects.toSatisfy(
+      (redirected: Response) =>
+        redirected.headers.get("Location") ===
+        `/login?next=${encodeURIComponent("/settings?plan=acme%3A1m&renew=once#subscription")}`,
+    );
+  });
+
+  it("starts the trial and shows the settings", async () => {
+    const calls = stubApi({
+      "POST /api/subscription/trial": () =>
+        Response.json({ sync: { state: "trialing", until: "2026-10-20T12:00:00Z" } }),
+    });
+    const response = (await homeAction(args(buy({ intent: "trial" })))) as Response;
+    expect(response.headers.get("Location")).toBe("/settings#subscription");
+    expect(calls.map((c) => c.call)).toEqual(["POST /api/subscription/trial"]);
+  });
+
+  it("has a signed-out visitor sign in before the trial starts", async () => {
+    const calls = stubApi({});
+    await expect(homeAction(args(buy({ intent: "trial" }), false))).rejects.toSatisfy(
+      (response: Response) =>
+        response.headers.get("Location") ===
+        `/login?next=${encodeURIComponent("/settings?trial=1#subscription")}`,
+    );
+    expect(calls).toEqual([]);
+  });
+
+  it("says why the trial did not start", async () => {
+    stubApi({
+      "POST /api/subscription/trial": () =>
+        Response.json({ error: { code: "sync_unavailable", message: "" } }, { status: 402 }),
+    });
+    expect(await homeAction(args(buy({ intent: "trial" })))).toMatchObject({
+      data: { error: { code: "sync_unavailable" } },
+      init: { status: 402 },
+    });
   });
 
   it("says why the API refused", async () => {

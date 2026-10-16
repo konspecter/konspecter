@@ -81,6 +81,7 @@ export const ru: Dictionary = {
   "home.sync.service.text":
     "Подключите компьютер, телефон и браузер к одному аккаунту — достаточно отсканировать QR-код, — и конспект, написанный на одном, появится на остальных. Прежде чем данные будут синхронизированы, они шифруются паролем, который знаете только вы: прочитать их не может даже сервер, который их хранит.",
   "home.sync.every": "раз в {period}",
+  "home.sync.for": "за {period}",
   "home.sync.cancel": "Отменить можно в любой момент.",
   "home.sync.trial": "Первые {trial} бесплатно.",
   "home.sync.connect": "Подключить устройства",
@@ -438,6 +439,8 @@ export const ru: Dictionary = {
     "Нет продлеваемой подписки, которую можно отменить. Обновите страницу.",
   "authError.not_resumable": "Эту подписку нельзя возобновить. Оформите новую.",
   "authError.billing_off": "Синхронизация на этом сервере бесплатна.",
+  "authError.sync_unavailable": "Этот сервер не предлагает синхронизацию на вашем языке.",
+  "authError.billing_unavailable": "Сейчас синхронизацию не запустить. Попробуйте через минуту.",
   "authError.unknown": "На сервере что-то пошло не так. Попробуйте чуть позже.",
 
   "error.title": "Страница не найдена",
@@ -456,6 +459,8 @@ export const ru: Dictionary = {
   "subscription.state.paidUntil": "Синхронизация оплачена до {date}.",
   "subscription.state.canceled":
     "Подписка отменена и не продлится. Синхронизация работает до {date}.",
+  "subscription.state.paidOnce":
+    "Синхронизация оплачена на {period}, до {date}. Сама она не продлевается: следующий период можно купить, когда захотите.",
   "subscription.state.past_due":
     "Последний платёж не прошёл; мы попробуем ещё раз. Синхронизация работает до {date}.",
   "subscription.state.paused":
@@ -463,7 +468,7 @@ export const ru: Dictionary = {
   "subscription.state.unpaid": "Синхронизация на этом сервере работает по подписке.",
   "subscription.unavailable": "Этот сервер не предлагает синхронизацию на русском языке.",
   "subscription.state.unpaidTrial":
-    "Синхронизация на этом сервере работает по подписке. Первые {trial} бесплатно: пробный период начнётся, когда вы подключите приложение.",
+    "Синхронизация на этом сервере работает по подписке. Первые {trial} бесплатно: начните пробный период здесь или подключите приложение.",
   "subscription.try": "Попробовать бесплатно",
   "subscription.pending":
     "Оплата была начата, но не завершена. Выберите период снова, чтобы начать заново.",
@@ -472,9 +477,12 @@ export const ru: Dictionary = {
   "subscription.resume": "Возобновить подписку",
   "subscription.choose": "Выберите период",
   "subscription.option": "{price} в {period}",
+  "subscription.optionOnce": "{price} за {period}",
+  "subscription.autoRenew": "Автопродление",
   "subscription.via": " через {gateway}",
   "subscription.consent":
     "Я принимаю {terms} и {privacy}. Подписка продлевается автоматически каждый период, пока я её не отменю.",
+  "subscription.consentOnce": "Я принимаю {terms} и {privacy}.",
   "subscription.consentTerms": "условия оферты",
   "subscription.consentPrivacy": "политику конфиденциальности",
   "subscription.payHint":
@@ -482,6 +490,7 @@ export const ru: Dictionary = {
   "subscription.payHintSeveral":
     "Оплата проходит на странице платёжного сервиса; данные карты на этот сайт не попадают.",
   "subscription.subscribe": "Оформить подписку",
+  "subscription.pay": "Оплатить",
   "subscription.continue": "Перейти к оплате",
   "subscription.cancel": "Отменить подписку",
   "subscription.cancelLead":
@@ -534,6 +543,7 @@ export const ru: Dictionary = {
   "checkout.paidTitle": "Спасибо",
   "checkout.paid": "Подписка оплачена. Синхронизация работает до {date} и продлевается сама.",
   "checkout.paidNoDate": "Подписка оплачена.",
+  "checkout.paidOnce": "Синхронизация оплачена до {date}. Сама она не продлевается.",
   "checkout.waitingTitle": "Ждём оплату",
   "checkout.waiting":
     "Платёжный сервис ещё не подтвердил оплату. Страница проверяет сама каждые несколько секунд.",

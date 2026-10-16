@@ -49,6 +49,8 @@ export interface Subscription {
   readonly currency: string;
   readonly status: SubscriptionStatus;
   readonly nextChargeAt: string | null;
+  /** False for a period paid once, which never renews. */
+  readonly autoRenew: boolean;
   /** A canceled subscription that can renew again as it is. */
   readonly resumable: boolean;
 }
@@ -139,6 +141,7 @@ function parseSubscriptionItem(value: unknown): Subscription | null {
     currency: text(item.currency),
     status,
     nextChargeAt: time(item.next_charge_at),
+    autoRenew: item.auto_renew !== false,
     resumable: item.resumable === true,
   };
 }
@@ -222,6 +225,16 @@ export function periodText(t: SiteTranslator, period: string): string {
   if (!parsed) return period;
   if (parsed.count === 1) return t.t(`subscription.unit.${parsed.unit}`);
   return t.tn(`subscription.units.${parsed.unit}`, parsed.count);
+}
+
+/**
+ * A price's period as a choice reads it: "every month" for a subscription,
+ * "for 1 month" for one period paid once (without auto-renewal).
+ */
+export function pricePeriod(t: SiteTranslator, period: string, autoRenew: boolean): string {
+  return autoRenew
+    ? t.t("home.sync.every", { period: periodText(t, period) })
+    : t.t("home.sync.for", { period: durationText(t, period) });
 }
 
 /** How much time a period is, always with its count: "1 month", "14 days". */

@@ -140,7 +140,7 @@ function termsEn(c: LegalContext): LegalDocument {
         title: "2. Prices",
         paragraphs: paid
           ? [
-              "Sync is sold as a subscription, at these prices:",
+              "Sync is sold as a subscription, or one period at a time, at these prices:",
               priceList(c),
               trial
                 ? `Every account gets one free trial of ${durationText(c.t, trial)}. It starts when an app of the account first syncs.`
@@ -159,6 +159,7 @@ function termsEn(c: LegalContext): LegalDocument {
               paragraphs: [
                 `Payments are made through ${gateways(c)}. Your card details go to the payment service, never to the operator.`,
                 "A subscription renews automatically at the end of every period, for the same period and price, and is charged then, until you cancel it. By subscribing you agree to these automatic payments.",
+                "You may instead pay for one period without automatic renewal (with «Auto renew» unticked). Nothing is charged again: you are reminded by email before the period ends, and you pay for the next one yourself if you wish.",
                 "Every payment, renewal, failed payment, cancellation and refund is confirmed by email.",
                 grace
                   ? `If a renewal cannot be charged, it is tried again; sync keeps working for ${durationText(c.t, grace)} after the paid time ends, free of charge. Then sync pauses until a payment goes through.`
@@ -247,7 +248,7 @@ function termsRu(c: LegalContext): LegalDocument {
         title: "2. Стоимость",
         paragraphs: paid
           ? [
-              "Синхронизация предоставляется по подписке по следующим ценам:",
+              "Синхронизация предоставляется по подписке или на один период по следующим ценам:",
               priceList(c),
               trial
                 ? `Каждый аккаунт один раз получает бесплатный пробный период — ${durationText(c.t, trial)}. Он начинается при первой синхронизации приложения аккаунта.`
@@ -266,6 +267,7 @@ function termsRu(c: LegalContext): LegalDocument {
               paragraphs: [
                 `Оплата принимается через ${gateways(c)}. Данные карты получает платёжный сервис; Исполнителю они не передаются.`,
                 "Подписка продлевается автоматически в конце каждого периода на тот же период и по той же цене, с автоматическим списанием (автоплатёж), пока вы её не отмените. Оформляя подписку, вы даёте согласие на такие списания.",
+                "Вместо подписки можно оплатить один период без автоматического продления (сняв отметку «Автопродление»). Повторных списаний не будет: перед окончанием периода на почту придёт напоминание, и следующий период вы оплачиваете сами, если пожелаете.",
                 "Каждая оплата, продление, неудачное списание, отмена и возврат подтверждаются письмом на электронную почту аккаунта.",
                 grace
                   ? `Если продлить подписку не удалось, списание повторяется; синхронизация бесплатно работает ещё ${durationText(c.t, grace)} после окончания оплаченного времени, затем приостанавливается до оплаты.`

@@ -47,6 +47,8 @@ const KNOWN = new Set([
   "not_subscribed",
   "not_resumable",
   "billing_off",
+  "sync_unavailable",
+  "billing_unavailable",
 ]);
 
 export function errorText(t: SiteTranslator["t"], error: FormError): string {

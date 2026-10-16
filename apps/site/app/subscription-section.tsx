@@ -1,6 +1,6 @@
 import { richText } from "@konspecter/i18n/rich";
-import { useEffect, useId, useState } from "react";
-import { Form, Link } from "react-router";
+import { useEffect, useId, useRef, useState } from "react";
+import { Form, Link, useSubmit } from "react-router";
 import { FormMessage, Submit, type FormError } from "./auth-form";
 import { useLocale, useT } from "./i18n/i18n";
 import {
@@ -8,6 +8,7 @@ import {
   durationText,
   money,
   periodText,
+  pricePeriod,
   type Billing,
   type GatewayPlan,
   type Payment,
@@ -15,7 +16,8 @@ import {
 
 /**
  * The subscription on the settings page (paid sync): how long sync works,
- * subscribing (with consent to the terms and to automatic renewal),
+ * subscribing (with consent to the terms and to automatic renewal) or
+ * paying for one period (Auto renew unticked),
  * cancelling (a confirm step that says nothing is lost), resuming, and the
  * payments. Where the server sells no sync in the page's language (no
  * gateways), it says so instead of offering to subscribe. Plain forms; the gateway's page is opened from the answer to
@@ -25,6 +27,8 @@ export function SubscriptionSection({
   billing,
   gateways,
   plan,
+  autoRenew = true,
+  startTrial = false,
   error,
   notice,
   redirectUrl,
@@ -33,6 +37,10 @@ export function SubscriptionSection({
   gateways: readonly GatewayPlan[];
   /** The plan ("gateway:period") to offer first; the first one when it is not on sale. */
   plan: string;
+  /** Auto renew ticked at first; not when renewing a period paid once from its email. */
+  autoRenew?: boolean;
+  /** Start the trial at once, if the account is due one (asked for before signing in). */
+  startTrial?: boolean;
   error: FormError | null;
   notice: string | null;
   redirectUrl: string | null;
@@ -43,7 +51,7 @@ export function SubscriptionSection({
   return (
     <section className="settings-section" id="subscription" aria-labelledby="subscription-heading">
       <h2 id="subscription-heading">{t.t("subscription.title")}</h2>
-      <AccessText billing={billing} sold={gateways.length > 0} />
+      <AccessText billing={billing} sold={gateways.length > 0} startTrial={startTrial} />
       <FormMessage error={error} notice={notice} />
       {redirectUrl ? (
         <Checkout url={redirectUrl} />
@@ -63,7 +71,7 @@ export function SubscriptionSection({
             </Form>
           )}
           {billing.access.state === "lifetime" ? null : gateways.length > 0 ? (
-            <Subscribe gateways={gateways} plan={plan} />
+            <Subscribe gateways={gateways} plan={plan} autoRenew={autoRenew} />
           ) : (
             <p className="settings-text">{t.t("subscription.unavailable")}</p>
           )}
@@ -74,7 +82,15 @@ export function SubscriptionSection({
   );
 }
 
-function AccessText({ billing, sold }: { billing: Billing; sold: boolean }) {
+function AccessText({
+  billing,
+  sold,
+  startTrial,
+}: {
+  billing: Billing;
+  sold: boolean;
+  startTrial: boolean;
+}) {
   const t = useT();
   const locale = useLocale();
   const { state, until } = billing.access;
@@ -103,7 +119,16 @@ function AccessText({ billing, sold }: { billing: Billing; sold: boolean }) {
         </p>
       );
     case "canceled":
-      return <p className="settings-text">{t.t("subscription.state.canceled", { date })}</p>;
+      return (
+        <p className="settings-text">
+          {sub && !sub.autoRenew
+            ? t.t("subscription.state.paidOnce", {
+                period: durationText(t, sub.period),
+                date: billing.paidUntil ? day(billing.paidUntil, locale) : date,
+              })
+            : t.t("subscription.state.canceled", { date })}
+        </p>
+      );
     case "past_due":
       return <p className="settings-text">{t.t("subscription.state.past_due", { date })}</p>;
     case "expired":
@@ -114,17 +139,12 @@ function AccessText({ billing, sold }: { billing: Billing; sold: boolean }) {
       if (!billing.trial) {
         return <p className="settings-text">{t.t("subscription.state.unpaid")}</p>;
       }
-      // The trial starts with the first sync: trying it is connecting an app.
       return (
         <>
           <p className="settings-text">
             {t.t("subscription.state.unpaidTrial", { trial: durationText(t, billing.trial) })}
           </p>
-          <div className="actions">
-            <a className="button" href="#connect">
-              {t.t("subscription.try")}
-            </a>
-          </div>
+          <TryTrial now={startTrial} />
         </>
       );
     default:
@@ -132,11 +152,43 @@ function AccessText({ billing, sold }: { billing: Billing; sold: boolean }) {
   }
 }
 
-function Subscribe({ gateways, plan }: { gateways: readonly GatewayPlan[]; plan: string }) {
+/**
+ * Starts the free trial; `now`, as the page's script runs (the visitor
+ * asked for it on the home page before signing in).
+ */
+function TryTrial({ now }: { now: boolean }) {
+  const t = useT();
+  const submit = useSubmit();
+  const started = useRef(false);
+  useEffect(() => {
+    if (!now || started.current) return;
+    started.current = true;
+    void submit({ intent: "trial" }, { method: "post" });
+  }, [now, submit]);
+  return (
+    <Form method="post" className="actions">
+      <Submit intent="trial" primary={false}>
+        {t.t("subscription.try")}
+      </Submit>
+    </Form>
+  );
+}
+
+function Subscribe({
+  gateways,
+  plan,
+  autoRenew,
+}: {
+  gateways: readonly GatewayPlan[];
+  plan: string;
+  autoRenew: boolean;
+}) {
   const t = useT();
   const locale = useLocale();
   const consentId = useId();
+  const renewId = useId();
   const [accepted, setAccepted] = useState(false);
+  const [renew, setRenew] = useState(autoRenew);
   const options = gateways.flatMap((gateway) =>
     gateway.prices.map((price) => ({ gateway, price })),
   );
@@ -151,10 +203,7 @@ function Subscribe({ gateways, plan }: { gateways: readonly GatewayPlan[]; plan:
       <fieldset className="price-options">
         <legend>{t.t("subscription.choose")}</legend>
         {options.map(({ gateway, price }, index) => {
-          const label = t.t("subscription.option", {
-            price: money(price.amount, gateway.currency, locale),
-            period: periodText(t, price.period),
-          });
+          const label = `${money(price.amount, gateway.currency, locale)} ${pricePeriod(t, price.period, renew)}`;
           return (
             <label key={`${gateway.id}:${price.period}`} className="price-option">
               <input
@@ -189,7 +238,7 @@ function Subscribe({ gateways, plan }: { gateways: readonly GatewayPlan[]; plan:
           }}
         />
         <label htmlFor={consentId}>
-          {richText(t.t("subscription.consent"), {
+          {richText(t.t(renew ? "subscription.consent" : "subscription.consentOnce"), {
             terms: <Link to="/terms">{t.t("subscription.consentTerms")}</Link>,
             privacy: <Link to="/privacy">{t.t("subscription.consentPrivacy")}</Link>,
           })}
@@ -201,8 +250,21 @@ function Subscribe({ gateways, plan }: { gateways: readonly GatewayPlan[]; plan:
           : t.t("subscription.payHint", { gateway: gateways[0]?.name ?? "" })}
       </p>
       <div className="actions">
+        <span className="auto-renew">
+          <input
+            id={renewId}
+            type="checkbox"
+            name="auto_renew"
+            value="yes"
+            checked={renew}
+            onChange={(event) => {
+              setRenew(event.target.checked);
+            }}
+          />
+          <label htmlFor={renewId}>{t.t("subscription.autoRenew")}</label>
+        </span>
         <Submit disabled={!accepted} intent="subscribe">
-          {t.t("subscription.subscribe")}
+          {t.t(renew ? "subscription.subscribe" : "subscription.pay")}
         </Submit>
       </div>
     </Form>

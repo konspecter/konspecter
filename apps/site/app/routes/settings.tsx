@@ -3,7 +3,7 @@ import { data, Form, redirect, useActionData, useLoaderData, useNavigation } fro
 import { requireUser, signInPath } from "../account.server";
 import { callApi, withCookies, type ApiResult } from "../api.server";
 import { Field, FormMessage, formError, Submit, textField, type FormError } from "../auth-form";
-import { startCheckout } from "../checkout.server";
+import { startCheckout, startTrial } from "../checkout.server";
 import { ConnectApp, parseConnectCode, type ConnectCode } from "../connect-app";
 import { parseDevices, timeAgo, type Device } from "../devices";
 import { Encryption } from "../encryption";
@@ -62,11 +62,16 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     gateways: parsePlans(plans.data).gateways,
     // The plan chosen on the home page before signing in.
     plan: new URL(request.url).searchParams.get("plan") ?? "",
+    // A period paid once, renewed from its email: Auto renew starts unticked.
+    autoRenew: new URL(request.url).searchParams.get("renew") !== "once",
+    // The trial asked for on the home page before signing in.
+    trial: new URL(request.url).searchParams.get("trial") === "1",
     now: Date.now(),
   };
 }
 
-type Intent = "rename" | "connect" | "disconnect" | "delete" | "subscribe" | "cancel" | "resume";
+type Intent =
+  "rename" | "connect" | "disconnect" | "delete" | "subscribe" | "trial" | "cancel" | "resume";
 
 interface ActionResult {
   readonly intent: Intent;
@@ -137,6 +142,14 @@ export async function action({ request }: Route.ActionArgs) {
     return { intent: "subscribe", error: null, redirectUrl: url } satisfies ActionResult;
   }
 
+  if (intent === "trial") {
+    const result = await startTrial(request);
+    signInAgainOn401(request, result);
+    if (result.error) return failed("trial", result);
+    // Off the link that asked for it, so a reload starts nothing.
+    return redirect("/settings#subscription");
+  }
+
   if (intent === "cancel" || intent === "resume") {
     const result = await callApi(request, `/api/subscription/${intent}`, { method: "POST" });
     signInAgainOn401(request, result);
@@ -159,12 +172,15 @@ export async function action({ request }: Route.ActionArgs) {
 
 export default function Settings() {
   const { t } = useT();
-  const { account, devices, devicesFailed, billing, gateways, plan, now } =
+  const { account, devices, devicesFailed, billing, gateways, plan, autoRenew, trial, now } =
     useLoaderData<typeof loader>();
   const result = useActionData<ActionResult>();
   const errorOf = (intent: Intent) => (result?.intent === intent ? result.error : null);
   const billingIntent =
-    result?.intent === "subscribe" || result?.intent === "cancel" || result?.intent === "resume";
+    result?.intent === "subscribe" ||
+    result?.intent === "trial" ||
+    result?.intent === "cancel" ||
+    result?.intent === "resume";
 
   return (
     <section className="settings-page site-frame" aria-labelledby="settings-title">
@@ -185,6 +201,8 @@ export default function Settings() {
             billing={billing}
             gateways={gateways}
             plan={plan}
+            autoRenew={autoRenew}
+            startTrial={trial}
             error={billingIntent ? result.error : null}
             notice={
               result?.error

@@ -32,13 +32,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         : checkout.status === "ended"
           ? ("failed" as const)
           : ("paid" as const);
-  return { outcome, paidUntil: billing?.paidUntil ?? null };
+  return { outcome, paidUntil: billing?.paidUntil ?? null, once: checkout?.autoRenew === false };
 }
 
 export default function SubscriptionReturn() {
   const { t } = useT();
   const locale = useLocale();
-  const { outcome, paidUntil } = useLoaderData<typeof loader>();
+  const { outcome, paidUntil, once } = useLoaderData<typeof loader>();
 
   if (outcome === "paid") {
     return (
@@ -47,7 +47,7 @@ export default function SubscriptionReturn() {
           <CheckCircleIcon className="signed-in-check" />
           <p>
             {paidUntil
-              ? t("checkout.paid", { date: day(paidUntil, locale) })
+              ? t(once ? "checkout.paidOnce" : "checkout.paid", { date: day(paidUntil, locale) })
               : t("checkout.paidNoDate")}
           </p>
         </div>

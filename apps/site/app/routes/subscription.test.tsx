@@ -2,6 +2,7 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import { createRoutesStub, RouterContextProvider } from "react-router";
 import { accountContext } from "../account.server";
+import { textField } from "../auth-form";
 import App from "../root";
 import type { Billing, GatewayPlan } from "../subscription";
 import { action as preferencesAction } from "./preferences";
@@ -134,7 +135,7 @@ describe("the subscription in the settings", () => {
       args(
         post(
           "/settings",
-          { intent: "subscribe", plan: "acme:1y", accept: "yes" },
+          { intent: "subscribe", plan: "acme:1y", accept: "yes", auto_renew: "yes" },
           "lang=ru; ksp_session=kss_1",
         ),
       ),
@@ -144,7 +145,13 @@ describe("the subscription in the settings", () => {
       error: null,
       redirectUrl: "https://pay.example.com/approve?ba=1",
     });
-    expect(calls[0]?.body).toEqual({ gateway: "acme", period: "1y", locale: "ru", accept: true });
+    expect(calls[0]?.body).toEqual({
+      gateway: "acme",
+      period: "1y",
+      locale: "ru",
+      accept: true,
+      auto_renew: true,
+    });
   });
 
   it("passes the API's refusal on, and never sends the visitor anywhere but https", async () => {
@@ -191,8 +198,10 @@ describe("the subscription in the settings", () => {
   function renderSubscription(
     billing: Billing,
     gateways: readonly GatewayPlan[],
-    action: () => unknown,
+    action: (args: { request: Request }) => unknown,
     plan = "",
+    trial = false,
+    autoRenew = true,
   ) {
     const Stub = createRoutesStub([
       {
@@ -211,6 +220,8 @@ describe("the subscription in the settings", () => {
               billing,
               gateways,
               plan,
+              trial,
+              autoRenew,
               now: Date.parse("2026-10-06T12:00:00Z"),
             }),
             action,
@@ -317,6 +328,67 @@ describe("the subscription in the settings", () => {
     });
   });
 
+  it("pays for one period with Auto renew unticked", async () => {
+    const fields: Record<string, string>[] = [];
+    renderSubscription(base, gateways, async ({ request }) => {
+      const form = await request.formData();
+      fields.push(Object.fromEntries([...form.keys()].map((key) => [key, textField(form, key)])));
+      return null;
+    });
+    const section = await screen.findByRole("region", { name: "Subscription" });
+    const renew = within(section).getByRole("checkbox", { name: "Auto renew" });
+    expect(renew).toBeChecked();
+    const user = userEvent.setup();
+    await user.click(renew);
+    expect(
+      within(section)
+        .getAllByRole("radio")
+        .map((option) => option.closest("label")?.textContent),
+    ).toEqual(["$3 for 1 month", "$30 for 1 year"]);
+    const consent = within(section).getByRole("checkbox", { name: /I accept the terms/ });
+    expect(consent).not.toHaveAccessibleName(/renews automatically/);
+    await user.click(consent);
+    await user.click(within(section).getByRole("button", { name: "Pay" }));
+    await waitFor(() => {
+      expect(fields).toEqual([{ plan: "acme:1m", accept: "yes", intent: "subscribe" }]);
+    });
+  });
+
+  it("renews a period paid once from its email, with Auto renew unticked", async () => {
+    renderSubscription(
+      {
+        ...base,
+        access: { state: "canceled", until: "2026-11-06T12:00:00Z" },
+        paidUntil: "2026-11-06T12:00:00Z",
+        subscription: {
+          id: "s1",
+          gateway: "acme",
+          gatewayName: "Acme Pay",
+          period: "1y",
+          amount: 30,
+          currency: "USD",
+          status: "canceled",
+          autoRenew: false,
+          nextChargeAt: null,
+          resumable: false,
+        },
+      },
+      gateways,
+      () => null,
+      "acme:1y",
+      false,
+      false,
+    );
+    const section = await screen.findByRole("region", { name: "Subscription" });
+    expect(section).toHaveTextContent(
+      "Sync is paid for 1 year, until November 6, 2026. It does not renew by itself",
+    );
+    expect(within(section).getByRole("checkbox", { name: "Auto renew" })).not.toBeChecked();
+    expect(within(section).getByRole("radio", { name: "$30 for 1 year" })).toBeChecked();
+    expect(within(section).getByRole("button", { name: "Pay" })).toBeInTheDocument();
+    expect(within(section).queryByRole("button", { name: "Resume subscription" })).toBeNull();
+  });
+
   it("shows a renewing subscription with its payments, and cancels after saying what stays", async () => {
     renderSubscription(
       {
@@ -331,6 +403,7 @@ describe("the subscription in the settings", () => {
           amount: 3,
           currency: "USD",
           status: "active",
+          autoRenew: true,
           nextChargeAt: null,
           resumable: false,
         },
@@ -367,14 +440,59 @@ describe("the subscription in the settings", () => {
     const section = await screen.findByRole("region", { name: "Subscription" });
     expect(section).toHaveTextContent("Sync is paused.");
     cleanup();
-    renderSubscription({ ...base, access: { state: "expired", until: null } }, gateways, noAction);
+    const intents: string[] = [];
+    renderSubscription(
+      { ...base, access: { state: "expired", until: null } },
+      gateways,
+      async ({ request }) => {
+        intents.push(textField(await request.formData(), "intent"));
+        return null;
+      },
+    );
     const unpaid = await screen.findByRole("region", { name: "Subscription" });
     expect(unpaid).toHaveTextContent("The first 14 days are free");
-    // Trying sync is connecting an app: the trial starts with its first sync.
-    expect(within(unpaid).getByRole("link", { name: "Try sync for free" })).toHaveAttribute(
-      "href",
-      "#connect",
+    await userEvent.click(within(unpaid).getByRole("button", { name: "Try sync for free" }));
+    await waitFor(() => {
+      expect(intents).toEqual(["trial"]);
+    });
+  });
+
+  it("starts the trial at once when it was asked for before signing in", async () => {
+    const intents: string[] = [];
+    renderSubscription(
+      { ...base, access: { state: "expired", until: null } },
+      gateways,
+      async ({ request }) => {
+        intents.push(textField(await request.formData(), "intent"));
+        return null;
+      },
+      "",
+      true,
     );
+    await waitFor(() => {
+      expect(intents).toEqual(["trial"]);
+    });
+  });
+
+  it("starts the trial through the API, off the link that asked for it", async () => {
+    const calls = stubApi({
+      "POST /api/subscription/trial": () =>
+        Response.json({ sync: { state: "trialing", until: "2026-10-20T12:00:00Z" } }),
+    });
+    const started = (await settingsAction(
+      args(post("/settings?trial=1", { intent: "trial" })),
+    )) as Response;
+    expect(started.status).toBe(302);
+    expect(started.headers.get("Location")).toBe("/settings#subscription");
+    expect(calls.map((c) => c.call)).toEqual(["POST /api/subscription/trial"]);
+
+    stubApi({
+      "POST /api/subscription/trial": () =>
+        Response.json({ error: { code: "sync_unavailable", message: "" } }, { status: 402 }),
+    });
+    expect(await settingsAction(args(post("/settings", { intent: "trial" })))).toMatchObject({
+      data: { intent: "trial", error: { code: "sync_unavailable" } },
+    });
   });
 
   it("offers to resume a canceled subscription the server charges", async () => {
@@ -391,6 +509,7 @@ describe("the subscription in the settings", () => {
           amount: 299,
           currency: "RUB",
           status: "canceled",
+          autoRenew: true,
           nextChargeAt: null,
           resumable: true,
         },

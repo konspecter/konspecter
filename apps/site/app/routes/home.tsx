@@ -4,7 +4,7 @@ import { data, Form, Link, redirect, useActionData } from "react-router";
 import { accountContext } from "../account.server";
 import { callApi } from "../api.server";
 import { formError, FormMessage, Submit, textField, type FormError } from "../auth-form";
-import { startCheckout } from "../checkout.server";
+import { startCheckout, startTrial } from "../checkout.server";
 import { firstMarks, MARKDOWN_GUIDE } from "../cheatsheet";
 import { downloadsFor } from "../downloads.server";
 import { useLocale, useT } from "../i18n/i18n";
@@ -13,7 +13,7 @@ import { useLocalePath } from "../pages";
 import type { Platform } from "../platform";
 import { PlatformList } from "../platform-list";
 import { readPreferences } from "../preferences.server";
-import { discounts, durationText, money, parsePlans, periodText } from "../subscription";
+import { discounts, durationText, money, parsePlans, pricePeriod } from "../subscription";
 import { SPECIMENS } from "../specimen";
 import { SpecimenSlider } from "../specimen-slider";
 import type { Route } from "./+types/home";
@@ -48,14 +48,26 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 /**
  * Buying sync from the home page: the chosen period, straight to the
- * gateway's page. A signed-out visitor signs in first and lands on the
- * settings page with that period chosen.
+ * gateway's page. Trying it starts the trial and shows the settings page.
+ * A signed-out visitor signs in first and lands on the settings page with
+ * that period chosen, or the trial starting.
  */
 export async function action({ request, context }: Route.ActionArgs) {
   const form = await request.formData();
-  const settings = `/settings?plan=${encodeURIComponent(textField(form, "plan"))}#subscription`;
+  const trial = textField(form, "intent") === "trial";
+  const once = textField(form, "auto_renew") === "yes" ? "" : "&renew=once";
+  const settings = trial
+    ? "/settings?trial=1#subscription"
+    : `/settings?plan=${encodeURIComponent(textField(form, "plan"))}${once}#subscription`;
   const signIn = `/login?next=${encodeURIComponent(settings)}`;
   if (!context.get(accountContext).user) throw redirect(signIn);
+  if (trial) {
+    const result = await startTrial(request);
+    if (result.status === 401) throw redirect(signIn);
+    if (!result.error) return redirect("/settings#subscription");
+    const error = result.error;
+    return data({ error: formError(error.code, result.retryAfter) }, result.status);
+  }
   const { url, result } = await startCheckout(request, form);
   if (result.status === 401) throw redirect(signIn);
   if (url) return redirect(url);
@@ -243,8 +255,9 @@ type Pricing = NonNullable<Route.ComponentProps["loaderData"]["pricing"]>;
 
 /**
  * Sync for a subscription: every period on sale with what it saves, the
- * consent, and buying the chosen one at once. The price on top follows the
- * choice; the trial, where there is one, starts from the settings page.
+ * consent, and buying the chosen one at once, renewing or (Auto renew
+ * unticked) for one period. The price on top follows the choice; trying it
+ * starts the trial.
  */
 function BuySync({ pricing, error }: { pricing: Pricing; error: FormError | null }) {
   const translate = useT();
@@ -252,12 +265,14 @@ function BuySync({ pricing, error }: { pricing: Pricing; error: FormError | null
   const locale = useLocale();
   const localePath = useLocalePath();
   const consentId = useId();
+  const renewId = useId();
   const [accepted, setAccepted] = useState(false);
+  const [renew, setRenew] = useState(true);
   const { options, several, trial } = pricing;
   const [chosen, setChosen] = useState(0);
   const option = options[chosen] ?? options[0];
   if (!option) return null;
-  const every = (period: string) => t("home.sync.every", { period: periodText(translate, period) });
+  const every = (period: string) => pricePeriod(translate, period, renew);
   return (
     <Form method="post" className="price-buy">
       <p className="price-amount">
@@ -265,7 +280,8 @@ function BuySync({ pricing, error }: { pricing: Pricing; error: FormError | null
         <span className="price-period">{every(option.period)}</span>
       </p>
       <p className="price-text">
-        {t("home.sync.service.text")} {t("home.sync.cancel")}
+        {t("home.sync.service.text")}
+        {renew && ` ${t("home.sync.cancel")}`}
         {trial && ` ${t("home.sync.trial", { trial: durationText(translate, trial) })}`}
       </p>
       {options.length > 1 ? (
@@ -315,7 +331,7 @@ function BuySync({ pricing, error }: { pricing: Pricing; error: FormError | null
           }}
         />
         <label htmlFor={consentId}>
-          {richText(t("subscription.consent"), {
+          {richText(t(renew ? "subscription.consent" : "subscription.consentOnce"), {
             terms: <Link to={localePath("/terms")}>{t("subscription.consentTerms")}</Link>,
             privacy: <Link to={localePath("/privacy")}>{t("subscription.consentPrivacy")}</Link>,
           })}
@@ -323,11 +339,25 @@ function BuySync({ pricing, error }: { pricing: Pricing; error: FormError | null
       </div>
       <FormMessage error={error} />
       <div className="actions">
+        <span className="auto-renew">
+          <input
+            id={renewId}
+            type="checkbox"
+            name="auto_renew"
+            value="yes"
+            checked={renew}
+            onChange={(event) => {
+              setRenew(event.target.checked);
+            }}
+          />
+          <label htmlFor={renewId}>{t("subscription.autoRenew")}</label>
+        </span>
         <Submit disabled={!accepted}>{t("home.sync.buy")}</Submit>
         {trial && (
-          <Link className="button" to="/settings">
+          // The consent is for buying: trying asks for none.
+          <button type="submit" className="button" name="intent" value="trial" formNoValidate>
             {t("home.sync.try")}
-          </Link>
+          </button>
         )}
         <Link className="price-terms" to={localePath("/terms")}>
           {t("home.sync.terms")}

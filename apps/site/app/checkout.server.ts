@@ -3,9 +3,10 @@ import { textField } from "./auth-form";
 import { readPreferences } from "./preferences.server";
 
 /**
- * Starts paying for sync from a form's chosen `plan` ("gateway:period") and
- * consent (`accept`): the gateway's page to pay on, or null with the API's
- * answer when there is none.
+ * Starts paying for sync from a form's chosen `plan` ("gateway:period"),
+ * consent (`accept`) and `auto_renew` (unticked: one period, which never
+ * renews): the gateway's page to pay on, or null with the API's answer when
+ * there is none.
  */
 export async function startCheckout(
   request: Request,
@@ -19,6 +20,7 @@ export async function startCheckout(
       period,
       locale: readPreferences(request).locale,
       accept: textField(form, "accept") === "yes",
+      auto_renew: textField(form, "auto_renew") === "yes",
     },
   });
   const url = result.data?.redirect_url;
@@ -26,4 +28,12 @@ export async function startCheckout(
     url: !result.error && typeof url === "string" && /^https:\/\//.test(url) ? url : null,
     result,
   };
+}
+
+/**
+ * Starts the account's free trial, as an app's first sync would. An account
+ * that has had its trial, or has time, is left as it is.
+ */
+export function startTrial(request: Request): Promise<ApiResult<unknown>> {
+  return callApi(request, "/api/subscription/trial", { method: "POST" });
 }
