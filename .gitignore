@@ -22,3 +22,4 @@ tests/playwright-report/
 !.claude/plans
 .claude/plans/*
 .pnpm-store
+distribute
