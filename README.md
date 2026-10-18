@@ -148,115 +148,27 @@ The same knowledge base can travel with you while remaining local-first.
 
 ## Tag-Chain
 
-**Tag-Chain** is how tags work in Konspecter: how they are written, what they mean and how
-they become the tree in the sidebar. Specification by Dmitry Taynov.
-
-> A tag is one name. `#parent#child` is a chain: two tags, `parent` and `child`, and a link
-> that puts `child` under `parent`.
-
-### Writing tags
-
-Tags are ordinary text in the conspect. Nothing about them is stored anywhere else: the tag
-list, the tree and the index are all read from the Markdown and can be rebuilt from it.
-
-| You write                   | Tags                             | Links                                                     |
-| --------------------------- | -------------------------------- | --------------------------------------------------------- |
-| `#java`                     | `java`                           | none                                                      |
-| `#java#collections`         | `java`, `collections`            | `collections` under `java`                                |
-| `#java#collections#hashmap` | `java`, `collections`, `hashmap` | `collections` under `java`, `hashmap` under `collections` |
-| `#java #collections`        | `java`, `collections`            | none: two independent tags                                |
-| `# Java`                    | none                             | a heading, not a tag                                      |
-
-The rules:
-
-- **Names** are letters of any script, digits, `_` and `-`. `_` shows as a space in the tree
-  (`#Linked_List` → Linked List).
-- **A tag starts at the start of a word.** `C#`, `foo#bar` and `##x` are not tags; `(#tips)`
-  is. Punctuation ends a tag: `#java.` is `java`.
-- **Not only digits:** a chain cannot start with a number, so `#2024` and `#123` (an issue
-  number) are not tags. Later names can be: `#java#8`.
-- **Case does not matter:** `#Java` and `#java` are the same tag. The spelling is kept for
-  display; when conspects spell a tag differently, the spelling most of them use wins.
-- **Anywhere in the text:** paragraphs, headings (`# Java #tips` → `tips`), lists, quotes,
-  tables and link text.
-- **Never in** inline or block code, HTML, URLs (`…/page#section`), image alt text or an
-  escaped `\#`.
-- **Frontmatter** can list chains too, without the `#` (in YAML an unquoted `#` starts a
-  comment):
-
-  ```yaml
-  tags:
-    - java#collections
-    - algorithms
-  ```
-
-### One chain, three views
-
-| View                       | `#java#collections` shows as                                  |
-| -------------------------- | ------------------------------------------------------------- |
-| Markdown                   | `#java#collections` in the text, `java#collections` in `tags` |
-| Tag list (details, search) | `#java`, `#collections`                                       |
-| Tree                       | Java › Collections                                            |
-
-### The tree is built from every conspect
-
-The links of all conspects make one tree, so a tag can have more than one parent:
+In Konspecter, **tags build the tree**. There's no predefined folder hierarchy or separate taxonomy to maintain — the structure emerges from the tags you write in your conspects.
 
 ```text
-A: #java#collections
-B: #python#collections
-C: #collections
+#java
+#java#collections
+#java#collections#hashmap
 ```
+
+Each `#` adds a level to the chain. Konspecter turns these tags into a tree:
 
 ```text
 Java
-└── Collections     A, C
-Python
-└── Collections     B, C
+└── Collections
+    └── Hashmap
 ```
 
-`collections` is one tag that shows under both of its parents. A conspect sits in the
-folders its chain leads to, the folders whose path ends with the chain:
+Tags are reusable, too. `#python#collections` puts the same `collections` tag under Python, while `#collections` matches it under any parent.
 
-- `#java#collections` (A) is in Java › Collections only, not in Java and not in Python ›
-  Collections.
-- A bare `#collections` (C) is in every Collections folder.
-- `#java #collections` is in Java and in every Collections folder.
+The tag tree is built from your content, so your knowledge structure grows naturally as you write.
 
-A folder counts the conspects in it and in the folders below it, each once. A tag without a
-parent is a root. If chains make a cycle (`#a#b` in one conspect, `#b#a` in another), the
-first tag by name becomes the root and a branch stops before a tag already above it.
-
-### Search and filters
-
-The tree is only the arrangement. For search and filters, a chain gives the conspect each of
-its tags: `#java` finds every conspect tagged `java`, including those written
-`#java#collections`. Tags combine with words (`hashmap #java`), and clicking a folder in the
-tree filters by its tag.
-
-### Folders on the desktop
-
-On the desktop, where conspects are files, the tag tree is also the folder tree. A
-conspect's folder is its first chain:
-
-```text
-#java#collections   ⇄   ~/Konspecter/java/collections/hashmap.md
-```
-
-Changing the first chain moves the file. A file placed in a folder without tags of its own
-gets the folder's chain written into its frontmatter, so the tags stay in the document.
-Further chains and independent tags do not change where a file lives.
-
-### Why chains
-
-- **Short, reusable names.** `collections` is the same tag under Java and under Python;
-  there is no `java/collections` to keep in step with `python/collections`.
-- **The hierarchy is written where it is used.** There is no separate taxonomy to maintain:
-  the tree is whatever your conspects say.
-- **Plain text.** Tags survive any Markdown editor, Git and `grep`.
-
-The full rules are in [Tags](docs/architecture/tags.md), and the folders in
-[ADR-013](docs/architecture/decisions/ADR-013-folders-follow-tags.md).
+See [TAG-CHAIN-SPEC.md](TAG-CHAIN-SPEC.md) for the full rules and examples.
 
 ---
 
