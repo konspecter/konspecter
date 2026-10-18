@@ -1,16 +1,14 @@
 # Konspecter
 
-**A personal memory for the things you've learned.**
+**A local-first knowledge base for Markdown conspects — with Tag-Chain tags that build the tree for you.**
 
-> **Learn. Save. Return.**
-
-Konspecter is a **local-first knowledge base for your own conspects** — notes about books, technologies, algorithms, tools, courses, and anything else you want to understand and remember.
-
-Every conspect is a plain **Markdown file**. Everything else — tags, search indexes, reading positions, and other metadata — is derived from your content and can be rebuilt.
+Every conspect is a plain **Markdown file**. Tags, search indexes and reading positions are derived from your content and can be rebuilt. Open source, works offline, and syncs through an optional self-hosted server with end-to-end encryption.
 
 [Website](https://konspecter.com) · [Documentation](docs/) · [Releases](https://github.com/konspecter/konspecter/releases) · [Issues](https://github.com/konspecter/konspecter/issues)
 
 ![Konspecter: a conspect in the text editor, the tag tree and recent conspects in the sidebar](docs/assets/hero.png)
+
+> **Learn. Save. Return.** Write conspects the way you think — the tree comes out on its own.
 
 ---
 
@@ -34,7 +32,7 @@ read → understand → write down → forget details
 
 Konspecter is built around this workflow.
 
-It is **not** a Notion clone, a generic note-taking app, or a cloud-first document editor.
+**You don't build a folder hierarchy first and then write into it.** You write as you think, and the tag tree is derived from your text. The structure is a description of your notes, not a separate thing you have to maintain.
 
 > You don't have to remember everything.
 > You just need to be able to recover your own understanding when you need it.
@@ -53,63 +51,45 @@ The core workflow:
 
 ## Features
 
-### Markdown-native
+### Tag-Chain: tags that build the tree
 
-Every conspect is ordinary Markdown.
-
-- Frontmatter
-- GitHub-flavored Markdown
-- Syntax highlighting
-- Raw HTML with sanitization
-- Import and export of `.md` files
-- Import folders and ZIP archives
-
-Your knowledge stays in a format that doesn't belong to Konspecter.
-
-### Local-first
-
-Your library lives on your device and works offline.
-
-- IndexedDB in the web app
-- Installable PWA
-- No cloud account required for local use
-- Full-text search works offline
-- Reading position is remembered
-- Data can be exported at any time
-
-The hosted service is optional.
-
-### Two editors
-
-Konspecter provides two ways to work with the same content:
-
-- a distraction-free, Telegraph-like editor;
-- a Markdown source editor powered by CodeMirror.
-
-Switching between them does not change what your conspect means.
-
-![The same conspect in the text editor and in the Markdown source editor](docs/assets/editors.png)
-
-### Tags and search
-
-Tags live directly in your text:
+Tags live directly in your text, and the hierarchy is written where it is used:
 
 ```text
 #java
 #java#collections
+#java#collections#hashmap
 ```
 
-Konspecter builds a tag tree from them and lets you combine tags with full-text search.
-
-For example:
+Each `#` adds a level. Konspecter turns these tags into a tree:
 
 ```text
-hashmap #java
+Java
+└── Collections
+    └── Hashmap
 ```
 
-Search is local and works without an internet connection.
+Tags are reusable: `#python#collections` puts the same `collections` tag under Python, while a bare `#collections` matches it under any parent. There's no separate taxonomy to keep in sync — the tree is whatever your conspects say.
 
-How tags and their tree work is described below, in [Tag-Chain](#tag-chain).
+See [TAG-CHAIN-SPEC.md](TAG-CHAIN-SPEC.md) for the full specification and examples.
+
+### Markdown-native
+
+Every conspect is ordinary Markdown: frontmatter, GitHub-flavored Markdown, syntax highlighting, sanitized raw HTML, import/export of `.md` files, folders and ZIP archives. Your knowledge stays in a format that doesn't belong to Konspecter.
+
+### Local-first
+
+Your library lives on your device and works offline: IndexedDB in the web app, installable PWA, no cloud account required for local use, offline full-text search, remembered reading position, export at any time. The hosted service is optional.
+
+### Two editors
+
+Konspecter provides two ways to work with the same content: a distraction-free, Telegraph-like editor, and a Markdown source editor powered by CodeMirror. Switching between them does not change what your conspect means.
+
+![The same conspect in the text editor and in the Markdown source editor](docs/assets/editors.png)
+
+### Search
+
+Combine tags with full-text search: `hashmap #java`. Search is local and works without an internet connection.
 
 ![Search for "leader" within the #distributed-systems tag, with the tag tree open](docs/assets/search.png)
 
@@ -125,20 +105,11 @@ The desktop application uses a real folder of Markdown files:
 └── ...
 ```
 
-The files can be opened and managed alongside the tools you already use:
-
-- VS Code
-- Vim
-- Git
-- other Markdown tools
-
-Konspecter should fit into your workflow, not lock you into its own database format.
+They can be opened alongside the tools you already use — VS Code, Vim, Git, other Markdown tools. Konspecter should fit into your workflow, not lock you into its own database format.
 
 ### Mobile
 
-Konspecter runs on Android through Capacitor.
-
-The same knowledge base can travel with you while remaining local-first.
+Konspecter runs on Android through Capacitor. The same knowledge base travels with you while remaining local-first. No Play Store needed — install the APK from the latest release or use the PWA.
 
 <p align="center">
   <img src="docs/assets/mobile.png" width="560" alt="Konspecter on a phone: the list of conspects and an open conspect">
@@ -146,37 +117,9 @@ The same knowledge base can travel with you while remaining local-first.
 
 ---
 
-## Tag-Chain
-
-In Konspecter, **tags build the tree**. There's no predefined folder hierarchy or separate taxonomy to maintain — the structure emerges from the tags you write in your conspects.
-
-```text
-#java
-#java#collections
-#java#collections#hashmap
-```
-
-Each `#` adds a level to the chain. Konspecter turns these tags into a tree:
-
-```text
-Java
-└── Collections
-    └── Hashmap
-```
-
-Tags are reusable, too. `#python#collections` puts the same `collections` tag under Python, while `#collections` matches it under any parent.
-
-The tag tree is built from your content, so your knowledge structure grows naturally as you write.
-
-See [TAG-CHAIN-SPEC.md](TAG-CHAIN-SPEC.md) for the full rules and examples.
-
----
-
 ## Sync
 
-Konspecter can synchronize your library through a Konspecter Sync Server.
-
-Sync is **optional**. Your local library does not depend on it.
+Konspecter can synchronize your library through a Konspecter Sync Server. Sync is **optional**: your local library does not depend on it.
 
 Conspects are end-to-end encrypted before they leave your device. When the same conspect changes on two devices, the later edit wins, and an edit always beats a deletion, so one conspect stays one conspect. See [Sync](docs/architecture/sync.md) for the details.
 
@@ -210,9 +153,7 @@ The principle is simple:
 >
 > You pay for infrastructure that synchronizes it.
 
-Local use remains independent of the hosted service.
-
-If a hosted subscription expires:
+Local use remains independent of the hosted service. If a hosted subscription expires:
 
 - your local library remains available;
 - your Markdown files remain yours;
@@ -407,6 +348,7 @@ adb logcat -s Capacitor/Console
 
 - [Architecture](docs/architecture/overview.md)
 - [Architecture decisions](docs/architecture/decisions/)
+- [Tag-Chain specification](TAG-CHAIN-SPEC.md)
 - [Testing](docs/testing.md)
 - [Performance](docs/performance.md)
 - [Security](docs/security.md)
