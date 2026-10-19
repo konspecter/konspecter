@@ -39,9 +39,32 @@ describe("summarize", () => {
       cover: "https://example.com/maps.png",
       tags: ["Java", "Collections", "algorithms"],
       excerpt: "Buckets #java #algorithms.",
+      headings: [],
       pin: "5",
       valid: true,
     });
+  });
+
+  it("keeps the headings up to h3 when asked, without the title's or empty ones", () => {
+    const note = createNote(
+      "\n# Hash *maps*\n\n## Buckets\n\n### Load factor\n\n#### Too deep\n\n##\n\n## Hash maps",
+      new Date("2024-01-02"),
+    );
+
+    expect(summarize(note).headings).toEqual([]);
+    expect(summarize(note, { headings: true }).headings).toEqual([
+      { level: 2, text: "Buckets", line: 3, index: 1 },
+      { level: 3, text: "Load factor", line: 5, index: 2 },
+      { level: 2, text: "Hash maps", line: 11, index: 4 },
+    ]);
+  });
+
+  it("keeps a first heading that is not the title", () => {
+    const note = createNote("---\ntitle: Maps\n---\nIntro.\n\n# Maps", new Date("2024-01-02"));
+
+    expect(summarize(note, { headings: true }).headings).toEqual([
+      { level: 1, text: "Maps", line: 2, index: 0 },
+    ]);
   });
 
   it("summarizes a note with invalid frontmatter from its raw text", () => {
@@ -51,6 +74,7 @@ describe("summarize", () => {
       updated: null,
       cover: null,
       tags: [],
+      headings: [],
       pin: null,
     });
   });
@@ -107,6 +131,22 @@ describe("notesInFolder", () => {
 });
 
 describe("NoteCatalog", () => {
+  it("holds the notes' headings only while asked to, reading the notes again", async () => {
+    const store = await newStore();
+    await store.put(createNote("# Maps\n\n## Buckets", new Date("2024-01-02"), "maps"));
+    const catalog = new NoteCatalog(store);
+    const stop = catalog.start();
+
+    expect((await ready(catalog))[0]?.headings).toEqual([]);
+    catalog.setHeadings(true);
+    expect(
+      (await ready(catalog, (notes) => notes[0]?.headings.length === 1))[0]?.headings[0]?.text,
+    ).toBe("Buckets");
+    catalog.setHeadings(false);
+    expect(await ready(catalog, (notes) => notes[0]?.headings.length === 0)).toHaveLength(1);
+    stop();
+  });
+
   it("lists notes most recently edited first", async () => {
     const store = await newStore();
     await store.put(createNote("# Old", new Date("2020-01-01"), "old"));

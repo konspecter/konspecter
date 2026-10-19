@@ -254,3 +254,52 @@ test("switching modes keeps the caret and the text on screen in a long note", as
   await page.keyboard.type("?");
   await expect(source).toContainText(`${middle} **some** words.!?`);
 });
+
+test("a heading in the tree opens the note scrolled to it, in either editor", async ({ page }) => {
+  // Off by default: the headings are read only for those who want them.
+  await page.goto("/settings");
+  const headings = page.getByRole("radiogroup", { name: "Headings in the sidebar" });
+  await headings.getByText("Shown", { exact: true }).click();
+  await expect(headings.getByRole("radio", { name: "Shown" })).toBeChecked();
+  await page
+    .getByRole("complementary", { name: "Sidebar" })
+    .getByRole("link", { name: "New conspect" })
+    .click();
+  const markdownToggle = page.getByRole("banner").getByRole("button", { name: "Markdown" });
+  await markdownToggle.click();
+  const source = page.getByRole("textbox", { name: "Markdown" });
+  await source.click();
+  const section = (name: string) =>
+    Array.from({ length: 30 }, (_, index) => `${name} paragraph ${String(index)}.`).join("\n\n");
+  await page.keyboard.insertText(
+    `# Outline\n\n${section("Intro")}\n\n## Middle\n\n${section("Middle")}\n\n## End\n\n${section("End")}\n`,
+  );
+  await saved(page);
+
+  const tree = page.getByRole("complementary", { name: "Sidebar" }).getByRole("navigation", {
+    name: "Goto",
+  });
+  // The open note shows its outline; the heading lands just under the top bar.
+  const underTopBar = async (heading: ReturnType<typeof page.locator>) => {
+    const bar = await page.getByRole("banner").boundingBox();
+    const box = await heading.boundingBox();
+    const top = (box?.y ?? 0) - ((bar?.y ?? 0) + (bar?.height ?? 0));
+    return top >= 0 && top < 40;
+  };
+
+  const sourceLine = (text: string) => page.locator(".cm-line", { hasText: text });
+  await tree.getByRole("link", { name: "End" }).click();
+  await expect(page).toHaveURL(/#heading-3$/);
+  await expect.poll(() => underTopBar(sourceLine("## End"))).toBe(true);
+
+  await markdownToggle.click();
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+  });
+  await tree.getByRole("link", { name: "Middle" }).click();
+  await expect(page).toHaveURL(/#heading-2$/);
+  const middle = page
+    .getByRole("textbox", { name: "Conspect text" })
+    .getByRole("heading", { name: "Middle" });
+  await expect.poll(() => underTopBar(middle)).toBe(true);
+});

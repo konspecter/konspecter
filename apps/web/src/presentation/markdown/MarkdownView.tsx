@@ -1,11 +1,13 @@
-import { memo, useEffect, useMemo, useRef, type RefObject } from "react";
-import Markdown, { type Components, type Options } from "react-markdown";
+import { memo, useEffect, useMemo, useRef, type ComponentProps, type RefObject } from "react";
+import Markdown, { type Components, type ExtraProps, type Options } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
+import { documentHeadings } from "../../domain/document/outline";
 import { findMatches, type Match } from "../../domain/search/find";
 import { NO_FIND, revealMatch, type NoteFind } from "../components/note-find";
+import { revealHeading, type HeadingTarget } from "../components/note-heading";
 import { omitLeadingTitle } from "./omit-leading-title";
 import { rehypeTags } from "./rehype-tags";
 import "./markdown.css";
@@ -21,9 +23,18 @@ export type MarkdownViewProps = {
   /** What to find in the text (see `NoteEditor`). */
   find?: NoteFind;
   onFindCount?: (count: number) => void;
+  /** A heading to scroll to (see `NoteEditor`). */
+  heading?: HeadingTarget | null;
 };
 
 const remarkPlugins: Options["remarkPlugins"] = [remarkGfm];
+
+/** A heading the outline lists, carrying its body line (from 1) to be scrolled to. */
+function withLine(Heading: "h1" | "h2" | "h3") {
+  return ({ node, ...props }: ComponentProps<"h1"> & ExtraProps) => (
+    <Heading {...props} data-line={node?.position?.start.line} />
+  );
+}
 
 const components: Components = {
   a({ node, href, children, ...props }) {
@@ -52,6 +63,9 @@ const components: Components = {
   img({ node, alt, ...props }) {
     return <img {...props} alt={alt ?? ""} loading="lazy" />;
   },
+  h1: withLine("h1"),
+  h2: withLine("h2"),
+  h3: withLine("h3"),
 };
 
 /** Elements whose text is searched on its own: a match never runs from one into the next. */
@@ -138,6 +152,7 @@ export const MarkdownView = memo(function MarkdownView({
   onRendered,
   find = NO_FIND,
   onFindCount,
+  heading = null,
 }: MarkdownViewProps) {
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -157,6 +172,19 @@ export const MarkdownView = memo(function MarkdownView({
     [title, titleDerived],
   );
   useFind(root, find, onFindCount, markdown, rehypePlugins);
+
+  // A heading followed in the tree: at the top of what can be seen. Once per
+  // target: the body re-rendered (a version from elsewhere) stays where it is.
+  const reached = useRef<string | null>(null);
+  useEffect(() => {
+    const element = root.current;
+    if (!element || !heading || reached.current === heading.key) return;
+    reached.current = heading.key;
+    const line = documentHeadings(markdown)[heading.index]?.line;
+    const found =
+      line === undefined ? null : element.querySelector(`[data-line="${String(line + 1)}"]`);
+    if (found) revealHeading(found.getBoundingClientRect());
+  }, [heading, markdown]);
 
   return (
     <div ref={root} className="markdown">

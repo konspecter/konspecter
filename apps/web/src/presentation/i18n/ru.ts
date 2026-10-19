@@ -26,6 +26,10 @@ export const ru: Dictionary = {
   "sidebar.noNotes": "Конспектов пока нет.",
   "tree.expand": "Развернуть #{tag}",
   "tree.collapse": "Свернуть #{tag}",
+  "tree.expandHeadings": "Показать заголовки «{title}»",
+  "tree.collapseHeadings": "Скрыть заголовки «{title}»",
+  "tree.expandHeading": "Развернуть «{heading}»",
+  "tree.collapseHeading": "Свернуть «{heading}»",
   "tree.notes": {
     one: "{count} конспект",
     few: "{count} конспекта",
@@ -265,6 +269,11 @@ Map<String, Integer> counts = new HashMap<>();
   "settings.tagNames.hint": "Как теги называются на боковой панели.",
   "settings.tagNames.capitalized": "С заглавной буквы",
   "settings.tagNames.asWritten": "Как написано в конспектах",
+  "settings.treeHeadings": "Заголовки на боковой панели",
+  "settings.treeHeadings.hint":
+    "Под конспектами на боковой панели видны их заголовки (уровни с 1 по 3), вложенные, как в тексте.",
+  "settings.treeHeadings.shown": "Показывать",
+  "settings.treeHeadings.hidden": "Скрывать",
   "settings.reading": "Место чтения",
   "settings.reading.restore": "Продолжать, где остановился",
   "settings.reading.ask": "Спрашивать перед переходом",

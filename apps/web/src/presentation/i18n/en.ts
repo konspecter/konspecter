@@ -28,6 +28,10 @@ export const en = {
   "sidebar.noNotes": "No conspects yet.",
   "tree.expand": "Expand #{tag}",
   "tree.collapse": "Collapse #{tag}",
+  "tree.expandHeadings": "Show the headings of {title}",
+  "tree.collapseHeadings": "Hide the headings of {title}",
+  "tree.expandHeading": "Expand {heading}",
+  "tree.collapseHeading": "Collapse {heading}",
   "tree.notes": { one: "{count} conspect", other: "{count} conspects" },
 
   "topbar.search": "Search conspects",
@@ -241,6 +245,11 @@ source, or delete this conspect when you are done.
   "settings.tagNames.hint": "How tags are named in the sidebar.",
   "settings.tagNames.capitalized": "Capital first letter",
   "settings.tagNames.asWritten": "As written in conspects",
+  "settings.treeHeadings": "Headings in the sidebar",
+  "settings.treeHeadings.hint":
+    "Conspects in the sidebar show their headings (levels 1 to 3) under them, nested as in the text.",
+  "settings.treeHeadings.shown": "Shown",
+  "settings.treeHeadings.hidden": "Hidden",
   "settings.reading": "Reading position",
   "settings.reading.restore": "Continue where I left off",
   "settings.reading.ask": "Ask before jumping",

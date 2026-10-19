@@ -1143,6 +1143,121 @@ describe("tags", () => {
   });
 });
 
+describe("headings in the tree", () => {
+  const MAPS = [
+    "# Hash maps",
+    "",
+    "## Buckets",
+    "",
+    "### Load factor",
+    "",
+    "## Collisions",
+    "",
+    "#### Too deep",
+    "",
+    "```md",
+    "# Not a heading",
+    "```",
+  ].join("\n");
+  async function storeWithMaps() {
+    const store = await newStore();
+    await store.put(createNote(MAPS, daysAgo(1), "maps"));
+    await store.put(createNote("# Plain\n\nNo headings.", daysAgo(2), "plain"));
+    return store;
+  }
+  const tagTree = () => within(sidebar()).findByRole("navigation", { name: "Goto" });
+  const shown: Settings = { ...DEFAULT_SETTINGS, treeHeadings: "shown" };
+
+  it("lists a note's headings up to h3 under it, nested, folded until opened", async () => {
+    renderApp(await storeWithMaps(), "/", shown);
+    const tree = await tagTree();
+
+    const toggle = await within(tree).findByRole("button", {
+      name: "Show the headings of Hash maps",
+    });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(within(tree).queryByRole("link", { name: "Buckets" })).not.toBeInTheDocument();
+    // A note without headings is a plain row.
+    expect(within(tree).getByRole("link", { name: "Plain" })).toHaveClass("tree-document");
+
+    await userEvent.click(toggle);
+    const buckets = within(tree).getByRole("link", { name: "Buckets" });
+    // The title heading is the note's own row; the hash counts it.
+    expect(buckets).toHaveAttribute("href", "/conspects/maps#heading-2");
+    const loadFactor = within(tree).getByRole("link", { name: "Load factor" });
+    expect(loadFactor).toHaveAttribute("href", "/conspects/maps#heading-3");
+    expect(buckets.closest("li")).toContainElement(loadFactor);
+    expect(within(tree).getByRole("link", { name: "Collisions" })).toHaveAttribute(
+      "href",
+      "/conspects/maps#heading-4",
+    );
+    expect(within(tree).queryByRole("link", { name: "Hash maps" })).toHaveAttribute(
+      "href",
+      "/conspects/maps",
+    );
+    expect(tree).not.toHaveTextContent("Too deep");
+    expect(tree).not.toHaveTextContent("Not a heading");
+
+    await userEvent.click(within(tree).getByRole("button", { name: "Collapse Buckets" }));
+    expect(within(tree).queryByRole("link", { name: "Load factor" })).not.toBeInTheDocument();
+  });
+
+  it("opens the open note's outline, and the note at a heading followed", async () => {
+    renderApp(await storeWithMaps(), "/conspects/maps", shown);
+    const tree = await tagTree();
+
+    expect(
+      await within(tree).findByRole("button", { name: "Hide the headings of Hash maps" }),
+    ).toHaveAttribute("aria-expanded", "true");
+    await userEvent.click(within(tree).getByRole("link", { name: "Collisions" }));
+
+    expect(await textEditor()).toHaveTextContent("Collisions");
+    expect(within(tree).getByRole("link", { name: "Hash maps" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+
+  it("walks the outline with the arrow keys like folders", async () => {
+    renderApp(await storeWithMaps(), "/", shown);
+    const tree = await tagTree();
+    const note = await within(tree).findByRole("link", { name: "Hash maps" });
+    act(() => {
+      note.focus();
+    });
+
+    await userEvent.keyboard("{ArrowRight}");
+    expect(
+      within(tree).getByRole("button", { name: "Hide the headings of Hash maps" }),
+    ).toBeInTheDocument();
+    await userEvent.keyboard("{ArrowRight}");
+    expect(within(tree).getByRole("link", { name: "Buckets" })).toHaveFocus();
+    await userEvent.keyboard("{ArrowDown}");
+    const loadFactor = within(tree).getByRole("link", { name: "Load factor" });
+    expect(loadFactor).toHaveFocus();
+    await userEvent.keyboard("{ArrowLeft}");
+    expect(within(tree).getByRole("link", { name: "Buckets" })).toHaveFocus();
+    await userEvent.keyboard("{ArrowLeft}{ArrowLeft}");
+    expect(loadFactor).not.toBeInTheDocument();
+    expect(note).toHaveFocus();
+    await userEvent.keyboard("{ArrowLeft}");
+    expect(within(tree).queryByRole("link", { name: "Buckets" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the notes flat by default, and always in Recent", async () => {
+    renderApp(await storeWithMaps(), "/conspects/maps");
+    const tree = await tagTree();
+
+    expect(await within(tree).findByRole("link", { name: "Hash maps" })).toHaveClass(
+      "tree-document",
+    );
+    expect(
+      within(sidebar()).queryByRole("button", { name: /headings of/ }),
+    ).not.toBeInTheDocument();
+    expect(within(recentNav()).getByRole("link", { name: "Hash maps" })).toBeInTheDocument();
+  });
+});
+
 describe("search", () => {
   async function storeWithNotes() {
     const store = await newStore();
@@ -1616,6 +1731,24 @@ describe("settings and the top bar", () => {
     expect(await within(tree).findByRole("link", { name: "новые технологии" })).toBeInTheDocument();
     await waitFor(async () => {
       expect(await store.loadSettings()).toMatchObject({ tagNames: "as-written" });
+    });
+  });
+
+  it("shows the notes' headings in the tree once they are turned on", async () => {
+    const store = await newStore();
+    await store.put(createNote("# Maps\n\n## Buckets", new Date(), "maps"));
+    renderWithSettings(store, "/settings");
+
+    const tree = await within(sidebar()).findByRole("navigation", { name: "Goto" });
+    expect(await within(tree).findByRole("link", { name: "Maps" })).toHaveClass("tree-document");
+    const headings = screen.getByRole("radiogroup", { name: "Headings in the sidebar" });
+    expect(within(headings).getByRole("radio", { name: "Hidden" })).toBeChecked();
+    await userEvent.click(within(headings).getByRole("radio", { name: "Shown" }));
+    expect(
+      await within(tree).findByRole("button", { name: "Show the headings of Maps" }),
+    ).toBeInTheDocument();
+    await waitFor(async () => {
+      expect(await store.loadSettings()).toMatchObject({ treeHeadings: "shown" });
     });
   });
 

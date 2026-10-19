@@ -47,6 +47,7 @@ catalog now publishes a lone change at once and a burst (an import, a first sync
 | parse a document (frontmatter + metadata)                | 0.014 ms               |
 | parse tags / plain text of a 200 KB body                 | 2.2 ms / 2.1 ms        |
 | read and sort 1,000 / 5,000 notes                        | 15 ms / 78 ms          |
+| summarize 5,000 notes, without / with their headings     | 455 ms / 570 ms        |
 | search 5,000 notes: `hash map` / `que #topic3`           | 4.8 ms / 2.0 ms        |
 | build the search index, 1,000 / 5,000 notes              | 230 ms / 1.15 s        |
 | longest main-thread block while building 5,000 (chunked) | **38 ms** (was 1.15 s) |
@@ -57,6 +58,14 @@ catalog now publishes a lone change at once and a burst (an import, a first sync
 
 fake-indexeddb is slower than browsers' IndexedDB, so storage numbers are upper bounds.
 The real-browser startup above confirms it.
+
+With Settings → Headings in the sidebar on, each summary carries the note's headings up to
+h3 for the tree, found with markdown-it's block rules alone (inline parsing only for the
+headings' own text): about 115 ms more for 5,000 notes, and in the browser a cold start of
+2,001 notes in about 357 ms instead of 333 ms (three runs each, the same machine). That is
+why the setting is off by default; off, the summaries skip the headings and the start is
+as fast as before (332–344 ms). After start-up the catalog summarizes one changed note at a
+time either way.
 
 ### File Mode (Rust, `folder.rs`)
 

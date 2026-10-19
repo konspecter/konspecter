@@ -13,6 +13,7 @@ import { errorMessage } from "../app/errors";
 import { t } from "../i18n/i18n";
 import { withBody, withSavedDates, type Note } from "../../domain/note/note";
 import { NO_FIND, type NoteFind } from "../components/note-find";
+import type { HeadingTarget } from "../components/note-heading";
 import { mapPlace, positionMap, type Place } from "./place";
 
 export type { EditorMode };
@@ -65,6 +66,11 @@ export type NoteEditorProps = {
   find?: NoteFind;
   /** How many matches the open view has, whenever that changes. */
   onFindCount?: (count: number) => void;
+  /**
+   * A heading to scroll to: the open view goes there, and again for each new
+   * target. A view that opens later (a mode switch) keeps its place instead.
+   */
+  heading?: HeadingTarget | null;
 };
 
 /** Turns the whole document into its edited version. */
@@ -165,6 +171,7 @@ export const NoteEditor = memo(function NoteEditor({
   onSelectionChange,
   find = NO_FIND,
   onFindCount,
+  heading = null,
 }: NoteEditorProps) {
   // The document as of the last metadata or source edit. In text mode its
   // body is replaced by `doc` (the rich text) once that has been edited.
@@ -179,6 +186,8 @@ export const NoteEditor = memo(function NoteEditor({
     readonly view: View;
     /** The view was opened by a mode switch: how to carry the place over. */
     readonly carry?: (() => Carry) | null;
+    /** The heading target already scrolled to when the view opened: it is not scrolled to again. */
+    readonly reached?: string | null;
   }>(() => ({ mode, view: viewFor(mode, initialMarkdown, 0) }));
   // The dates each save writes join the document at once: the frontmatter
   // held here (text mode), and the text read when saving.
@@ -211,7 +220,7 @@ export const NoteEditor = memo(function NoteEditor({
     setMarkdown(current);
     setDoc(null);
     setIncoming(null); // The new editor opens with the current text.
-    setShown({ mode, view, carry });
+    setShown({ mode, view, carry, reached: heading?.key ?? null });
   }
 
   // A version from elsewhere: into the open editor in place when it can show
@@ -237,10 +246,11 @@ export const NoteEditor = memo(function NoteEditor({
         docRef.current = null;
         setDoc(null);
         setIncoming(null);
-        setShown({ mode, view });
+        setShown({ mode, view, reached: heading?.key ?? null });
       }
     }
   }
+  const target = heading && heading.key !== shown.reached ? heading : null;
   const textReplacement = incoming && "doc" in incoming ? incoming : null;
   const sourceReplacement = incoming && "markdown" in incoming ? incoming : null;
 
@@ -381,6 +391,7 @@ export const NoteEditor = memo(function NoteEditor({
           titleFromFirstLine={titleFromFirstLine}
           find={find}
           {...(onFindCount ? { onFindCount } : {})}
+          heading={target}
           onLeave={handleLeave}
           {...arriving}
         />
@@ -398,6 +409,7 @@ export const NoteEditor = memo(function NoteEditor({
           saved={saved}
           find={find}
           {...(onFindCount ? { onFindCount } : {})}
+          heading={target}
           onLeave={handleLeave}
           {...arriving}
         />
@@ -410,6 +422,7 @@ export const NoteEditor = memo(function NoteEditor({
           {...(onReady ? { onRendered: onReady } : {})}
           find={find}
           {...(onFindCount ? { onFindCount } : {})}
+          heading={target}
         />
       )}
     </div>

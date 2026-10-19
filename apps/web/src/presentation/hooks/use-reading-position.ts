@@ -24,6 +24,8 @@ type Options = {
   mode: ReadingPositionMode;
   /** True once the note's content is laid out, so positions mean something. */
   ready: boolean;
+  /** False: the position is saved but not brought back (the note opened elsewhere in it). */
+  restore?: boolean;
   /** Milliseconds of scroll inactivity before saving. */
   saveDelay?: number;
 };
@@ -34,7 +36,14 @@ type Options = {
  * `resume`), or not at all ("off", which also stops saving). The caret is
  * saved alongside (`rememberSelection`); the note page restores it.
  */
-export function useReadingPosition({ store, noteId, mode, ready, saveDelay = 400 }: Options) {
+export function useReadingPosition({
+  store,
+  noteId,
+  mode,
+  ready,
+  restore = true,
+  saveDelay = 400,
+}: Options) {
   const [offer, setOffer] = useState<{ noteId: string; position: number } | null>(null);
   // Once per editing session: a note that gets a new id while open (its file
   // renamed after the title) stays where it is.
@@ -42,6 +51,10 @@ export function useReadingPosition({ store, noteId, mode, ready, saveDelay = 400
 
   useEffect(() => {
     if (!ready || mode === "off" || restored.current) return;
+    if (!restore) {
+      restored.current = true;
+      return;
+    }
     let current = true;
     store.readingState(noteId).then(
       (state) => {
@@ -59,7 +72,7 @@ export function useReadingPosition({ store, noteId, mode, ready, saveDelay = 400
     return () => {
       current = false;
     };
-  }, [store, noteId, mode, ready]);
+  }, [store, noteId, mode, ready, restore]);
 
   // Saving needs no readiness check: until the content is laid out the page
   // does not scroll, and there is no position to save.

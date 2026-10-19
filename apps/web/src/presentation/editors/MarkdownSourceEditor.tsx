@@ -16,6 +16,7 @@ import {
   StateEffect,
   StateField,
   Transaction,
+  type Text,
 } from "@codemirror/state";
 import {
   Decoration,
@@ -33,9 +34,12 @@ import { textChanges } from "./diff";
 import { sourceEditorMarks } from "./source-marks";
 import { t } from "../i18n/i18n";
 import { TITLE_MAX_LENGTH } from "./text-editor-setup";
+import { parseDocument } from "../../domain/document/document";
+import { documentHeadings } from "../../domain/document/outline";
 import { withSavedDates, type Note } from "../../domain/note/note";
 import { findMatches, type Match } from "../../domain/search/find";
 import { NO_FIND, type NoteFind } from "../components/note-find";
+import { headingTop, type HeadingTarget } from "../components/note-heading";
 import { coveredBelow, visibleArea, type Place } from "./place";
 
 type MarkdownSourceEditorProps = {
@@ -60,6 +64,8 @@ type MarkdownSourceEditorProps = {
   /** What to find in the text (see `NoteEditor`). */
   find?: NoteFind;
   onFindCount?: (count: number) => void;
+  /** A heading to scroll to (see `NoteEditor`). */
+  heading?: HeadingTarget | null;
   /** Where the reader was when the editor closes (switching modes). */
   onLeave?: (place: Place) => void;
   /**
@@ -249,6 +255,25 @@ function placeOf(view: EditorView): Place {
   return { anchor, head, shown: { at, top: view.coordsAtPos(at)?.top ?? top } };
 }
 
+/**
+ * Where the body's heading number `index` (`Heading.index`) starts in the
+ * document: its line, under the frontmatter. Null when there is no such
+ * heading, or the frontmatter cannot be read.
+ */
+function headingPosition(doc: Text, index: number): number | null {
+  const text = doc.toString();
+  let body: string;
+  try {
+    ({ body } = parseDocument(text));
+  } catch {
+    return null;
+  }
+  const heading = documentHeadings(body)[index];
+  if (!heading) return null;
+  const first = doc.lineAt(text.length - body.length).number;
+  return doc.line(Math.min(first + heading.line, doc.lines)).from;
+}
+
 /** CodeMirror 6 editing the whole document as Markdown source. No autocompletion. */
 export const MarkdownSourceEditor = memo(function MarkdownSourceEditor({
   initialValue,
@@ -261,6 +286,7 @@ export const MarkdownSourceEditor = memo(function MarkdownSourceEditor({
   onSelectionChange,
   find = NO_FIND,
   onFindCount,
+  heading = null,
   onLeave,
   arrival,
 }: MarkdownSourceEditorProps) {
@@ -357,6 +383,17 @@ export const MarkdownSourceEditor = memo(function MarkdownSourceEditor({
     }
     revealed.current = find.reveal;
   }, [find]);
+
+  // A heading followed in the tree: its line at the top of what can be seen.
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || !heading) return;
+    const at = headingPosition(view.state.doc, heading.index);
+    if (at === null) return;
+    view.dispatch({
+      effects: EditorView.scrollIntoView(at, { y: "start", yMargin: headingTop() }),
+    });
+  }, [heading]);
 
   // After each save, the frontmatter's dates follow the stored version.
   useEffect(() => {

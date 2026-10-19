@@ -77,6 +77,7 @@ All planned phases are done. New work needs a new plan in `.claude/plans/`.
 | Panes      | Sidebar blocks fold like VS Code's: any number open, each scrolls, kept     | Done   |
 | Domains    | konspecter.com canonical, `/ru` pages, hreflang, sitemap, `.ru`/`www` 301   | Done   |
 | Pins       | A pin is the note's frontmatter (`pin: 3`): synced, in the file, an edit    | Done   |
+| Outline    | Tree notes list their h1–h3 headings, nested; a heading scrolls the note    | Done   |
 
 Where the packages are described: UI architecture: `docs/architecture/ui.md`; languages:
 `docs/architecture/i18n.md`; server and API: `docs/architecture/server.md`; sync:

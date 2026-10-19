@@ -1160,7 +1160,8 @@ kbd {
   color: var(--color-tree-folder);
 }
 
-.tree .icon-document {
+.tree .icon-document,
+.tree .icon-heading {
   color: var(--color-muted);
 }
 

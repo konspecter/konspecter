@@ -121,7 +121,8 @@ describe("SyncEngine", () => {
     await a.store.put(createNote("# Two", date, "n2"));
     await connected(a.engine, config);
     await connected(b.engine, config);
-    const pinsOn = async (d: Device) => pinsOf((await d.store.list()).map(summarize));
+    const pinsOn = async (d: Device) =>
+      pinsOf((await d.store.list()).map((note) => summarize(note)));
 
     await setStoredPin(a.store, "n1", "3", minutesLater(1));
     await a.engine.syncNow();
@@ -129,7 +130,7 @@ describe("SyncEngine", () => {
     expect(await pinsOn(b)).toEqual({ 3: "n1" });
 
     // B gives the key to the other note; A follows.
-    const notes = (await b.store.list()).map(summarize);
+    const notes = (await b.store.list()).map((note) => summarize(note));
     for (const change of pinChanges(notes, "3", "n2")) {
       await setStoredPin(b.store, change.noteId, change.pin, minutesLater(2));
     }

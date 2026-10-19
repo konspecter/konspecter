@@ -19,6 +19,11 @@ export function plainText(body: string): string {
   return blocks.filter((block) => block.trim() !== "").join("\n");
 }
 
+/** One line of inline Markdown as readable text (`Using **maps**` → `Using maps`). */
+export function inlinePlainText(markdown: string): string {
+  return inlineText(tokenizer.parseInline(markdown, {})[0]?.children ?? []);
+}
+
 function inlineText(tokens: readonly Token[]): string {
   return tokens
     .map((token) => {

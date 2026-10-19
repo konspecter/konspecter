@@ -14,10 +14,12 @@ import {
   type ReactNode,
 } from "react";
 import { ChevronIcon, ExternalIcon } from "@konspecter/ui/icons";
+import { OUTLINE_DEPTH } from "../../domain/document/outline";
 import { openInBrowser } from "../../infrastructure/desktop/desktop";
 import { reportError } from "../app/errors";
 import { InIsland } from "../components/island-slot";
 import { NO_FIND, revealMatch, type NoteFind } from "../components/note-find";
+import { revealHeading, type HeadingTarget } from "../components/note-heading";
 import {
   createTextEditorState,
   findTransaction,
@@ -55,6 +57,8 @@ type TextEditorProps = {
   /** What to find in the text (see `NoteEditor`). */
   find?: NoteFind;
   onFindCount?: (count: number) => void;
+  /** A heading to scroll to (see `NoteEditor`). */
+  heading?: HeadingTarget | null;
   /** Where the reader was when the editor closes (switching modes). */
   onLeave?: (place: Place) => void;
   /**
@@ -64,6 +68,23 @@ type TextEditorProps = {
    */
   arrival?: () => Place | null;
 };
+
+/** The element of the document's heading number `index` among those up to OUTLINE_DEPTH. */
+function headingElement(view: EditorView, index: number): HTMLElement | null {
+  let count = 0;
+  let found: HTMLElement | null = null;
+  view.state.doc.descendants((node, pos) => {
+    if (found) return false;
+    if (node.type.name !== "heading" || Number(node.attrs.level) > OUTLINE_DEPTH) return true;
+    if (count === index) {
+      const dom = view.nodeDOM(pos);
+      found = dom instanceof HTMLElement ? dom : null;
+    }
+    count += 1;
+    return false;
+  });
+  return found;
+}
 
 /** A caret in ProseMirror positions, and whether the editor has the focus. */
 export type Caret = { readonly anchor: number; readonly head: number; readonly focused: boolean };
@@ -230,6 +251,7 @@ export const TextEditor = memo(function TextEditor({
   titleFromFirstLine = false,
   find = NO_FIND,
   onFindCount,
+  heading = null,
   onLeave,
   arrival,
 }: TextEditorProps) {
@@ -367,6 +389,13 @@ export const TextEditor = memo(function TextEditor({
     }
     revealed.current = find.reveal;
   }, [find]);
+  // A heading followed in the tree: at the top of what can be seen.
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || !heading) return;
+    const element = headingElement(view, heading.index);
+    if (element) revealHeading(element.getBoundingClientRect());
+  }, [heading]);
   const findCount = foundMatches(editorState).length;
   useEffect(() => {
     onFindCount?.(findCount);

@@ -109,7 +109,7 @@ export async function movePinsIntoNotes(
     return;
   }
   if (typeof saved !== "object" || saved === null) return;
-  let notes = (await store.list()).map(summarize);
+  let notes = (await store.list()).map((note) => summarize(note));
   for (const key of PIN_KEYS) {
     const noteId = (saved as Record<string, unknown>)[key];
     if (typeof noteId !== "string" || pinsOf(notes)[key] === noteId) continue;
@@ -117,6 +117,6 @@ export async function movePinsIntoNotes(
     for (const change of pinChanges(notes, key, noteId)) {
       await setStoredPin(store, change.noteId, change.pin, now);
     }
-    notes = (await store.list()).map(summarize);
+    notes = (await store.list()).map((note) => summarize(note));
   }
 }

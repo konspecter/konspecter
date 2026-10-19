@@ -5,6 +5,8 @@ export type Theme = "system" | "light" | "dark";
 export type EditorMode = "text" | "markdown";
 /** How tags are named in the sidebar tree. */
 export type TagNames = "capitalized" | "as-written";
+/** Whether notes in the sidebar tree list their headings (h1–h3) under them. */
+export type TreeHeadings = "shown" | "hidden";
 /** Whether the editing area has its own surface (a slightly darker panel). */
 export type EditingArea = "highlighted" | "plain";
 /**
@@ -23,6 +25,7 @@ export type Settings = {
   readonly fontScale: number;
   readonly readingPosition: ReadingPositionMode;
   readonly tagNames: TagNames;
+  readonly treeHeadings: TreeHeadings;
   readonly editingArea: EditingArea;
   readonly language: Language;
   readonly fileNames: FileNames;
@@ -41,6 +44,8 @@ export const DEFAULT_SETTINGS: Settings = {
   fontScale: 1,
   readingPosition: "restore",
   tagNames: "capitalized",
+  // Finding every note's headings slows the start a little: an opt-in.
+  treeHeadings: "hidden",
   editingArea: "highlighted",
   language: "system",
   fileNames: "kept",
@@ -75,6 +80,7 @@ export function parseSettings(value: unknown): Settings {
       DEFAULT_SETTINGS.readingPosition,
     ),
     tagNames: oneOf(record.tagNames, ["capitalized", "as-written"], DEFAULT_SETTINGS.tagNames),
+    treeHeadings: oneOf(record.treeHeadings, ["shown", "hidden"], DEFAULT_SETTINGS.treeHeadings),
     editingArea: oneOf(record.editingArea, ["highlighted", "plain"], DEFAULT_SETTINGS.editingArea),
     language: oneOf(record.language, ["system", "en", "ru"], DEFAULT_SETTINGS.language),
     fileNames: oneOf(record.fileNames, ["kept", "title"], DEFAULT_SETTINGS.fileNames),

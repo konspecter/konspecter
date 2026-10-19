@@ -22,7 +22,8 @@ The interface speaks English and Russian ([i18n](i18n.md)). The account site sha
   position keeps using the window's scroll). No app header, brand or menu.
 - **Sidebar** (`Sidebar.tsx`): toggle, Settings, New note; the tag tree, always open and
   without a header (a navigation landmark named Goto; tags as folders, notes as documents inside them and untagged ones at the
-  root; a tag's name opens `/?q=#tag`, see [tags](tags.md)); recent notes, those created or edited in the last 7 days (`recentNotes`; "No activity in 7
+  root; a tag's name opens `/?q=#tag`, see [tags](tags.md); a note with headings holds its
+  outline, see [Headings in the tree](#headings-in-the-tree)); recent notes, those created or edited in the last 7 days (`recentNotes`; "No activity in 7
   days" when there are none), most recently edited first, with the open
   one marked. Above them the pinned notes, as StarCraft's unit groups: on a note
   `Mod+Alt+1`…`Mod+Alt+0` pins it to that key (the same keys again unpin it), and `Mod+1`…`Mod+0`
@@ -255,10 +256,35 @@ go of the focus. CodeMirror has no search panel of its own: `Mod+F` is the top b
 current there, else to the first row); `Mod+\` from there hides it and gives the focus back to
 where it was, so the caret is in the editor again. Hiding it from the editor leaves the caret
 where it is, and `Mod+/` puts it in the other editor. In the sidebar `↑`/`↓` go row by row
-through the tag tree and the recent notes as one flat list; `→` opens a tag folder, then goes
-to its first entry, and `←` closes it, then goes to the folder above. On a Russian layout they are the keys that type `ё`/`\` and
+through the tag tree and the recent notes as one flat list; `→` opens a tag folder (or a note's
+outline, or a heading's sub-headings), then goes to its first entry, and `←` closes it, then
+goes to the row above it in the tree. On a Russian layout they are the keys that type `ё`/`\` and
 `.`: the physical key (`Backslash`, `Slash`) is what counts. Browsers keep `Ctrl+N` for themselves in ordinary tabs; it works in the
 desktop app and in the installed PWA, and `n` works everywhere.
+
+## Headings in the tree
+
+A note in the tag tree lists its headings, levels 1 to 3, as its outline: each heading under
+the nearest higher one before it (`domain/document/outline.ts`: `documentHeadings` runs
+markdown-it's block rules only, so a `#` in code is no heading and setext headings count;
+`outlineTree` nests them). They come with the note's summary (`NoteSummary.headings`), without
+the leading heading that is the title (the note's own row shows it) and without empty ones,
+and only while the setting below is on: finding them reads every note's whole body, which
+slows the start a little (`summarize(note, { headings })`; `NoteCatalog.setHeadings` reads
+the notes again when it changes, [performance](../performance.md)). A
+note with headings has a chevron, like a folder: folded, except the open note, which opens
+whenever it becomes the open one; a heading with sub-headings folds too, open to begin with.
+The Recent pane stays flat. Settings → Writing → Headings in the sidebar: hidden (the
+default) or shown (`treeHeadings`).
+
+A heading links to `/conspects/<id>#heading-<n>`, `n` its place among the body's h1–h3 from 1
+(the title counts). The note page reads the hash, and each navigation to it (a new
+`location.key`, so following the same heading again works) scrolls the open view until the
+heading is just under the top bar: the text editor finds its `n`-th heading node, the Markdown
+editor the heading's line under the frontmatter (CodeMirror scrolls, as it draws only the lines
+in view), the rendered view the heading whose `data-line` is that line. A view opened later (a
+mode switch, a version from elsewhere) keeps its place instead. A note opened at a heading does
+not go back to its reading position; the last location the app reopens keeps no hash.
 
 ## Visual rules
 

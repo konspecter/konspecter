@@ -106,7 +106,7 @@ describe("movePinsIntoNotes", () => {
     localStorage.setItem("konspecter.pins", JSON.stringify({ 2: "bee", 3: "gone", x: "sea" }));
 
     await movePinsIntoNotes(store, localStorage, now);
-    const pins = pinsOf((await store.list()).map(summarize));
+    const pins = pinsOf((await store.list()).map((note) => summarize(note)));
     // The key goes to the device's note; a pin of a note that is gone is dropped.
     expect(pins).toEqual({ 2: "bee" });
     expect(localStorage.getItem("konspecter.pins")).toBeNull();

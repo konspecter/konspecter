@@ -1,4 +1,4 @@
-import { use, useCallback, useEffect, useRef, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { InvalidDocumentError, updateMetadata } from "../../domain/document/document";
 import { readNote, withoutTag, type Note } from "../../domain/note/note";
@@ -19,6 +19,7 @@ import { Details } from "../components/details-slot";
 import { NoteDetails } from "../components/NoteDetails";
 import { NoteNotFound } from "../components/NoteNotFound";
 import { NoteFindContext } from "../components/note-find";
+import { headingInHash, type HeadingTarget } from "../components/note-heading";
 import { displayTitle } from "../components/note-title";
 import { LazyNoteEditor, preloadEditor } from "../editors/LazyNoteEditor";
 import type { DocumentEdit } from "../editors/NoteEditor";
@@ -69,6 +70,12 @@ export function NotePage({
   const [adopted, setAdopted] = useState<Adopted | null>(null);
   const continued =
     id !== undefined && (adopted?.id === id || adopted?.from === id) ? adopted : null;
+  // A heading followed in the tree (`#heading-2`): each navigation to it scrolls there.
+  const headingIndex = headingInHash(location.hash);
+  const heading = useMemo<HeadingTarget | null>(
+    () => (headingIndex === null ? null : { index: headingIndex, key: location.key }),
+    [headingIndex, location.key],
+  );
 
   const target = id !== undefined && continued === null ? id : null;
   // After any save of the note still running (the editor just left it), so
@@ -132,6 +139,7 @@ export function NotePage({
       mode={mode}
       activity={activity}
       readingPosition={readingPosition}
+      heading={heading}
       onAdopt={adopt}
     />
   );
@@ -146,6 +154,8 @@ type NoteSessionProps = {
   mode: EditorMode;
   activity: Activity;
   readingPosition: ReadingPositionMode;
+  /** The heading to scroll to, if one was followed. */
+  heading: HeadingTarget | null;
   onAdopt: (note: Note) => void;
 };
 
@@ -157,6 +167,7 @@ function NoteSession({
   mode,
   activity,
   readingPosition,
+  heading,
   onAdopt,
 }: NoteSessionProps) {
   const navigate = useNavigate();
@@ -288,11 +299,14 @@ function NoteSession({
     setReady(true);
   }, []);
 
+  // A note opened at a heading stays there rather than going back to where it was read.
+  const [openedAtHeading] = useState(heading !== null);
   const reading = useReadingPosition({
     store,
     noteId: saved?.id ?? "",
     mode: saved ? readingPosition : "off",
     ready,
+    restore: !openedAtHeading,
   });
 
   const read = saved ? readNote(saved) : null;
@@ -344,6 +358,7 @@ function NoteSession({
         showMetadata={showMetadata}
         initialSelection={initialSelection}
         onSelectionChange={reading.rememberSelection}
+        heading={heading}
         {...(finding ? { find: finding.find, onFindCount: finding.onCount } : {})}
       />
       {problemText !== null && (

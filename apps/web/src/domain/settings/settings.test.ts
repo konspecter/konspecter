@@ -9,6 +9,7 @@ describe("parseSettings", () => {
       fontScale: 1.3,
       readingPosition: "ask",
       tagNames: "as-written",
+      treeHeadings: "hidden",
       editingArea: "plain",
       language: "ru",
       fileNames: "title",
@@ -19,6 +20,11 @@ describe("parseSettings", () => {
 
   it("names tags with a capital letter and highlights the editing area by default", () => {
     expect(DEFAULT_SETTINGS).toMatchObject({ tagNames: "capitalized", editingArea: "highlighted" });
+  });
+
+  it("leaves the notes' headings out of the tree by default", () => {
+    expect(DEFAULT_SETTINGS.treeHeadings).toBe("hidden");
+    expect(parseSettings({ treeHeadings: "maybe" }).treeHeadings).toBe("hidden");
   });
 
   it("keeps file names when titles change by default", () => {

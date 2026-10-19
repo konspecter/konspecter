@@ -3,6 +3,7 @@
  * `pnpm --filter @konspecter/web bench`; results are in docs/performance.md.
  */
 import { Bench } from "tinybench";
+import { summarize } from "../application/notes/note-catalog";
 import { parseDocument } from "../domain/document/document";
 import { plainText } from "../domain/document/plain-text";
 import { readNotes, type Note } from "../domain/note/note";
@@ -39,6 +40,10 @@ it("measures the core logic", { timeout: 300_000 }, async () => {
     .add("plainText 200 KB body", () => plainText(parseDocument(large).body))
     .add("readNotes + sort, 1,000 notes", () => readNotes(thousand))
     .add("readNotes + sort, 5,000 notes", () => readNotes(fiveThousand))
+    .add("summarize 5,000 notes", () => fiveThousand.map((note) => summarize(note)))
+    .add("summarize 5,000 notes with headings", () =>
+      fiveThousand.map((note) => summarize(note, { headings: true })),
+    )
     .add("search 'hash map', 5,000 notes", () => index5k.search(parseQuery("hash map")))
     .add("search 'que #topic3', 5,000 notes", () => index5k.search(parseQuery("que #topic3")));
   await bench.run();

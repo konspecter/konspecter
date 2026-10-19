@@ -10,6 +10,7 @@ import {
   type Language,
   type Settings,
   type TagNames,
+  type TreeHeadings,
   type Theme,
 } from "../../domain/settings/settings";
 import {
@@ -78,6 +79,10 @@ function options() {
       { value: "capitalized", label: t("settings.tagNames.capitalized") },
       { value: "as-written", label: t("settings.tagNames.asWritten") },
     ] satisfies Option<TagNames>[],
+    treeHeadings: [
+      { value: "shown", label: t("settings.treeHeadings.shown") },
+      { value: "hidden", label: t("settings.treeHeadings.hidden") },
+    ] satisfies Option<TreeHeadings>[],
     editingAreas: [
       { value: "highlighted", label: t("settings.editingArea.highlighted") },
       { value: "plain", label: t("settings.editingArea.plain") },
@@ -185,6 +190,15 @@ export function SettingsPage({
             value={settings.tagNames}
             onChange={(value) => {
               update("tagNames", value);
+            }}
+          />
+          <Choice
+            legend={t("settings.treeHeadings")}
+            hint={t("settings.treeHeadings.hint")}
+            options={choices.treeHeadings}
+            value={settings.treeHeadings}
+            onChange={(value) => {
+              update("treeHeadings", value);
             }}
           />
         </Group>

@@ -1,5 +1,6 @@
 import type { PinKey } from "../../domain/document/document";
-import { plainText } from "../../domain/document/plain-text";
+import { documentHeadings, type Heading } from "../../domain/document/outline";
+import { inlinePlainText, plainText } from "../../domain/document/plain-text";
 import {
   noteTitle,
   noteUpdated,
@@ -22,6 +23,12 @@ export type NoteSummary = {
   readonly tags: readonly string[];
   /** The start of the note's readable text, without the heading that is its title. */
   readonly excerpt: string;
+  /**
+   * The note's headings up to h3, for the tree's outline: not the leading one
+   * that is its title, nor empty ones. Their `index` still counts every heading.
+   * Empty unless asked for (`SummaryOptions`): finding them reads the whole body.
+   */
+  readonly headings: readonly Heading[];
   /** The key the frontmatter pins the note to (`pin: 3`), if any. */
   readonly pin: PinKey | null;
   /** False when the frontmatter cannot be read. */
@@ -41,7 +48,13 @@ const EXCERPT_LENGTH = 200;
  */
 const PUBLISH_INTERVAL = 100;
 
-export function summarize(note: Note): NoteSummary {
+/** What a summary holds beyond the defaults. */
+export type SummaryOptions = {
+  /** The headings, for the tree's outline (Settings → Headings in the sidebar). */
+  readonly headings?: boolean;
+};
+
+export function summarize(note: Note, { headings = false }: SummaryOptions = {}): NoteSummary {
   const read = readNote(note);
   const title = noteTitle(read);
   const blocks = (
@@ -56,9 +69,22 @@ export function summarize(note: Note): NoteSummary {
     cover: read.valid ? read.document.metadata.cover : null,
     tags: writtenTagList(noteWrittenTags(read)).map(({ written }) => written),
     excerpt: blocks.join(" ").replace(/\s+/g, " ").trim().slice(0, EXCERPT_LENGTH),
+    headings: headings && read.valid ? outlineHeadings(read.document.body, title) : [],
     pin: read.valid ? read.document.metadata.pin : null,
     valid: read.valid,
   };
+}
+
+/** The body's headings without the leading one that repeats the title, and without empty ones. */
+function outlineHeadings(body: string, title: string): Heading[] {
+  const headings = documentHeadings(body);
+  const [first] = headings;
+  const leading =
+    first !== undefined &&
+    // The title is the line as written (`# Hash *maps*` gives `Hash *maps*`).
+    first.text === inlinePlainText(title).trim() &&
+    body.split("\n", first.line).every((line) => line.trim() === "");
+  return headings.filter((heading) => heading.text !== "" && !(leading && heading === first));
 }
 
 /** The same order as `byMostRecent` for notes: newest first, undated last, then by id. */
@@ -88,11 +114,12 @@ function byTitleSummary(a: NoteSummary, b: NoteSummary): number {
 export async function notesInFolder(
   store: NoteRepository,
   noteIds: readonly string[],
+  options: SummaryOptions = {},
 ): Promise<NoteSummary[]> {
   const notes = await Promise.all(noteIds.map((id) => store.get(id)));
   return notes
     .filter((note): note is Note => note !== undefined)
-    .map(summarize)
+    .map((note) => summarize(note, options))
     .sort(byTitleSummary);
 }
 
@@ -125,6 +152,7 @@ export function untaggedNotes(notes: readonly NoteSummary[]): NoteSummary[] {
  */
 export class NoteCatalog {
   readonly #store: NoteRepository;
+  #options: SummaryOptions;
   readonly #listeners = new Set<() => void>();
   readonly #notes = new Map<string, NoteSummary>();
   /** Per note, the latest change being read; older reads are dropped. */
@@ -136,8 +164,19 @@ export class NoteCatalog {
   #publishedAt = Number.NEGATIVE_INFINITY;
   #publishTimer: ReturnType<typeof setTimeout> | undefined;
 
-  constructor(store: NoteRepository) {
+  constructor(store: NoteRepository, options: SummaryOptions = {}) {
     this.#store = store;
+    this.#options = options;
+  }
+
+  /**
+   * Whether the summaries hold the notes' headings. A change reads every note
+   * again, so the headings appear (or the memory they took is let go).
+   */
+  setHeadings(headings: boolean): void {
+    if (headings === (this.#options.headings ?? false)) return;
+    this.#options = { ...this.#options, headings };
+    void this.reload();
   }
 
   /** Loads the notes and follows changes. Returns a function that stops following. */
@@ -169,7 +208,7 @@ export class NoteCatalog {
     this.#loading = this.#store.list().then(
       (notes) => {
         this.#notes.clear();
-        for (const note of notes) this.#notes.set(note.id, summarize(note));
+        for (const note of notes) this.#notes.set(note.id, summarize(note, this.#options));
         this.#publish();
       },
       (error: unknown) => {
@@ -202,7 +241,7 @@ export class NoteCatalog {
       (note) => {
         if (this.#reads.get(id) !== read) return;
         this.#reads.delete(id);
-        if (note) this.#notes.set(id, summarize(note));
+        if (note) this.#notes.set(id, summarize(note, this.#options));
         else this.#notes.delete(id);
         this.#publishSoon();
       },

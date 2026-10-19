@@ -21,7 +21,7 @@ import {
 } from "../../application/notes/note-catalog";
 import type { NoteRepository } from "../../application/notes/note-repository";
 import { recentWithPins } from "../../application/notes/note-pins";
-import type { TagNames } from "../../domain/settings/settings";
+import type { TagNames, TreeHeadings } from "../../domain/settings/settings";
 import { formatKeys, SHORTCUTS } from "../app/shortcuts";
 import { ChevronIcon, GearIcon, NewNoteIcon, SidebarIcon } from "@konspecter/ui/icons";
 import { TagTreeView, TreeDocument } from "./TagTreeView";
@@ -39,6 +39,7 @@ type SidebarProps = {
   /** The tag the note list is filtered by, if any. */
   activeTag: string | null;
   tagNames: TagNames;
+  treeHeadings?: TreeHeadings;
   onToggle: () => void;
   /** Called when a link in the sidebar is followed (narrow screens close it). */
   onNavigate: () => void;
@@ -139,6 +140,7 @@ export const Sidebar = memo(function Sidebar({
   currentNoteId,
   activeTag,
   tagNames,
+  treeHeadings = "hidden",
   onToggle,
   onNavigate,
   toggleRef,
@@ -215,6 +217,7 @@ export const Sidebar = memo(function Sidebar({
           activeTag={activeTag}
           currentNoteId={currentNoteId}
           tagNames={tagNames}
+          headings={treeHeadings === "shown"}
         />
         <SidebarPane
           title={t("sidebar.recent")}
@@ -342,6 +345,8 @@ type SidebarTagsProps = {
   activeTag: string | null;
   currentNoteId: string | null;
   tagNames: TagNames;
+  /** The notes list their headings. */
+  headings: boolean;
 };
 
 /** The tag tree: not a pane, so neither folded nor titled; it scrolls on its own. */
@@ -352,13 +357,14 @@ function SidebarTags({
   activeTag,
   currentNoteId,
   tagNames,
+  headings,
 }: SidebarTagsProps) {
   const [tree, setTree] = useState<readonly TagNode[] | null>(null);
   // A new loader for every change, so open folders read their notes again.
   const loadNotes = useCallback(
-    (noteIds: readonly string[]) => notesInFolder(store, noteIds),
+    (noteIds: readonly string[]) => notesInFolder(store, noteIds, { headings }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- library marks the change
-    [store, library],
+    [store, library, headings],
   );
   // Read again whenever a note changes; the old tree stays until then.
   useEffect(() => {
@@ -395,6 +401,7 @@ function SidebarTags({
             notes={untagged}
             activeTag={activeTag}
             currentNoteId={currentNoteId}
+            headings={headings}
             loadNotes={loadNotes}
           />
         )}

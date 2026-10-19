@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useMatch, useNavigate, useSearchParams } from "react-router";
 import { parseQuery } from "../../domain/search/query";
-import type { EditorMode, TagNames, Theme } from "../../domain/settings/settings";
+import type { EditorMode, TagNames, Theme, TreeHeadings } from "../../domain/settings/settings";
 import type { NoteCatalog } from "../../application/notes/note-catalog";
 import { pinsOf, recentWithPins } from "../../application/notes/note-pins";
 import type { NoteRepository } from "../../application/notes/note-repository";
@@ -41,6 +41,8 @@ type LayoutProps = {
   mode: EditorMode;
   onModeChange: (mode: EditorMode) => void;
   tagNames: TagNames;
+  /** Whether the tree's notes list their headings (hidden unless set otherwise). */
+  treeHeadings?: TreeHeadings;
   updates?: UpdateSource | undefined;
   sync?: SyncEngine | undefined;
 };
@@ -98,6 +100,7 @@ export function Layout({
   mode,
   onModeChange,
   tagNames,
+  treeHeadings = "hidden",
   updates,
   sync,
 }: LayoutProps) {
@@ -343,6 +346,7 @@ export function Layout({
         currentNoteId={currentNoteId}
         activeTag={activeTag}
         tagNames={tagNames}
+        treeHeadings={treeHeadings}
         onToggle={toggleSidebar}
         onNavigate={closeSidebarOnNarrow}
         toggleRef={sidebarToggleRef}

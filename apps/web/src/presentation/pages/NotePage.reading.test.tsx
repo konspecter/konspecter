@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router";
+import { Link, MemoryRouter, Route, Routes } from "react-router";
 import type { ReadingPositionMode } from "../../domain/reading/reading";
 import type { EditorMode } from "../../domain/settings/settings";
 import { sourceView } from "../editors/test-helpers";
@@ -18,9 +18,15 @@ async function storeWithNote() {
   return store;
 }
 
-function renderNote(store: NoteStore, mode: ReadingPositionMode, editor: EditorMode = "text") {
-  return render(
-    <MemoryRouter initialEntries={["/conspects/n"]}>
+function notePage(
+  store: NoteStore,
+  mode: ReadingPositionMode,
+  editor: EditorMode = "text",
+  path = "/conspects/n",
+) {
+  return (
+    <MemoryRouter initialEntries={[path]}>
+      <Link to="/conspects/n#heading-3">Part two again</Link>
       <Routes>
         <Route
           path="conspects/:id"
@@ -35,8 +41,12 @@ function renderNote(store: NoteStore, mode: ReadingPositionMode, editor: EditorM
           }
         />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
+}
+
+function renderNote(store: NoteStore, mode: ReadingPositionMode, editor: EditorMode = "text") {
+  return render(notePage(store, mode, editor));
 }
 
 // jsdom has no layout: give the page a height and a viewport.
@@ -211,6 +221,91 @@ describe("the caret", () => {
     expect(await store.readingState("n")).toMatchObject({
       position: 0.25,
       selection: { editor: "text", anchor: 3 },
+    });
+  });
+});
+
+describe("a heading followed in the tree", () => {
+  const OUTLINED = "# Long read\n\nBody text.\n\n## Part one\n\nOne.\n\n## Part two\n\nTwo.";
+
+  async function storeWith(markdown: string) {
+    const store = await storeWithNote();
+    await store.put(createNote(markdown, new Date("2020-01-01T00:00:00Z"), "n"));
+    await store.saveReadingPosition("n", 0.5);
+    return store;
+  }
+
+  // jsdom has no layout: the heading named `text` is `top` pixels down the window.
+  function headingAt(text: string, top: number) {
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
+      this: Element,
+    ) {
+      const y = /^H[1-3]$/.test(this.tagName) && this.textContent === text ? top : 0;
+      return {
+        x: 0,
+        y,
+        top: y,
+        bottom: y + 20,
+        left: 0,
+        right: 0,
+        width: 0,
+        height: 20,
+      } as DOMRect;
+    });
+  }
+
+  beforeEach(() => {
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 0 });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /** Scrolled so the heading stands just under the top of the window (no top bar here). */
+  const AT_PART_TWO = { top: 600 - 12 };
+
+  it("opens the note scrolled to it, not where it was last read", async () => {
+    headingAt("Part two", 600);
+    render(notePage(await storeWith(OUTLINED), "restore", "text", "/conspects/n#heading-3"));
+    expect(await screen.findByText("Two.")).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(scrollTo).toHaveBeenCalledWith(AT_PART_TWO);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(scrollTo).not.toHaveBeenCalledWith({ top: 1000 });
+  });
+
+  it("scrolls the rendered view to it", async () => {
+    headingAt("Part two", 600);
+    const markdown = "# Long read\n\n| a |\n| - |\n| b |\n\n## Part two\n\nTwo.";
+    render(notePage(await storeWith(markdown), "restore", "text", "/conspects/n#heading-2"));
+    expect(await screen.findByText("Two.")).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(scrollTo).toHaveBeenCalledWith(AT_PART_TWO);
+    });
+  });
+
+  it("scrolls again each time it is followed, but not when the mode changes", async () => {
+    headingAt("Part two", 600);
+    const store = await storeWith(OUTLINED);
+    const view = render(notePage(store, "off", "text", "/conspects/n#heading-3"));
+    await waitFor(() => {
+      expect(scrollTo).toHaveBeenCalledWith(AT_PART_TWO);
+    });
+    scrollTo.mockClear();
+
+    view.rerender(notePage(store, "off", "markdown", "/conspects/n#heading-3"));
+    await screen.findByRole("textbox", { name: "Markdown" });
+    view.rerender(notePage(store, "off", "text", "/conspects/n#heading-3"));
+    expect(await screen.findByText("Two.")).toBeInTheDocument();
+    expect(scrollTo).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("link", { name: "Part two again" }));
+    await waitFor(() => {
+      expect(scrollTo).toHaveBeenCalledWith(AT_PART_TWO);
     });
   });
 });

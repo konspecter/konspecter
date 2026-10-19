@@ -73,7 +73,9 @@ export function App({
   reset,
 }: AppProps) {
   const [settings, setSettings] = useState(initialSettings);
-  const [catalog] = useState(() => new NoteCatalog(store));
+  const [catalog] = useState(
+    () => new NoteCatalog(store, { headings: initialSettings.treeHeadings === "shown" }),
+  );
   const [activity] = useState(() => new Activity());
 
   // Theme and font scale apply to the whole document, outside React's tree.
@@ -85,6 +87,9 @@ export function App({
   }, [settings.theme, settings.fontScale, settings.editingArea]);
 
   useEffect(() => catalog.start(), [catalog]);
+  useEffect(() => {
+    catalog.setHeadings(settings.treeHeadings === "shown");
+  }, [catalog, settings.treeHeadings]);
   // Pins kept on the device before they were the notes' own move into them, once.
   useEffect(() => {
     movePinsIntoNotes(store, deviceStorage(), new Date()).catch(reportError);
@@ -155,6 +160,7 @@ export function App({
               mode={settings.defaultEditor}
               onModeChange={setMode}
               tagNames={settings.tagNames}
+              treeHeadings={settings.treeHeadings}
               updates={updates}
               sync={sync}
             />

@@ -151,6 +151,15 @@ export function DocumentIcon() {
   );
 }
 
+/** A capital H: a heading of a note in the tag tree. */
+export function HeadingIcon() {
+  return (
+    <Icon className="icon-heading">
+      <path d="M7.5 5.5v13M16.5 5.5v13M7.5 12h9" />
+    </Icon>
+  );
+}
+
 export function SearchIcon() {
   return (
     <Icon>
