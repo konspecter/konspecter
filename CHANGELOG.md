@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.0 — 2026-10-19
 
 - **Hear of new versions on the desktop:** once a day the desktop app looks for a newer
   release; when there is one, a banner says "Konspecter 0.9.0 is available." and _Download_
