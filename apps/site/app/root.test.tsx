@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { createRoutesStub, RouterContextProvider } from "react-router";
 import { accountContext } from "./account.server";
 import App, { loader, SearchTags } from "./root";
@@ -46,6 +46,17 @@ it("links to the source code on GitHub", async () => {
     "href",
     "https://github.com/konspecter/konspecter",
   );
+});
+
+it("links to Konspecter's channels in the footer, each with its mark", async () => {
+  renderHeader({ email: null, name: "" });
+  const contacts = await screen.findByRole("navigation", { name: "Contacts" });
+  const links = within(contacts).getAllByRole("link");
+  expect(links.map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
+    ["Telegram", "https://t.me/konspecter"],
+    ["VK", "https://vk.ru/konspecter"],
+  ]);
+  for (const link of links) expect(link.querySelector("svg")).not.toBeNull();
 });
 
 describe("search engines", () => {

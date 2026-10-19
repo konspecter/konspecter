@@ -19,6 +19,7 @@ import {
 } from "react-router";
 import { accountContext, loadAccount } from "./account.server";
 import { siteConfig } from "./config.server";
+import { Contacts } from "./contacts";
 import { LOCALE_NAMES, LOCALES, translator, useT, type Locale } from "./i18n/i18n";
 import { SOURCE_CODE } from "./links";
 import { expectedOrigin, isSameOriginRequest } from "./origin.server";
@@ -293,7 +294,10 @@ function Footer() {
   return (
     <footer className="site-footer">
       <div className="site-frame site-footer-row">
-        <p>{t("site.footer")}</p>
+        <div className="site-footer-about">
+          <p>{t("site.footer")}</p>
+          <Contacts />
+        </div>
         <nav aria-label={t("site.footerLinks")} className="site-footer-links">
           <Link to={localePath("/download")}>{t("site.download")}</Link>
           <Link to={localePath("/markdown")}>{t("site.markdown")}</Link>

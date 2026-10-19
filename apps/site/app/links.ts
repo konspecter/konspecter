@@ -7,3 +7,7 @@ export const SELF_HOSTING = `${SOURCE_CODE}/blob/main/docs/self-hosting.md`;
 export const TAG_CHAIN_SPEC = `${SOURCE_CODE}/blob/main/TAG-CHAIN-SPEC.md`;
 export const TAG_RULES = `${SOURCE_CODE}/blob/main/docs/architecture/tags.md`;
 export const FOLDERS_FOLLOW_TAGS = `${SOURCE_CODE}/blob/main/docs/architecture/decisions/ADR-013-folders-follow-tags.md`;
+
+/** Konspecter's channels: news and talk with the people who use it. */
+export const TELEGRAM = "https://t.me/konspecter";
+export const VK = "https://vk.ru/konspecter";

@@ -23,6 +23,10 @@ export const en = {
   "site.privacy": "Privacy",
   "site.footer": "Konspecter: a notebook for everything worth keeping.",
 
+  "contacts.label": "Contacts",
+  "contacts.telegram": "Telegram",
+  "contacts.vk": "VK",
+
   "home.title": "A notebook for everything worth keeping",
   "home.lead":
     "Lectures and books, recipes and trips, work and ideas: write them down in Konspecter and find them again in a second. It works without the internet, on your computer, your phone and in the browser, and your notes stay yours.",
