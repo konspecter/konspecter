@@ -6,14 +6,17 @@ import { BrowserRouter } from "react-router";
 import { registerSW } from "virtual:pwa-register";
 import type { NoteRepository } from "./application/notes/note-repository";
 import {
+  appInfo,
   closeFolder,
   currentFolder,
   folderBridge,
   isDesktop,
   keychainCredentials,
   onWindowClose,
+  openInBrowser,
   pickFolder,
 } from "./infrastructure/desktop/desktop";
+import { watchReleases } from "./infrastructure/desktop/releases";
 import { FolderStore } from "./infrastructure/folder/folder-store";
 import { FolderSync } from "./infrastructure/folder/folder-sync";
 import { isNativeMobile } from "./infrastructure/mobile/mobile";
@@ -25,7 +28,7 @@ import { factoryReset, type FactoryReset } from "./presentation/app/factory-rese
 import { reportError } from "./presentation/app/errors";
 import { restoreLocation } from "./presentation/app/last-location";
 import type { LibraryControls } from "./presentation/app/library";
-import type { UpdateSource } from "./presentation/app/updates";
+import type { Update, UpdateSource } from "./presentation/app/updates";
 import { isMac } from "./presentation/app/shortcuts";
 import { ErrorState } from "./presentation/components/ErrorState";
 import { stopFocusZoom } from "@konspecter/ui/viewport";
@@ -50,27 +53,46 @@ stopFocusZoom();
 // The service worker precaches the app so it works offline, and reports when
 // a new version is waiting.
 // The desktop and mobile apps ship their files inside the app: no service worker.
-let updateWaiting = false;
-let onUpdate: (() => void) | null = null;
+// The desktop app asks GitHub for a newer release instead.
+let updateWaiting: Update | null = null;
+let onUpdate: ((update: Update) => void) | null = null;
+const announceUpdate = (update: Update) => {
+  updateWaiting = update;
+  onUpdate?.(update);
+};
+let releasePage: string | null = null;
+if (isDesktop()) {
+  void appInfo()
+    .then(({ version }) => {
+      watchReleases({
+        current: version,
+        onNewer(release) {
+          releasePage = release.url;
+          announceUpdate({ kind: "download", version: release.version });
+        },
+      });
+    })
+    .catch(reportError);
+}
 const updateServiceWorker =
   isDesktop() || isNativeMobile()
     ? () => Promise.resolve()
     : registerSW({
         onNeedRefresh() {
-          updateWaiting = true;
-          onUpdate?.();
+          announceUpdate({ kind: "reload" });
         },
       });
 const updates: UpdateSource = {
   subscribe(listener) {
     onUpdate = listener;
-    if (updateWaiting) listener();
+    if (updateWaiting) listener(updateWaiting);
     return () => {
       onUpdate = null;
     };
   },
   apply() {
-    void updateServiceWorker(true);
+    if (releasePage) void openInBrowser(releasePage).catch(reportError);
+    else void updateServiceWorker(true);
   },
 };
 

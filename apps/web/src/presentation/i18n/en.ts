@@ -9,6 +9,8 @@ export const en = {
   "app.skipToContent": "Skip to content",
   "app.updateAvailable": "A new version of Konspecter is available.",
   "app.reload": "Reload",
+  "app.releaseAvailable": "Konspecter {version} is available.",
+  "app.download": "Download",
   "app.later": "Later",
   "app.tryAgain": "Try again",
   "app.close": "Close",

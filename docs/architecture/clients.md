@@ -72,8 +72,17 @@ apps/desktop/
   `~/Library/Logs/app.konspecter.desktop/`, shown by Console.app). Not next to the binary:
   on macOS that is inside the signed app bundle. At 1 MB the file becomes `konspecter.log.old`;
   an entry is cut at 16 KB.
-- **Differences from the PWA:** no service worker or update banner (the bundle contains the
-  files). Settings shows _About_ instead of the storage-persistence section.
+- **New versions:** 10 seconds after start, then once a day while the window is open, the app
+  asks GitHub for the latest release (`api.github.com/repos/konspecter/konspecter/releases/latest`;
+  drafts and pre-releases are never the latest), in `infrastructure/desktop/releases.ts`. A
+  newer version (semantic versioning: `0.9.0` comes after `0.9.0-rc.1`) shows the update
+  banner, "Konspecter 0.9.0 is available." with _Download_, which opens the release's page in
+  the browser (what is new, and the files), and _Later_. Each version is announced once per
+  run; a failed check (offline, rate limit) waits for the next. It installs nothing itself:
+  there is no Tauri updater.
+- **Differences from the PWA:** no service worker (the bundle contains the files); the update
+  banner announces releases instead. Settings shows _About_ instead of the storage-persistence
+  section.
 - **Requirements:** Rust (rustup) and Xcode Command Line Tools on macOS. WebKitGTK and friends
   on Linux (see the CI job).
 

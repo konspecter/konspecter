@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **Hear of new versions on the desktop:** once a day the desktop app looks for a newer
+  release; when there is one, a banner says "Konspecter 0.9.0 is available." and _Download_
+  opens its page, with what is new and the files.
+
 ## 0.8.0 — 2026-10-19
 
 - **New notes take their finished titles:** in a Markdown folder, a new note's file follows its

@@ -110,6 +110,8 @@ What Konspecter protects, from whom, and how. Every item below has tests unless 
   paths on the site.
 - Client: everything from storage, the network and the native side is `unknown` until parsed
   (notes, documents, sync entries, reading state, settings, API responses, file entries).
+  The desktop's release check takes only a version tag and a `https://github.com/` page from
+  GitHub's answer.
 - Desktop: every file path is validated in Rust (see File Mode below).
 
 ### XSS and HTML

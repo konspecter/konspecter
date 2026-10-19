@@ -7,6 +7,8 @@ export const ru: Dictionary = {
   "app.skipToContent": "Перейти к содержимому",
   "app.updateAvailable": "Доступна новая версия Konspecter.",
   "app.reload": "Обновить",
+  "app.releaseAvailable": "Доступна новая версия Konspecter: {version}.",
+  "app.download": "Скачать",
   "app.later": "Позже",
   "app.tryAgain": "Повторить",
   "app.close": "Закрыть",

@@ -1,11 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { act } from "react";
-import type { UpdateSource } from "../app/updates";
+import type { Update, UpdateSource } from "../app/updates";
 import { UpdateBanner } from "./UpdateBanner";
 
 function fakeUpdates() {
-  let listener: (() => void) | null = null;
+  let listener: ((update: Update) => void) | null = null;
   const source: UpdateSource = {
     subscribe(next) {
       listener = next;
@@ -17,9 +17,9 @@ function fakeUpdates() {
   };
   return {
     source,
-    announce: () => {
+    announce: (update: Update = { kind: "reload" }) => {
       act(() => {
-        listener?.();
+        listener?.(update);
       });
     },
   };
@@ -37,6 +37,17 @@ describe("UpdateBanner", () => {
     );
 
     await userEvent.click(screen.getByRole("button", { name: "Reload" }));
+    expect(source.apply).toHaveBeenCalled();
+  });
+
+  it("names a newer desktop release and opens its download", async () => {
+    const { source, announce } = fakeUpdates();
+    render(<UpdateBanner updates={source} />);
+
+    announce({ kind: "download", version: "0.9.0" });
+    expect(screen.getByRole("status")).toHaveTextContent("Konspecter 0.9.0 is available.");
+
+    await userEvent.click(screen.getByRole("button", { name: "Download" }));
     expect(source.apply).toHaveBeenCalled();
   });
 
