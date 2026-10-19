@@ -1,65 +1,60 @@
-import { recentNotes, type NoteSummary } from "./note-catalog";
+import { PIN_KEYS, updateMetadata, type PinKey } from "../../domain/document/document";
+import { updateNote } from "../../domain/note/note";
+import { savesSettled } from "./autosave";
+import { byMostRecentSummary, recentNotes, summarize, type NoteSummary } from "./note-catalog";
 import type { NoteRepository } from "./note-repository";
 
-/** The keys a note can be pinned to (Ctrl+1…0), in the order Recent lists the pins. */
-export const PIN_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"] as const;
-
-export type PinKey = (typeof PIN_KEYS)[number];
+/**
+ * A pin is the note's own frontmatter (`pin: 3`), so it syncs with the note
+ * and is in its file (ADR-027). The pins here are read from the notes.
+ */
 
 /** Which note each key holds. A key holds one note and a note one key. */
 export type Pins = Readonly<Partial<Record<PinKey, string>>>;
 
 export type PinnedNote = { readonly key: PinKey; readonly note: NoteSummary };
 
-export function isPinKey(value: string): value is PinKey {
-  return (PIN_KEYS as readonly string[]).includes(value);
-}
-
-/** The pins without the note `noteId`. */
-function without(pins: Pins, noteId: string): Partial<Record<PinKey, string>> {
-  return Object.fromEntries(Object.entries(pins).filter(([, id]) => id !== noteId));
-}
+/** A note whose `pin` is to be set to a key, or removed with null. */
+export type PinChange = { readonly noteId: string; readonly pin: PinKey | null };
 
 /**
- * Ctrl+key on a note: unpins it when the key holds it already, else pins it
- * there, taking the key from another note and the note from another key.
+ * The note each key holds. Two notes can claim one key (pinned on two devices
+ * before they synced): the one edited last holds it, the others are not pinned.
  */
-export function togglePin(pins: Pins, key: PinKey, noteId: string): Pins {
-  if (pins[key] === noteId) return without(pins, noteId);
-  return { ...without(pins, noteId), [key]: noteId };
-}
-
-/** A renamed note (File Mode: its file moved) keeps its key. */
-export function renamePinned(pins: Pins, from: string, to: string): Pins {
-  const key = PIN_KEYS.find((pin) => pins[pin] === from);
-  return key === undefined ? pins : { ...without(pins, to), [key]: to };
-}
-
-/** Validates stored pins: unknown keys, ids that are not strings and repeated notes are dropped. */
-export function parsePins(value: unknown): Pins {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return {};
-  const record = value as Record<string, unknown>;
+export function pinsOf(notes: readonly NoteSummary[]): Pins {
   const pins: Partial<Record<PinKey, string>> = {};
-  const seen = new Set<string>();
-  for (const key of PIN_KEYS) {
-    const id = record[key];
-    if (typeof id !== "string" || id === "" || seen.has(id)) continue;
-    seen.add(id);
-    pins[key] = id;
+  for (const note of [...notes].sort(byMostRecentSummary)) {
+    if (note.pin !== null && pins[note.pin] === undefined) pins[note.pin] = note.id;
   }
   return pins;
 }
 
 /**
+ * Mod+Alt+key on a note: unpins it when the key holds it already, else pins
+ * it there; every other note claiming the key lets it go. The changes to
+ * write, the note itself last.
+ */
+export function pinChanges(
+  notes: readonly NoteSummary[],
+  key: PinKey,
+  noteId: string,
+): PinChange[] {
+  if (pinsOf(notes)[key] === noteId) return [{ noteId, pin: null }];
+  const others = notes
+    .filter((note) => note.pin === key && note.id !== noteId)
+    .map((note): PinChange => ({ noteId: note.id, pin: null }));
+  return [...others, { noteId, pin: key }];
+}
+
+/**
  * The sidebar's Recent: the pinned notes first, by key (1…9, then 0), then
- * the notes of the last week (`recentNotes`) that are not pinned. Pins of
- * notes that are gone are not listed.
+ * the notes of the last week (`recentNotes`) that are not pinned.
  */
 export function recentWithPins(
   notes: readonly NoteSummary[],
-  pins: Pins,
   now: Date,
 ): { pinned: PinnedNote[]; recent: NoteSummary[] } {
+  const pins = pinsOf(notes);
   const byId = new Map(notes.map((note) => [note.id, note]));
   const pinned = PIN_KEYS.flatMap((key) => {
     const note = byId.get(pins[key] ?? "");
@@ -69,58 +64,59 @@ export function recentWithPins(
   return { pinned, recent: recentNotes(notes, now).filter((note) => !pinnedIds.has(note.id)) };
 }
 
-const PINS_KEY = "konspecter.pins";
+/**
+ * Sets a stored note's pin, after any save of it still running. It is an
+ * edit like any other (`updated` moves on), so the last write wins when it
+ * syncs. A note that is gone, or whose frontmatter cannot be read, is left
+ * alone.
+ */
+export async function setStoredPin(
+  store: NoteRepository,
+  noteId: string,
+  pin: PinKey | null,
+  now: Date,
+): Promise<void> {
+  await savesSettled(store, noteId);
+  const note = await store.get(noteId);
+  if (!note) return;
+  let markdown: string;
+  try {
+    markdown = updateMetadata(note.markdown, { pin });
+  } catch {
+    return;
+  }
+  if (markdown !== note.markdown) await store.put(updateNote(note, markdown, now));
+}
+
+const OLD_PINS_KEY = "konspecter.pins";
 
 /**
- * The pins of this device, kept in its storage (like the sidebar's folded
- * panes; a factory reset clears them): an external store for
- * useSyncExternalStore. Without storage they last until the app closes.
+ * Pins used to be kept per device (localStorage, `{ "3": "note id" }`). Moves
+ * them into the notes, once, and forgets them on the device.
  */
-export class NotePins {
-  readonly #storage: Pick<Storage, "getItem" | "setItem"> | null;
-  readonly #listeners = new Set<() => void>();
-  #pins: Pins;
-
-  constructor(storage: Pick<Storage, "getItem" | "setItem"> | null) {
-    this.#storage = storage;
-    this.#pins = this.#read();
+export async function movePinsIntoNotes(
+  store: NoteRepository,
+  storage: Pick<Storage, "getItem" | "removeItem"> | null,
+  now: Date,
+): Promise<void> {
+  let saved: unknown;
+  try {
+    const text = storage?.getItem(OLD_PINS_KEY);
+    if (!text) return;
+    storage?.removeItem(OLD_PINS_KEY);
+    saved = JSON.parse(text);
+  } catch {
+    return;
   }
-
-  subscribe = (listener: () => void): (() => void) => {
-    this.#listeners.add(listener);
-    return () => this.#listeners.delete(listener);
-  };
-
-  getSnapshot = (): Pins => this.#pins;
-
-  toggle(key: PinKey, noteId: string): void {
-    this.#set(togglePin(this.#pins, key, noteId));
-  }
-
-  /** Keeps the pins on renamed notes. Returns a function that stops following. */
-  follow(store: NoteRepository): () => void {
-    return store.onChange(({ noteId, previousId }) => {
-      if (previousId !== undefined) this.#set(renamePinned(this.#pins, previousId, noteId));
-    });
-  }
-
-  #set(pins: Pins): void {
-    if (pins === this.#pins) return;
-    this.#pins = pins;
-    try {
-      this.#storage?.setItem(PINS_KEY, JSON.stringify(pins));
-    } catch {
-      // A per-device convenience; without storage the pins last until the app closes.
+  if (typeof saved !== "object" || saved === null) return;
+  let notes = (await store.list()).map(summarize);
+  for (const key of PIN_KEYS) {
+    const noteId = (saved as Record<string, unknown>)[key];
+    if (typeof noteId !== "string" || pinsOf(notes)[key] === noteId) continue;
+    if (!notes.some((note) => note.id === noteId)) continue;
+    for (const change of pinChanges(notes, key, noteId)) {
+      await setStoredPin(store, change.noteId, change.pin, now);
     }
-    for (const listener of this.#listeners) listener();
-  }
-
-  #read(): Pins {
-    try {
-      const saved = this.#storage?.getItem(PINS_KEY);
-      return saved ? parsePins(JSON.parse(saved)) : {};
-    } catch {
-      return {};
-    }
+    notes = (await store.list()).map(summarize);
   }
 }

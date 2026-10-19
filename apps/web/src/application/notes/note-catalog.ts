@@ -1,3 +1,4 @@
+import type { PinKey } from "../../domain/document/document";
 import { plainText } from "../../domain/document/plain-text";
 import {
   noteTitle,
@@ -21,6 +22,8 @@ export type NoteSummary = {
   readonly tags: readonly string[];
   /** The start of the note's readable text, without the heading that is its title. */
   readonly excerpt: string;
+  /** The key the frontmatter pins the note to (`pin: 3`), if any. */
+  readonly pin: PinKey | null;
   /** False when the frontmatter cannot be read. */
   readonly valid: boolean;
 };
@@ -53,6 +56,7 @@ export function summarize(note: Note): NoteSummary {
     cover: read.valid ? read.document.metadata.cover : null,
     tags: writtenTagList(noteWrittenTags(read)).map(({ written }) => written),
     excerpt: blocks.join(" ").replace(/\s+/g, " ").trim().slice(0, EXCERPT_LENGTH),
+    pin: read.valid ? read.document.metadata.pin : null,
     valid: read.valid,
   };
 }

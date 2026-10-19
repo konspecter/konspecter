@@ -36,6 +36,7 @@ const noMetadata = {
   author: null,
   cover: null,
   conflictOf: null,
+  pin: null,
 };
 
 describe("parseDocument", () => {
@@ -48,6 +49,7 @@ describe("parseDocument", () => {
         author: null,
         cover: null,
         conflictOf: null,
+        pin: null,
       },
       body: "# Java Collections\n\nArrayList — dynamic array.\n\n#java#collections\n\nHashMap stores key/value pairs.\n",
     });
@@ -131,6 +133,7 @@ describe("serializeDocument", () => {
         title: "Java: Collections",
         author: "Ann",
         conflictOf: null,
+        pin: null,
       },
       body: "# Java\n",
     });
@@ -328,6 +331,36 @@ describe("conflict_of", () => {
     expect(markdown).toBe("---\nconflict_of: n1\n---\n\nBody");
     expect(parseDocument(markdown).metadata.conflictOf).toBe("n1");
     expect(updateMetadata(markdown, { conflictOf: null })).toBe("---\n---\n\nBody");
+  });
+});
+
+describe("pin", () => {
+  it("writes the key as a number and removes it", () => {
+    const markdown = updateMetadata("---\ntitle: A\n---\n\nBody", { pin: "3" });
+
+    expect(markdown).toBe("---\ntitle: A\npin: 3\n---\n\nBody");
+    expect(parseDocument(markdown).metadata.pin).toBe("3");
+    expect(updateMetadata(markdown, { pin: "0" })).toBe("---\ntitle: A\npin: 0\n---\n\nBody");
+    expect(updateMetadata(markdown, { pin: null })).toBe("---\ntitle: A\n---\n\nBody");
+    expect(updateMetadata("Body", { pin: "1" })).toBe("---\npin: 1\n---\n\nBody");
+  });
+
+  it.each([
+    ["a number", "pin: 7", "7"],
+    ["text", 'pin: "7"', "7"],
+    ["zero", "pin: 0", "0"],
+    ["two digits", "pin: 12", null],
+    ["a fraction", "pin: 1.5", null],
+    ["a word", "pin: yes", null],
+    ["a list", "pin: [1]", null],
+  ])("reads %s, leaving anything but one digit unpinned", (_name, line, pin) => {
+    expect(parseDocument(`---\n${line}\n---\n\nBody`).metadata.pin).toBe(pin);
+  });
+
+  it("is not one of the other fields", () => {
+    expect(otherMetadata("---\npin: 2\nproject: K\n---\n")).toEqual([
+      { key: "project", value: "K" },
+    ]);
   });
 });
 

@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { parseDocument } from "../../domain/document/document";
 import { createNote } from "../../domain/note/note";
 import type { EditorMode } from "../../domain/settings/settings";
+import { NoteCatalog } from "../../application/notes/note-catalog";
 import type { NoteRepository } from "../../application/notes/note-repository";
 import { FakeFolder } from "../../infrastructure/folder/fake-folder";
 import { FolderStore } from "../../infrastructure/folder/folder-store";
@@ -47,7 +48,9 @@ function renderNotePage(
   activity = new Activity(),
   mode: EditorMode = "text",
 ) {
-  const page = <NotePage store={store} mode={mode} activity={activity} />;
+  const page = (
+    <NotePage store={store} catalog={new NoteCatalog(store)} mode={mode} activity={activity} />
+  );
   render(
     <MemoryRouter initialEntries={[path]}>
       <WithDetails>
@@ -233,7 +236,14 @@ describe("an existing note", () => {
         <Routes>
           <Route
             path="conspects/:id"
-            element={<NotePage store={store} mode="markdown" activity={new Activity()} />}
+            element={
+              <NotePage
+                store={store}
+                catalog={new NoteCatalog(store)}
+                mode="markdown"
+                activity={new Activity()}
+              />
+            }
           />
         </Routes>
       </MemoryRouter>,

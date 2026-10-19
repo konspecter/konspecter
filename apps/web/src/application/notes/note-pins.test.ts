@@ -1,54 +1,68 @@
-import type { NoteSummary } from "./note-catalog";
-import type { NoteChange, NoteRepository } from "./note-repository";
-import { NotePins, parsePins, recentWithPins, renamePinned, togglePin } from "./note-pins";
+import { parseDocument } from "../../domain/document/document";
+import { createNote } from "../../domain/note/note";
+import { openNoteStore } from "../../infrastructure/storage/note-store";
+import { summarize, type NoteSummary } from "./note-catalog";
+import { movePinsIntoNotes, pinChanges, pinsOf, recentWithPins, setStoredPin } from "./note-pins";
 
-describe("togglePin", () => {
-  it("pins a note to a key, and unpins it with the same key", () => {
-    const pinned = togglePin({}, "3", "a");
-    expect(pinned).toEqual({ 3: "a" });
-    expect(togglePin(pinned, "3", "a")).toEqual({});
-  });
+let count = 0;
+const newStore = () => openNoteStore(`pins-test-${String((count += 1))}`);
 
-  it("gives a key one note and a note one key", () => {
-    // A taken key moves to this note; a pinned note moves to the new key.
-    expect(togglePin({ 1: "a" }, "1", "b")).toEqual({ 1: "b" });
-    expect(togglePin({ 1: "a", 2: "b" }, "3", "a")).toEqual({ 2: "b", 3: "a" });
-  });
-});
+const note = (id: string, updated: string | null, pin: NoteSummary["pin"] = null) =>
+  ({ id, updated, pin }) as unknown as NoteSummary;
 
-describe("renamePinned", () => {
-  it("keeps the key on the renamed note", () => {
-    expect(renamePinned({ 1: "old.md", 2: "b.md" }, "old.md", "new.md")).toEqual({
-      1: "new.md",
-      2: "b.md",
-    });
-    const pins = { 1: "a.md" };
-    expect(renamePinned(pins, "other.md", "new.md")).toBe(pins);
-  });
-});
-
-describe("parsePins", () => {
-  it("keeps the digit keys holding note ids, each note once", () => {
-    expect(parsePins({ 1: "a", 0: "b", 2: "a", 11: "c", x: "d", 3: 4, 4: "" })).toEqual({
+describe("pinsOf", () => {
+  it("gives each key the note that claims it", () => {
+    expect(pinsOf([note("a", null, "1"), note("b", null, "0"), note("c", null)])).toEqual({
       1: "a",
       0: "b",
     });
-    expect(parsePins(null)).toEqual({});
-    expect(parsePins(["a"])).toEqual({});
+  });
+
+  it("gives a key claimed twice (pinned on two devices) to the note edited last", () => {
+    const notes = [
+      note("older", "2026-10-01T00:00:00Z", "3"),
+      note("newer", "2026-10-02T00:00:00Z", "3"),
+    ];
+    expect(pinsOf(notes)).toEqual({ 3: "newer" });
+  });
+});
+
+describe("pinChanges", () => {
+  it("pins a note to a key, and unpins it with the same key", () => {
+    expect(pinChanges([note("a", null)], "3", "a")).toEqual([{ noteId: "a", pin: "3" }]);
+    expect(pinChanges([note("a", null, "3")], "3", "a")).toEqual([{ noteId: "a", pin: null }]);
+  });
+
+  it("moves a pinned note to the new key, and takes the key from every other note", () => {
+    expect(pinChanges([note("a", null, "1")], "2", "a")).toEqual([{ noteId: "a", pin: "2" }]);
+    const notes = [
+      note("a", "2026-10-02T00:00:00Z", "1"),
+      note("b", "2026-10-01T00:00:00Z", "1"),
+      note("c", null),
+    ];
+    expect(pinChanges(notes, "1", "c")).toEqual([
+      { noteId: "a", pin: null },
+      { noteId: "b", pin: null },
+      { noteId: "c", pin: "1" },
+    ]);
+    // The note that lost the key to a later edit takes it back.
+    expect(pinChanges(notes, "1", "b")).toEqual([
+      { noteId: "a", pin: null },
+      { noteId: "b", pin: "1" },
+    ]);
   });
 });
 
 describe("recentWithPins", () => {
   const now = new Date("2026-10-15T12:00:00Z");
-  const note = (id: string, updated: string | null) => ({ id, updated }) as unknown as NoteSummary;
-  const notes = [
-    note("today", "2026-10-15T09:00:00Z"),
-    note("yesterday", "2026-10-14T09:00:00Z"),
-    note("old", "2026-01-01T00:00:00Z"),
-  ];
 
   it("lists the pins first, 1 to 9 then 0, then the week's other notes", () => {
-    const { pinned, recent } = recentWithPins(notes, { 0: "today", 2: "old", 5: "gone" }, now);
+    const notes = [
+      note("today", "2026-10-15T09:00:00Z", "0"),
+      note("yesterday", "2026-10-14T09:00:00Z"),
+      note("old", "2026-01-01T00:00:00Z", "2"),
+    ];
+    const { pinned, recent } = recentWithPins(notes, now);
     expect(pinned.map(({ key, note }) => [key, note.id])).toEqual([
       ["2", "old"],
       ["0", "today"],
@@ -57,38 +71,55 @@ describe("recentWithPins", () => {
   });
 });
 
-describe("NotePins", () => {
-  it("keeps the pins in the device's storage and notifies subscribers", () => {
-    const pins = new NotePins(localStorage);
-    const listener = vi.fn();
-    pins.subscribe(listener);
-    pins.toggle("1", "a");
-    expect(pins.getSnapshot()).toEqual({ 1: "a" });
-    expect(listener).toHaveBeenCalledTimes(1);
-    expect(new NotePins(localStorage).getSnapshot()).toEqual({ 1: "a" });
+describe("setStoredPin", () => {
+  const now = new Date("2026-10-19T12:00:00Z");
+
+  it("writes the pin into the note's frontmatter, as an edit", async () => {
+    const store = await newStore();
+    await store.put(createNote("# Bee\n\nB.", new Date("2026-10-01T00:00:00Z"), "bee"));
+
+    await setStoredPin(store, "bee", "4", now);
+    const pinned = parseDocument((await store.get("bee"))?.markdown ?? "").metadata;
+    expect(pinned).toMatchObject({ pin: "4", updated: "2026-10-19T12:00:00Z" });
+
+    await setStoredPin(store, "bee", null, now);
+    expect(parseDocument((await store.get("bee"))?.markdown ?? "").metadata.pin).toBeNull();
   });
 
-  it("starts empty from unreadable or missing storage", () => {
+  it("leaves a missing note and unreadable frontmatter alone", async () => {
+    const store = await newStore();
+    const broken = { id: "broken", markdown: "---\ntitle: [\n---\n\nStill here." };
+    await store.put(broken);
+    await setStoredPin(store, "gone", "1", now);
+    await setStoredPin(store, "broken", "1", now);
+    expect(await store.get("broken")).toEqual(broken);
+  });
+});
+
+describe("movePinsIntoNotes", () => {
+  const now = new Date("2026-10-19T12:00:00Z");
+
+  it("moves the device's old pins into the notes, once", async () => {
+    const store = await newStore();
+    await store.put(createNote("# Bee\n\nB.", now, "bee"));
+    await store.put(createNote("---\npin: 2\n---\n\n# Sea", now, "sea"));
+    localStorage.setItem("konspecter.pins", JSON.stringify({ 2: "bee", 3: "gone", x: "sea" }));
+
+    await movePinsIntoNotes(store, localStorage, now);
+    const pins = pinsOf((await store.list()).map(summarize));
+    // The key goes to the device's note; a pin of a note that is gone is dropped.
+    expect(pins).toEqual({ 2: "bee" });
+    expect(localStorage.getItem("konspecter.pins")).toBeNull();
+  });
+
+  it("does nothing without old pins, or with unreadable ones", async () => {
+    const store = await newStore();
+    await store.put(createNote("# Bee", now, "bee"));
+    const before = await store.get("bee");
+    await movePinsIntoNotes(store, null, now);
     localStorage.setItem("konspecter.pins", "{not json");
-    expect(new NotePins(localStorage).getSnapshot()).toEqual({});
-    const pins = new NotePins(null);
-    pins.toggle("2", "a");
-    expect(pins.getSnapshot()).toEqual({ 2: "a" });
-  });
-
-  it("follows renamed notes", () => {
-    let emit: (change: NoteChange) => void = () => undefined;
-    const store = {
-      onChange: (listener: (change: NoteChange) => void) => {
-        emit = listener;
-        return () => undefined;
-      },
-    } as unknown as NoteRepository;
-    const pins = new NotePins(null);
-    pins.toggle("4", "old.md");
-    pins.follow(store);
-    emit({ noteId: "other.md", source: "remote" });
-    emit({ noteId: "new.md", source: "local", previousId: "old.md" });
-    expect(pins.getSnapshot()).toEqual({ 4: "new.md" });
+    await movePinsIntoNotes(store, localStorage, now);
+    expect(await store.get("bee")).toEqual(before);
+    expect(localStorage.getItem("konspecter.pins")).toBeNull();
   });
 });

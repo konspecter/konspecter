@@ -6,6 +6,8 @@ import { FakeServer, TEST_PASSPHRASE } from "./fake-server";
 import { DeviceLoginError } from "./device-login";
 import { NoKeyError, SyncEngine, type Scheduler } from "./sync-engine";
 import { mustGet } from "../storage/test-utils";
+import { summarize } from "../../application/notes/note-catalog";
+import { pinChanges, pinsOf, setStoredPin } from "../../application/notes/note-pins";
 
 let databaseCount = 0;
 const config = { serverUrl: "https://sync.example.com", token: "ksp_ada" };
@@ -109,6 +111,31 @@ describe("SyncEngine", () => {
 
     expect(await markdownOf(a.store, "n1")).toContain("edited on B");
     expect(await a.store.syncEntry("n1")).toMatchObject({ baseRevision: 2, dirty: false });
+  });
+
+  it("carries a pin to the other device, and its move to another note", async () => {
+    const server = new FakeServer();
+    const a = await device(server);
+    const b = await device(server);
+    await a.store.put(createNote("# One", date, "n1"));
+    await a.store.put(createNote("# Two", date, "n2"));
+    await connected(a.engine, config);
+    await connected(b.engine, config);
+    const pinsOn = async (d: Device) => pinsOf((await d.store.list()).map(summarize));
+
+    await setStoredPin(a.store, "n1", "3", minutesLater(1));
+    await a.engine.syncNow();
+    await b.engine.syncNow();
+    expect(await pinsOn(b)).toEqual({ 3: "n1" });
+
+    // B gives the key to the other note; A follows.
+    const notes = (await b.store.list()).map(summarize);
+    for (const change of pinChanges(notes, "3", "n2")) {
+      await setStoredPin(b.store, change.noteId, change.pin, minutesLater(2));
+    }
+    await b.engine.syncNow();
+    await a.engine.syncNow();
+    expect(await pinsOn(a)).toEqual({ 3: "n2" });
   });
 
   it("propagates deletions in both directions", async () => {

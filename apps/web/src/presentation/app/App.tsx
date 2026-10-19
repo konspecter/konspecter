@@ -7,7 +7,7 @@ import {
   type Theme,
 } from "../../domain/settings/settings";
 import { NoteCatalog } from "../../application/notes/note-catalog";
-import { NotePins } from "../../application/notes/note-pins";
+import { movePinsIntoNotes } from "../../application/notes/note-pins";
 import type { NoteRepository } from "../../application/notes/note-repository";
 import type { SyncEngine } from "../../infrastructure/sync/sync-engine";
 import { Layout } from "../components/Layout";
@@ -20,6 +20,7 @@ import { NotesPage } from "../pages/NotesPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import { applyLanguage } from "../i18n/setup";
 import { Activity } from "./activity";
+import { reportError } from "./errors";
 import type { FactoryReset } from "./factory-reset";
 import type { LibraryControls } from "./library";
 import type { UpdateSource } from "./updates";
@@ -73,7 +74,6 @@ export function App({
 }: AppProps) {
   const [settings, setSettings] = useState(initialSettings);
   const [catalog] = useState(() => new NoteCatalog(store));
-  const [pins] = useState(() => new NotePins(deviceStorage()));
   const [activity] = useState(() => new Activity());
 
   // Theme and font scale apply to the whole document, outside React's tree.
@@ -85,7 +85,10 @@ export function App({
   }, [settings.theme, settings.fontScale, settings.editingArea]);
 
   useEffect(() => catalog.start(), [catalog]);
-  useEffect(() => pins.follow(store), [pins, store]);
+  // Pins kept on the device before they were the notes' own move into them, once.
+  useEffect(() => {
+    movePinsIntoNotes(store, deviceStorage(), new Date()).catch(reportError);
+  }, [store]);
 
   // Nothing waits for these; they only make the first note (rich text or
   // rendered) and the first search immediate.
@@ -127,6 +130,7 @@ export function App({
   const notePage = (
     <NotePage
       store={store}
+      catalog={catalog}
       mode={settings.defaultEditor}
       activity={activity}
       readingPosition={settings.readingPosition}
@@ -145,7 +149,6 @@ export function App({
             <Layout
               store={store}
               catalog={catalog}
-              pins={pins}
               activity={activity}
               theme={settings.theme}
               onThemeChange={setTheme}

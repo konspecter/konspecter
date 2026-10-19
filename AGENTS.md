@@ -76,6 +76,7 @@ All planned phases are done. New work needs a new plan in `.claude/plans/`.
 | Key by QR  | The site's QR code hands the encryption key over: no passphrase on the app  | Done   |
 | Panes      | Sidebar blocks fold like VS Code's: any number open, each scrolls, kept     | Done   |
 | Domains    | konspecter.com canonical, `/ru` pages, hreflang, sitemap, `.ru`/`www` 301   | Done   |
+| Pins       | A pin is the note's frontmatter (`pin: 3`): synced, in the file, an edit    | Done   |
 
 Where the packages are described: UI architecture: `docs/architecture/ui.md`; languages:
 `docs/architecture/i18n.md`; server and API: `docs/architecture/server.md`; sync:
@@ -84,7 +85,8 @@ Where the packages are described: UI architecture: `docs/architecture/ui.md`; la
 `docs/architecture/decisions/`: last write wins (ADR-011), change events (ADR-012), folders follow
 tags (ADR-013), the account site and end-to-end encrypted sync (ADR-014 to ADR-017), connecting by
 QR code (ADR-019), published images (ADR-023), desktop folder sync (ADR-024), the key handed
-over by QR code (ADR-025) and the canonical domain with an address per language (ADR-026).
+over by QR code (ADR-025), the canonical domain with an address per language (ADR-026) and
+pins in the frontmatter (ADR-027).
 
 ## Working rules
 

@@ -9,7 +9,7 @@ import {
 } from "react";
 import { Link } from "react-router";
 import type { NoteSummary } from "../../application/notes/note-catalog";
-import type { PinKey } from "../../application/notes/note-pins";
+import type { PinKey } from "../../domain/document/document";
 import { tagTreeContains, type Tag, type TagNode } from "../../domain/tag/tags";
 import { ChevronIcon, DocumentIcon, FolderIcon, FolderOpenIcon } from "@konspecter/ui/icons";
 import { isMac } from "../app/shortcuts";

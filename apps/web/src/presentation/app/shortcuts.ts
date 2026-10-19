@@ -1,4 +1,4 @@
-import { isPinKey, type PinKey } from "../../application/notes/note-pins";
+import { isPinKey, type PinKey } from "../../domain/document/document";
 import type { TextKey } from "../i18n/i18n";
 
 /**

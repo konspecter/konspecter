@@ -6,6 +6,7 @@ import type { EditorMode } from "../../domain/settings/settings";
 import { sourceView } from "../editors/test-helpers";
 import { createNote } from "../../domain/note/note";
 import { openNoteStore, type NoteStore } from "../../infrastructure/storage/note-store";
+import { NoteCatalog } from "../../application/notes/note-catalog";
 import { Activity } from "../app/activity";
 import { NotePage } from "./NotePage";
 
@@ -26,6 +27,7 @@ function renderNote(store: NoteStore, mode: ReadingPositionMode, editor: EditorM
           element={
             <NotePage
               store={store}
+              catalog={new NoteCatalog(store)}
               mode={editor}
               activity={new Activity()}
               readingPosition={mode}

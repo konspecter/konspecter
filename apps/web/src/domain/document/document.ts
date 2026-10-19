@@ -18,6 +18,7 @@ import {
  *     updated: 2026-09-28T10:15:00Z
  *     author: Ann
  *     cover: null
+ *     pin: 3
  *     ---
  *
  *     # Java Collections
@@ -39,7 +40,18 @@ export type Metadata = {
   readonly cover: string | null;
   /** Id of the note this one is a conflict copy of (frontmatter `conflict_of`). */
   readonly conflictOf: string | null;
+  /** The key the note is pinned to in Recent (Mod+1…0 opens it). */
+  readonly pin: PinKey | null;
 };
+
+/** The keys a note can be pinned to (Mod+1…0), in the order Recent lists the pins. */
+export const PIN_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"] as const;
+
+export type PinKey = (typeof PIN_KEYS)[number];
+
+export function isPinKey(value: string): value is PinKey {
+  return (PIN_KEYS as readonly string[]).includes(value);
+}
 
 export type MarkdownDocument = {
   readonly metadata: Metadata;
@@ -50,7 +62,15 @@ export class InvalidDocumentError extends Error {
   override readonly name = "InvalidDocumentError";
 }
 
-const METADATA_KEYS = ["title", "created", "updated", "author", "cover", "conflictOf"] as const;
+const METADATA_KEYS = [
+  "title",
+  "created",
+  "updated",
+  "author",
+  "cover",
+  "conflictOf",
+  "pin",
+] as const;
 
 /**
  * How each field may be spelled in the frontmatter, the spelling the app
@@ -63,6 +83,7 @@ const FRONTMATTER_KEYS: Record<keyof Metadata, readonly [string, ...string[]]> =
   author: ["author"],
   cover: ["cover"],
   conflictOf: ["conflict_of"],
+  pin: ["pin"],
 };
 
 const EMPTY_METADATA: Metadata = {
@@ -72,6 +93,7 @@ const EMPTY_METADATA: Metadata = {
   author: null,
   cover: null,
   conflictOf: null,
+  pin: null,
 };
 
 const OPENING_DELIMITER = /^\uFEFF?---[ \t]*\r?\n/;
@@ -147,7 +169,19 @@ function readMetadata(frontmatter: Document): Metadata {
     author: readAuthor(record, key("author")),
     cover: readText(record, key("cover")),
     conflictOf: readText(record, key("conflictOf")),
+    pin: readPin(record, key("pin")),
   };
+}
+
+/**
+ * A digit, written as a number (`pin: 3`) or as text. Anything else is no pin
+ * rather than an invalid document: a pin is a convenience, not content.
+ */
+function readPin(record: Record<string, unknown>, key: string): PinKey | null {
+  const value = record[key];
+  if (typeof value !== "number" && typeof value !== "string") return null;
+  const text = String(value).trim();
+  return isPinKey(text) ? text : null;
 }
 
 /** The first spelling of the field that has a value, else the canonical one. */
@@ -241,7 +275,7 @@ export function frontmatterTags(markdown: string): string[] {
 
 /**
  * The frontmatter fields Konspecter does not manage itself (anything but
- * title, dates, author, cover, conflict_of and tags), in written order, with each value as
+ * title, dates, author, cover, conflict_of, pin and tags), in written order, with each value as
  * display text. Empty when there is no valid frontmatter.
  */
 export function otherMetadata(markdown: string): { key: string; value: string }[] {
@@ -276,7 +310,8 @@ export function serializeDocument(document: MarkdownDocument): string {
   const fields = Object.fromEntries(
     METADATA_KEYS.flatMap((key) => {
       const value = document.metadata[key];
-      return value === null ? [] : [[FRONTMATTER_KEYS[key][0], value]];
+      if (value === null) return [];
+      return [[FRONTMATTER_KEYS[key][0], key === "pin" ? Number(value) : value]];
     }),
   );
   const hasMetadata = Object.keys(fields).length > 0;
@@ -311,7 +346,9 @@ export function updateMetadata(markdown: string, changes: Partial<Metadata>): st
     const spellings = FRONTMATTER_KEYS[field];
     if (value === null) return spellings.map((key) => ({ key, value: null }));
     const present = spellings.filter((key) => fields.has(key));
-    return (present.length > 0 ? present : [spellings[0]]).map((key) => ({ key, value }));
+    // A pin is written as a number: `pin: 3`.
+    const written = field === "pin" ? Number(value) : value;
+    return (present.length > 0 ? present : [spellings[0]]).map((key) => ({ key, value: written }));
   });
   return editFrontmatter(markdown, edits);
 }
@@ -334,8 +371,11 @@ export function setFrontmatterTags(markdown: string, tags: readonly string[]): s
   ]);
 }
 
-/** A frontmatter key set to a value (text or a list of texts), or removed with null. */
-type FieldEdit = { readonly key: string; readonly value: string | readonly string[] | null };
+/** A frontmatter key set to a value (text, a number or a list of texts), or removed with null. */
+type FieldEdit = {
+  readonly key: string;
+  readonly value: string | number | readonly string[] | null;
+};
 
 /** The keys a frontmatter block has (none when it is empty). */
 function fieldsOf(frontmatter: Document): Set<string> {
@@ -424,7 +464,7 @@ function columnOf(text: string, offset: number): string {
  */
 function renderField(
   key: string,
-  value: string | readonly string[],
+  value: string | number | readonly string[],
   previous: Node | null,
   indent: string,
   newline: string,

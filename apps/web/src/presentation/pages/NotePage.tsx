@@ -1,13 +1,17 @@
-import { use, useCallback, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
-import { InvalidDocumentError } from "../../domain/document/document";
+import { InvalidDocumentError, updateMetadata } from "../../domain/document/document";
 import { readNote, withoutTag, type Note } from "../../domain/note/note";
 import type { EditorSelection, ReadingPositionMode } from "../../domain/reading/reading";
 import type { EditorMode } from "../../domain/settings/settings";
 import { Autosave, savesSettled } from "../../application/notes/autosave";
+import type { NoteCatalog } from "../../application/notes/note-catalog";
+import { pinChanges, setStoredPin } from "../../application/notes/note-pins";
 import type { NoteRepository } from "../../application/notes/note-repository";
 import { requestPersistence } from "../../infrastructure/storage/persistence";
 import { saveBeforeClosing } from "../app/closing";
+import { reportError } from "../app/errors";
+import { pinKeyOf } from "../app/shortcuts";
 import type { Activity } from "../app/activity";
 import { CoverImage } from "../components/CoverImage";
 import { ErrorState } from "../components/ErrorState";
@@ -27,6 +31,8 @@ import { rich } from "../i18n/rich";
 
 type NotePageProps = {
   store: NoteRepository;
+  /** Every note's summary: whose pin a key takes over (Mod+Alt+1…0). */
+  catalog: NoteCatalog;
   mode: EditorMode;
   activity: Activity;
   readingPosition?: ReadingPositionMode;
@@ -50,7 +56,13 @@ type Adopted = {
  * save gives it an id, the URL changes but the editing session (and the
  * editor, caret and all) stays mounted.
  */
-export function NotePage({ store, mode, activity, readingPosition = "restore" }: NotePageProps) {
+export function NotePage({
+  store,
+  catalog,
+  mode,
+  activity,
+  readingPosition = "restore",
+}: NotePageProps) {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -116,6 +128,7 @@ export function NotePage({ store, mode, activity, readingPosition = "restore" }:
       initial={note}
       initialSelection={selection}
       store={store}
+      catalog={catalog}
       mode={mode}
       activity={activity}
       readingPosition={readingPosition}
@@ -129,6 +142,7 @@ type NoteSessionProps = {
   /** Where the caret was when the note was last open. */
   initialSelection: EditorSelection | null;
   store: NoteRepository;
+  catalog: NoteCatalog;
   mode: EditorMode;
   activity: Activity;
   readingPosition: ReadingPositionMode;
@@ -139,6 +153,7 @@ function NoteSession({
   initial,
   initialSelection,
   store,
+  catalog,
   mode,
   activity,
   readingPosition,
@@ -228,7 +243,32 @@ function NoteSession({
     };
   }, [store, autosave, navigate]);
 
-  useShortcuts({ save: () => void autosave.flush() });
+  // The next change is saved at once rather than after typing pauses: a pin
+  // shows in Recent as soon as it is set.
+  const saveNow = useRef(false);
+  useShortcuts({
+    save: () => void autosave.flush(),
+    // Mod+Alt+1…0 pins this note to the key, or unpins it from the key it
+    // holds. Its own frontmatter changes in the editor, so unsaved typing is
+    // kept; other notes holding the key let go of it in the store. A note not
+    // stored yet has no pin: the keys stay the browser's.
+    pinNote: (event: KeyboardEvent) => {
+      const key = pinKeyOf(event);
+      const current = autosave.note;
+      const library = catalog.getSnapshot();
+      if (key === null || !current || library.status !== "ready") return false;
+      const now = new Date();
+      for (const { noteId, pin } of pinChanges(library.notes, key, current.id)) {
+        if (noteId !== current.id) {
+          setStoredPin(store, noteId, pin, now).catch(reportError);
+          continue;
+        }
+        saveNow.current = true;
+        setEdit({ apply: (markdown) => updateMetadata(markdown, { pin }) });
+      }
+      return undefined;
+    },
+  });
 
   // The top bar's search searches this note; it ends with the session.
   const finding = use(NoteFindContext);
@@ -238,6 +278,9 @@ function NoteSession({
   const handleChange = useCallback(
     (read: () => string) => {
       autosave.change(read);
+      if (!saveNow.current) return;
+      saveNow.current = false;
+      void autosave.flush();
     },
     [autosave],
   );

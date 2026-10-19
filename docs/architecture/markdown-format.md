@@ -38,15 +38,16 @@ Code: `apps/web/src/domain/document/document.ts` (pure, no UI or storage depende
 
 All fields are optional. `null` and an absent key mean the same thing.
 
-| Field         | Type                    | Meaning                                                                                                                                  |
-| ------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `title`       | text                    | Display title. Falls back to the body's first line.                                                                                      |
-| `created`     | ISO 8601 date/date-time | When the note was created.                                                                                                               |
-| `updated`     | ISO 8601 date/date-time | When the note was last saved. Used for ordering.                                                                                         |
-| `author`      | text, or a list of text | Who wrote the note. A list (`[Ann, Bob]`) is shown as `Ann, Bob`.                                                                        |
-| `tags`        | list of tags, or text   | The note's tags besides those in the body (see [tags](tags.md)).                                                                         |
-| `cover`       | text (URL, path, data)  | Cover image: a URL, a path, or an uploaded image as a base64 `data:` URL.                                                                |
-| `conflict_of` | text (note id)          | Set on conflict copies made before the last write won ([ADR-011](decisions/ADR-011-last-write-wins.md)): the note this one is a copy of. |
+| Field         | Type                    | Meaning                                                                                                                                     |
+| ------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `title`       | text                    | Display title. Falls back to the body's first line.                                                                                         |
+| `created`     | ISO 8601 date/date-time | When the note was created.                                                                                                                  |
+| `updated`     | ISO 8601 date/date-time | When the note was last saved. Used for ordering.                                                                                            |
+| `author`      | text, or a list of text | Who wrote the note. A list (`[Ann, Bob]`) is shown as `Ann, Bob`.                                                                           |
+| `tags`        | list of tags, or text   | The note's tags besides those in the body (see [tags](tags.md)).                                                                            |
+| `cover`       | text (URL, path, data)  | Cover image: a URL, a path, or an uploaded image as a base64 `data:` URL.                                                                   |
+| `conflict_of` | text (note id)          | Set on conflict copies made before the last write won ([ADR-011](decisions/ADR-011-last-write-wins.md)): the note this one is a copy of.    |
+| `pin`         | a digit, 0–9            | The key the note is pinned to in Recent (`Mod+1…0` opens it), [ADR-027](decisions/ADR-027-pins-in-frontmatter.md). Anything else is no pin. |
 
 - **Date spellings:** other tools write `create_at` and `updated_at`. They are read as
   `created` and `updated` (which win when a document has both). A save stamps the date under
@@ -56,6 +57,8 @@ All fields are optional. `null` and an absent key mean the same thing.
   example `2026-09-28T10:15:00Z` or `2026-09-28T12:15:00+02:00`. Date-times without a zone
   are rejected as ambiguous, and so are impossible dates (`2026-02-30`). The app writes
   second-precision UTC (`2026-09-28T10:15:00Z`) and compares instants, not strings.
+- **Pin** is written as a number (`pin: 3`); `"3"` is read too. Any other value, two digits or a
+  word, means no pin rather than an invalid document.
 - **Text** must be a YAML string. `title: 2024` is a number and is rejected. Write
   `title: "2024"` instead.
 - **Unknown keys** (e.g. `project: Konspecter` added by another tool) are allowed and preserved.

@@ -3,7 +3,7 @@ import { Link, Outlet, useLocation, useMatch, useNavigate, useSearchParams } fro
 import { parseQuery } from "../../domain/search/query";
 import type { EditorMode, TagNames, Theme } from "../../domain/settings/settings";
 import type { NoteCatalog } from "../../application/notes/note-catalog";
-import { recentWithPins, type NotePins } from "../../application/notes/note-pins";
+import { pinsOf, recentWithPins } from "../../application/notes/note-pins";
 import type { NoteRepository } from "../../application/notes/note-repository";
 import type { SyncEngine } from "../../infrastructure/sync/sync-engine";
 import type { Activity } from "../app/activity";
@@ -35,7 +35,6 @@ const passedBy = (path: string) => path === SETTINGS_PATH;
 type LayoutProps = {
   store: NoteRepository;
   catalog: NoteCatalog;
-  pins: NotePins;
   activity: Activity;
   theme: Theme;
   onThemeChange: (theme: Theme) => void;
@@ -93,7 +92,6 @@ function sidebarEntry(): HTMLElement | null {
 export function Layout({
   store,
   catalog,
-  pins,
   activity,
   theme,
   onThemeChange,
@@ -229,7 +227,7 @@ export function Layout({
   const openRecent = (step: 1 | -1) => {
     const library = catalog.getSnapshot();
     if (library.status !== "ready") return;
-    const { pinned, recent } = recentWithPins(library.notes, pins.getSnapshot(), new Date());
+    const { pinned, recent } = recentWithPins(library.notes, new Date());
     const id = recentStep(
       [...pinned.map(({ note }) => note.id), ...recent.map((note) => note.id)],
       currentNoteId,
@@ -241,9 +239,9 @@ export function Layout({
   const openPinned = (event: KeyboardEvent): false | undefined => {
     const key = pinKeyOf(event);
     const library = catalog.getSnapshot();
-    const id = key === null ? undefined : pins.getSnapshot()[key];
-    if (id === undefined || library.status !== "ready") return false;
-    if (!library.notes.some((note) => note.id === id)) return false;
+    if (key === null || library.status !== "ready") return false;
+    const id = pinsOf(library.notes)[key];
+    if (id === undefined) return false;
     if (id !== currentNoteId) void navigate(`/conspects/${encodeURIComponent(id)}`);
     return undefined;
   };
@@ -295,15 +293,7 @@ export function Layout({
     nextRecent: () => {
       openRecent(1);
     },
-    // On a note only: elsewhere Mod+Alt+1…0 stay the browser's.
-    ...(currentNoteId === null
-      ? {}
-      : {
-          pinNote: (event: KeyboardEvent) => {
-            const key = pinKeyOf(event);
-            if (key !== null) pins.toggle(key, currentNoteId);
-          },
-        }),
+    // Mod+Alt+1…0 (pinning) is the note page's: it edits the note.
     openPinned,
     help: () => {
       setShowShortcuts(true);
@@ -349,7 +339,6 @@ export function Layout({
       <Sidebar
         store={store}
         catalog={catalog}
-        pins={pins}
         open={sidebarOpen}
         currentNoteId={currentNoteId}
         activeTag={activeTag}

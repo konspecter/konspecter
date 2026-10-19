@@ -28,9 +28,11 @@ The interface speaks English and Russian ([i18n](i18n.md)). The account site sha
   `Mod+Alt+1`…`Mod+Alt+0` pins it to that key (the same keys again unpin it), and `Mod+1`…`Mod+0`
   opens it from any page, also in the editors. They are listed by key (1…9, then 0): the key as a small keycap where a
   folder has its chevron (not on the right, where the folders' counts are), then the document
-  icon and the title; a key holds one note and a note one key. A touch screen without a keyboard (`hover: none` and `pointer: coarse`) shows no keycaps, only the order. Pins belong to the device
-  (`NotePins` in `application/notes/note-pins.ts`, kept in localStorage like the folded panes,
-  following File Mode renames), and a pin whose note is gone is not shown. These and the details are panes, as in VS Code's side bar: each header (a chevron
+  icon and the title; a key holds one note and a note one key. A touch screen without a keyboard (`hover: none` and `pointer: coarse`) shows no keycaps, only the order. A pin is the note's own
+  frontmatter, `pin: 3` ([ADR-027](decisions/ADR-027-pins-in-frontmatter.md)), so it syncs with
+  the note and is in its file. Pinning is an edit (the open note's in its editor, the note that
+  gives up the key in the store), and of two notes claiming a key the one edited last holds it
+  (`application/notes/note-pins.ts`). These and the details are panes, as in VS Code's side bar: each header (a chevron
   and the title, a button with `aria-expanded`) folds or opens its pane (its height animated
   over 160 ms, `useFold`, the content still under the moving edge, so the details keep it at
   the bottom; at once with reduced motion), any number open at once;
