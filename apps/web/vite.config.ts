@@ -38,6 +38,33 @@ function csp(): Plugin {
   };
 }
 
+/**
+ * The splash screen (index.html) shows the version and paints before anything has loaded.
+ * In the build, the app's stylesheets are preloaded rather than linked, which would hold
+ * the first paint back until they arrive; `applyStyles` (presentation/app/splash.ts) applies
+ * them before the app renders.
+ */
+function splash(): Plugin[] {
+  return [
+    {
+      name: "konspecter-splash-version",
+      transformIndexHtml: {
+        order: "pre",
+        handler: (html) => html.replace("%KONSPECTER_VERSION%", packageJson.version),
+      },
+    },
+    {
+      name: "konspecter-splash-styles",
+      apply: "build",
+      transformIndexHtml: {
+        order: "post",
+        handler: (html) =>
+          html.replaceAll('<link rel="stylesheet"', '<link rel="preload" as="style"'),
+      },
+    },
+  ];
+}
+
 export default defineConfig({
   define: {
     // The version the app reports to the sync server (its device list).
@@ -46,6 +73,7 @@ export default defineConfig({
   plugins: [
     react(),
     csp(),
+    splash(),
     VitePWA({
       // Updates wait for the user: an automatic reload could interrupt an edit.
       registerType: "prompt",

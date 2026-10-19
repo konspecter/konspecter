@@ -31,6 +31,7 @@ import { restoreLocation } from "./presentation/app/last-location";
 import type { LibraryControls } from "./presentation/app/library";
 import type { CheckForRelease, Update, UpdateSource } from "./presentation/app/updates";
 import { isMac } from "./presentation/app/shortcuts";
+import { applyStyles, hideSplash, showStage } from "./presentation/app/splash";
 import { ErrorState } from "./presentation/components/ErrorState";
 import { stopFocusZoom } from "@konspecter/ui/viewport";
 import "@konspecter/ui/fonts.css";
@@ -38,6 +39,9 @@ import "@konspecter/ui/tokens.css";
 import "@konspecter/ui/base.css";
 import "@konspecter/ui/controls.css";
 import "./presentation/app/app.css";
+
+showStage("scripts");
+const styles = applyStyles();
 
 const rootElement = document.getElementById("root");
 if (!rootElement) {
@@ -109,6 +113,7 @@ try {
   const store = await openNoteStore();
   const settings = await store.loadSettings();
   applyLanguage(settings.language);
+  showStage("storage");
   updateCheck = settings.updateCheck;
 
   // On the desktop the library is a folder of Markdown files, ~/Konspecter
@@ -145,6 +150,7 @@ try {
 
   // Back to where the app was last time, before the router reads the address.
   await restoreLocation(async (id) => (await repository.get(id)) !== undefined);
+  showStage("library");
 
   // Sync runs in the background for the app library; the UI never waits for it.
   // On the desktop the access token lives in the OS keychain.
@@ -166,6 +172,7 @@ try {
       window.location.replace("/");
     },
   };
+  await styles;
   root.render(
     <StrictMode>
       <BrowserRouter>
@@ -189,6 +196,7 @@ try {
     </StrictMode>,
   );
 } catch (error) {
+  await styles;
   root.render(
     <StrictMode>
       <main className="content">
@@ -197,3 +205,5 @@ try {
     </StrictMode>,
   );
 }
+// React commits the render while the bookmark fills the rest and the splash fades.
+hideSplash();

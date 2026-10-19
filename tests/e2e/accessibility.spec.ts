@@ -1,8 +1,12 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
-/** WCAG 2.1 AA checks (axe-core) on every screen, in both themes. */
+/**
+ * WCAG 2.1 AA checks (axe-core) on every screen, in both themes. The start's splash screen,
+ * gone a moment after the app renders, is left out: its version is light gray on purpose.
+ */
 async function audit(page: Page) {
+  await expect(page.locator("#splash")).toHaveCount(0);
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
@@ -152,6 +156,7 @@ test("the top bars move the desktop window from edge to edge", async ({ page }) 
   await page.goto("/conspects/new");
   // The bars are probed point by point, which does not wait: let them render first.
   await expect(page.getByRole("button", { name: "Hide sidebar" })).toBeVisible();
+  await expect(page.locator("#splash")).toHaveCount(0);
   /** The points along the top bars that are neither a drag region nor a control. */
   const dead = () =>
     page.evaluate(() => {

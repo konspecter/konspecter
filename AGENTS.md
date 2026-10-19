@@ -79,6 +79,7 @@ All planned phases are done. New work needs a new plan in `.claude/plans/`.
 | Pins       | A pin is the note's frontmatter (`pin: 3`): synced, in the file, an edit    | Done   |
 | Outline    | Tree notes list their h1–h3 headings, nested; a heading scrolls the note    | Done   |
 | Releases   | The desktop app checks GitHub daily; a banner links to a newer release      | Done   |
+| Splash     | Logo at start-up, bookmark fills with the progress, version under it        | Done   |
 
 Where the packages are described: UI architecture: `docs/architecture/ui.md`; languages:
 `docs/architecture/i18n.md`; server and API: `docs/architecture/server.md`; sync:

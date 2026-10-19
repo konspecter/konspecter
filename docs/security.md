@@ -124,7 +124,7 @@ What Konspecter protects, from whom, and how. Every item below has tests unless 
 - **Content-Security-Policy** on the production web build (and the desktop app):
   `script-src 'self'` (no inline or remote script), `object-src 'none'`, `base-uri 'none'`,
   `form-action 'self'`. Styles allow `'unsafe-inline'` (React and CodeMirror set inline
-  styles); images and `connect-src` allow any `https:`/`http:` because notes show remote
+  styles, and the splash screen's style is inline in `index.html`); images and `connect-src` allow any `https:`/`http:` because notes show remote
   images and sync may use any server.
 - Server responses: `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src
 'none'`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store`.

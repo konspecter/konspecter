@@ -184,9 +184,36 @@ breakpoint in the CSS), in the browser, the PWA and the Android app alike.
   cycling), with a short linger so brief writes show as one pulse.
 - The editor mode is the `defaultEditor` setting; the top bar changes it.
 
+## The splash screen
+
+While the app starts, `index.html` shows the logo in the middle of the page, the version
+right under it in light gray. The logo's red bookmark is first an empty outline and fills
+with its colour from the bottom up as the start goes on.
+
+- **At the first paint.** The splash's markup and style are inline in `index.html`; nothing
+  in `<head>` blocks the paint, since the build preloads the app's stylesheets instead of
+  linking them (`vite.config.ts`) and `applyStyles` (`presentation/app/splash.ts`) applies
+  them before the app renders. The empty page paints at once (measured: 12–24 ms after the
+  page arrives); the logo fades in from 50 ms and is in by 150 ms.
+- **Progress.** A download cannot be measured byte by byte without fetching it twice, so
+  while the scripts load, a CSS timer fills the bookmark up to 55 %. Then `main.tsx` reports
+  the stages (`showStage`): scripts loaded 60 %, storage open 75 %, library ready 90 %. Two
+  filled layers, the timer's and the stages', show the higher. Once the app has rendered,
+  `hideSplash` fills the rest (150 ms), fades the splash out over the app (180 ms) and
+  removes it. `prefers-reduced-motion` stops the timer, the transitions and the fades.
+- **A fifth of the screen.** The logo's box takes 1/5 of the screen's area at its own aspect
+  ratio, in either orientation. The width √(0.2 · aspect · vw · vh) cannot be multiplied out
+  in CSS, so each band of screen aspect ratios uses the straight line through the band's
+  ends: under 1 % off in area from 1:3.4 to 3.4:1. On screens wider than about 2.4:1 the
+  height caps it (72vh) to keep the version in view; on tall ones, the width (80vw).
+- **Theme.** The splash follows the system's light or dark scheme: the chosen theme is in
+  the library, read later. The version is deliberately quieter than WCAG AA contrast; the
+  accessibility audits run once the splash has gone (`tests/e2e/splash.spec.ts` checks its
+  size and shape).
+
 ## No loading screens
 
-Nothing shows "Loading…". Local reads take milliseconds, so the space stays empty for that
+Inside the app, nothing shows "Loading…". Local reads take milliseconds, so the space stays empty for that
 moment; the editor chunk is preloaded when the browser is idle after start-up, and so is the
 search index. The **antenna** is the only activity indicator, in three states: light gray and
 still while idle, darker with animated waves while saving or syncing (the dark theme inverts

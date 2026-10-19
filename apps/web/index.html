@@ -12,8 +12,181 @@
     <meta name="theme-color" content="#1f1f1f" />
     <meta name="description" content="Local-first conspects in Markdown." />
     <title>Konspecter</title>
+    <!--
+      The splash screen, shown at the first paint while the app loads: everything it needs
+      is inline, and nothing in <head> holds the paint back (the build preloads the app's
+      stylesheets, presentation/app/splash.ts applies them). Until the scripts run, the
+      bookmark fills on a timer; then main.tsx sets how far the start is (--splash-progress).
+    -->
+    <style>
+      #splash {
+        --splash-bg: #fbfbfa;
+        --splash-strokes: #1f2328;
+        --splash-ribbon: #e5484d;
+        --splash-version: #b8b9b5;
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: grid;
+        place-items: center;
+        background: var(--splash-bg);
+      }
+      @media (prefers-color-scheme: dark) {
+        #splash {
+          --splash-bg: #31302d;
+          --splash-strokes: #f0eee8;
+          --splash-version: #6e6c66;
+        }
+      }
+      /*
+       * The logo's box takes a fifth of the screen's area at its own aspect ratio: its width
+       * is √(0.2 · 0.9216 · vw · vh), which CSS cannot multiply out, so each band of aspect
+       * ratios uses the straight line through its ends (under 1 % off in area). Very wide or
+       * tall screens cap it, to keep the version in view.
+       */
+      #splash .splash-logo {
+        --splash-width: calc(19.298vw + 23.635vh);
+        position: relative;
+        width: min(var(--splash-width), 66.36vh, 80vw);
+        aspect-ratio: 771.4 / 837;
+        /* The empty page paints at once; the logo is in by 150 ms. */
+        animation: splash-in 100ms ease-out 50ms both;
+      }
+      @media (min-aspect-ratio: 3/2) {
+        #splash .splash-logo {
+          --splash-width: calc(15.757vw + 28.947vh);
+        }
+      }
+      @media (min-aspect-ratio: 9/4) {
+        #splash .splash-logo {
+          --splash-width: calc(12.839vw + 35.511vh);
+        }
+      }
+      @media (max-aspect-ratio: 1/1) {
+        #splash .splash-logo {
+          --splash-width: calc(23.635vw + 19.298vh);
+        }
+      }
+      @media (max-aspect-ratio: 2/3) {
+        #splash .splash-logo {
+          --splash-width: calc(28.947vw + 15.757vh);
+        }
+      }
+      @media (max-aspect-ratio: 4/9) {
+        #splash .splash-logo {
+          --splash-width: calc(35.511vw + 12.839vh);
+        }
+      }
+      #splash svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      #splash .splash-strokes {
+        fill: var(--splash-strokes);
+      }
+      /* The empty bookmark is its outline; the filled layers draw the same outline, filled. */
+      #splash .splash-ribbon {
+        fill: none;
+        stroke: var(--splash-ribbon);
+        stroke-width: 7;
+        stroke-linejoin: round;
+      }
+      #splash .splash-fill .splash-ribbon {
+        fill: var(--splash-ribbon);
+      }
+      /* Two layers, and the higher shows: the timer while the scripts download, then the stages. */
+      #splash .splash-timer {
+        animation: splash-timer 20s cubic-bezier(0.2, 0.6, 0.35, 1) forwards;
+      }
+      #splash .splash-stages {
+        clip-path: inset(calc((1 - var(--splash-progress, 0)) * 100%) 0 0 0);
+        transition: clip-path 150ms ease-out;
+      }
+      @keyframes splash-in {
+        from {
+          opacity: 0;
+        }
+      }
+      @keyframes splash-timer {
+        from {
+          clip-path: inset(100% 0 0 0);
+        }
+        to {
+          clip-path: inset(45% 0 0 0);
+        }
+      }
+      #splash .splash-version {
+        position: absolute;
+        top: 100%;
+        right: 0;
+        left: 0;
+        margin: 1.5em 0 0;
+        color: var(--splash-version);
+        font:
+          12px/1.2 system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.04em;
+        text-align: center;
+      }
+      #splash.splash-out {
+        pointer-events: none;
+        animation: splash-out 180ms ease-in forwards;
+      }
+      @keyframes splash-out {
+        to {
+          opacity: 0;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #splash .splash-logo,
+        #splash .splash-timer,
+        #splash.splash-out {
+          animation: none;
+        }
+        #splash .splash-stages {
+          transition: none;
+        }
+      }
+    </style>
   </head>
   <body>
+    <div
+      id="splash"
+      role="progressbar"
+      aria-label="Konspecter"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      aria-valuenow="0"
+    >
+      <div class="splash-logo">
+        <svg viewBox="126.3 179.4 771.4 837" aria-hidden="true">
+          <defs>
+            <path
+              id="splash-ribbon"
+              d="M659.8 183.4 L632.8 284.2 L797.1 284.2 L824.1 183.4 Z M545.8 915.3 L602 1012.4 L751.1 456 L586.8 456 L437.7 1012.4 Z"
+            />
+          </defs>
+          <path
+            class="splash-strokes"
+            d="M307.2 426.1 L337.2 314.1 L236.4 314.1 L206.4 426.1 Z M863.7 426.1 L893.7 314.1 L509 314.1 L479 426.1 Z M411.1 568 L514.2 183.4 L402.1 183.4 L299.1 568 Z M488.8 709.9 L518.9 597.9 L160.3 597.9 L130.3 709.9 Z M787.6 709.9 L817.6 597.9 L742.9 597.9 L712.9 709.9 Z M226 840.6 L338 840.6 L365.1 739.8 L253 739.8 Z"
+          />
+          <use class="splash-ribbon" href="#splash-ribbon" />
+        </svg>
+        <svg class="splash-fill splash-timer" viewBox="126.3 179.4 771.4 837" aria-hidden="true">
+          <use class="splash-ribbon" href="#splash-ribbon" />
+        </svg>
+        <svg class="splash-fill splash-stages" viewBox="126.3 179.4 771.4 837" aria-hidden="true">
+          <use class="splash-ribbon" href="#splash-ribbon" />
+        </svg>
+        <p class="splash-version">%KONSPECTER_VERSION%</p>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
