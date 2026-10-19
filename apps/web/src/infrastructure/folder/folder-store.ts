@@ -58,10 +58,12 @@ type CachedFile = {
  * not listed (the native side does not even walk into them), and no note is
  * made or moved into a folder it skips.
  *
- * A note saved before it had a title is "untitled.md" ("untitled-2.md" …).
- * That name is a placeholder: the file takes its title's name once there is
- * one, whether or not files follow their titles, and files found with it
- * when the folder opens are renamed then.
+ * A note being written in the editor follows its title until it is closed
+ * (`settleName`), whether or not files follow their titles: its first save
+ * may have caught the title half typed. A note saved before it had a title
+ * is "untitled.md" ("untitled-2.md" …). That name is a placeholder: the file
+ * takes its title's name once there is one, and files found with it when the
+ * folder opens are renamed then.
  */
 export class FolderStore implements NoteRepository {
   readonly #folder: FolderBridge;
@@ -74,9 +76,9 @@ export class FolderStore implements NoteRepository {
   /** Paths being renamed by this app: the watcher's reports of them are its own. */
   readonly #moving = new Set<string>();
   /**
-   * Files renamed from "untitled" while their titles were being typed: they
-   * keep following their titles while the app runs, so a save in the middle
-   * of a title ("ha.md") does not name the file for good.
+   * Files that follow their titles until their notes are closed: new notes
+   * from the editor, and "untitled" files being given titles. A save in the
+   * middle of a title ("ha.md") does not name the file for good.
    */
   readonly #followingTitle = new Set<string>();
 
@@ -344,11 +346,12 @@ export class FolderStore implements NoteRepository {
   /**
    * Creates a new file named after the note's title, in the folder of its
    * first tag chain (the top level without tags, or when the rules skip that
-   * folder).
+   * folder). With `followTitle` the name follows the title until `settleName`.
    */
-  async create(markdown: string, now: Date): Promise<Note> {
+  async create(markdown: string, now: Date, { followTitle = false } = {}): Promise<Note> {
     await this.#ensureLoaded();
     const created = await this.#newFile(createNote(markdown, now));
+    if (followTitle) this.#followingTitle.add(created.id);
     this.#emit({ noteId: created.id, source: "local" });
     return created;
   }
@@ -364,6 +367,11 @@ export class FolderStore implements NoteRepository {
     const created = this.#remember(entry, note.markdown);
     this.#moving.delete(entry.path);
     return created;
+  }
+
+  /** The note was closed: its file keeps its name, unless the setting renames it. */
+  settleName(id: string): void {
+    this.#followingTitle.delete(id);
   }
 
   /**
@@ -408,8 +416,8 @@ export class FolderStore implements NoteRepository {
    * Moves a saved file where its note says it belongs, unless it is there:
    * into the folder of its first tag chain when the save changed that chain
    * (from `previous`), and to its title's slug when its name no longer fits
-   * and files follow their titles, or this one does (an "untitled" file, see
-   * `#followingTitle`). A file whose chain the save kept stays in its folder,
+   * and files follow their titles, or this one does (a new or "untitled"
+   * file, see `#followingTitle`). A file whose chain the save kept stays in its folder,
    * so files left where they are (see `reformat`) stay there.
    */
   async #relocate(path: string, previous: string | undefined): Promise<Note | null> {

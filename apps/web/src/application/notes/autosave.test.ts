@@ -55,7 +55,9 @@ describe("a new note's first save", () => {
 
     autosave.change(() => "# Hash maps\n\nB");
     await vi.waitFor(() => {
-      expect(create).toHaveBeenCalledWith("# Hash maps\n\nB", expect.any(Date));
+      expect(create).toHaveBeenCalledWith("# Hash maps\n\nB", expect.any(Date), {
+        followTitle: true,
+      });
     });
   });
 
@@ -67,6 +69,39 @@ describe("a new note's first save", () => {
     await vi.waitFor(async () => {
       expect(await store.list()).toHaveLength(1);
     });
+  });
+});
+
+describe("the file name", () => {
+  it("is settled once the editor is gone and its last save is written", async () => {
+    const store = await newStore();
+    const settleName = vi.fn<(id: string) => void>();
+    const autosave = new Autosave(Object.assign(store, { settleName }), null);
+
+    autosave.change(() => "# Draft");
+    await autosave.flush();
+    expect(settleName).not.toHaveBeenCalled();
+
+    autosave.detach();
+    autosave.change(() => "# Draft\n\nMore");
+    await autosave.flush();
+    expect(settleName).toHaveBeenCalledWith(autosave.note?.id);
+  });
+
+  it("stays open when the editor comes back before the save ends", async () => {
+    const store = await newStore();
+    const settleName = vi.fn<(id: string) => void>();
+    const autosave = new Autosave(Object.assign(store, { settleName }), null);
+    autosave.change(() => "# Draft");
+
+    // React's development mode unmounts and mounts an effect at once.
+    autosave.detach();
+    const flushed = autosave.flush();
+    autosave.attach();
+    await flushed;
+
+    expect(autosave.note).not.toBeNull();
+    expect(settleName).not.toHaveBeenCalled();
   });
 });
 

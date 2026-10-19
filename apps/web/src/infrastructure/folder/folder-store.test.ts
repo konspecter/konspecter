@@ -214,6 +214,38 @@ describe("FolderStore", () => {
       expect(kept.id).toBe("test.md");
     });
 
+    it("names a new note after its title until it is closed, with the setting off", async () => {
+      const { folder, store } = await setup();
+
+      // The first save caught a title typed in the wrong keyboard layout.
+      const created = await store.create("# cnfnm", now, { followTitle: true });
+      const typed = await store.put(updateNote(created, "# Статья\n\nText", now));
+      expect([created.id, typed.id]).toEqual(["cnfnm.md", "statya.md"]);
+
+      store.settleName(typed.id);
+      const kept = await store.put(updateNote(typed, "# Другая статья\n\nText", now));
+      expect(kept.id).toBe("statya.md");
+      expect([...folder.files.keys()]).toEqual(["statya.md"]);
+    });
+
+    it("keeps the names of notes not written in the editor", async () => {
+      const { store } = await setup();
+      const imported = await store.create("# Imported", now);
+
+      const saved = await store.put(updateNote(imported, "# Renamed", now));
+      expect(saved.id).toBe("imported.md");
+    });
+
+    it("settles an untitled file's name when its note is closed", async () => {
+      const { store } = await setup();
+      const created = await store.create("- ", now);
+
+      const typing = await store.put(updateNote(created, "# Ha", now));
+      store.settleName(typing.id);
+      const kept = await store.put(updateNote(typing, "# Hash maps", now));
+      expect([typing.id, kept.id]).toEqual(["ha.md", "ha.md"]);
+    });
+
     it("renames untitled files that have titles when the folder opens", async () => {
       const { folder, store } = await setup();
       folder.edit("untitled.md", "# Hash maps");

@@ -145,12 +145,18 @@ is left. "Hello мир!" is `hello-mir.md`. Letters of other scripts are kept as
   `test.md` titled "Hello мир!" becomes `hello-mir.md`. A name that fits already is kept,
   numbered ones too (`hello-mir-2.md`), and `Maps.md` becomes `maps.md` by a change of case
   only. Files that are never saved from the app keep whatever names they have.
-- **Untitled files** follow their titles whatever the setting: `untitled.md` (and
-  `untitled-2.md` …) is a placeholder for a note saved before it had a title. A save that
-  gives it a title renames it, and the file keeps following its title while the app runs,
-  so a save in the middle of the title ("ha.md") does not name it for good. Files found
-  with such a name and a title when the folder opens are renamed then, in their folders.
-  Only that lower-case name counts: `Untitled.md` from another program is left alone.
+- **New notes follow their titles until closed**, whatever the setting: the first save of
+  a new note may catch its title half typed, or typed in the wrong keyboard layout ("cnfnm"
+  on the way to "Статья"). The editor creates it with `followTitle` (`Autosave`), so every
+  save renames the file after the title while the note is open. Closing it (its editor
+  session ends and the last save is written) calls `settleName`, and the name stays from then
+  on. Notes created otherwise (imported, the welcome example, from sync) keep their names.
+- **Untitled files** follow their titles the same way: `untitled.md` (and `untitled-2.md` …)
+  is a placeholder for a note saved before it had a title. A save that gives it a title
+  renames it, and the file keeps following its title until the note is closed, so a save in
+  the middle of the title ("ha.md") does not name it for good. Files found with such a name
+  and a title when the folder opens are renamed then, in their folders. Only that lower-case
+  name counts: `Untitled.md` from another program is left alone.
 - A rename never replaces another file: `folder_rename` fails with `exists` for a name taken
   by a file the app has not seen yet, and the next number is tried. `put` returns the note
   under its new id and emits a change with `previousId`. The open note's autosave

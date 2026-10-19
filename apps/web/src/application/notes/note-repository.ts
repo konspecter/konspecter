@@ -32,8 +32,12 @@ export type NoteChange = {
 export interface NoteRepository {
   list(): Promise<Note[]>;
   get(id: string): Promise<Note | undefined>;
-  /** Stores a new note; the backend chooses its id (a UUID, or a file name). */
-  create(markdown: string, now: Date): Promise<Note>;
+  /**
+   * Stores a new note; the backend chooses its id (a UUID, or a file name).
+   * `followTitle`: the note is being written in the editor, so in File Mode
+   * its file is renamed after its title on every save until `settleName`.
+   */
+  create(markdown: string, now: Date, options?: { followTitle?: boolean }): Promise<Note>;
   /**
    * Saves an existing note and returns it as stored. Its id can change: in
    * File Mode a file that follows its title is renamed.
@@ -55,6 +59,11 @@ export interface NoteRepository {
   removeUnreadable?(keys: readonly string[]): Promise<void>;
   /** App library only: discards derived indexes and rebuilds them from the notes. */
   rebuildIndexes?(): Promise<void>;
+  /**
+   * File Mode only: the note was closed, and its last save written. A file
+   * that followed its title while it was open keeps its name from now on.
+   */
+  settleName?(id: string): void;
   /** File Mode only: opens the note's file in the system's default Markdown app. */
   openExternally?(id: string): Promise<void>;
   /** File Mode only: shows the note's file in the system file manager. */

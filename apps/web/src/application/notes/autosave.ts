@@ -133,9 +133,17 @@ export class Autosave {
     this.#timer = setTimeout(() => void this.flush(), wait);
   }
 
-  /** Saves any pending change now. Never rejects: problems go to `onProblem`. */
+  /**
+   * Saves any pending change now. Never rejects: problems go to `onProblem`.
+   * Once the editor is gone (`detach`), the note's file name is settled
+   * after this save (see `NoteRepository.settleName`).
+   */
   flush(): Promise<void> {
-    const done = this.#flush();
+    const done = this.#flush().then(() => {
+      // Read after the save: an editor that came back meanwhile keeps the name open.
+      const note = this.#base;
+      if (!this.#attached && note) this.#store.settleName?.(note.id);
+    });
     const id = this.#base?.id;
     if (id !== undefined) track(this.#store, id, done);
     return done;
@@ -162,7 +170,8 @@ export class Autosave {
 
   /**
    * The editor is gone (the user moved on): pending text is still saved, but
-   * onCreated, onRenamed, onSaved and onProblem are no longer called. `attach` undoes it.
+   * onCreated, onRenamed, onSaved and onProblem are no longer called, and the
+   * next flush settles the file name. `attach` undoes it.
    */
   detach(): void {
     this.#attached = false;
@@ -220,7 +229,8 @@ export class Autosave {
     const base = this.#base;
     if (base === null) {
       if (markdown.trim() === "") return;
-      const note = await this.#store.create(markdown, now);
+      // The first save may catch the title half typed: the file follows it until closed.
+      const note = await this.#store.create(markdown, now, { followTitle: true });
       this.#adopt(note, markdown);
       if (this.#attached) this.#events.onCreated?.(note);
       return;

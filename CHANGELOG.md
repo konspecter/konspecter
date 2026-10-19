@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **New notes take their finished titles:** in a Markdown folder, a new note's file follows its
+  title until the note is closed, so a first save of a half-typed title (or one typed in the
+  wrong keyboard layout) no longer names the file for good.
+
 ## 0.7.0 — 2026-10-16
 
 - **Formatting as you type:** in Text mode, typing the closing marker of `` `code` ``, `*em*`,
