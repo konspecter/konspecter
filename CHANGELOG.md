@@ -1,11 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.11.0 — 2026-10-20
 
 - **A splash screen while the app starts:** the web, desktop and mobile apps no longer show a
   blank page while they load, which a slow connection made long. The logo appears in the middle
   of the screen at once, at a fifth of its area in either orientation, with the version under
   it, and its red bookmark fills from the bottom up as the app gets ready.
+- **Auto renew remembers your choice:** the subscribe form in the settings starts with Auto
+  renew as you last chose it, so after paying for one period it starts unticked, even if you
+  left that checkout without paying.
 
 ## 0.10.0 — 2026-10-20
 
