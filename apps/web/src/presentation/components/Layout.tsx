@@ -10,7 +10,7 @@ import type { Activity } from "../app/activity";
 import { rememberLocation } from "../app/last-location";
 import { pinKeyOf, SHORTCUTS } from "../app/shortcuts";
 import type { UpdateSource } from "../app/updates";
-import { stepsBack, useHistorySteps } from "../hooks/use-history-steps";
+import { stepsAway, useHistorySteps } from "../hooks/use-history-steps";
 import { useShortcuts } from "../hooks/use-shortcuts";
 import { useSwipe } from "../hooks/use-swipe";
 import { Antenna } from "./Antenna";
@@ -29,6 +29,8 @@ import { isNarrow, useNarrow } from "../hooks/use-narrow";
 import { useScrollbarGutter } from "../hooks/use-scrollbar-gutter";
 
 const SETTINGS_PATH = "/settings";
+/** Settings is gone through, not gone back or forward to (Escape, swipes). */
+const passedBy = (path: string) => path === SETTINGS_PATH;
 
 type LayoutProps = {
   store: NoteRepository;
@@ -178,10 +180,6 @@ export function Layout({
       )?.focus();
     });
   }, []);
-  // On touch screens a sideways swipe shows (to the right) or hides (to the left) the sidebar.
-  useSwipe((direction) => {
-    if ((direction === "right") !== sidebarOpen) toggleSidebar();
-  });
   // Mod+\ that shows the sidebar also goes into it, to the open note; hiding
   // it from there gives the focus back to where it was (the editor's caret).
   const returnFocus = useRef<HTMLElement | null>(null);
@@ -249,20 +247,33 @@ export function Layout({
     if (id !== currentNoteId) void navigate(`/conspects/${encodeURIComponent(id)}`);
     return undefined;
   };
+  // Back or forward, but never into Settings (past it); with nothing further
+  // back in the app's history, back is to the list (if not there yet).
+  // Whether it went anywhere.
+  const goPastSettings = (direction: -1 | 1): boolean => {
+    const delta = stepsAway(historySteps.steps, direction, passedBy);
+    if (delta !== null) {
+      void navigate(delta);
+      return true;
+    }
+    if (direction === 1 || (location.pathname === "/" && location.search === "")) return false;
+    void navigate("/");
+    return true;
+  };
+  // On touch screens a sideways swipe goes through the history as Escape
+  // does: to the right back, to the left forward. On a narrow screen the
+  // sidebar, which covers the page, closes to show where it went.
+  useSwipe((direction) => {
+    if (goPastSettings(direction === "right" ? -1 : 1)) closeSidebarOnNarrow();
+  });
   useShortcuts({
     search: openSearch,
     quickSearch: openSearch,
     // Elsewhere Mod+F stays the browser's.
     ...(onNote ? { find: openFind } : {}),
-    // Back, as ‹, from the list, a search, a note or Settings, but never into
-    // Settings (back past it); with nothing further back in the app's
-    // history, to the list (if not there yet). Other pages keep it.
+    // Back, as ‹, from the list, a search, a note or Settings. Other pages keep it.
     escapeBack: () => {
-      const onList = location.pathname === "/";
-      if (!onList && !onNote && !onSettings) return;
-      const delta = stepsBack(historySteps.steps, (path) => path === SETTINGS_PATH);
-      if (delta !== null) void navigate(delta);
-      else if (!onList || location.search !== "") void navigate("/");
+      if (location.pathname === "/" || onNote || onSettings) goPastSettings(-1);
     },
     newNote,
     quickNewNote: newNote,

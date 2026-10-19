@@ -27,11 +27,20 @@ export function stepHistory(
 }
 
 /**
- * How many steps back the nearest earlier entry is whose path is not
- * `skipped` (a negative delta for `navigate`), or null when there is none.
+ * How many steps away the nearest entry back (`direction` -1) or forward (1)
+ * is whose path is not `skipped` (the delta for `navigate`), or null when
+ * there is none.
  */
-export function stepsBack(steps: HistorySteps, skipped: (path: string) => boolean): number | null {
-  for (let index = steps.index - 1; index >= 0; index--) {
+export function stepsAway(
+  steps: HistorySteps,
+  direction: -1 | 1,
+  skipped: (path: string) => boolean,
+): number | null {
+  for (
+    let index = steps.index + direction;
+    index >= 0 && index < steps.entries.length;
+    index += direction
+  ) {
     const entry = steps.entries[index];
     if (entry && !skipped(entry.path)) return index - steps.index;
   }
@@ -40,7 +49,7 @@ export function stepsBack(steps: HistorySteps, skipped: (path: string) => boolea
 
 /**
  * Whether the app can go back and forward in its history (the top bar's ‹
- * and ›), and the history itself (Escape goes back past some pages).
+ * and ›), and the history itself (Escape and swipes go past some pages).
  */
 export function useHistorySteps(): {
   readonly back: boolean;

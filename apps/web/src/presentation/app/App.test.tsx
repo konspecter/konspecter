@@ -284,8 +284,12 @@ describe("layout", () => {
     expect(open()).toBe("2Old");
   });
 
-  it("hides and shows the sidebar with a sideways swipe", async () => {
-    renderApp(await newStore());
+  it("goes back with a swipe to the right and forward with one to the left, past Settings", async () => {
+    const store = await newStore();
+    await store.put(createNote("# Bee\n\nB.", daysAgo(1), "bee"));
+    await store.put(createNote("# Sea\n\nC.", daysAgo(2), "sea"));
+    renderApp(store);
+    await noteList();
     const swipe = (fromX: number, toX: number) => {
       fireEvent.touchStart(document.body, { touches: [{ clientX: fromX, clientY: 300 }] });
       fireEvent.touchEnd(document.body, {
@@ -293,10 +297,36 @@ describe("layout", () => {
         changedTouches: [{ clientX: toX, clientY: 310 }],
       });
     };
+    const openInRecent = async (name: string) => {
+      await userEvent.click(within(recentNav()).getByRole("link", { name }));
+      await waitFor(() => {
+        expect(within(recentNav()).getByRole("link", { current: "page" })).toHaveTextContent(name);
+      });
+    };
+    const settingsHeading = () => screen.queryByRole("heading", { level: 1, name: "Settings" });
 
-    swipe(300, 100);
-    expect(screen.queryByRole("complementary", { name: "Sidebar" })).not.toBeInTheDocument();
+    // A (the list) ← B ← Settings ← C.
+    await openInRecent("Bee");
+    await userEvent.click(within(sidebar()).getByRole("link", { name: "Settings" }));
+    await screen.findByRole("heading", { level: 1, name: "Settings" });
+    await openInRecent("Sea");
+
+    // Back from C to B (past Settings), then A; nothing further back.
     swipe(100, 300);
+    expect(await textEditor()).toHaveTextContent("B.");
+    expect(settingsHeading()).not.toBeInTheDocument();
+    swipe(100, 300);
+    expect(await listTitles()).toEqual(["Bee", "Sea"]);
+    swipe(100, 300);
+    expect(await listTitles()).toEqual(["Bee", "Sea"]);
+
+    // Forward from A to B, then C (past Settings).
+    swipe(300, 100);
+    expect(await textEditor()).toHaveTextContent("B.");
+    swipe(300, 100);
+    expect(await textEditor()).toHaveTextContent("C.");
+    expect(settingsHeading()).not.toBeInTheDocument();
+    // The sidebar stays as it was.
     expect(sidebar()).toBeInTheDocument();
   });
 

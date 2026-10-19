@@ -1,5 +1,5 @@
 import { NavigationType } from "react-router";
-import { stepHistory, stepsBack, type HistorySteps } from "./use-history-steps";
+import { stepHistory, stepsAway, type HistorySteps } from "./use-history-steps";
 
 const at = (key: string, path = `/${key}`) => ({ key, path });
 
@@ -38,7 +38,7 @@ describe("stepHistory", () => {
   });
 });
 
-describe("stepsBack", () => {
+describe("stepsAway", () => {
   const settings = (path: string) => path === "/settings";
 
   it("goes back one step, or past the skipped pages", () => {
@@ -46,13 +46,26 @@ describe("stepsBack", () => {
       entries: [at("a", "/"), at("b", "/settings"), at("c", "/settings"), at("d", "/conspects/d")],
       index: 3,
     };
-    expect(stepsBack(steps, () => false)).toBe(-1);
-    expect(stepsBack(steps, settings)).toBe(-3);
+    expect(stepsAway(steps, -1, () => false)).toBe(-1);
+    expect(stepsAway(steps, -1, settings)).toBe(-3);
   });
 
-  it("finds nothing at the start, or with only skipped pages behind", () => {
-    expect(stepsBack({ entries: [at("a", "/")], index: 0 }, settings)).toBeNull();
+  it("goes forward one step, or past the skipped pages", () => {
+    const steps = {
+      entries: [at("a", "/"), at("b", "/settings"), at("c", "/settings"), at("d", "/conspects/d")],
+      index: 0,
+    };
+    expect(stepsAway(steps, 1, () => false)).toBe(1);
+    expect(stepsAway(steps, 1, settings)).toBe(3);
+  });
+
+  it("finds nothing at the ends, or with only skipped pages that way", () => {
+    expect(stepsAway({ entries: [at("a", "/")], index: 0 }, -1, settings)).toBeNull();
+    expect(stepsAway({ entries: [at("a", "/")], index: 0 }, 1, settings)).toBeNull();
     const steps = { entries: [at("b", "/settings"), at("d", "/conspects/d")], index: 1 };
-    expect(stepsBack(steps, settings)).toBeNull();
+    expect(stepsAway(steps, -1, settings)).toBeNull();
+    expect(stepsAway({ ...steps, index: 0 }, 1, settings)).toBe(1);
+    const ahead = { entries: [at("d", "/conspects/d"), at("b", "/settings")], index: 0 };
+    expect(stepsAway(ahead, 1, settings)).toBeNull();
   });
 });

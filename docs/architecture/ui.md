@@ -97,7 +97,9 @@ breakpoint in the CSS), in the browser, the PWA and the Android app alike.
   `scrollMargin` and CodeMirror's `scrollMargins`). The viewport meta has
   `interactive-widget=resizes-content`, so the island rides above the soft keyboard.
 - **Swipes** (`hooks/use-swipe.ts`, on every touch screen, wide ones too): a sideways swipe
-  shows the sidebar (to the right) or hides it (to the left). A swipe is one finger moving at
+  goes through the app's history as `Esc` does, past Settings: to the right back (to the list
+  when there is nothing further back), to the left forward. One that goes somewhere closes the
+  full-screen sidebar, so the page it went to shows. A swipe is one finger moving at
   least 60px sideways, twice as far as up or down, within 600 ms (`swipeDirection`). It
   does not count when it starts in a dialog or in something that scrolls sideways (a code
   block, a table), or while text is selected.
@@ -242,7 +244,7 @@ on the key (a handler returns `false` to let the keys go on), and `Mod+Alt+1…0
 note. AltGr with a digit, which Windows reports as Ctrl+Alt and which types `{` and `[` on a
 German layout, is not a pin.
 `Esc` goes back, as `‹` does, from the list, a search, a note and Settings, also in the editor,
-but never into Settings: it goes back past it (`stepsBack`; the app's history keeps each entry's
+but never into Settings: it goes back past it (`stepsAway`; the app's history keeps each entry's
 path). So with A ← B ← Settings ← C it goes from C to B, then A, and from Settings opened after
 B to B, then A. With nothing further back in the app's history it goes to the list, unless
 already there; on other pages it does nothing. It gives way where Escape already means something: an
