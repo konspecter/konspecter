@@ -29,7 +29,7 @@ import { isNarrow, useNarrow } from "../hooks/use-narrow";
 import { useScrollbarGutter } from "../hooks/use-scrollbar-gutter";
 
 const SETTINGS_PATH = "/settings";
-/** Settings is gone through, not gone back or forward to (Escape, swipes). */
+/** Settings is gone through, not gone back or forward to by a swipe. */
 const passedBy = (path: string) => path === SETTINGS_PATH;
 
 type LayoutProps = {
@@ -111,7 +111,6 @@ export function Layout({
   const matchedId = noteMatch?.params.id;
   const currentNoteId = matchedId === undefined || matchedId === "new" ? null : matchedId;
   const onNote = noteMatch !== null;
-  const onSettings = location.pathname === SETTINGS_PATH;
   const [sidebarOpen, setSidebarOpen] = useState(initialSidebarOpen);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [detailsSlot, setDetailsSlot] = useState<HTMLDivElement | null>(null);
@@ -261,8 +260,8 @@ export function Layout({
     void navigate("/");
     return true;
   };
-  // On touch screens a sideways swipe goes through the history as Escape
-  // does: to the right back, to the left forward. On a narrow screen the
+  // On touch screens a sideways swipe goes through the history: to the
+  // right back, to the left forward. On a narrow screen the
   // sidebar, which covers the page, closes to show where it went.
   useSwipe((direction) => {
     if (goPastSettings(direction === "right" ? -1 : 1)) closeSidebarOnNarrow();
@@ -272,10 +271,6 @@ export function Layout({
     quickSearch: openSearch,
     // Elsewhere Mod+F stays the browser's.
     ...(onNote ? { find: openFind } : {}),
-    // Back, as ‹, from the list, a search, a note or Settings. Other pages keep it.
-    escapeBack: () => {
-      if (location.pathname === "/" || onNote || onSettings) goPastSettings(-1);
-    },
     newNote,
     quickNewNote: newNote,
     settings: () => void navigate(SETTINGS_PATH),

@@ -420,7 +420,7 @@ describe("layout", () => {
     await store.put(recentJavaNote);
     renderApp(store, "/notes/java");
 
-    expect(await textEditor()).toHaveTextContent("Java Collections");
+    expect(await textEditor()).toHaveTextContent("ArrayList");
     const link = within(recentNav()).getByRole("link", { name: "Java Collections" });
     expect(link).toHaveAttribute("href", "/conspects/java");
     expect(link).toHaveAttribute("aria-current", "page");
@@ -2760,7 +2760,7 @@ describe("keyboard shortcuts", () => {
     expect(await listTitles()).toHaveLength(1);
   });
 
-  it("goes back with Escape from the list, a search and the editor", async () => {
+  it("never goes anywhere with Escape: not from the editor, a search or Settings", async () => {
     const store = await newStore();
     await store.put(javaNote);
     renderApp(store);
@@ -2769,75 +2769,13 @@ describe("keyboard shortcuts", () => {
     await userEvent.click(within(await noteList()).getByRole("link", { name: /Java Collections/ }));
     await userEvent.click(await textEditor());
 
-    // From the editor back to the search, from the search back to the list.
     await userEvent.keyboard("{Escape}");
-    expect(await listTitles()).toEqual(["Java Collections"]);
-    await waitFor(() => {
-      expect(searchBox()).toHaveValue("java");
-    });
-    await userEvent.keyboard("{Escape}");
-    await waitFor(() => {
-      expect(searchBox()).toHaveValue("");
-    });
-  });
+    expect(await textEditor()).toHaveTextContent("ArrayList");
 
-  it("goes to the list with Escape from a note opened first", async () => {
-    const store = await newStore();
-    await store.put(javaNote);
-    renderApp(store, "/conspects/java");
-    await userEvent.click(await textEditor());
-    await userEvent.keyboard("{Escape}");
-    // Nowhere further back within the app: every note.
-    expect(await listTitles()).toEqual(["Java Collections"]);
-    expect(screen.queryByRole("textbox", { name: "Conspect text" })).not.toBeInTheDocument();
-  });
-
-  it("goes out of Settings with Escape, and never back into it", async () => {
-    const store = await newStore();
-    await store.put(createNote("# Bee\n\nB.", daysAgo(1), "bee"));
-    await store.put(createNote("# Sea\n\nC.", daysAgo(2), "sea"));
-    renderApp(store);
-    await noteList();
-    const settingsLink = () => within(sidebar()).getByRole("link", { name: "Settings" });
-    const settingsHeading = () => screen.queryByRole("heading", { level: 1, name: "Settings" });
-    const openInRecent = async (name: string) => {
-      await userEvent.click(within(recentNav()).getByRole("link", { name }));
-      await waitFor(() => {
-        expect(within(recentNav()).getByRole("link", { current: "page" })).toHaveTextContent(name);
-      });
-    };
-
-    // A (the list) ← B ← Settings: Escape goes to B, then A.
-    await openInRecent("Bee");
-    await userEvent.click(settingsLink());
+    await userEvent.click(within(sidebar()).getByRole("link", { name: "Settings" }));
     await screen.findByRole("heading", { level: 1, name: "Settings" });
     await userEvent.keyboard("{Escape}");
-    expect(await textEditor()).toHaveTextContent("B.");
-    await userEvent.keyboard("{Escape}");
-    expect(await listTitles()).toEqual(["Bee", "Sea"]);
-
-    // A ← B ← Settings ← C: Escape goes from C to B (past Settings), then A.
-    await openInRecent("Bee");
-    await userEvent.click(settingsLink());
-    await screen.findByRole("heading", { level: 1, name: "Settings" });
-    await openInRecent("Sea");
-    await userEvent.click(await textEditor());
-    await userEvent.keyboard("{Escape}");
-    await waitFor(() => {
-      expect(within(recentNav()).getByRole("link", { current: "page" })).toHaveTextContent("Bee");
-    });
-    expect(settingsHeading()).not.toBeInTheDocument();
-    await userEvent.keyboard("{Escape}");
-    expect(await listTitles()).toEqual(["Bee", "Sea"]);
-  });
-
-  it("goes from Settings opened first to the list with Escape", async () => {
-    const store = await newStore();
-    await store.put(javaNote);
-    renderApp(store, "/settings");
-    await screen.findByRole("heading", { level: 1, name: "Settings" });
-    await userEvent.keyboard("{Escape}");
-    expect(await listTitles()).toEqual(["Java Collections"]);
+    expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument();
   });
 
   it("leaves Escape to dialogs and the search box", async () => {

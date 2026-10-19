@@ -100,7 +100,7 @@ breakpoint in the CSS), in the browser, the PWA and the Android app alike.
   `scrollMargin` and CodeMirror's `scrollMargins`). The viewport meta has
   `interactive-widget=resizes-content`, so the island rides above the soft keyboard.
 - **Swipes** (`hooks/use-swipe.ts`, on every touch screen, wide ones too): a sideways swipe
-  goes through the app's history as `Esc` does, past Settings: to the right back (to the list
+  goes through the app's history, past Settings: to the right back (to the list
   when there is nothing further back), to the left forward. One that goes somewhere closes the
   full-screen sidebar, so the page it went to shows. A swipe is one finger moving at
   least 60px sideways, twice as far as up or down, within 600 ms (`swipeDirection`). It
@@ -214,24 +214,23 @@ One registry, `presentation/app/shortcuts.ts`, used by the handlers and by the l
 `?` dialog and in Settings. `Mod` is ⌘ on macOS and Ctrl elsewhere, `Alt` is ⌥; the physical key is also
 matched, so the shortcuts work on Cyrillic layouts.
 
-| Keys          | Action                          | Where                                |
-| ------------- | ------------------------------- | ------------------------------------ |
-| `Mod+P`       | Search                          | everywhere, also in editors          |
-| `Mod+F`       | Search in the open note         | the note page, also in editors       |
-| `Esc`         | Back (the list at the start)    | the list, a search, a note, Settings |
-| `Mod+N`       | New note                        | everywhere, also in editors          |
-| `Mod+,`       | Settings                        | everywhere, also in editors          |
-| `Mod+\`       | Show or hide the sidebar        | everywhere, also in editors          |
-| `Mod+/`       | Switch text editor and Markdown | everywhere, also in editors          |
-| `Mod+←`       | Back (the search box's ‹)       | outside text fields                  |
-| `Mod+→`       | Forward (the search box's ›)    | outside text fields                  |
-| `Mod+Alt+←`   | Previous note in Recent         | everywhere, also in editors          |
-| `Mod+Alt+→`   | Next note in Recent             | everywhere, also in editors          |
-| `Mod+Alt+1…0` | Pin the note to Recent, unpin   | the note page, also in editors       |
-| `Mod+1…0`     | Open the note pinned to the key | everywhere, also in editors          |
-| `Mod+S`       | Save now                        | the editor                           |
-| `/` `n`       | Search, new note                | outside text fields                  |
-| `?`           | Show the shortcuts              | outside text fields                  |
+| Keys          | Action                          | Where                          |
+| ------------- | ------------------------------- | ------------------------------ |
+| `Mod+P`       | Search                          | everywhere, also in editors    |
+| `Mod+F`       | Search in the open note         | the note page, also in editors |
+| `Mod+N`       | New note                        | everywhere, also in editors    |
+| `Mod+,`       | Settings                        | everywhere, also in editors    |
+| `Mod+\`       | Show or hide the sidebar        | everywhere, also in editors    |
+| `Mod+/`       | Switch text editor and Markdown | everywhere, also in editors    |
+| `Mod+←`       | Back (the search box's ‹)       | outside text fields            |
+| `Mod+→`       | Forward (the search box's ›)    | outside text fields            |
+| `Mod+Alt+←`   | Previous note in Recent         | everywhere, also in editors    |
+| `Mod+Alt+→`   | Next note in Recent             | everywhere, also in editors    |
+| `Mod+Alt+1…0` | Pin the note to Recent, unpin   | the note page, also in editors |
+| `Mod+1…0`     | Open the note pinned to the key | everywhere, also in editors    |
+| `Mod+S`       | Save now                        | the editor                     |
+| `/` `n`       | Search, new note                | outside text fields            |
+| `?`           | Show the shortcuts              | outside text fields            |
 
 Modifier shortcuts are caught in the capture phase, before editors and the browser (no print
 dialog on `Mod+P`), and go no further (CodeMirror's own `Mod-/` does not comment the line).
@@ -246,13 +245,9 @@ Keys that are not ours stay the browser's (`Mod+1…0` switch its tabs): `Mod+1�
 on the key (a handler returns `false` to let the keys go on), and `Mod+Alt+1…0` away from a
 note. AltGr with a digit, which Windows reports as Ctrl+Alt and which types `{` and `[` on a
 German layout, is not a pin.
-`Esc` goes back, as `‹` does, from the list, a search, a note and Settings, also in the editor,
-but never into Settings: it goes back past it (`stepsAway`; the app's history keeps each entry's
-path). So with A ← B ← Settings ← C it goes from C to B, then A, and from Settings opened after
-B to B, then A. With nothing further back in the app's history it goes to the list, unless
-already there; on other pages it does nothing. It gives way where Escape already means something: an
-open dialog closes, the search box and other form fields (CodeMirror's go-to-line field) let
-go of the focus. CodeMirror has no search panel of its own: `Mod+F` is the top bar's. `Mod+\` that shows the sidebar moves the focus into it, to the open note (else to what is
+`Esc` is not a shortcut: it keeps its usual meaning, never a way back. An open dialog closes,
+the search box and other form fields (CodeMirror's go-to-line field) let go of the focus, and
+in the editors and elsewhere it does nothing of the app's. CodeMirror has no search panel of its own: `Mod+F` is the top bar's. `Mod+\` that shows the sidebar moves the focus into it, to the open note (else to what is
 current there, else to the first row); `Mod+\` from there hides it and gives the focus back to
 where it was, so the caret is in the editor again. Hiding it from the editor leaves the caret
 where it is, and `Mod+/` puts it in the other editor. In the sidebar `↑`/`↓` go row by row

@@ -9,13 +9,12 @@ import type { TextKey } from "../i18n/i18n";
  * 1…0. Modifier shortcuts work
  * everywhere, also while typing in an editor, unless they are `outsideText`
  * (in text ⌘←/⌘→ go to the line's ends, Ctrl+←/→ by words); single keys only
- * outside text fields, except Escape, which also works in the editors. Labels
- * are message keys (translated where they are shown).
+ * outside text fields. Escape is never ours: it closes dialogs and lets go
+ * of form fields. Labels are message keys (translated where they are shown).
  */
 export const SHORTCUTS = {
   search: { keys: "Mod+P", label: "shortcut.search" },
   find: { keys: "Mod+F", label: "shortcut.find" },
-  escapeBack: { keys: "Escape", label: "shortcut.escapeBack" },
   newNote: { keys: "Mod+N", label: "shortcut.newNote" },
   settings: { keys: "Mod+,", label: "shortcut.settings" },
   save: { keys: "Mod+S", label: "shortcut.save" },
@@ -67,12 +66,11 @@ function modifierKeys(keys: string): { alt: boolean; key: string } {
 }
 
 /**
- * "Mod+P" as the user sees it: "⌘P" on macOS, "Ctrl+P" elsewhere; "Escape"
- * is "Esc", arrow keys are arrows ("⌘←", "⌥⌘←", "Ctrl+Alt+←"), and a
+ * "Mod+P" as the user sees it: "⌘P" on macOS, "Ctrl+P" elsewhere; arrow
+ * keys are arrows ("⌘←", "⌥⌘←", "Ctrl+Alt+←"), and a
  * digit is "1…0" ("⌘1…0", "Ctrl+Alt+1…0").
  */
 export function formatKeys(keys: string, mac = isMac()): string {
-  if (keys === "Escape") return "Esc";
   if (!keys.startsWith("Mod+")) return keys;
   const { alt, key } = modifierKeys(keys);
   const shown = key === "Digit" ? "1…0" : (ARROWS[key] ?? key);

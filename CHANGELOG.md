@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **`Esc` no longer goes back:** it only closes dialogs and leaves the search box, as it does
+  everywhere else, so pressing it in the editor or in Settings no longer jumps to another page.
+  Back is `‹`, ⌘/Ctrl+← outside text, or a swipe on a touch screen.
+
 ## 0.9.0 — 2026-10-19
 
 - **Hear of new versions on the desktop:** once a day the desktop app looks for a newer

@@ -16,29 +16,18 @@ function isTyping(target: EventTarget | null): boolean {
   );
 }
 
-/**
- * Whether Escape belongs to something else here: an open dialog closes, a form
- * field (the search box, CodeMirror's go-to-line field) lets go of the focus.
- * In the editors themselves it is ours.
- */
-function escapeTaken(target: EventTarget | null): boolean {
-  if (document.querySelector("[aria-modal='true']") !== null) return true;
-  return target instanceof HTMLElement && target.closest("input, textarea, select") !== null;
-}
-
 function blocked(name: ShortcutName, target: EventTarget | null): boolean {
   const shortcut: { keys: string; outsideText?: boolean } = SHORTCUTS[name];
   const { keys } = shortcut;
   if (keys.startsWith("Mod+")) return shortcut.outsideText === true && isTyping(target);
-  return keys === "Escape" ? escapeTaken(target) : isTyping(target);
+  return isTyping(target);
 }
 
 /**
  * Handles shortcuts from the registry (app/shortcuts.ts) for as long as the
  * component is mounted. Modifier shortcuts are caught before editors and the
  * browser see them (no print dialog on Ctrl+P), except those that are
- * `outsideText` while typing; single keys are ignored while typing, and
- * Escape wherever something else uses it.
+ * `outsideText` while typing; single keys are ignored while typing.
  */
 export function useShortcuts(handlers: ShortcutHandlers): void {
   const latest = useRef(handlers);

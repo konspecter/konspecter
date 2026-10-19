@@ -49,7 +49,7 @@ export function stepsAway(
 
 /**
  * Whether the app can go back and forward in its history (the top bar's ‹
- * and ›), and the history itself (Escape and swipes go past some pages).
+ * and ›), and the history itself (swipes go past some pages).
  */
 export function useHistorySteps(): {
   readonly back: boolean;

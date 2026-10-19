@@ -236,16 +236,15 @@ Konspecter is designed to be fast to use from the keyboard.
 
 On macOS, use `⌘`; elsewhere, use `Ctrl`.
 
-| Shortcut        | Action                                     |
-| --------------- | ------------------------------------------ |
-| `⌘P` / `Ctrl+P` | Search                                     |
-| `Esc`           | Back from the list, a search or a conspect |
-| `⌘N` / `Ctrl+N` | New conspect                               |
-| `⌘,` / `Ctrl+,` | Settings                                   |
-| `⌘S` / `Ctrl+S` | Save now                                   |
-| `/`             | Search                                     |
-| `n`             | New conspect                               |
-| `?`             | Show shortcuts                             |
+| Shortcut        | Action         |
+| --------------- | -------------- |
+| `⌘P` / `Ctrl+P` | Search         |
+| `⌘N` / `Ctrl+N` | New conspect   |
+| `⌘,` / `Ctrl+,` | Settings       |
+| `⌘S` / `Ctrl+S` | Save now       |
+| `/`             | Search         |
+| `n`             | New conspect   |
+| `?`             | Show shortcuts |
 
 Outside text fields, `/`, `n` and `?` are available as quick shortcuts.
 
