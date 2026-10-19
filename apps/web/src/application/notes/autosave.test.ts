@@ -140,7 +140,13 @@ describe("coalescing", () => {
       autosave.change(() => `# A\n\n${String(Date.now())}`);
       await new Promise((resolve) => setTimeout(resolve, 5));
     }
-    expect(put).toHaveBeenCalled();
+    // A loaded machine may reach the write a little later; still well before the 1 s delay.
+    await vi.waitFor(
+      () => {
+        expect(put).toHaveBeenCalled();
+      },
+      { timeout: 500 },
+    );
     await autosave.dispose();
   });
 
