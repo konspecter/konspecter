@@ -92,6 +92,9 @@ describe("parseBilling", () => {
       amount: 3,
     });
     expect(billing?.checkout).toBeNull();
+    expect(billing?.autoRenewChoice).toBe(true);
+    const once = parseBilling({ access: { state: "canceled" }, auto_renew_choice: false });
+    expect(once?.autoRenewChoice).toBe(false);
     expect(billing?.payments.map((payment) => payment.status)).toEqual([
       "succeeded",
       "partially_refunded",

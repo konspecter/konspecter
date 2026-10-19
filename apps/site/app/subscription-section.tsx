@@ -18,7 +18,7 @@ import {
 /**
  * The subscription on the settings page (paid sync): how long sync works,
  * subscribing (with consent to the terms and to automatic renewal) or
- * paying for one period (Auto renew unticked),
+ * paying for one period (Auto renew unticked, and kept so for the next time),
  * cancelling (a confirm step that says nothing is lost), resuming, and the
  * payments. Sync is end-to-end encrypted, so paying is only the first of two
  * steps: the form says so, and once sync is paid the section names the step
@@ -42,7 +42,10 @@ export function SubscriptionSection({
   gateways: readonly GatewayPlan[];
   /** The plan ("gateway:period") to offer first; the first one when it is not on sale. */
   plan: string;
-  /** Auto renew ticked at first; not when renewing a period paid once from its email. */
+  /**
+   * Auto renew ticked at first, unless its owner last chose it unticked; not
+   * when renewing a period paid once from its email.
+   */
   autoRenew?: boolean;
   /** Start the trial at once, if the account is due one (asked for before signing in). */
   startTrial?: boolean;
@@ -60,7 +63,12 @@ export function SubscriptionSection({
   // Folded once paid, unless the visitor came to buy: a period chosen on the
   // home page, a renewal from its email, or a try that failed.
   const subscribe = (
-    <Subscribe gateways={gateways} plan={plan} autoRenew={autoRenew} steps={!paid} />
+    <Subscribe
+      gateways={gateways}
+      plan={plan}
+      autoRenew={autoRenew && billing.autoRenewChoice}
+      steps={!paid}
+    />
   );
   return (
     <section className="settings-section" id="subscription" aria-labelledby="subscription-heading">

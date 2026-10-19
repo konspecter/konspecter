@@ -248,6 +248,7 @@ describe("the subscription in the settings", () => {
     subscription: null,
     checkout: null,
     payments: [],
+    autoRenewChoice: true,
   };
 
   it("says until when free sync given lasts, and still offers to subscribe", async () => {
@@ -422,6 +423,17 @@ describe("the subscription in the settings", () => {
     await waitFor(() => {
       expect(fields).toEqual([{ plan: "acme:1m", accept: "yes", intent: "subscribe" }]);
     });
+  });
+
+  it("starts Auto renew as its owner chose it last, and keeps more time folded", async () => {
+    renderSubscription({ ...paidOnce, autoRenewChoice: false }, gateways, () => null);
+    const section = await screen.findByRole("region", { name: "Subscription" });
+    const renew = within(section).getByRole("checkbox", { name: "Auto renew", hidden: true });
+    expect(renew).not.toBeVisible();
+    await userEvent.setup().click(within(section).getByText("Buy more time"));
+    expect(renew).toBeVisible();
+    expect(renew).not.toBeChecked();
+    expect(within(section).getByRole("radio", { name: "$3 for 1 month" })).toBeChecked();
   });
 
   it("renews a period paid once from its email, with Auto renew unticked", async () => {

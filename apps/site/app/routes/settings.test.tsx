@@ -222,6 +222,7 @@ describe("settings", () => {
       subscription: null,
       checkout: null,
       payments: [],
+      autoRenewChoice: true,
     });
     const nav = await screen.findByRole("navigation", { name: "Settings sections" });
     const links = within(nav).getAllByRole("link");

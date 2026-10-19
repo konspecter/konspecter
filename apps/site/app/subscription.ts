@@ -73,6 +73,11 @@ export interface Billing {
   /** The subscription a return page asked about. */
   readonly checkout: Subscription | null;
   readonly payments: readonly Payment[];
+  /**
+   * Auto renew as its owner chose it last, kept with each checkout (paid or
+   * not): false after a period paid once; true before any choice.
+   */
+  readonly autoRenewChoice: boolean;
 }
 
 const ACCESS: readonly AccessState[] = [
@@ -172,6 +177,7 @@ export function parseBilling(value: unknown): Billing | null {
     subscription: parseSubscriptionItem(body.subscription),
     checkout: parseSubscriptionItem(body.checkout),
     payments,
+    autoRenewChoice: body.auto_renew_choice !== false,
   };
 }
 
