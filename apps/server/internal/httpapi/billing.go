@@ -24,7 +24,7 @@ import (
 // requests, the price list and the gateways' webhooks are passed on to the
 // service, the signed-in user named in headers the server sets itself. The
 // service pushes entitlements to the internal routes, has the server
-// email billing events, and finds a user by email.
+// email billing events, and finds a user by email or reads one by id.
 
 // EntitlementStore keeps the accounts' entitlements, finds where to email
 // an account, and finds a user by email.
@@ -102,6 +102,7 @@ func (a *api) registerBillingRoutes(mux *http.ServeMux) {
 		mux.Handle("PUT /internal/entitlements/{user}", a.internal(a.putEntitlement))
 		mux.Handle("POST /internal/users/{user}/notices", a.internal(a.sendNotice))
 		mux.Handle("GET /internal/users", a.internal(a.findUser))
+		mux.Handle("GET /internal/users/{user}", a.internal(a.getUser))
 	}
 }
 
@@ -530,6 +531,21 @@ func (a *api) findUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"id": user.ID})
+}
+
+// getUser is the billing service asking who a user is, by id.
+func (a *api) getUser(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("user")
+	email, locale, err := a.billing.Store.Recipient(r.Context(), id)
+	if errors.Is(err, auth.ErrUserNotFound) {
+		writeError(w, http.StatusNotFound, "unknown_user", "no such user")
+		return
+	}
+	if err != nil {
+		a.internalError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"id": id, "email": email, "locale": locale})
 }
 
 // forgetBilling has the billing service cancel a renewing subscription at

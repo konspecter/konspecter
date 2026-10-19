@@ -766,3 +766,23 @@ func TestTheBillingServiceFindsUsersByEmail(t *testing.T) {
 		t.Errorf("without the token = %d %v", r.status, r.body)
 	}
 }
+
+func TestTheBillingServiceReadsAUserByID(t *testing.T) {
+	s := newBillingServer(t)
+	s.ann(t)
+	get := func(token, id string) response {
+		t.Helper()
+		req, _ := http.NewRequest(http.MethodGet, s.server.URL+"/internal/users/"+id, nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		return send(t, req)
+	}
+	if r := get(billingToken, annID); r.status != http.StatusOK || r.body["id"] != annID || r.body["email"] != "ann@example.com" || r.body["locale"] != "en" {
+		t.Errorf("ann = %d %v", r.status, r.body)
+	}
+	if r := get(billingToken, "00000000-0000-4000-8000-000000000000"); r.status != http.StatusNotFound || errorCode(r) != "unknown_user" {
+		t.Errorf("nobody = %d %v", r.status, r.body)
+	}
+	if r := get("wrong", annID); r.status != http.StatusUnauthorized {
+		t.Errorf("without the token = %d %v", r.status, r.body)
+	}
+}
