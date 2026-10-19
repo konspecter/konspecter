@@ -5,7 +5,9 @@ import { requireUser, signInPath } from "../account.server";
 import { callApi } from "../api.server";
 import { AuthPage } from "../auth-form";
 import { useLocale, useT } from "../i18n/i18n";
-import { day, parseBilling } from "../subscription";
+import { parseDevices } from "../devices";
+import { day, encryptedOf, parseBilling, setupStep } from "../subscription";
+import { SetupLeft } from "../subscription-section";
 import type { Route } from "./+types/subscription-return";
 
 /**
@@ -13,7 +15,8 @@ import type { Route } from "./+types/subscription-return";
  * (`/subscription/return?id=…`). The server reads the payment from the
  * gateway, so the page knows even before the gateway's notification: paid,
  * still waiting (the page looks again by itself while it is open), or not
- * paid. The cross closes it for the subscription in the settings, which
+ * paid. Once paid, it names the step left before sync runs, if one is. The
+ * cross closes it for the subscription in the settings, which
  * shows the payment from then on: a payer who left the gateway without
  * paying is not kept waiting here.
  */
@@ -39,13 +42,26 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         : checkout.status === "ended"
           ? ("failed" as const)
           : ("paid" as const);
-  return { outcome, paidUntil: billing?.paidUntil ?? null, once: checkout?.autoRenew === false };
+  let setup = null;
+  if (outcome === "paid") {
+    const [keys, devices] = await Promise.all([
+      callApi(request, "/api/keys"),
+      callApi(request, "/api/devices"),
+    ]);
+    setup = setupStep(encryptedOf(keys), devices.error ? null : parseDevices(devices.data).length);
+  }
+  return {
+    outcome,
+    paidUntil: billing?.paidUntil ?? null,
+    once: checkout?.autoRenew === false,
+    setup,
+  };
 }
 
 export default function SubscriptionReturn() {
   const { t } = useT();
   const locale = useLocale();
-  const { outcome, paidUntil, once } = useLoaderData<typeof loader>();
+  const { outcome, paidUntil, once, setup } = useLoaderData<typeof loader>();
   const { revalidate } = useRevalidator();
   const close = { to: SETTINGS, label: t("checkout.close") };
 
@@ -73,6 +89,7 @@ export default function SubscriptionReturn() {
               : t("checkout.paidNoDate")}
           </p>
         </div>
+        {setup && <SetupLeft step={setup} page="/settings" />}
         <p className="auth-links">
           <Link to={SETTINGS}>{t("checkout.toSettings")}</Link>
         </p>

@@ -3,11 +3,13 @@ import {
   day,
   discounts,
   durationText,
+  encryptedOf,
   FREE,
   money,
   parseBilling,
   parsePlans,
   periodText,
+  setupStep,
 } from "./subscription";
 
 describe("parsePlans", () => {
@@ -152,5 +154,23 @@ describe("formatting", () => {
   it("writes days", () => {
     expect(day("2026-11-06T23:30:00Z", "en")).toBe("November 6, 2026");
     expect(day("2026-11-06T12:00:00Z", "ru")).toBe("6 ноября 2026 г.");
+  });
+});
+
+describe("setting sync up", () => {
+  it("reads whether the account has an encryption key", () => {
+    expect(encryptedOf({ status: 200, error: null })).toBe(true);
+    expect(encryptedOf({ status: 404, error: { code: "no_key" } })).toBe(false);
+    expect(encryptedOf({ status: 503, error: { code: "unreachable" } })).toBeNull();
+  });
+
+  it("names the step left: encryption, then an app", () => {
+    expect(setupStep(false, 0)).toBe("encryption");
+    expect(setupStep(false, 2)).toBe("encryption");
+    expect(setupStep(true, 0)).toBe("connect");
+    expect(setupStep(true, 1)).toBeNull();
+    // Not known: nothing to nag about.
+    expect(setupStep(null, 0)).toBeNull();
+    expect(setupStep(true, null)).toBeNull();
   });
 });

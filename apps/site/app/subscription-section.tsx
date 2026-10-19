@@ -12,6 +12,7 @@ import {
   type Billing,
   type GatewayPlan,
   type Payment,
+  type SetupStep,
 } from "./subscription";
 
 /**
@@ -19,7 +20,9 @@ import {
  * subscribing (with consent to the terms and to automatic renewal) or
  * paying for one period (Auto renew unticked),
  * cancelling (a confirm step that says nothing is lost), resuming, and the
- * payments. Where the server sells no sync in the page's language (no
+ * payments. Sync is end-to-end encrypted, so paying is only the first of two
+ * steps: the form says so, and once sync is paid the section names the step
+ * left (until it is done) and folds the form behind a button. Where the server sells no sync in the page's language (no
  * gateways), it says so instead of offering to subscribe. Plain forms; the gateway's page is opened from the answer to
  * subscribing (a link, followed at once when the page's script runs).
  */
@@ -29,6 +32,8 @@ export function SubscriptionSection({
   plan,
   autoRenew = true,
   startTrial = false,
+  setup = null,
+  now,
   error,
   notice,
   redirectUrl,
@@ -41,6 +46,9 @@ export function SubscriptionSection({
   autoRenew?: boolean;
   /** Start the trial at once, if the account is due one (asked for before signing in). */
   startTrial?: boolean;
+  /** What is left to set up before sync runs. */
+  setup?: SetupStep | null;
+  now: number;
   error: FormError | null;
   notice: string | null;
   redirectUrl: string | null;
@@ -48,10 +56,17 @@ export function SubscriptionSection({
   const t = useT();
   const sub = billing.subscription;
   const renewing = sub?.status === "active" || sub?.status === "past_due";
+  const paid = billing.paidUntil !== null && Date.parse(billing.paidUntil) > now;
+  // Folded once paid, unless the visitor came to buy: a period chosen on the
+  // home page, a renewal from its email, or a try that failed.
+  const subscribe = (
+    <Subscribe gateways={gateways} plan={plan} autoRenew={autoRenew} steps={!paid} />
+  );
   return (
     <section className="settings-section" id="subscription" aria-labelledby="subscription-heading">
       <h2 id="subscription-heading">{t.t("subscription.title")}</h2>
       <AccessText billing={billing} sold={gateways.length > 0} startTrial={startTrial} />
+      {paid && setup && <SetupLeft step={setup} />}
       <FormMessage error={error} notice={notice} />
       {redirectUrl ? (
         <Checkout url={redirectUrl} />
@@ -71,7 +86,14 @@ export function SubscriptionSection({
             </Form>
           )}
           {billing.access.state === "lifetime" ? null : gateways.length > 0 ? (
-            <Subscribe gateways={gateways} plan={plan} autoRenew={autoRenew} />
+            paid ? (
+              <details className="buy-more" open={plan !== "" || !autoRenew || error !== null}>
+                <summary className="button">{t.t("subscription.buyMore")}</summary>
+                {subscribe}
+              </details>
+            ) : (
+              subscribe
+            )
           ) : (
             <p className="settings-text">{t.t("subscription.unavailable")}</p>
           )}
@@ -174,14 +196,33 @@ function TryTrial({ now }: { now: boolean }) {
   );
 }
 
+/**
+ * The step left before paid sync runs, with the way to it: `page` is where
+ * its section is, the settings page itself when empty.
+ */
+export function SetupLeft({ step, page = "" }: { step: SetupStep; page?: string }) {
+  const t = useT();
+  return (
+    <div className="setup-left">
+      <p>{t.t(`subscription.setup.${step}`)}</p>
+      <a className="button button-primary" href={`${page}#${step}`}>
+        {t.t(`subscription.setup.${step}Go`)}
+      </a>
+    </div>
+  );
+}
+
+/** `steps`: say first that paying is one of two steps (before sync is paid). */
 function Subscribe({
   gateways,
   plan,
   autoRenew,
+  steps,
 }: {
   gateways: readonly GatewayPlan[];
   plan: string;
   autoRenew: boolean;
+  steps: boolean;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -200,6 +241,16 @@ function Subscribe({
   const several = gateways.length > 1;
   return (
     <Form method="post" className="settings-form subscribe-form">
+      {steps && (
+        <div className="sync-steps">
+          <p>{t.t("subscription.steps")}</p>
+          <ol>
+            <li>{t.t("subscription.stepPay")}</li>
+            <li>{t.t("subscription.stepSetUp")}</li>
+          </ol>
+          <p>{t.t("subscription.stepsWhy")}</p>
+        </div>
+      )}
       <fieldset className="price-options">
         <legend>{t.t("subscription.choose")}</legend>
         {options.map(({ gateway, price }, index) => {

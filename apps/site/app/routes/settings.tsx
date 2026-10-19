@@ -10,7 +10,7 @@ import { Encryption } from "../encryption";
 import { useLocale, useT } from "../i18n/i18n";
 import { homePath, readPreferences } from "../preferences.server";
 import { forgetKey, forgetKeyThenSubmit } from "../remembered-key";
-import { parseBilling, parsePlans, type Billing } from "../subscription";
+import { encryptedOf, parseBilling, parsePlans, setupStep, type Billing } from "../subscription";
 import { SubscriptionSection } from "../subscription-section";
 import type { Route } from "./+types/settings";
 
@@ -43,20 +43,24 @@ function signInAgainOn401(request: Request, result: ApiResult<unknown>): void {
 export async function loader({ request, context }: Route.LoaderArgs) {
   requireUser(request, context);
   const { locale } = readPreferences(request);
-  const [account, devices, billing, plans] = await Promise.all([
+  const [account, devices, billing, plans, keys] = await Promise.all([
     callApi(request, "/api/account"),
     callApi(request, "/api/devices"),
     callApi(request, `/api/subscription?locale=${locale}`),
     callApi(request, `/api/billing/plans?locale=${locale}`),
+    callApi(request, "/api/keys"),
   ]);
   signInAgainOn401(request, account);
   const parsed = parseAccount(account.data);
   if (!parsed) throw data("The account could not be loaded", { status: 503 });
   const subscription = parseBilling(billing.data);
+  const parsedDevices = parseDevices(devices.data);
   return {
     account: parsed,
-    devices: parseDevices(devices.data),
+    devices: parsedDevices,
     devicesFailed: devices.error !== null,
+    // What is left to set up before sync runs, said once it is paid.
+    setup: setupStep(encryptedOf(keys), devices.error ? null : parsedDevices.length),
     // Shown only where sync is paid.
     billing: subscription?.paid ? subscription : null,
     gateways: parsePlans(plans.data).gateways,
@@ -172,7 +176,7 @@ export async function action({ request }: Route.ActionArgs) {
 
 export default function Settings() {
   const { t } = useT();
-  const { account, devices, devicesFailed, billing, gateways, plan, autoRenew, trial, now } =
+  const { account, devices, devicesFailed, setup, billing, gateways, plan, autoRenew, trial, now } =
     useLoaderData<typeof loader>();
   const result = useActionData<ActionResult>();
   const errorOf = (intent: Intent) => (result?.intent === intent ? result.error : null);
@@ -203,6 +207,8 @@ export default function Settings() {
             plan={plan}
             autoRenew={autoRenew}
             startTrial={trial}
+            setup={setup}
+            now={now}
             error={billingIntent ? result.error : null}
             notice={
               result?.error

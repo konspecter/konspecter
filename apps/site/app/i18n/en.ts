@@ -483,6 +483,19 @@ export const en = {
   "subscription.payHint": "You pay on {gateway}'s page; your card details never reach this site.",
   "subscription.payHintSeveral":
     "You pay on the payment service's page; your card details never reach this site.",
+  "subscription.steps": "Sync takes two steps:",
+  "subscription.stepPay": "Pay for it here.",
+  "subscription.stepSetUp":
+    "Set it up below: choose an encryption passphrase, then connect your devices.",
+  "subscription.stepsWhy":
+    "Conspects are encrypted end to end: only your devices hold the key, so the second step is yours, and nothing syncs until it is done.",
+  "subscription.buyMore": "Buy more time",
+  "subscription.setup.encryption":
+    "Step 1 is done: sync is paid. One step is left: set it up. Conspects are encrypted end to end, so choose an encryption passphrase, then connect your devices. Nothing syncs until then.",
+  "subscription.setup.encryptionGo": "Set up encryption",
+  "subscription.setup.connect":
+    "Step 1 is done: sync is paid, and encryption is on. One step is left: connect your devices, and they start syncing.",
+  "subscription.setup.connectGo": "Connect an app",
   "subscription.subscribe": "Subscribe",
   "subscription.pay": "Pay",
   "subscription.continue": "Continue to payment",

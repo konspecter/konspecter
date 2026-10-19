@@ -1696,17 +1696,48 @@ main {
   font-size: 15px;
 }
 
-.cancel-subscription {
+.cancel-subscription,
+.buy-more {
   margin-top: 1.1rem;
 }
 
-.cancel-subscription > summary {
+.cancel-subscription > summary,
+.buy-more > summary {
   display: inline-flex;
   list-style: none;
 }
 
-.cancel-subscription > summary::-webkit-details-marker {
+.cancel-subscription > summary::-webkit-details-marker,
+.buy-more > summary::-webkit-details-marker {
   display: none;
+}
+
+/* Paying is the first of two steps: sync runs once it is set up (end-to-end encryption). */
+.sync-steps,
+.setup-left {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 36rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 8px;
+  background: var(--color-field);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.sync-steps p,
+.setup-left p {
+  margin: 0;
+}
+
+.sync-steps ol {
+  margin: 0;
+  padding-left: 1.4rem;
+}
+
+.setup-left {
+  justify-items: start;
+  margin-top: 1rem;
 }
 
 .settings-subheading {

@@ -4,7 +4,7 @@ import { createRoutesStub, RouterContextProvider } from "react-router";
 import { accountContext } from "../account.server";
 import { textField } from "../auth-form";
 import App from "../root";
-import type { Billing, GatewayPlan } from "../subscription";
+import type { Billing, GatewayPlan, SetupStep } from "../subscription";
 import { action as preferencesAction } from "./preferences";
 import Privacy from "./privacy";
 import Settings, { action as settingsAction, loader as settingsLoader } from "./settings";
@@ -101,10 +101,14 @@ describe("the subscription in the settings", () => {
       "GET /api/devices": () => Response.json({ devices: [] }),
       "GET /api/subscription?locale=ru": () => Response.json(billingAnswer()),
       "GET /api/billing/plans?locale=ru": () => Response.json(plans),
+      "GET /api/keys": () =>
+        Response.json({ error: { code: "no_key", message: "" } }, { status: 404 }),
     });
     const request = new Request("http://site.test/settings", { headers: { Cookie: "lang=ru" } });
     const loaded = await settingsLoader(args(request));
     expect(loaded.billing?.access.state).toBe("active");
+    // Encryption is not set up: that is the step left.
+    expect(loaded.setup).toBe("encryption");
     expect(loaded.gateways.map((g) => g.name)).toEqual(["Acme Pay"]);
     expect(loaded.billing?.subscription?.gatewayName).toBe("Acme Pay");
     expect(calls.map((c) => c.call)).toContain("GET /api/billing/plans?locale=ru");
@@ -202,6 +206,7 @@ describe("the subscription in the settings", () => {
     plan = "",
     trial = false,
     autoRenew = true,
+    setup: SetupStep | null = null,
   ) {
     const Stub = createRoutesStub([
       {
@@ -217,6 +222,7 @@ describe("the subscription in the settings", () => {
               account: { email: "ann@example.com", name: "", recentSignIn: true },
               devices: [],
               devicesFailed: false,
+              setup,
               billing,
               gateways,
               plan,
@@ -326,6 +332,70 @@ describe("the subscription in the settings", () => {
     await waitFor(() => {
       expect(assign).toHaveBeenCalledWith("https://pay.example.com/approve?ba=1");
     });
+  });
+
+  it("says before paying that sync takes a second step, for end-to-end encryption", async () => {
+    renderSubscription(base, gateways, () => null);
+    const section = await screen.findByRole("region", { name: "Subscription" });
+    expect(section).toHaveTextContent("Sync takes two steps:");
+    expect(
+      within(section)
+        .getAllByRole("listitem")
+        .map((step) => step.textContent),
+    ).toEqual([
+      "Pay for it here.",
+      "Set it up below: choose an encryption passphrase, then connect your devices.",
+    ]);
+    expect(section).toHaveTextContent("Conspects are encrypted end to end");
+    expect(within(section).getByRole("button", { name: "Subscribe" })).toBeVisible();
+    expect(within(section).queryByText("Step 1 is done", { exact: false })).toBeNull();
+  });
+
+  const paidOnce: Billing = {
+    ...base,
+    access: { state: "canceled", until: "2026-11-06T12:00:00Z" },
+    paidUntil: "2026-11-06T12:00:00Z",
+    subscription: {
+      id: "s1",
+      gateway: "acme",
+      gatewayName: "Acme Pay",
+      period: "1m",
+      amount: 3,
+      currency: "USD",
+      status: "canceled",
+      autoRenew: false,
+      nextChargeAt: null,
+      resumable: false,
+    },
+  };
+
+  it("names the step left once paid, and folds the form behind a button", async () => {
+    renderSubscription(paidOnce, gateways, () => null, "", false, true, "encryption");
+    const section = await screen.findByRole("region", { name: "Subscription" });
+    expect(section).toHaveTextContent("Step 1 is done: sync is paid. One step is left: set it up.");
+    expect(within(section).getByRole("link", { name: "Set up encryption" })).toHaveAttribute(
+      "href",
+      "#encryption",
+    );
+    expect(section).not.toHaveTextContent("Sync takes two steps");
+    const pay = within(section).getByRole("button", { name: "Subscribe", hidden: true });
+    expect(pay).not.toBeVisible();
+    await userEvent.setup().click(within(section).getByText("Buy more time"));
+    expect(pay).toBeVisible();
+  });
+
+  it("asks to connect an app once encryption is on, and says nothing once sync is set up", async () => {
+    renderSubscription(paidOnce, gateways, () => null, "", false, true, "connect");
+    let section = await screen.findByRole("region", { name: "Subscription" });
+    expect(section).toHaveTextContent("sync is paid, and encryption is on");
+    expect(within(section).getByRole("link", { name: "Connect an app" })).toHaveAttribute(
+      "href",
+      "#connect",
+    );
+    cleanup();
+    renderSubscription(paidOnce, gateways, () => null);
+    section = await screen.findByRole("region", { name: "Subscription" });
+    expect(section).not.toHaveTextContent("Step 1 is done");
   });
 
   it("pays for one period with Auto renew unticked", async () => {
@@ -568,7 +638,11 @@ describe("the return from the payment service", () => {
           {
             path: "subscription/return",
             Component: SubscriptionReturn as never,
-            loader: () => ({ outcome: "paid", paidUntil: "2026-11-06T12:00:00Z" }),
+            loader: () => ({
+              outcome: "paid",
+              paidUntil: "2026-11-06T12:00:00Z",
+              setup: "encryption",
+            }),
           },
         ],
       },
@@ -577,6 +651,34 @@ describe("the return from the payment service", () => {
     expect(await screen.findByRole("status")).toHaveTextContent(
       "The subscription is paid. Sync works until November 6, 2026",
     );
+    expect(screen.getByText(/Step 1 is done: sync is paid/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Set up encryption" })).toHaveAttribute(
+      "href",
+      "/settings#encryption",
+    );
+  });
+
+  it("finds the step left once paid", async () => {
+    const calls = stubApi({
+      "GET /api/subscription/checkouts/s1": checkoutAnswer("active"),
+      "GET /api/keys": () =>
+        Response.json({ error: { code: "no_key", message: "" } }, { status: 404 }),
+      "GET /api/devices": () => Response.json({ devices: [] }),
+    });
+    const paid = await returnLoader(
+      args(new Request("http://site.test/subscription/return?id=s1")),
+    );
+    expect(paid.setup).toBe("encryption");
+    expect(calls.map((c) => c.call)).toContain("GET /api/keys");
+
+    const waitingCalls = stubApi({
+      "GET /api/subscription/checkouts/s1": checkoutAnswer("pending"),
+    });
+    const waiting = await returnLoader(
+      args(new Request("http://site.test/subscription/return?id=s1")),
+    );
+    expect(waiting.setup).toBeNull();
+    expect(waitingCalls.map((c) => c.call)).toEqual(["GET /api/subscription/checkouts/s1"]);
   });
 
   it("looks again while waiting, and closes for good to the settings", async () => {

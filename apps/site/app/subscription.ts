@@ -255,3 +255,28 @@ export function day(value: string, locale: Locale): string {
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat(locale, { dateStyle: "long", timeZone: "UTC" }).format(date);
 }
+
+/** What is left to do, once sync is paid, before it runs: it is end-to-end encrypted. */
+export type SetupStep = "encryption" | "connect";
+
+/**
+ * Whether the account has an encryption key, from `GET /api/keys`: null when
+ * the answer says neither.
+ */
+export function encryptedOf(result: {
+  readonly status: number;
+  readonly error: { readonly code: string } | null;
+}): boolean | null {
+  if (result.status === 200) return true;
+  return result.error?.code === "no_key" ? false : null;
+}
+
+/**
+ * The step left before sync runs: encryption, then connecting an app. Null
+ * when both are done, or when what is known does not say one is left.
+ */
+export function setupStep(encrypted: boolean | null, devices: number | null): SetupStep | null {
+  if (encrypted === false) return "encryption";
+  if (encrypted === true && devices === 0) return "connect";
+  return null;
+}
