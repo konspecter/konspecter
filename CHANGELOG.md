@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.12.0 — 2026-10-20
 
 - **A quieter splash screen:** a start quicker than 150 ms no longer flashes the logo; on a
   slower one the logo fades in, now at a ninth of the screen's area, with a soft shadow under
