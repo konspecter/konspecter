@@ -517,7 +517,8 @@ export const en = {
   "checkout.paidOnce": "Sync is paid until {date}. It does not renew by itself.",
   "checkout.waitingTitle": "Waiting for the payment",
   "checkout.waiting":
-    "The payment service has not confirmed the payment yet. This page looks again by itself every few seconds.",
+    "The payment service has not confirmed the payment yet. This page looks again by itself every few seconds. You can close it: the subscription in the settings shows how the payment went.",
+  "checkout.close": "Close",
   "checkout.failedTitle": "Not paid",
   "checkout.failed": "The payment did not go through. Nothing was charged.",
   "checkout.unknown": "There is no such payment. Check the subscription in the settings.",

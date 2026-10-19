@@ -578,6 +578,52 @@ describe("the return from the payment service", () => {
       "The subscription is paid. Sync works until November 6, 2026",
     );
   });
+
+  it("looks again while waiting, and closes for good to the settings", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let checks = 0;
+      const Stub = createRoutesStub([
+        {
+          id: "root",
+          path: "/",
+          Component: App as never,
+          loader: () => ({
+            locale: "en",
+            theme: "system",
+            email: "ann@example.com",
+            accounts: true,
+          }),
+          children: [
+            {
+              path: "subscription/return",
+              Component: SubscriptionReturn as never,
+              loader: () => {
+                checks += 1;
+                return { outcome: "waiting", paidUntil: null, once: false };
+              },
+            },
+            { path: "settings", Component: () => <h1>Settings</h1> },
+          ],
+        },
+      ]);
+      render(<Stub initialEntries={["/subscription/return?id=s1"]} />);
+      expect(await screen.findByRole("status")).toHaveTextContent("You can close it");
+      expect(document.querySelector('meta[http-equiv="refresh"]')).toBeNull();
+      await vi.advanceTimersByTimeAsync(5000);
+      await waitFor(() => {
+        expect(checks).toBe(2);
+      });
+
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime.bind(vi) });
+      await user.click(screen.getByRole("link", { name: "Close" }));
+      expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
+      await vi.advanceTimersByTimeAsync(15000);
+      expect(checks).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("the terms and the privacy policy", () => {

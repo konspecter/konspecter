@@ -1,6 +1,7 @@
+import { CloseIcon } from "@konspecter/ui/icons";
 import { PasswordInput } from "@konspecter/ui/password-input";
 import { useId, type ReactNode, type Ref } from "react";
-import { useNavigation } from "react-router";
+import { Link, useNavigation } from "react-router";
 import { useT, type SiteTranslator } from "./i18n/i18n";
 
 /**
@@ -66,16 +67,21 @@ export function formError(code: string, retryAfter: number | null = null): FormE
   return retryAfter === null ? { code } : { code, minutes: Math.ceil(retryAfter / 60) };
 }
 
-/** A sign-in page: its title, lead and form on a card. `wide` makes room for two columns. */
+/**
+ * A sign-in page: its title, lead and form on a card. `wide` makes room for
+ * two columns; `close` puts a cross in the card's corner that leaves for it.
+ */
 export function AuthPage({
   title,
   lead,
   wide = false,
+  close,
   children,
 }: {
   title: string;
   lead?: ReactNode;
   wide?: boolean;
+  close?: { readonly to: string; readonly label: string };
   children: ReactNode;
 }) {
   return (
@@ -84,7 +90,12 @@ export function AuthPage({
       aria-labelledby="auth-title"
     >
       <title>{`${title} · Konspecter`}</title>
-      <div className="auth-card">
+      <div className={close ? "auth-card auth-closable" : "auth-card"}>
+        {close && (
+          <Link to={close.to} className="icon-button auth-close" aria-label={close.label}>
+            <CloseIcon />
+          </Link>
+        )}
         <h1 id="auth-title">{title}</h1>
         {lead && <p className="auth-lead">{lead}</p>}
         {children}
