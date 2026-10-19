@@ -100,7 +100,7 @@ test("register, encrypt, connect two devices, disconnect one, delete the account
   const page = await person.newPage();
   await page.goto(`${site ?? ""}/register`);
   await page.getByRole("textbox", { name: "Email" }).fill(email);
-  await page.getByLabel("Password").fill(password);
+  await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Create account" }).click();
   await page.getByLabel("Code").fill(await codeFor(email));
   await page.getByRole("button", { name: "Continue" }).click();
