@@ -34,7 +34,8 @@ node scripts/next-version.mjs [patch|minor|major|X.Y.Z]
 ```
 
 It prints JSON: `current` (from `package.json`), `lastTag` (the last `v*` tag, or `null`), each commit since it with
-the bump it asks for, `level` and `next`. The rules, in order:
+the bump it asks for, `level`, `next` and `unlogged`: the `feat`, `fix`, `perf` and breaking commits that did not edit
+`CHANGELOG.md`, so wrote no entry. The rules, in order:
 
 - A breaking change (`type!:` or a `BREAKING CHANGE:` footer) is **major**, a `feat` is **minor**, anything else
   (`fix`, `perf`, `docs`, `chore`, …) is **patch**. The release takes the largest.
@@ -48,14 +49,21 @@ the bump it asks for, `level` and `next`. The rules, in order:
 Then read the `## Unreleased` sections of `CHANGELOG.md` (there may be several, `## Unreleased — …`, above the last
 version heading). The commits decide the level, but the changelog knows what users see: if it describes a breaking
 change (a removed setting, a migration that drops data, an incompatible sync API) and the commits do not say so, raise
-the level. If there is no Unreleased section, stop: nothing to release.
+the level. If there is no Unreleased section and nothing is `unlogged`, stop: nothing to release.
+
+Each `unlogged` commit needs an entry. Read it (`git show <hash>`) and write one at the end of the first Unreleased
+section, adding `## Unreleased` above the last version heading if there is none, in the changelog's voice: a bold
+title saying what users get, then what changed for them, not how (`- **Title:** text`, wrapped at 100 columns). One
+entry may cover several commits; a commit users cannot notice (a test-only fix) needs none. `pnpm release` drafts
+them from the subjects and bodies instead.
 
 ## 3. Confirm with the user
 
 Pushing a tag starts the release builds and is public, so ask once with `AskUserQuestion` before changing anything:
 the computed version first, marked "(Recommended)", then the other bumps, each with its version
 (`0.2.0 (minor)`, `0.1.1 (patch)`, `1.0.0 (major)`). Show why in the descriptions: the counts of breaking, feature and
-other commits, and the commits that set the level. If the user is told to "just release" or passed an argument, the
+other commits, and the commits that set the level. Before asking, show the release notes, the entries you wrote
+among them, so the user can have them changed. If the user is told to "just release" or passed an argument, the
 argument is the answer; still name the version before pushing.
 
 ## 4. Write the version

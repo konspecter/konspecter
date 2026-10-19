@@ -1,14 +1,16 @@
 // Releases Konspecter from a terminal, the steps the `release` skill takes:
 //   pnpm release [patch|minor|major|X.Y.Z] [--dry-run]
 // Checks the ground, works out the version from the commits since the last
-// tag, asks, writes the version everywhere, dates CHANGELOG.md, commits, tags
-// vX.Y.Z and pushes the branch and the tag together (docs/release.md).
+// tag, drafts CHANGELOG.md entries for the commits that wrote none, asks (and
+// opens the changelog in the editor if wanted), writes the version everywhere,
+// dates CHANGELOG.md, commits, tags vX.Y.Z and pushes the branch and the tag
+// together (docs/release.md).
 // --dry-run stops after showing the version and the release notes.
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
-import { nextVersion } from "./next-version.mjs";
+import { header, nextVersion } from "./next-version.mjs";
 import { releaseNotes } from "./release-notes.mjs";
 
 const unreleased = /^## Unreleased(?:\s*—\s*(.*))?$/;
@@ -37,6 +39,70 @@ export function datedChangelog(changelog, version, date) {
     }
   }
   return found ? result.join("\n") : undefined;
+}
+
+// A list item wrapped at Prettier's 100 columns. A line never starts with a
+// word Markdown would read as a list, a heading or a quote.
+function listItem(text) {
+  const lines = [];
+  let line = "-";
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    const opensBlock = /^([-+*#>]|\d+[.)])/.test(word);
+    if (line.length + 1 + word.length > 100 && line !== "-" && !opensBlock) {
+      lines.push(line);
+      line = `  ${word}`;
+    } else {
+      line += ` ${word}`;
+    }
+  }
+  lines.push(line);
+  return lines.join("\n");
+}
+
+// A CHANGELOG.md entry drafted from a commit message: the subject as the bold
+// title, and the body's first paragraph, unless it is a list or a trailer.
+export function entryOf(message) {
+  const [subject = "", ...body] = message.split("\n");
+  const title = subject.replace(header, "").trim().replace(/\.$/, "");
+  const paragraph =
+    body
+      .join("\n")
+      .trim()
+      .split(/\n\s*\n/)[0] ?? "";
+  const capitalized = `${title.charAt(0).toUpperCase()}${title.slice(1)}`;
+  if (paragraph === "" || /^([-+*] |\d+[.)] |[\w-]+: |BREAKING CHANGE: )/.test(paragraph)) {
+    return listItem(`**${capitalized}**`);
+  }
+  return listItem(`**${capitalized}:** ${paragraph}`);
+}
+
+// The entries for the commits that wrote none: breaking changes first, then
+// features, then the rest, each oldest first (the log is newest first).
+export function draftEntries(commits) {
+  const order = ["major", "minor", "patch"];
+  return commits
+    .filter((c) => c.unlogged)
+    .reverse()
+    .sort((a, b) => order.indexOf(a.level) - order.indexOf(b.level))
+    .map((c) => entryOf(c.message));
+}
+
+// The changelog with `entries` at the end of its first Unreleased section, or
+// in a new one above the last release when there is none.
+export function withEntries(changelog, entries) {
+  if (entries.length === 0) return changelog;
+  const lines = changelog.split("\n");
+  let first = lines.findIndex((line) => line.startsWith("## "));
+  if (first === -1) first = lines.length;
+  if (!unreleased.test(lines[first] ?? "")) {
+    lines.splice(first, 0, "## Unreleased", "", ...entries, "");
+    return lines.join("\n");
+  }
+  let end = lines.findIndex((line, i) => i > first && line.startsWith("## "));
+  if (end === -1) end = lines.length;
+  while (end > first + 1 && lines[end - 1] === "") end--;
+  lines.splice(end, 0, ...(end === first + 1 ? [""] : []), ...entries);
+  return lines.join("\n");
 }
 
 // Today as YYYY-MM-DD, in the local time zone.
@@ -98,11 +164,23 @@ function summary(release, remote) {
   );
 }
 
-async function confirm(question) {
+async function ask(question) {
   const prompt = createInterface({ input: process.stdin, output: process.stdout });
-  const answer = await prompt.question(question);
+  // Ctrl-C or the end of the input (Ctrl-D, a closed pipe) answers no.
+  const no = new Promise((resolve) => {
+    prompt.once("SIGINT", () => resolve(""));
+    prompt.once("close", () => resolve(""));
+  });
+  const answer = await Promise.race([prompt.question(question), no]);
   prompt.close();
-  return /^y(es)?$/i.test(answer.trim());
+  return answer.trim().toLowerCase();
+}
+
+// Opens a file in git's editor ($GIT_EDITOR, core.editor, $VISUAL, $EDITOR, vi)
+// and waits for it to close.
+function edit(file) {
+  const editor = git("var", "GIT_EDITOR");
+  execFileSync("sh", ["-c", `${editor} "$@"`, editor, file], { stdio: "inherit" });
 }
 
 async function main() {
@@ -117,18 +195,53 @@ async function main() {
     fail(`Nothing to release: no commits since ${release.lastTag ?? release.current}.`);
   }
   if (git("tag", "--list", release.tag) !== "") fail(`The tag ${release.tag} already exists.`);
-  const changelog = datedChangelog(readFileSync("CHANGELOG.md", "utf8"), release.next, today());
-  if (changelog === undefined) fail("CHANGELOG.md has no Unreleased section: nothing to release.");
+  const original = readFileSync("CHANGELOG.md", "utf8");
+  const entries = draftEntries(release.commits);
+  const drafted = withEntries(original, entries);
+  if (datedChangelog(drafted, release.next, today()) === undefined) {
+    fail("CHANGELOG.md has no Unreleased section and no commit asks for one: nothing to release.");
+  }
 
   summary(release, remote);
+  if (entries.length > 0) {
+    console.log(
+      `\n${String(entries.length)} CHANGELOG.md ${entries.length === 1 ? "entry" : "entries"} ` +
+        "drafted from the commits that wrote none: say e to rewrite them for users.",
+    );
+  }
+  // The notes the pipelines will publish, from the changelog as it stands.
+  const notes = (changelog) => {
+    const dated = datedChangelog(changelog, release.next, today()) ?? "";
+    console.log(`\nRelease notes:\n\n${releaseNotes(dated, release.tag) ?? ""}`);
+  };
   if (dryRun) {
-    console.log(`\nRelease notes:\n\n${releaseNotes(changelog, release.tag) ?? ""}`);
+    notes(drafted);
     return;
   }
-  if (!(await confirm(`\nRelease ${release.tag} and push it to ${remote}? [y/N] `))) {
+
+  if (entries.length > 0) {
+    writeFileSync("CHANGELOG.md", drafted);
+    run("pnpm", "exec", "prettier", "--log-level", "warn", "--write", "CHANGELOG.md");
+  }
+  for (;;) {
+    notes(readFileSync("CHANGELOG.md", "utf8"));
+    const answer = await ask(
+      `\nRelease ${release.tag} and push it to ${remote}? [y/N, e to edit CHANGELOG.md] `,
+    );
+    if (/^y(es)?$/.test(answer)) break;
+    if (answer === "e") {
+      edit("CHANGELOG.md");
+      continue;
+    }
+    writeFileSync("CHANGELOG.md", original);
     fail("Nothing changed.");
   }
 
+  const changelog = datedChangelog(readFileSync("CHANGELOG.md", "utf8"), release.next, today());
+  if (changelog === undefined) {
+    writeFileSync("CHANGELOG.md", original);
+    fail("CHANGELOG.md has no Unreleased section left: nothing changed.");
+  }
   run("node", "scripts/set-version.mjs", release.next);
   writeFileSync("CHANGELOG.md", changelog);
   try {

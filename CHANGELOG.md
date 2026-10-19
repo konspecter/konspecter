@@ -5,6 +5,9 @@
 - **New notes take their finished titles:** in a Markdown folder, a new note's file follows its
   title until the note is closed, so a first save of a half-typed title (or one typed in the
   wrong keyboard layout) no longer names the file for good.
+- **`pnpm release` writes the changelog:** every `feat`, `fix`, `perf` or breaking commit since
+  the last release that wrote no `CHANGELOG.md` entry gets one drafted from its message, shown
+  with the release notes; `e` at the question opens the changelog in the editor first.
 
 ## 0.7.0 — 2026-10-16
 

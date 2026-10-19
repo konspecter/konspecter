@@ -1,7 +1,8 @@
 // The next release's version, from the Conventional Commits since the last one:
 //   node scripts/next-version.mjs [patch|minor|major|X.Y.Z]
 // Prints JSON: the current version, the last release tag, the commits since it,
-// the bump they ask for and the next version. An argument overrides the bump.
+// the bump they ask for, the next version and the commits that still need a
+// CHANGELOG.md entry. An argument overrides the bump.
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -10,7 +11,11 @@ import { parseVersion } from "./versions.mjs";
 const LEVELS = ["none", "patch", "minor", "major"];
 
 // `type(scope)!: subject`; the `!` marks a breaking change.
-const header = /^(\w+)(?:\([^)]*\))?(!)?: /;
+export const header = /^(\w+)(?:\([^)]*\))?(!)?: /;
+
+// The types users notice. A commit of one of them, or a breaking one, needs a
+// CHANGELOG.md entry; docs, chores, refactors and tests do not.
+const NOTABLE = new Set(["feat", "fix", "perf"]);
 
 // The bump one commit message asks for: a breaking change is major, a feature
 // minor, anything else (fixes, docs, chores) patch.
@@ -66,14 +71,26 @@ export function nextVersion(override) {
     tag !== undefined ||
     new RegExp(`^## ${current.replaceAll(".", "\\.")}\\b`, "m").test(changelog);
 
-  const log = git("log", "--format=%h %s%x00%B%x1e", ...(tag ? [`${tag}..HEAD`] : []));
+  const range = tag ? [`${tag}..HEAD`] : [];
+  const log = git("log", "--format=%H %h %s%x00%B%x1e", ...range);
+  // A commit that edited CHANGELOG.md wrote its own entry.
+  const logged = new Set(git("log", "--format=%H", ...range, "--", "CHANGELOG.md").split("\n"));
   const commits = log
     .split("\x1e")
     .map((entry) => entry.trim())
     .filter(Boolean)
     .map((entry) => {
-      const [subject, body] = entry.split("\x00");
-      return { subject, level: levelOf(body.trim()) };
+      const [line, body] = entry.split("\x00");
+      const [hash, ...subject] = line.split(" ");
+      const message = body.trim();
+      const level = levelOf(message);
+      const notable = level === "major" || NOTABLE.has(header.exec(message)?.[1] ?? "");
+      return {
+        subject: subject.join(" "),
+        message,
+        level,
+        unlogged: notable && !logged.has(hash),
+      };
     });
 
   const wanted = override?.replace(/^v/, "");
@@ -104,6 +121,7 @@ function main() {
       {
         ...result,
         commits: result.commits.map((c) => `${c.level.padEnd(5)} ${c.subject}`),
+        unlogged: result.commits.filter((c) => c.unlogged).map((c) => c.subject),
       },
       null,
       2,

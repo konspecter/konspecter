@@ -17,7 +17,10 @@
    skill in Claude Code (`/release`, `/release minor`): it works out the bump from the
    Conventional Commits since the last tag (a breaking change is major, a minor before 1.0; a
    `feat` minor; anything else patch), asks before changing anything, then commits, tags and
-   pushes.
+   pushes. Both write the missing changelog entries: every `feat`, `fix`, `perf` or breaking
+   commit that did not edit `CHANGELOG.md` gets one under `## Unreleased`. `pnpm release`
+   drafts them from the commit's subject and body and, at its question, `e` opens
+   `CHANGELOG.md` in git's editor to rewrite them for users; the skill writes them itself.
 3. `.github/workflows/release.yml` builds everything into a **draft** GitHub Release. Its
    notes are the version's section of `CHANGELOG.md` (`scripts/release-notes.mjs`; a
    pre-release without a section of its own takes the Unreleased ones). With no section, the
