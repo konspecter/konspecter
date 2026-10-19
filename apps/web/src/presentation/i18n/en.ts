@@ -11,7 +11,6 @@ export const en = {
   "app.reload": "Reload",
   "app.releaseAvailable": "Konspecter {version} is available.",
   "app.download": "Download",
-  "app.later": "Later",
   "app.tryAgain": "Try again",
   "app.close": "Close",
   "app.cancel": "Cancel",
@@ -275,6 +274,17 @@ source, or delete this conspect when you are done.
   "settings.about.text":
     "{name} {version} for {os}. Conspects are stored in the app's local database.",
   "settings.about.unavailable": "Desktop details are unavailable.",
+  "settings.updateCheck": "New versions",
+  "settings.updateCheck.hint":
+    "Once a day Konspecter asks GitHub for its latest release and says when a newer one is out. Nothing is installed by itself.",
+  "settings.updateCheck.daily": "Check daily",
+  "settings.updateCheck.off": "Don't check",
+  "settings.checkNow": "Check for a new version",
+  "settings.checkNow.idle": "Asks GitHub now, even when the daily check is off.",
+  "settings.checkNow.checking": "Checking…",
+  "settings.checkNow.latest": "This is the latest version.",
+  "settings.checkNow.failed": "Could not reach GitHub. Try again later.",
+  "settings.checkNow.button": "Check now",
   "settings.library": "Library",
   "settings.library.none":
     "Konspecter keeps every conspect as a {md} file in a folder, but could not open one. Choose a folder to work in.",

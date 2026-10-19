@@ -1,3 +1,4 @@
+import { CloseIcon } from "@konspecter/ui/icons";
 import { useEffect, useState } from "react";
 import type { Update, UpdateSource } from "../app/updates";
 import { t } from "../i18n/i18n";
@@ -20,12 +21,14 @@ export function UpdateBanner({ updates }: { updates: UpdateSource }) {
       </button>
       <button
         type="button"
-        className="button"
+        className="icon-button"
+        aria-label={t("app.close")}
+        title={t("app.close")}
         onClick={() => {
           setUpdate(null);
         }}
       >
-        {t("app.later")}
+        <CloseIcon />
       </button>
     </div>
   );

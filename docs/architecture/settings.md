@@ -13,6 +13,7 @@ apply and are saved immediately.
 | Editing area     | Highlighted, Plain (see [editors](editors.md))       | Highlighted                                    |
 | Tag names        | Capital first letter, As written in notes            | Capital first letter                           |
 | File names       | Keep when the title changes, Rename after the title  | Keep                                           |
+| New versions     | Check daily, Don't check (desktop only)              | Check daily                                    |
 | Ignored files    | `.konspecterignore` rules, written like `.gitignore` | `.*`, `node_modules`, `vendors`, `dist`, `bin` |
 
 ## Storage
@@ -47,6 +48,13 @@ are not synced. A separate strategy can be added with sync if needed.
 - **File names** (shown only while a Markdown folder is open): `main.tsx` passes it to
   `FolderStore.followTitles`, at start and on every change. See
   [File Mode](filesystem-mode.md#file-names).
+
+- **New versions** (desktop only, under App): `main.tsx` keeps the value, and the release
+  check asks it before every check, so _Don't check_ stops the next request at once and
+  _Check daily_ checks right away. Until the settings are read, nothing is checked. Below
+  it, _Check now_ asks once whatever the setting says, and shows the answer in place: the
+  latest version, a newer one with _Download_, or that GitHub could not be reached. See
+  [clients](clients.md#desktop-tauri).
 
 - **Ignored files:** a text box with Save and Restore default, not saved per keystroke. In
   the app library the rules are this setting, and a folder import skips what they match

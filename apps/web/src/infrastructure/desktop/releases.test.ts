@@ -90,4 +90,33 @@ describe("watchReleases", () => {
     expect(check).toHaveBeenCalledTimes(5);
     expect(onNewer.mock.calls).toEqual([[release("0.9.0")], [release("0.10.0")]]);
   });
+
+  it("asks nothing while turned off, but checks at once when asked to", async () => {
+    const answers = ["0.8.0", "offline", "0.9.0", "0.9.0"];
+    const check = vi.fn(() => {
+      const answer = answers.shift() ?? "0.9.0";
+      return answer === "offline"
+        ? Promise.reject(new Error("offline"))
+        : Promise.resolve(release(answer));
+    });
+    const onNewer = vi.fn();
+    const checkNow = watchReleases({
+      current: "0.8.0",
+      onNewer,
+      enabled: () => false,
+      check,
+      after: 100,
+      every: 1000,
+    });
+
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(check).not.toHaveBeenCalled();
+
+    expect(await checkNow()).toBeNull();
+    await expect(checkNow()).rejects.toThrow("offline");
+    expect(await checkNow()).toEqual(release("0.9.0"));
+    // Still newer, but already announced.
+    expect(await checkNow()).toEqual(release("0.9.0"));
+    expect(onNewer.mock.calls).toEqual([[release("0.9.0")]]);
+  });
 });

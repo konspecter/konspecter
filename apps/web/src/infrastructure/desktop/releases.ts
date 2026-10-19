@@ -64,28 +64,41 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /**
  * Checks for a release newer than `current` `after` start, then `every` so
  * often, and calls `onNewer` once for each newer version. A failed check
- * (offline, rate limit) waits for the next one.
+ * (offline, rate limit) waits for the next one; while `enabled` says no,
+ * nothing is asked.
+ *
+ * Returns a check to run at once, whatever `enabled` says: the newer release,
+ * or null when `current` is the latest. It rejects when the check fails.
  */
 export function watchReleases({
   current,
   onNewer,
+  enabled = () => true,
   check = latestRelease,
   after = 10_000,
   every = DAY_MS,
 }: {
   current: string;
   onNewer: (release: Release) => void;
+  enabled?: () => boolean;
   check?: () => Promise<Release>;
   after?: number;
   every?: number;
-}): void {
-  let newest = current;
-  const run = async () => {
-    try {
-      const release = await check();
-      if (!isNewer(release.version, newest)) return;
-      newest = release.version;
+}): () => Promise<Release | null> {
+  let announced = current;
+  const checkNow = async () => {
+    const release = await check();
+    if (!isNewer(release.version, current)) return null;
+    if (isNewer(release.version, announced)) {
+      announced = release.version;
       onNewer(release);
+    }
+    return release;
+  };
+  const run = async () => {
+    if (!enabled()) return;
+    try {
+      await checkNow();
     } catch {
       // Offline or refused: the next check tries again.
     }
@@ -94,4 +107,5 @@ export function watchReleases({
     void run();
     setInterval(() => void run(), every);
   }, after);
+  return checkNow;
 }

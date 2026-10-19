@@ -16,6 +16,7 @@ import { SyncEngine } from "../../infrastructure/sync/sync-engine";
 import type { NoteRepository } from "../../application/notes/note-repository";
 import { applyLanguage } from "../i18n/setup";
 import { App } from "./App";
+import type { CheckForRelease } from "./updates";
 
 let databaseCount = 0;
 async function newStore() {
@@ -1684,13 +1685,19 @@ describe("settings and the top bar", () => {
     applyLanguage("system");
   });
 
-  function renderWithSettings(store: NoteStore, path: string, settings?: Settings) {
+  function renderWithSettings(
+    store: NoteStore,
+    path: string,
+    settings?: Settings,
+    checkForRelease?: CheckForRelease,
+  ) {
     render(
       <MemoryRouter initialEntries={[path]}>
         <App
           store={store}
           saveSettings={(next) => store.saveSettings(next)}
           {...(settings ? { initialSettings: settings } : {})}
+          checkForRelease={checkForRelease}
         />
       </MemoryRouter>,
     );
@@ -1750,6 +1757,51 @@ describe("settings and the top bar", () => {
     await waitFor(async () => {
       expect(await store.loadSettings()).toMatchObject({ treeHeadings: "shown" });
     });
+  });
+
+  it("lets the desktop app stop checking for new versions, and keeps it", async () => {
+    const store = await newStore();
+    renderWithSettings(store, "/settings", undefined, () => Promise.resolve(null));
+
+    const versions = screen.getByRole("radiogroup", { name: "New versions" });
+    expect(within(versions).getByRole("radio", { name: "Check daily" })).toBeChecked();
+    await userEvent.click(within(versions).getByRole("radio", { name: "Don't check" }));
+    await waitFor(async () => {
+      expect(await store.loadSettings()).toMatchObject({ updateCheck: "off" });
+    });
+  });
+
+  it("checks for a new version on request, even with the daily check off", async () => {
+    const off: Settings = { ...DEFAULT_SETTINGS, updateCheck: "off" };
+    const answers = [
+      () => Promise.resolve(null),
+      () => Promise.reject(new Error("offline")),
+      () =>
+        Promise.resolve({
+          version: "0.9.0",
+          url: "https://github.com/konspecter/konspecter/releases/tag/v0.9.0",
+        }),
+    ];
+    const check = vi.fn(() => (answers.shift() ?? (() => Promise.resolve(null)))());
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    renderWithSettings(await newStore(), "/settings", off, check);
+
+    const button = screen.getByRole("button", { name: "Check now" });
+    await userEvent.click(button);
+    expect(await screen.findByText("This is the latest version.")).toBeInTheDocument();
+    await userEvent.click(button);
+    expect(await screen.findByText("Could not reach GitHub. Try again later.")).toBeInTheDocument();
+    await userEvent.click(button);
+    expect(await screen.findByText("Konspecter 0.9.0 is available.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Download" })).toBeInTheDocument();
+    expect(check).toHaveBeenCalledTimes(3);
+    logged.mockRestore();
+  });
+
+  it("asks nothing about new versions outside the desktop app", async () => {
+    renderWithSettings(await newStore(), "/settings");
+    expect(screen.queryByRole("radiogroup", { name: "New versions" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Check now" })).not.toBeInTheDocument();
   });
 
   it("switches the interface language at once and keeps it", async () => {

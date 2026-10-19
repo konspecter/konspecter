@@ -15,6 +15,8 @@ export type EditingArea = "highlighted" | "plain";
  * New files are named after their titles either way.
  */
 export type FileNames = "kept" | "title";
+/** Desktop: whether the app asks GitHub once a day for a newer release. */
+export type UpdateCheck = "daily" | "off";
 /** The interface language: the system's (the default) or a chosen one. */
 export type Language = "system" | "en" | "ru";
 
@@ -29,6 +31,7 @@ export type Settings = {
   readonly editingArea: EditingArea;
   readonly language: Language;
   readonly fileNames: FileNames;
+  readonly updateCheck: UpdateCheck;
   /**
    * The app library's `.konspecterignore`: what a folder import skips, written
    * like `.gitignore`. A Markdown folder (File Mode) keeps its own file instead.
@@ -49,6 +52,7 @@ export const DEFAULT_SETTINGS: Settings = {
   editingArea: "highlighted",
   language: "system",
   fileNames: "kept",
+  updateCheck: "daily",
   ignore: DEFAULT_IGNORE,
 };
 
@@ -84,6 +88,7 @@ export function parseSettings(value: unknown): Settings {
     editingArea: oneOf(record.editingArea, ["highlighted", "plain"], DEFAULT_SETTINGS.editingArea),
     language: oneOf(record.language, ["system", "en", "ru"], DEFAULT_SETTINGS.language),
     fileNames: oneOf(record.fileNames, ["kept", "title"], DEFAULT_SETTINGS.fileNames),
+    updateCheck: oneOf(record.updateCheck, ["daily", "off"], DEFAULT_SETTINGS.updateCheck),
     ignore:
       typeof record.ignore === "string" && record.ignore.length <= MAX_IGNORE_LENGTH
         ? record.ignore

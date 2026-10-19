@@ -12,13 +12,14 @@ import {
   type TagNames,
   type TreeHeadings,
   type Theme,
+  type UpdateCheck,
 } from "../../domain/settings/settings";
 import {
   persistenceStatus,
   requestPersistence,
   type PersistenceStatus,
 } from "../../infrastructure/storage/persistence";
-import { appInfo, isDesktop } from "../../infrastructure/desktop/desktop";
+import { appInfo, isDesktop, openInBrowser } from "../../infrastructure/desktop/desktop";
 import type { SyncEngine } from "../../infrastructure/sync/sync-engine";
 import { useErrorMessage } from "../hooks/use-error-message";
 import { SyncSettings } from "../components/SyncSettings";
@@ -31,6 +32,8 @@ import { FactoryResetSettings } from "../components/FactoryResetSettings";
 import type { NoteRepository } from "../../application/notes/note-repository";
 import type { FactoryReset } from "../app/factory-reset";
 import type { LibraryControls } from "../app/library";
+import { reportError } from "../app/errors";
+import type { CheckForRelease } from "../app/updates";
 import { useAsync } from "../hooks/use-async";
 import { LOCALE_NAMES, LOCALES, t, tn, type TextKey } from "../i18n/i18n";
 import { rich } from "../i18n/rich";
@@ -44,6 +47,8 @@ type SettingsPageProps = {
   store?: NoteRepository | undefined;
   /** Reset to factory settings; hidden when absent. */
   reset?: FactoryReset | undefined;
+  /** Desktop: New versions, with Check now; hidden when absent. */
+  checkForRelease?: CheckForRelease | undefined;
 };
 
 type Option<T> = { readonly value: T; readonly label: string };
@@ -91,6 +96,10 @@ function options() {
       { value: "kept", label: t("settings.fileNames.kept") },
       { value: "title", label: t("settings.fileNames.title") },
     ] satisfies Option<FileNames>[],
+    updateChecks: [
+      { value: "daily", label: t("settings.updateCheck.daily") },
+      { value: "off", label: t("settings.updateCheck.off") },
+    ] satisfies Option<UpdateCheck>[],
     reading: [
       { value: "restore", label: t("settings.reading.restore") },
       { value: "ask", label: t("settings.reading.ask") },
@@ -107,6 +116,7 @@ export function SettingsPage({
   library,
   store,
   reset,
+  checkForRelease,
 }: SettingsPageProps) {
   const [saveError, setSaveError] = useState<unknown>(null);
   const saveErrorText = useErrorMessage(saveError);
@@ -241,9 +251,21 @@ export function SettingsPage({
             <ShortcutList />
           </div>
         </Group>
-        {(isDesktop() || reset) && (
+        {(isDesktop() || checkForRelease || reset) && (
           <Group title={t("settings.group.app")}>
             {isDesktop() && <DesktopAbout />}
+            {checkForRelease && (
+              <Choice
+                legend={t("settings.updateCheck")}
+                hint={t("settings.updateCheck.hint")}
+                options={choices.updateChecks}
+                value={settings.updateCheck}
+                onChange={(value) => {
+                  update("updateCheck", value);
+                }}
+              />
+            )}
+            {checkForRelease && <CheckNow check={checkForRelease} />}
             {reset && <FactoryResetSettings reset={reset} />}
           </Group>
         )}
@@ -419,6 +441,59 @@ function DesktopAbout() {
         </p>
       )}
     </section>
+  );
+}
+
+type CheckState =
+  | { readonly kind: "idle" | "checking" | "latest" | "failed" }
+  | { readonly kind: "newer"; readonly version: string; readonly url: string };
+
+/** Looks for a newer release on request, even with the daily check off. */
+function CheckNow({ check }: { check: CheckForRelease }) {
+  const [state, setState] = useState<CheckState>({ kind: "idle" });
+  const hint =
+    state.kind === "newer"
+      ? t("app.releaseAvailable", { version: state.version })
+      : t(`settings.checkNow.${state.kind}`);
+  return (
+    <div className="setting setting-row">
+      <span className="setting-label">{t("settings.checkNow")}</span>
+      <p role="status" className="setting-hint">
+        {hint}
+      </p>
+      <div className="setting-control actions">
+        {state.kind === "newer" && (
+          <button
+            type="button"
+            className="button"
+            onClick={() => {
+              openInBrowser(state.url).catch(reportError);
+            }}
+          >
+            {t("app.download")}
+          </button>
+        )}
+        <button
+          type="button"
+          className="button"
+          disabled={state.kind === "checking"}
+          onClick={() => {
+            setState({ kind: "checking" });
+            check().then(
+              (release) => {
+                setState(release ? { kind: "newer", ...release } : { kind: "latest" });
+              },
+              (error: unknown) => {
+                reportError(error);
+                setState({ kind: "failed" });
+              },
+            );
+          }}
+        >
+          {t("settings.checkNow.button")}
+        </button>
+      </div>
+    </div>
   );
 }
 

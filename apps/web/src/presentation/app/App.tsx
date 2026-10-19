@@ -23,7 +23,7 @@ import { Activity } from "./activity";
 import { reportError } from "./errors";
 import type { FactoryReset } from "./factory-reset";
 import type { LibraryControls } from "./library";
-import type { UpdateSource } from "./updates";
+import type { CheckForRelease, UpdateSource } from "./updates";
 
 type AppProps = {
   store: NoteRepository;
@@ -34,6 +34,8 @@ type AppProps = {
   library?: LibraryControls | undefined;
   /** Service worker updates; absent in tests and development. */
   updates?: UpdateSource;
+  /** Desktop: Settings → New versions; absent elsewhere. */
+  checkForRelease?: CheckForRelease | undefined;
   /** Background sync with a server; absent when not wired up (tests). */
   sync?: SyncEngine | undefined;
   /** Reset to factory settings in Settings; absent in tests. */
@@ -69,6 +71,7 @@ export function App({
   saveSettings: persistSettings,
   library,
   updates,
+  checkForRelease,
   sync,
   reset,
 }: AppProps) {
@@ -181,6 +184,7 @@ export function App({
                 library={library}
                 store={store}
                 reset={reset}
+                checkForRelease={checkForRelease}
               />
             }
           />

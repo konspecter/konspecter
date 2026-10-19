@@ -13,6 +13,7 @@ describe("parseSettings", () => {
       editingArea: "plain",
       language: "ru",
       fileNames: "title",
+      updateCheck: "off",
       ignore: "drafts/\n",
     };
     expect(parseSettings(settings)).toEqual(settings);
@@ -30,6 +31,11 @@ describe("parseSettings", () => {
   it("keeps file names when titles change by default", () => {
     expect(DEFAULT_SETTINGS.fileNames).toBe("kept");
     expect(parseSettings({ fileNames: "slug" }).fileNames).toBe("kept");
+  });
+
+  it("checks for new versions daily by default", () => {
+    expect(DEFAULT_SETTINGS.updateCheck).toBe("daily");
+    expect(parseSettings({ updateCheck: "weekly" }).updateCheck).toBe("daily");
   });
 
   it("skips the default folders on import until the rules are changed, even to none", () => {

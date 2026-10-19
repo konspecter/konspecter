@@ -9,7 +9,6 @@ export const ru: Dictionary = {
   "app.reload": "Обновить",
   "app.releaseAvailable": "Доступна новая версия Konspecter: {version}.",
   "app.download": "Скачать",
-  "app.later": "Позже",
   "app.tryAgain": "Повторить",
   "app.close": "Закрыть",
   "app.cancel": "Отмена",
@@ -299,6 +298,17 @@ Map<String, Integer> counts = new HashMap<>();
   "settings.about.text":
     "{name} {version} для {os}. Конспекты хранятся в локальной базе данных приложения.",
   "settings.about.unavailable": "Сведения о приложении недоступны.",
+  "settings.updateCheck": "Новые версии",
+  "settings.updateCheck.hint":
+    "Раз в день Konspecter узнаёт у GitHub о последнем выпуске и сообщает, если вышла новая версия. Сам он ничего не устанавливает.",
+  "settings.updateCheck.daily": "Проверять каждый день",
+  "settings.updateCheck.off": "Не проверять",
+  "settings.checkNow": "Проверить новую версию",
+  "settings.checkNow.idle": "Спрашивает GitHub сейчас, даже если ежедневная проверка выключена.",
+  "settings.checkNow.checking": "Проверка…",
+  "settings.checkNow.latest": "Это последняя версия.",
+  "settings.checkNow.failed": "Не удалось связаться с GitHub. Попробуйте позже.",
+  "settings.checkNow.button": "Проверить сейчас",
   "settings.library": "Библиотека",
   "settings.library.none":
     "Konspecter хранит каждый конспект файлом {md} в папке, но не смог открыть её. Выберите папку для работы.",

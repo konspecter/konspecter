@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { registerSW } from "virtual:pwa-register";
 import type { NoteRepository } from "./application/notes/note-repository";
+import type { UpdateCheck } from "./domain/settings/settings";
 import {
   appInfo,
   closeFolder,
@@ -28,7 +29,7 @@ import { factoryReset, type FactoryReset } from "./presentation/app/factory-rese
 import { reportError } from "./presentation/app/errors";
 import { restoreLocation } from "./presentation/app/last-location";
 import type { LibraryControls } from "./presentation/app/library";
-import type { Update, UpdateSource } from "./presentation/app/updates";
+import type { CheckForRelease, Update, UpdateSource } from "./presentation/app/updates";
 import { isMac } from "./presentation/app/shortcuts";
 import { ErrorState } from "./presentation/components/ErrorState";
 import { stopFocusZoom } from "@konspecter/ui/viewport";
@@ -53,7 +54,10 @@ stopFocusZoom();
 // The service worker precaches the app so it works offline, and reports when
 // a new version is waiting.
 // The desktop and mobile apps ship their files inside the app: no service worker.
-// The desktop app asks GitHub for a newer release instead.
+// The desktop app asks GitHub for a newer release instead, unless the setting
+// says not to (off until the settings are read).
+let updateCheck: UpdateCheck = "off";
+let checkReleasesNow: CheckForRelease | null = null;
 let updateWaiting: Update | null = null;
 let onUpdate: ((update: Update) => void) | null = null;
 const announceUpdate = (update: Update) => {
@@ -64,8 +68,9 @@ let releasePage: string | null = null;
 if (isDesktop()) {
   void appInfo()
     .then(({ version }) => {
-      watchReleases({
+      checkReleasesNow = watchReleases({
         current: version,
+        enabled: () => updateCheck === "daily",
         onNewer(release) {
           releasePage = release.url;
           announceUpdate({ kind: "download", version: release.version });
@@ -82,6 +87,10 @@ const updateServiceWorker =
           announceUpdate({ kind: "reload" });
         },
       });
+// Settings → New versions → Check now, whatever the setting says.
+const checkForRelease: CheckForRelease | undefined = isDesktop()
+  ? () => checkReleasesNow?.() ?? Promise.reject(new Error("The app's version is not known yet"))
+  : undefined;
 const updates: UpdateSource = {
   subscribe(listener) {
     onUpdate = listener;
@@ -100,6 +109,7 @@ try {
   const store = await openNoteStore();
   const settings = await store.loadSettings();
   applyLanguage(settings.language);
+  updateCheck = settings.updateCheck;
 
   // On the desktop the library is a folder of Markdown files, ~/Konspecter
   // unless another was chosen (ADR-024); elsewhere it is the app library (IndexedDB).
@@ -164,10 +174,14 @@ try {
           initialSettings={settings}
           saveSettings={(next) => {
             folderStore?.followTitles(next.fileNames === "title");
+            const turnedOn = updateCheck === "off" && next.updateCheck === "daily";
+            updateCheck = next.updateCheck;
+            if (turnedOn) checkReleasesNow?.().catch(() => undefined);
             return store.saveSettings(next);
           }}
           library={library}
           updates={updates}
+          checkForRelease={checkForRelease}
           sync={sync}
           reset={reset}
         />

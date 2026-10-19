@@ -30,7 +30,8 @@ The web app is an installable Progressive Web App (`vite-plugin-pwa`, Workbox, M
   Old precaches are cleaned up on activation.
 
 - **Updates:** a new service worker waits. The app shows "A new version is available" with
-  _Reload_ / _Later_. It never reloads by itself, because that could interrupt an edit.
+  _Reload_ and a close button (×). It never reloads by itself, because that could interrupt an
+  edit.
 - **Hosting:** `apps/web/Dockerfile` builds an image that serves the app on `:8080`
   (`apps/web/Caddyfile`), with the server's public URL as the suggested sync server. In
   `deploy/` it is the `web` service, and Caddy in front serves it on its own address
@@ -77,9 +78,10 @@ apps/desktop/
   drafts and pre-releases are never the latest), in `infrastructure/desktop/releases.ts`. A
   newer version (semantic versioning: `0.9.0` comes after `0.9.0-rc.1`) shows the update
   banner, "Konspecter 0.9.0 is available." with _Download_, which opens the release's page in
-  the browser (what is new, and the files), and _Later_. Each version is announced once per
-  run; a failed check (offline, rate limit) waits for the next. It installs nothing itself:
-  there is no Tauri updater.
+  the browser (what is new, and the files), and × to close it. Each version is announced once
+  per run; a failed check (offline, rate limit) waits for the next. It installs nothing itself:
+  there is no Tauri updater. Settings → App → New versions → _Don't check_ turns it off, and
+  _Check now_ below it checks once even then ([settings](settings.md)).
 - **Differences from the PWA:** no service worker (the bundle contains the files); the update
   banner announces releases instead. Settings shows _About_ instead of the storage-persistence
   section.

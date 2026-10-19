@@ -51,12 +51,12 @@ describe("UpdateBanner", () => {
     expect(source.apply).toHaveBeenCalled();
   });
 
-  it("can be postponed", async () => {
+  it("closes", async () => {
     const { source, announce } = fakeUpdates();
     render(<UpdateBanner updates={source} />);
     announce();
 
-    await userEvent.click(screen.getByRole("button", { name: "Later" }));
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
 
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(source.apply).not.toHaveBeenCalled();
