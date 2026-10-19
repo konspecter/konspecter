@@ -1,3 +1,4 @@
+import { PasswordInput } from "@konspecter/ui/password-input";
 import { useId, type ReactNode, type Ref } from "react";
 import { useNavigation } from "react-router";
 import { useT, type SiteTranslator } from "./i18n/i18n";
@@ -145,12 +146,18 @@ export function Field({
   label: string;
   hint?: string;
 } & React.InputHTMLAttributes<HTMLInputElement>) {
+  const { t } = useT();
   const id = useId();
   const hintId = `${id}-hint`;
+  const described = hint ? { "aria-describedby": hintId } : {};
   return (
     <div className="field">
       <label htmlFor={id}>{label}</label>
-      <input id={id} {...(hint ? { "aria-describedby": hintId } : {})} {...input} />
+      {input.type === "password" ? (
+        <PasswordInput id={id} showLabel={t("auth.showPassword")} {...described} {...input} />
+      ) : (
+        <input id={id} {...described} {...input} />
+      )}
       {hint && (
         <p id={hintId} className="field-hint">
           {hint}

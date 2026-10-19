@@ -9,6 +9,7 @@ import {
   type SubmitEvent,
 } from "react";
 import { WrongSecretError } from "@konspecter/crypto";
+import { PasswordInput } from "@konspecter/ui/password-input";
 import { parseConnectLink, type ConnectLink } from "../../domain/sync/connect-link";
 import { cameraAvailable } from "../../infrastructure/camera/qr-scanner";
 import { appInfo, isDesktop, openInBrowser } from "../../infrastructure/desktop/desktop";
@@ -264,9 +265,9 @@ function Locked({ sync, status }: { sync: SyncEngine; status: SyncStatus }) {
             {t("sync.lockedUnlock")}
           </p>
           <label htmlFor={passphraseId}>{t("sync.passphrase")}</label>
-          <input
+          <PasswordInput
             id={passphraseId}
-            type="password"
+            showLabel={t("sync.showPassword")}
             required
             autoComplete="current-password"
             value={passphrase}
@@ -591,9 +592,9 @@ function TokenForm({ sync, serverUrl }: { sync: SyncEngine; serverUrl: string })
     <form className="connect-form" onSubmit={(event) => void handleSubmit(event)}>
       <p className="setting-hint">{t("sync.tokenHint")}</p>
       <label htmlFor={tokenId}>{t("sync.token")}</label>
-      <input
+      <PasswordInput
         id={tokenId}
-        type="password"
+        showLabel={t("sync.showPassword")}
         required
         autoComplete="off"
         placeholder="ksp_…"

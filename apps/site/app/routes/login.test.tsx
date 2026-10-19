@@ -44,6 +44,26 @@ it("asks for a code first and shows the password only when asked to", async () =
   expect(screen.getByRole("button", { name: "Email me a code" })).toBeInTheDocument();
 });
 
+it("shows and hides the password with a button that is always there", async () => {
+  renderLogin(() => null);
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "Use password" }));
+  const password = screen.getByLabelText("Password");
+  const show = screen.getByRole("button", { name: "Show password" });
+  // Empty, the button is there all the same (only lighter).
+  expect(show).toBeVisible();
+  expect(password).toHaveAttribute("type", "password");
+
+  await user.type(password, "secret");
+  await user.click(show);
+  expect(show).toHaveAttribute("aria-pressed", "true");
+  expect(password).toHaveAttribute("type", "text");
+  // The field keeps the focus, and the keyboard on a phone.
+  expect(password).toHaveFocus();
+  await user.click(show);
+  expect(password).toHaveAttribute("type", "password");
+});
+
 it("shows the API's error next to the form and keeps the address", async () => {
   renderLogin(() => ({
     email: "ann@example.com",

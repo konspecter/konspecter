@@ -280,7 +280,10 @@ from the same parts as the app, so the two cannot drift apart:
 
 - **`packages/ui`:** the colour tokens with their dark set (`tokens.css`), Inter
   (`fonts.css`), base styles (`base.css`), buttons, fields and settings blocks
-  (`controls.css`) and the line icons (`icons.tsx`). The app imports them too.
+  (`controls.css`), the line icons (`icons.tsx`) and the password field (`password-input.tsx`):
+  every password, passphrase and token field has its own show button at the end, always
+  there and lighter while the field is empty; the browser's own (Edge's, which comes and goes)
+  is hidden. The app imports them too.
 - **Pages render on the server** and work without JavaScript: forms post to route actions,
   and the language and theme switches in the top bar are forms too. The theme (system,
   light or dark, in a cookie) is rendered as `data-theme`, so the page never flashes the

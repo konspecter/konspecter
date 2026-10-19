@@ -336,6 +336,7 @@ export const ru: Dictionary = {
   "auth.email": "Почта",
   "auth.password": "Пароль",
   "auth.newPassword": "Новый пароль",
+  "auth.showPassword": "Показать пароль",
   "auth.passwordHint": "Не меньше 8 символов.",
   "auth.working": "Минутку…",
 

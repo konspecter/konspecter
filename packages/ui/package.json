@@ -11,6 +11,7 @@
     "./base.css": "./src/base.css",
     "./controls.css": "./src/controls.css",
     "./icons": "./src/icons.tsx",
+    "./password-input": "./src/password-input.tsx",
     "./viewport": "./src/viewport.ts"
   },
   "scripts": {

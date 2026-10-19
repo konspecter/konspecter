@@ -91,6 +91,21 @@ it("signs in with the browser: shows the code, opens the page, connects once app
   expect(await screen.findByText(/Up to date/)).toBeInTheDocument();
 });
 
+it("shows the passphrase with a button that is always there", async () => {
+  const { engine } = await setup();
+  const user = userEvent.setup();
+  await engine.connect({ serverUrl: "https://sync.example.com", token: "ksp_ada" });
+  const passphrase = await screen.findByLabelText("Encryption passphrase");
+  const show = screen.getByRole("button", { name: "Show password" });
+  expect(show).toBeVisible();
+
+  await user.type(passphrase, "horse");
+  await user.click(show);
+  expect(passphrase).toHaveAttribute("type", "text");
+  expect(passphrase).toHaveValue("horse");
+  expect(passphrase).toHaveFocus();
+});
+
 it("suggests the server the web app's host names, unless the owner typed one", async () => {
   vi.spyOn(globalThis, "fetch").mockImplementation(() =>
     Promise.resolve(Response.json({ serverUrl: "https://notes.example.com" })),

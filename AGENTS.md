@@ -143,7 +143,7 @@ apps/server/              Go HTTP server (module konspecter/server)
                           httpapi, storage/postgres
   migrations/             embedded SQL migrations
 packages/ui/              shared look of the app and the site: tokens, fonts, base, controls, icons,
-                          the viewport (no zoom on focus in iOS Safari)
+                          the password field, the viewport (no zoom on focus in iOS Safari)
 packages/i18n/            shared message engine: translators, plurals, locale detection, rich text
 packages/crypto/          end-to-end encryption on WebCrypto: content key, wrapping, recovery key, envelopes
 deploy/                   docker compose: PostgreSQL, the API, the site, the web app and Caddy in front

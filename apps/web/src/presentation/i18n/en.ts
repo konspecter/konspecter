@@ -391,6 +391,7 @@ source, or delete this conspect when you are done.
     "Enter your encryption passphrase to unlock sync on this device. Conspects are encrypted with it before they leave the device.",
   "sync.openEncryptionSettings": "Open encryption settings",
   "sync.passphrase": "Encryption passphrase",
+  "sync.showPassword": "Show password",
   "sync.unlock": "Unlock",
   "sync.unlocking": "Unlocking…",
   "sync.wrongPassphrase":

@@ -121,6 +121,54 @@
   pointer-events: none;
 }
 
+/* A password field with its show button inside, at the end (password-input.tsx).
+   The field keeps its own look; it only leaves room for the button. */
+.password-input {
+  position: relative;
+  display: grid;
+}
+
+/* Two attribute tests outweigh the app's and the site's own field rules. */
+.password-input input:is([type="password"], [type="text"]) {
+  width: 100%;
+  padding-right: 2.5rem;
+}
+
+/* Edge's own reveal button, which shows only now and then: ours is always there. */
+.password-input input::-ms-reveal {
+  display: none;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.25rem;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--color-muted);
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.password-toggle:hover {
+  color: var(--color-fg);
+}
+
+.password-toggle[aria-pressed="true"] {
+  color: var(--color-fg);
+}
+
+/* Empty, it is still there, only lighter. */
+.password-input input:placeholder-shown + .password-toggle {
+  opacity: 0.45;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;

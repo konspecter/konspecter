@@ -444,6 +444,7 @@ Map<String, Integer> counts = new HashMap<>();
     "Введите пароль шифрования, чтобы разблокировать синхронизацию на этом устройстве. Им конспекты шифруются до того, как покинут устройство.",
   "sync.openEncryptionSettings": "Открыть настройки шифрования",
   "sync.passphrase": "Пароль шифрования",
+  "sync.showPassword": "Показать пароль",
   "sync.unlock": "Разблокировать",
   "sync.unlocking": "Разблокирую…",
   "sync.wrongPassphrase":

@@ -334,6 +334,7 @@ export const en = {
   "auth.email": "Email",
   "auth.password": "Password",
   "auth.newPassword": "New password",
+  "auth.showPassword": "Show password",
   "auth.passwordHint": "At least 8 characters.",
   "auth.working": "One moment…",
 
