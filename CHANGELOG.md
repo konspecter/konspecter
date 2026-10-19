@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.0 — 2026-10-19
 
 - **New notes take their finished titles:** in a Markdown folder, a new note's file follows its
   title until the note is closed, so a first save of a half-typed title (or one typed in the
@@ -8,6 +8,20 @@
 - **`pnpm release` writes the changelog:** every `feat`, `fix`, `perf` or breaking commit since
   the last release that wrote no `CHANGELOG.md` entry gets one drafted from its message, shown
   with the release notes; `e` at the question opens the changelog in the editor first.
+- **List notes' headings in the sidebar tree:** A note in the tag tree can hold its h1–h3 headings,
+  nested; a heading opens the note scrolled to it, in either editor or the rendered view. Off by
+  default (Settings → Headings in the sidebar): finding every note's headings slows the start (about
+  357 ms instead of 333 ms for 2,001 notes), so summaries skip them unless the setting is on.
+- **Swipe through history instead of toggling the sidebar:** A swipe to the right goes back and one
+  to the left forward, both past Settings as `Esc` does.
+- **Stay locked or unpaid while checking, without a syncing flash:** Each check briefly reported
+  `syncing`, so Settings swapped the passphrase form out and back, clearing what was typed and
+  making the page jump.
+- **Keep a show-password button on every password field:** The only one was the browser's own
+  (Edge's), which shows only while the field has text and goes once it loses the focus. Ours is
+  always there, lighter while the field is empty.
+- **Keep a pin in the note's frontmatter so it syncs:** Pins lived in each device's localStorage, so
+  they never reached other devices or File Mode files. A pin is now `pin: 3` in the note (ADR-027).
 
 ## 0.7.0 — 2026-10-16
 
