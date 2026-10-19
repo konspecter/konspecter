@@ -323,12 +323,13 @@ from the same parts as the app, so the two cannot drift apart:
   on `/activate`, the recovery key shown once.
 - **Pages:** `/` (landing, download buttons from `KONSPECTER_DOWNLOAD_*_URL`), `/download`
   (the same downloads, with installing help and links to the releases, the source and the
-  guides), `/markdown` (the cheatsheet), `/login`
+  guides), `/markdown` (the cheatsheet), `/tag-chain` (Tag-Chain for people who don't read
+  specifications, with links to `TAG-CHAIN-SPEC.md` and the rules on GitHub), `/login`
   (password, email code or a provider), `/register`, `/login/code`, `/forgot`, `/reset`,
   `/complete` (an address for a provider that gave none), `/settings` and `/activate`.
-- **Search engines:** the public pages (`/`, `/download`, `/markdown`, `/terms`, `/privacy`) are in
-  English at those paths and in Russian under `/ru`, each with a canonical link and `hreflang`
-  links, listed in `/sitemap.xml`; every other page is `noindex`
+- **Search engines:** the public pages (`/`, `/download`, `/markdown`, `/tag-chain`, `/terms`,
+  `/privacy`) are in English at those paths and in Russian under `/ru`, each with a canonical
+  link and `hreflang` links, listed in `/sitemap.xml`; every other page is `noindex`
   ([ADR-026](decisions/ADR-026-canonical-domain.md)).
 
 ## Sync in the app

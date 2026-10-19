@@ -13,6 +13,7 @@ it("finds a public page and its language by the address", () => {
   expect(publicPage("/ru")).toEqual({ page: "/", locale: "ru" });
   expect(publicPage("/ru/")).toEqual({ page: "/", locale: "ru" });
   expect(publicPage("/ru/markdown")).toEqual({ page: "/markdown", locale: "ru" });
+  expect(publicPage("/tag-chain")).toEqual({ page: "/tag-chain", locale: "en" });
 });
 
 it("leaves every other page out", () => {

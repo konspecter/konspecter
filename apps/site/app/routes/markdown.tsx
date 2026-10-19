@@ -1,11 +1,14 @@
 import { richText } from "@konspecter/i18n/rich";
+import { Link } from "react-router";
 import { cheatsheet, MARKDOWN_GUIDE, SECTIONS } from "../cheatsheet";
 import { useLocale, useT } from "../i18n/i18n";
+import { useLocalePath } from "../pages";
 
 /** The Markdown cheatsheet: the marks people use most, as typed and as shown. */
 export default function Markdown() {
   const { t } = useT();
   const locale = useLocale();
+  const localePath = useLocalePath();
   const clues = cheatsheet(locale);
 
   return (
@@ -17,7 +20,13 @@ export default function Markdown() {
       {SECTIONS.map((section) => (
         <section key={section.id} aria-labelledby={`cheatsheet-${section.id}`}>
           <h2 id={`cheatsheet-${section.id}`}>{t(`cheatsheet.section.${section.id}`)}</h2>
-          {section.id === "tags" && <p className="section-lead">{t("cheatsheet.tagsLead")}</p>}
+          {section.id === "tags" && (
+            <p className="section-lead">
+              {richText(t("cheatsheet.tagsLead"), {
+                link: <Link to={localePath("/tag-chain")}>{t("cheatsheet.tagChain")}</Link>,
+              })}
+            </p>
+          )}
           <table className="cheat-table" aria-labelledby={`cheatsheet-${section.id}`}>
             <thead>
               <tr>

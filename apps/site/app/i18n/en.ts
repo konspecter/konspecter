@@ -18,6 +18,7 @@ export const en = {
   "site.footerLinks": "About the site",
   "site.download": "Download",
   "site.markdown": "Markdown cheatsheet",
+  "site.tagChain": "Tag-Chain",
   "site.terms": "Terms",
   "site.privacy": "Privacy",
   "site.footer": "Konspecter: a notebook for everything worth keeping.",
@@ -151,7 +152,8 @@ export const en = {
   "cheatsheet.section.blocks": "Blocks",
   "cheatsheet.section.tags": "Tags",
   "cheatsheet.tagsLead":
-    "Konspecter's own mark: # right before a word, anywhere in the text. The conspect then shows up under that tag.",
+    "Konspecter's own mark: # right before a word, anywhere in the text. The conspect then shows up under that tag. {link}",
+  "cheatsheet.tagChain": "How tags build the tree",
   "cheatsheet.clue.heading": "Headings",
   "cheatsheet.clue.paragraph": "Paragraphs: a blank line between",
   "cheatsheet.clue.bold": "Bold",
@@ -171,6 +173,44 @@ export const en = {
   "cheatsheet.clue.tags": "Several tags",
   "cheatsheet.more": "That is the short version. {link} explains every mark in detail.",
   "cheatsheet.guide": "The Markdown Guide",
+
+  "tagChain.title": "Tag-Chain: tags that build the tree",
+  "tagChain.lead":
+    "In Konspecter you don't make folders and then sort conspects into them. You write a tag or two right in the text, and Konspecter builds the tree from them. This is how it works.",
+  "tagChain.write": "You write",
+  "tagChain.get": "You get",
+  "tagChain.tree": "Tree",
+  "tagChain.conspects": "Three conspects",
+  "tagChain.tag.title": "A tag is a word with # in front",
+  "tagChain.tag.text":
+    "Put # right before a word, anywhere in a conspect: in a sentence, a heading or a list. The conspect then shows up under that tag. Capital letters don't matter: #Recipes and #recipes are one tag.",
+  "tagChain.chain.title": "Each # adds a level",
+  "tagChain.chain.text":
+    "Write tags one after another, with no spaces, and each goes inside the one before it: three tags in a row make three levels of the tree. With a space between them, they are separate tags instead.",
+  "tagChain.shared.title": "One tag, many places",
+  "tagChain.shared.text":
+    "A tag is just one word, so the same word can sit under different topics. Italy can belong to your travels and your recipes at once and still be one tag. A conspect tagged only #italy shows up wherever Italy does.",
+  "tagChain.find.title": "Finding conspects",
+  "tagChain.find.text":
+    "Search for #italy and you get every conspect with that tag, wherever it sits in the tree. Add a word, like pasta #italy, to narrow it down. Or click a folder in the tree to see the conspects under it.",
+  "tagChain.folders.title": "Folders on your computer",
+  "tagChain.folders.text":
+    "On a computer every conspect is a file, and the tree is also the folders the files are kept in. The first chain of tags picks the folder: change it, and the file moves. Put a file into a folder yourself, and Konspecter writes the folder's tags into it.",
+  "tagChain.why.title": "Why it works this way",
+  "tagChain.why.short":
+    "Short names you can reuse: one Italy, not a separate one under every topic.",
+  "tagChain.why.inPlace":
+    "No list of categories to keep tidy on the side: the tree is whatever your conspects say.",
+  "tagChain.why.plain":
+    "Tags are plain text, so they still make sense in any other editor and stay with your conspects wherever they go.",
+  "tagChain.spec.title": "The full specification",
+  "tagChain.spec.text":
+    "Tag-Chain is an open specification. Every rule, with examples, is on GitHub:",
+  "tagChain.spec.spec": "The Tag-Chain specification",
+  "tagChain.spec.rules": "How Konspecter reads tags",
+  "tagChain.spec.folders": "How folders follow tags on a computer",
+  "tagChain.spec.credit":
+    "Building Tag-Chain into an app of your own? Please name the specification as its source.",
 
   "site.signIn": "Sign in",
   "site.signOut": "Sign out",

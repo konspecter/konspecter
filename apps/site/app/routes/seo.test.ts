@@ -28,6 +28,8 @@ it("lists every public page in both languages with its translations", async () =
     "http://site.test/ru/download",
     "http://site.test/markdown",
     "http://site.test/ru/markdown",
+    "http://site.test/tag-chain",
+    "http://site.test/ru/tag-chain",
     "http://site.test/terms",
     "http://site.test/ru/terms",
     "http://site.test/privacy",
@@ -36,7 +38,7 @@ it("lists every public page in both languages with its translations", async () =
   expect(xml).toContain(
     '<xhtml:link rel="alternate" hreflang="x-default" href="http://site.test/markdown"/>',
   );
-  expect(xml.match(/hreflang="ru"/g)).toHaveLength(10);
+  expect(xml.match(/hreflang="ru"/g)).toHaveLength(12);
 });
 
 it("moves any other page under /ru to its one address for good", () => {

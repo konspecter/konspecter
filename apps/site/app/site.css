@@ -1070,6 +1070,84 @@ main {
   color: var(--color-muted);
 }
 
+/* --- Tag-Chain ----------------------------------------------------------- */
+
+/* A reading column with the cheatsheet's headings. Each rule sits above an
+   example: the source as in the cheatsheet, beside the tree as the app's
+   sidebar shows it, one level under another. */
+.tag-chain {
+  max-width: calc(46rem + 2 * var(--site-gutter));
+  padding-block: clamp(2.5rem, 6vw, 4.5rem) 1rem;
+  line-height: 1.6;
+}
+
+.tag-chain h1 {
+  margin: 0;
+  font-size: clamp(2rem, 1.5rem + 2vw, 2.75rem);
+  font-weight: 720;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+}
+
+.tag-chain section {
+  margin-top: clamp(2rem, 4.5vw, 2.75rem);
+}
+
+.tag-chain h2 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.tag-chain section > p,
+.tag-chain section > ul {
+  margin: 0.6rem 0 0;
+}
+
+.tag-example {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 0.75rem 1.5rem;
+  margin-top: 1rem;
+}
+
+.tag-example-label {
+  margin: 0 0 0.35rem;
+  color: var(--color-muted);
+  font-size: 14px;
+}
+
+.tag-example-result {
+  padding-top: 0.45rem;
+  overflow-wrap: anywhere;
+}
+
+.tag-example-result code {
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+}
+
+.tag-tree {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tag-tree .tag-tree {
+  margin-left: 0.4rem;
+  padding-left: 0.9rem;
+  border-left: 1px solid var(--color-border);
+}
+
+.tag-folder {
+  font-weight: 620;
+}
+
+.tag-folder-conspects {
+  margin-left: 0.6rem;
+  color: var(--color-muted);
+  font-size: 14.5px;
+}
+
 /* --- Sign-in pages ------------------------------------------------------- */
 
 /* A sign-in page is a card raised off the page, with the hero specimen's

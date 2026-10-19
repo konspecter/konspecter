@@ -37,6 +37,10 @@ it("shows each mark as typed and as shown, by section", async () => {
 
   const tags = screen.getByRole("table", { name: "Tags" });
   expect(within(tags).getByText("#recipes#baking")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "How tags build the tree" })).toHaveAttribute(
+    "href",
+    "/tag-chain",
+  );
   expect(screen.getByRole("link", { name: "The Markdown Guide" })).toHaveAttribute(
     "href",
     "https://www.markdownguide.org/basic-syntax/",

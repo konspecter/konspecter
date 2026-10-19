@@ -6,7 +6,14 @@ import { DEFAULT_LOCALE, LOCALES, useLocale, type Locale } from "./i18n/i18n";
  * x-default), Russian under /ru. Every other page (sign-in, settings…) has one
  * address, speaks the visitor's language and is kept out of search.
  */
-export const PUBLIC_PAGES = ["/", "/download", "/markdown", "/terms", "/privacy"] as const;
+export const PUBLIC_PAGES = [
+  "/",
+  "/download",
+  "/markdown",
+  "/tag-chain",
+  "/terms",
+  "/privacy",
+] as const;
 export type PublicPage = (typeof PUBLIC_PAGES)[number];
 
 /** A public page's address in a language: "/markdown" → "/ru/markdown", home → "/ru/". */

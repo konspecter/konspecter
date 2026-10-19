@@ -297,6 +297,7 @@ function Footer() {
         <nav aria-label={t("site.footerLinks")} className="site-footer-links">
           <Link to={localePath("/download")}>{t("site.download")}</Link>
           <Link to={localePath("/markdown")}>{t("site.markdown")}</Link>
+          <Link to={localePath("/tag-chain")}>{t("site.tagChain")}</Link>
           <Link to={localePath("/terms")}>{t("site.terms")}</Link>
           <Link to={localePath("/privacy")}>{t("site.privacy")}</Link>
         </nav>
