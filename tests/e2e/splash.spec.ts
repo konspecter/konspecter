@@ -14,7 +14,7 @@ const SCREENS = [
 
 test.describe("splash screen", () => {
   for (const screen of SCREENS) {
-    test(`the logo keeps its shape and a fifth of the area at ${String(screen.width)}×${String(screen.height)}`, async ({
+    test(`the logo keeps its shape and a ninth of the area at ${String(screen.width)}×${String(screen.height)}`, async ({
       page,
     }) => {
       await page.setViewportSize(screen);
@@ -24,12 +24,14 @@ test.describe("splash screen", () => {
 
       const splash = page.getByRole("progressbar", { name: "Konspecter" });
       await expect(splash).toBeVisible();
+      // A slow start: the logo fades in after 150 ms.
+      await expect(splash.locator(".splash-logo")).toHaveCSS("opacity", "1");
       const logo = await splash.locator(".splash-logo").boundingBox();
       if (!logo) throw new Error("The logo has no box");
       expect(logo.width / logo.height).toBeCloseTo(ASPECT, 2);
       const share = (logo.width * logo.height) / (screen.width * screen.height);
-      expect(share).toBeGreaterThan(0.198);
-      expect(share).toBeLessThan(0.202);
+      expect(share).toBeGreaterThan(0.99 / 9);
+      expect(share).toBeLessThan(1.01 / 9);
       // Centred, with the version right under it, on the screen.
       expect(logo.x + logo.width / 2).toBeCloseTo(screen.width / 2, 0);
       expect(logo.y + logo.height / 2).toBeCloseTo(screen.height / 2, 0);

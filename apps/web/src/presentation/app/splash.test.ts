@@ -29,6 +29,19 @@ describe("splash screen", () => {
     vi.useRealTimers();
   });
 
+  it("fades only the empty page when the app is ready before the logo shows", () => {
+    vi.useFakeTimers();
+    const element = splash();
+    element.innerHTML = '<div class="splash-logo" style="opacity: 0"></div>';
+    hideSplash();
+    expect(element).toHaveClass("splash-quick");
+    vi.advanceTimersByTime(0);
+    expect(element).toHaveClass("splash-out");
+    vi.advanceTimersByTime(180);
+    expect(document.getElementById("splash")).toBeNull();
+    vi.useRealTimers();
+  });
+
   it("does nothing without a splash", () => {
     document.body.innerHTML = "";
     expect(() => {

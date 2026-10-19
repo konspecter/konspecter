@@ -31,17 +31,27 @@ export function showStage(stage: StartStage, splash = splashElement()): void {
   if (splash) fill(splash, STAGES[stage]);
 }
 
-/** Fills the bookmark, fades the splash out over the rendered app and removes it. */
+/**
+ * Fills the bookmark, fades the splash out over the rendered app and removes it. A start
+ * quicker than the logo's 150 ms delay never shows it: the empty page fades out at once.
+ */
 export function hideSplash(splash = splashElement()): void {
   if (!splash || splash.dataset.hiding !== undefined) return;
   splash.dataset.hiding = "";
   fill(splash, 1);
-  setTimeout(() => {
-    splash.classList.add("splash-out");
-    setTimeout(() => {
-      splash.remove();
-    }, FADE_MS);
-  }, FILL_MS);
+  // Still fully transparent: its fade-in (index.html) has not begun.
+  const logo = splash.querySelector(".splash-logo");
+  const quick = logo !== null && getComputedStyle(logo).opacity === "0";
+  if (quick) splash.classList.add("splash-quick");
+  setTimeout(
+    () => {
+      splash.classList.add("splash-out");
+      setTimeout(() => {
+        splash.remove();
+      }, FADE_MS);
+    },
+    quick ? 0 : FILL_MS,
+  );
 }
 
 /**

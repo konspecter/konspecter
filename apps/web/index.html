@@ -13,10 +13,11 @@
     <meta name="description" content="Local-first conspects in Markdown." />
     <title>Konspecter</title>
     <!--
-      The splash screen, shown at the first paint while the app loads: everything it needs
-      is inline, and nothing in <head> holds the paint back (the build preloads the app's
-      stylesheets, presentation/app/splash.ts applies them). Until the scripts run, the
-      bookmark fills on a timer; then main.tsx sets how far the start is (--splash-progress).
+      The splash screen, painted at once while the app loads, its logo fading in if the start
+      takes over 150 ms: everything it needs is inline, and nothing in <head> holds the paint
+      back (the build preloads the app's stylesheets, presentation/app/splash.ts applies them).
+      Until the scripts run, the bookmark fills on a timer; then main.tsx sets how far the
+      start is (--splash-progress).
     -->
     <style>
       #splash {
@@ -24,6 +25,7 @@
         --splash-strokes: #1f2328;
         --splash-ribbon: #e5484d;
         --splash-version: #b8b9b5;
+        --splash-shadow: rgb(31 35 40 / 0.12);
         position: fixed;
         inset: 0;
         z-index: 1000;
@@ -36,45 +38,55 @@
           --splash-bg: #31302d;
           --splash-strokes: #f0eee8;
           --splash-version: #6e6c66;
+          --splash-shadow: rgb(0 0 0 / 0.35);
         }
       }
       /*
-       * The logo's box takes a fifth of the screen's area at its own aspect ratio: its width
-       * is √(0.2 · 0.9216 · vw · vh), which CSS cannot multiply out, so each band of aspect
+       * The logo's box takes a ninth of the screen's area at its own aspect ratio: its width
+       * is √(1/9 · 0.9216 · vw · vh), which CSS cannot multiply out, so each band of aspect
        * ratios uses the straight line through its ends (under 1 % off in area). Very wide or
        * tall screens cap it, to keep the version in view.
        */
       #splash .splash-logo {
-        --splash-width: calc(19.298vw + 23.635vh);
+        --splash-width: calc(14.384vw + 17.616vh);
+        --splash-size: min(var(--splash-width), 66.36vh, 80vw);
         position: relative;
-        width: min(var(--splash-width), 66.36vh, 80vw);
+        width: var(--splash-size);
         aspect-ratio: 771.4 / 837;
-        /* The empty page paints at once; the logo is in by 150 ms. */
-        animation: splash-in 100ms ease-out 50ms both;
+        /* The empty page paints at once; a start quicker than 150 ms never shows the logo. */
+        animation: splash-in 250ms ease-out 150ms both;
+      }
+      /* A soft shadow under the whole mark, filled layers and all, scaled with it. */
+      #splash .splash-mark {
+        position: absolute;
+        inset: 0;
+        filter: drop-shadow(
+          0 calc(var(--splash-size) * 0.03) calc(var(--splash-size) * 0.06) var(--splash-shadow)
+        );
       }
       @media (min-aspect-ratio: 3/2) {
         #splash .splash-logo {
-          --splash-width: calc(15.757vw + 28.947vh);
+          --splash-width: calc(11.745vw + 21.576vh);
         }
       }
       @media (min-aspect-ratio: 9/4) {
         #splash .splash-logo {
-          --splash-width: calc(12.839vw + 35.511vh);
+          --splash-width: calc(9.57vw + 26.468vh);
         }
       }
       @media (max-aspect-ratio: 1/1) {
         #splash .splash-logo {
-          --splash-width: calc(23.635vw + 19.298vh);
+          --splash-width: calc(17.616vw + 14.384vh);
         }
       }
       @media (max-aspect-ratio: 2/3) {
         #splash .splash-logo {
-          --splash-width: calc(28.947vw + 15.757vh);
+          --splash-width: calc(21.576vw + 11.745vh);
         }
       }
       @media (max-aspect-ratio: 4/9) {
         #splash .splash-logo {
-          --splash-width: calc(35.511vw + 12.839vh);
+          --splash-width: calc(26.468vw + 9.57vh);
         }
       }
       #splash svg {
@@ -143,8 +155,15 @@
           opacity: 0;
         }
       }
+      /* The app was ready before the logo came: it stays away while the page fades. */
+      #splash.splash-quick .splash-logo {
+        visibility: hidden;
+      }
       @media (prefers-reduced-motion: reduce) {
-        #splash .splash-logo,
+        /* Still only after 150 ms, but at once. */
+        #splash .splash-logo {
+          animation-duration: 0s;
+        }
         #splash .splash-timer,
         #splash.splash-out {
           animation: none;
@@ -165,25 +184,27 @@
       aria-valuenow="0"
     >
       <div class="splash-logo">
-        <svg viewBox="126.3 179.4 771.4 837" aria-hidden="true">
-          <defs>
+        <div class="splash-mark">
+          <svg viewBox="126.3 179.4 771.4 837" aria-hidden="true">
+            <defs>
+              <path
+                id="splash-ribbon"
+                d="M659.8 183.4 L632.8 284.2 L797.1 284.2 L824.1 183.4 Z M545.8 915.3 L602 1012.4 L751.1 456 L586.8 456 L437.7 1012.4 Z"
+              />
+            </defs>
             <path
-              id="splash-ribbon"
-              d="M659.8 183.4 L632.8 284.2 L797.1 284.2 L824.1 183.4 Z M545.8 915.3 L602 1012.4 L751.1 456 L586.8 456 L437.7 1012.4 Z"
+              class="splash-strokes"
+              d="M307.2 426.1 L337.2 314.1 L236.4 314.1 L206.4 426.1 Z M863.7 426.1 L893.7 314.1 L509 314.1 L479 426.1 Z M411.1 568 L514.2 183.4 L402.1 183.4 L299.1 568 Z M488.8 709.9 L518.9 597.9 L160.3 597.9 L130.3 709.9 Z M787.6 709.9 L817.6 597.9 L742.9 597.9 L712.9 709.9 Z M226 840.6 L338 840.6 L365.1 739.8 L253 739.8 Z"
             />
-          </defs>
-          <path
-            class="splash-strokes"
-            d="M307.2 426.1 L337.2 314.1 L236.4 314.1 L206.4 426.1 Z M863.7 426.1 L893.7 314.1 L509 314.1 L479 426.1 Z M411.1 568 L514.2 183.4 L402.1 183.4 L299.1 568 Z M488.8 709.9 L518.9 597.9 L160.3 597.9 L130.3 709.9 Z M787.6 709.9 L817.6 597.9 L742.9 597.9 L712.9 709.9 Z M226 840.6 L338 840.6 L365.1 739.8 L253 739.8 Z"
-          />
-          <use class="splash-ribbon" href="#splash-ribbon" />
-        </svg>
-        <svg class="splash-fill splash-timer" viewBox="126.3 179.4 771.4 837" aria-hidden="true">
-          <use class="splash-ribbon" href="#splash-ribbon" />
-        </svg>
-        <svg class="splash-fill splash-stages" viewBox="126.3 179.4 771.4 837" aria-hidden="true">
-          <use class="splash-ribbon" href="#splash-ribbon" />
-        </svg>
+            <use class="splash-ribbon" href="#splash-ribbon" />
+          </svg>
+          <svg class="splash-fill splash-timer" viewBox="126.3 179.4 771.4 837" aria-hidden="true">
+            <use class="splash-ribbon" href="#splash-ribbon" />
+          </svg>
+          <svg class="splash-fill splash-stages" viewBox="126.3 179.4 771.4 837" aria-hidden="true">
+            <use class="splash-ribbon" href="#splash-ribbon" />
+          </svg>
+        </div>
         <p class="splash-version">%KONSPECTER_VERSION%</p>
       </div>
     </div>

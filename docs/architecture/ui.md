@@ -194,18 +194,23 @@ with its colour from the bottom up as the start goes on.
   in `<head>` blocks the paint, since the build preloads the app's stylesheets instead of
   linking them (`vite.config.ts`) and `applyStyles` (`presentation/app/splash.ts`) applies
   them before the app renders. The empty page paints at once (measured: 12–24 ms after the
-  page arrives); the logo fades in from 50 ms and is in by 150 ms.
+  page arrives).
+- **Only for a slow start.** The logo waits 150 ms, then fades in over 250 ms. An app ready
+  sooner never shows it: `hideSplash` sees it still transparent, hides it and fades only the
+  empty page over the app.
 - **Progress.** A download cannot be measured byte by byte without fetching it twice, so
   while the scripts load, a CSS timer fills the bookmark up to 55 %. Then `main.tsx` reports
   the stages (`showStage`): scripts loaded 60 %, storage open 75 %, library ready 90 %. Two
   filled layers, the timer's and the stages', show the higher. Once the app has rendered,
   `hideSplash` fills the rest (150 ms), fades the splash out over the app (180 ms) and
-  removes it. `prefers-reduced-motion` stops the timer, the transitions and the fades.
-- **A fifth of the screen.** The logo's box takes 1/5 of the screen's area at its own aspect
-  ratio, in either orientation. The width √(0.2 · aspect · vw · vh) cannot be multiplied out
+  removes it. `prefers-reduced-motion` stops the timer, the transitions and the fades; the
+  logo still waits 150 ms, then appears at once.
+- **A ninth of the screen.** The logo's box takes 1/9 of the screen's area at its own aspect
+  ratio, in either orientation. The width √(1/9 · aspect · vw · vh) cannot be multiplied out
   in CSS, so each band of screen aspect ratios uses the straight line through the band's
-  ends: under 1 % off in area from 1:3.4 to 3.4:1. On screens wider than about 2.4:1 the
-  height caps it (72vh) to keep the version in view; on tall ones, the width (80vw).
+  ends: under 1 % off in area from 1:3.4 to 3.4:1. On screens wider than about 4.3:1 the
+  height caps it (72vh) to keep the version in view; on ones taller than 1:6.2, the width
+  (80vw). A soft drop shadow, scaled with the logo, lifts the whole mark off the page.
 - **Theme.** The splash follows the system's light or dark scheme: the chosen theme is in
   the library, read later. The version is deliberately quieter than WCAG AA contrast; the
   accessibility audits run once the splash has gone (`tests/e2e/splash.spec.ts` checks its

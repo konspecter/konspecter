@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **A quieter splash screen:** a start quicker than 150 ms no longer flashes the logo; on a
+  slower one the logo fades in, now at a ninth of the screen's area, with a soft shadow under
+  it.
+
 ## 0.11.0 — 2026-10-20
 
 - **A splash screen while the app starts:** the web, desktop and mobile apps no longer show a
