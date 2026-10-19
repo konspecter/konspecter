@@ -1,10 +1,25 @@
 # Changelog
 
-## Unreleased
+## 0.10.0 — 2026-10-20
 
 - **`Esc` no longer goes back:** it only closes dialogs and leaves the search box, as it does
   everywhere else, so pressing it in the editor or in Settings no longer jumps to another page.
   Back is `‹`, ⌘/Ctrl+← outside text, or a swipe on a touch screen.
+- **Indent list items with Tab:** in the text editor, Tab nests a list item under the one above
+  it and Shift+Tab brings it back out, as ⌘/Ctrl+] and ⌘/Ctrl+[ already did. Inside a list, Tab
+  no longer takes the focus out of the text; elsewhere it still moves on.
+- **Tag-Chain explained:** the site has a page of its own on how `#parent#child` tags build the
+  tag tree, linked from the footer and from the Markdown cheatsheet, in English and Russian.
+- **Telegram and VK:** the site's footer links to Konspecter's channels.
+- **Paid sync names the step left:** before paying, the buy form says sync takes two steps,
+  paying and setting it up, since conspects are encrypted end to end. Once sync is paid, the
+  settings and the payment return page name what is left (encryption, then connecting an app)
+  until it is done.
+- **The payment return page lets go:** a cross closes it for the settings, and it checks on the
+  payment only while it is open, so it no longer brings you back after you have left it.
+- **Refunds say what they took back:** the refund email tells when the paid time now ends, or
+  that it is over, and whether only part of the payment came back; the settings list partly
+  refunded payments.
 
 ## 0.9.0 — 2026-10-19
 

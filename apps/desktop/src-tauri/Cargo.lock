@@ -2099,7 +2099,7 @@ dependencies = [
 
 [[package]]
 name = "konspecter-desktop"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "dunce",
  "ignore",
