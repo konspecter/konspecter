@@ -181,6 +181,22 @@ export function parseBilling(value: unknown): Billing | null {
   };
 }
 
+/**
+ * Whether the account syncs now, from `GET /api/subscription`: free sync does,
+ * paid time not yet over does, an expired account or a server that offers it
+ * no sync ("unavailable") does not. Null when the answer says neither.
+ */
+export function syncWorks(value: unknown, now: number): boolean | null {
+  const access = record(record(value).access);
+  if (access.state === "unavailable") return false;
+  const state = oneOf(ACCESS, access.state);
+  if (!state) return null;
+  if (state === "free") return true;
+  if (state === "expired") return false;
+  const until = time(access.until);
+  return until !== null && Date.parse(until) > now;
+}
+
 /** An amount in a currency, as the page's language writes it: "$3", "299 ₽". */
 export function money(amount: number | string, currency: string, locale: Locale): string {
   const value = typeof amount === "number" ? amount : Number(amount);

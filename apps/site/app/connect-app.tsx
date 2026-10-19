@@ -18,6 +18,8 @@ import { sealRememberedKey, useRememberedKeyId } from "./remembered-key";
  * request carries the key sealed with a new secret, and the secret is added
  * to the link's fragment here: it never reaches the server, and the app
  * that scans the code needs no passphrase (ADR-025).
+ *
+ * While the account does not sync, no code is asked for (`disabled`).
  */
 
 /** A connect code as the action returns it. */
@@ -42,11 +44,13 @@ export function ConnectApp({
   code,
   error,
   devices,
+  disabled,
 }: {
   account: string;
   code: ConnectCode | null;
   error: FormError | null;
   devices: readonly Device[];
+  disabled: boolean;
 }) {
   const { t } = useT();
   const { revalidate } = useRevalidator();
@@ -130,7 +134,7 @@ export function ConnectApp({
           </div>
         </div>
       )}
-      {!showing && remembered !== undefined && (
+      {!showing && !disabled && remembered !== undefined && (
         <p className="settings-text">
           {remembered ? (
             t("settings.connect.withKey")
@@ -145,7 +149,7 @@ export function ConnectApp({
       <Form method="post" className="settings-form" onSubmit={handleSubmit}>
         <FormMessage error={error} />
         <div className="actions">
-          <Submit intent="connect" primary={!showing}>
+          <Submit intent="connect" primary={!showing} disabled={disabled}>
             {current ? t("settings.connect.again") : t("settings.connect.show")}
           </Submit>
           {showing && (

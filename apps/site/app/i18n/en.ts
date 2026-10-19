@@ -240,6 +240,8 @@ export const en = {
   "settings.connect.title": "Connect an app",
   "settings.connect.lead":
     "Show a QR code and scan it with Konspecter on your phone (Settings → Sync → Scan QR code). It connects the app to this account; no code to type.",
+  "settings.connect.inactive":
+    "Sync is not active for this account, so no new app can be connected. The ones connected already can be disconnected below.",
   "settings.connect.show": "Show QR code",
   "settings.connect.again": "Show a new code",
   "settings.connect.done": "Done",
@@ -356,6 +358,8 @@ export const en = {
   "activate.codeLabelled": "Code {code}",
   "activate.warning":
     "Approve only if you started this yourself, on your own device. An approved app can read and change every conspect you sync.",
+  "activate.inactive": "Sync is not active for this account, so this app cannot be connected yet.",
+  "activate.toSubscription": "Start sync in the settings",
   "activate.approve": "Approve",
   "activate.deny": "Deny",
   "activate.enterLead": "Enter the code the app shows you.",
@@ -480,6 +484,8 @@ export const en = {
   "authError.not_subscribed": "There is no renewing subscription to cancel. Reload the page.",
   "authError.not_resumable": "This subscription cannot be resumed. Subscribe again instead.",
   "authError.billing_off": "Sync is free on this server.",
+  "authError.subscription_required":
+    "Sync is not active for this account, so no new app can be connected. Start it in the settings first.",
   "authError.sync_unavailable": "This server does not offer sync in your language.",
   "authError.billing_unavailable": "Sync cannot be started right now. Try again in a minute.",
   "authError.unknown": "Something went wrong on the server. Try again in a moment.",

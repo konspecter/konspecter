@@ -1,4 +1,5 @@
 import { richText } from "@konspecter/i18n/rich";
+import { useState } from "react";
 import { data, Form, redirect, useActionData, useLoaderData, useNavigation } from "react-router";
 import { requireUser, signInPath } from "../account.server";
 import { callApi, withCookies, type ApiResult } from "../api.server";
@@ -10,14 +11,22 @@ import { Encryption } from "../encryption";
 import { useLocale, useT } from "../i18n/i18n";
 import { homePath, readPreferences } from "../preferences.server";
 import { forgetKey, forgetKeyThenSubmit } from "../remembered-key";
-import { encryptedOf, parseBilling, parsePlans, setupStep, type Billing } from "../subscription";
+import {
+  encryptedOf,
+  parseBilling,
+  parsePlans,
+  setupStep,
+  syncWorks,
+  type Billing,
+} from "../subscription";
 import { SubscriptionSection } from "../subscription-section";
 import type { Route } from "./+types/settings";
 
 /**
  * The account's settings: its name, the subscription (where sync is paid),
  * connecting an app by QR code, the connected devices (each can be
- * disconnected: it stops syncing and keeps its conspects), encryption, and
+ * disconnected: it stops syncing and keeps its conspects; no new one is
+ * connected while the account does not sync), encryption, and
  * deleting the account. Plain forms, so the page works without JavaScript,
  * except the encryption, which runs in the browser (encryption.tsx).
  */
@@ -55,10 +64,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   if (!parsed) throw data("The account could not be loaded", { status: 503 });
   const subscription = parseBilling(billing.data);
   const parsedDevices = parseDevices(devices.data);
+  const now = Date.now();
   return {
     account: parsed,
     devices: parsedDevices,
     devicesFailed: devices.error !== null,
+    // No app is connected while the account does not sync; null when not known.
+    syncing: syncWorks(billing.data, now),
     // What is left to set up before sync runs, said once it is paid.
     setup: setupStep(encryptedOf(keys), devices.error ? null : parsedDevices.length),
     // Shown only where sync is paid.
@@ -70,7 +82,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     autoRenew: new URL(request.url).searchParams.get("renew") !== "once",
     // The trial asked for on the home page before signing in.
     trial: new URL(request.url).searchParams.get("trial") === "1",
-    now: Date.now(),
+    now,
   };
 }
 
@@ -176,9 +188,24 @@ export async function action({ request }: Route.ActionArgs) {
 
 export default function Settings() {
   const { t } = useT();
-  const { account, devices, devicesFailed, setup, billing, gateways, plan, autoRenew, trial, now } =
-    useLoaderData<typeof loader>();
+  const {
+    account,
+    devices,
+    devicesFailed,
+    syncing,
+    setup,
+    billing,
+    gateways,
+    plan,
+    autoRenew,
+    trial,
+    now,
+  } = useLoaderData<typeof loader>();
   const result = useActionData<ActionResult>();
+  // Checking for a connected app reloads all this every few seconds: an answer
+  // that fails then keeps what the page showed, not to blink an error or a state.
+  const shownDevices = useLastKnown(devicesFailed ? null : devices);
+  const syncs = useLastKnown(syncing) ?? true;
   const errorOf = (intent: Intent) => (result?.intent === intent ? result.error : null);
   const billingIntent =
     result?.intent === "subscribe" ||
@@ -198,7 +225,7 @@ export default function Settings() {
           })}
         </p>
       </header>
-      <SectionNav billing={billing} devices={devicesFailed ? null : devices.length} />
+      <SectionNav billing={billing} devices={shownDevices ? shownDevices.length : null} />
       <div className="settings-body">
         {billing && (
           <SubscriptionSection
@@ -232,11 +259,13 @@ export default function Settings() {
         <section className="settings-section" id="connect" aria-labelledby="connect-heading">
           <h2 id="connect-heading">{t("settings.connect.title")}</h2>
           <p className="settings-text">{t("settings.connect.lead")}</p>
+          {!syncs && <p className="settings-empty">{t("settings.connect.inactive")}</p>}
           <ConnectApp
             account={account.email}
             code={result?.connect ?? null}
             error={errorOf("connect")}
-            devices={devices}
+            devices={shownDevices ?? devices}
+            disabled={!syncs}
           />
         </section>
 
@@ -251,13 +280,13 @@ export default function Settings() {
                 : null
             }
           />
-          {devicesFailed ? (
+          {!shownDevices ? (
             <p className="inline-error">{t("settings.devices.failed")}</p>
-          ) : devices.length === 0 ? (
-            <p className="settings-empty">{t("settings.devices.empty")}</p>
+          ) : shownDevices.length === 0 ? (
+            syncs && <p className="settings-empty">{t("settings.devices.empty")}</p>
           ) : (
             <ul className="device-list" aria-labelledby="devices-heading">
-              {devices.map((device) => (
+              {shownDevices.map((device) => (
                 <DeviceRow key={device.id} device={device} now={now} />
               ))}
             </ul>
@@ -393,6 +422,13 @@ function SectionNav({ billing, devices }: { billing: Billing | null; devices: nu
       </ul>
     </nav>
   );
+}
+
+/** The value, or while it is null, the last one that was not. */
+function useLastKnown<T>(value: T | null): T | null {
+  const [known, setKnown] = useState(value);
+  if (value !== null && value !== known) setKnown(value);
+  return value ?? known;
 }
 
 /** A date as "Oct 15", in UTC as the server renders it. */

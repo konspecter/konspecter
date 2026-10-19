@@ -20,14 +20,17 @@ import (
 // The other way round, the site asks for a connect code for its signed-in
 // owner and shows it as a QR code; an app scans it and trades it for its
 // token (connect) without waiting for anyone.
+//
+// Approving an app and asking for a connect code need an account that may
+// sync (addsDevice); disconnecting needs nothing.
 
 func (a *api) registerDeviceRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /api/devices/authorize", a.deviceFlow(a.authorizeDevice))
 	mux.Handle("POST /api/devices/token", a.deviceFlow(a.deviceToken))
 	mux.Handle("GET /api/devices/pending", a.withSession(a.pendingDevice))
-	mux.Handle("POST /api/devices/approve", a.withSession(a.decideDevice(true)))
+	mux.Handle("POST /api/devices/approve", a.withSession(a.addsDevice(a.decideDevice(true))))
 	mux.Handle("POST /api/devices/deny", a.withSession(a.decideDevice(false)))
-	mux.Handle("POST /api/devices/connect-codes", a.withSession(a.createConnectCode))
+	mux.Handle("POST /api/devices/connect-codes", a.withSession(a.addsDevice(a.createConnectCode)))
 	mux.Handle("POST /api/devices/connect", a.deviceFlow(a.connectDevice))
 	mux.Handle("GET /api/devices", a.withSession(a.listDevices))
 	mux.Handle("DELETE /api/devices/{id}", a.withSession(a.revokeDevice))

@@ -5,12 +5,15 @@ import { callApi } from "../api.server";
 import { AuthPage, Field, FormMessage, formError, Submit, textField } from "../auth-form";
 import { parseClient, type DeviceClient } from "../devices";
 import { useT } from "../i18n/i18n";
+import { readPreferences } from "../preferences.server";
+import { syncWorks } from "../subscription";
 import type { Route } from "./+types/activate";
 
 /**
  * Connecting an app: the app shows a code and opens this page with it
  * (`/activate?code=BCDF-GHJK`), or its owner types the code in. Signed in,
- * they compare the codes and approve or deny the app.
+ * they compare the codes and approve or deny the app. An account that does
+ * not sync approves none (the API refuses), and is sent to its settings.
  */
 
 /** A code as the app shows it: upper case, "BCDF-GHJK". */
@@ -22,18 +25,24 @@ export function displayCode(input: string): string {
 export async function loader({ request, context }: Route.LoaderArgs) {
   const user = requireUser(request, context);
   const code = displayCode(new URL(request.url).searchParams.get("code")?.trim() ?? "");
-  if (!code) return { email: user.email, code, device: null, error: null };
-  const result = await callApi<{ device?: unknown }>(
-    request,
-    `/api/devices/pending?user_code=${encodeURIComponent(code)}`,
-  );
+  if (!code) return { email: user.email, code, device: null, error: null, syncing: true };
+  const { locale } = readPreferences(request);
+  const [result, subscription] = await Promise.all([
+    callApi<{ device?: unknown }>(
+      request,
+      `/api/devices/pending?user_code=${encodeURIComponent(code)}`,
+    ),
+    callApi(request, `/api/subscription?locale=${locale}`),
+  ]);
   if (result.status === 401) throw redirect(signInPath(request));
   const device = parseClient(result.data?.device);
   if (!device) {
     const error = formError(result.error?.code ?? "internal", result.retryAfter);
-    return { email: user.email, code, device: null, error };
+    return { email: user.email, code, device: null, error, syncing: true };
   }
-  return { email: user.email, code, device, error: null };
+  // Not known: as if it did, and the API says otherwise when it does not.
+  const syncing = syncWorks(subscription.data, Date.now()) ?? true;
+  return { email: user.email, code, device, error: null, syncing };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -95,10 +104,19 @@ export default function Activate() {
         <DeviceCode code={loaded.code} device={loaded.device} />
         <Form method="post" className="form">
           <input type="hidden" name="code" value={loaded.code} />
-          <p className="activate-warning">{t("activate.warning")}</p>
+          {loaded.syncing ? (
+            <p className="activate-warning">{t("activate.warning")}</p>
+          ) : (
+            <p className="inline-error">
+              {t("activate.inactive")}{" "}
+              <Link to="/settings#subscription">{t("activate.toSubscription")}</Link>
+            </p>
+          )}
           <FormMessage error={result?.error ?? null} />
           <div className="actions">
-            <Submit intent="approve">{t("activate.approve")}</Submit>
+            <Submit intent="approve" disabled={!loaded.syncing}>
+              {t("activate.approve")}
+            </Submit>
             <Submit intent="deny" primary={false}>
               {t("activate.deny")}
             </Submit>

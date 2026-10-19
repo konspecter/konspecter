@@ -23,7 +23,7 @@ const url = "https://notes.example.com/connect#ksc_abcdefghijklmnopqrstuvwxyz012
  * The settings page's part: the action hands out a code (and records what
  * was posted to it), the loader lists `devices.now`.
  */
-function renderConnect(devices: { now: Device[] }, posted: FormData[] = []) {
+function renderConnect(devices: { now: Device[] }, posted: FormData[] = [], disabled = false) {
   function Page() {
     const loaded = useLoaderData<{ devices: Device[] }>();
     const result = useActionData<{ connect: ConnectCode }>();
@@ -33,6 +33,7 @@ function renderConnect(devices: { now: Device[] }, posted: FormData[] = []) {
         code={result?.connect ?? null}
         error={null}
         devices={loaded.devices}
+        disabled={disabled}
       />
     );
   }
@@ -75,6 +76,11 @@ it("reads the API's code", () => {
     expiresIn: 300,
   });
   expect(parseConnectCode({ url })).toBeNull();
+});
+
+it("asks for no code while the account does not sync", async () => {
+  renderConnect({ now: [] }, [], true);
+  expect(await screen.findByRole("button", { name: "Show QR code" })).toBeDisabled();
 });
 
 it("shows the code as a QR code and as a link to paste", async () => {

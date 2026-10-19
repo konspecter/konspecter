@@ -10,6 +10,7 @@ import {
   parsePlans,
   periodText,
   setupStep,
+  syncWorks,
 } from "./subscription";
 
 describe("parsePlans", () => {
@@ -175,5 +176,28 @@ describe("setting sync up", () => {
     // Not known: nothing to nag about.
     expect(setupStep(null, 0)).toBeNull();
     expect(setupStep(true, null)).toBeNull();
+  });
+});
+
+describe("whether the account syncs", () => {
+  const now = Date.parse("2026-10-05T12:00:00Z");
+  const access = (state: string, until: string | null = null) => ({ access: { state, until } });
+
+  it("syncs where sync is free, and while paid time is left", () => {
+    expect(syncWorks(access("free"), now)).toBe(true);
+    expect(syncWorks(access("trialing", "2026-10-15T00:00:00Z"), now)).toBe(true);
+    expect(syncWorks(access("past_due", "2026-10-06T00:00:00Z"), now)).toBe(true);
+  });
+
+  it("does not once the time is over, expired, or where the server offers none", () => {
+    expect(syncWorks(access("canceled", "2026-10-01T00:00:00Z"), now)).toBe(false);
+    expect(syncWorks(access("active"), now)).toBe(false);
+    expect(syncWorks(access("expired"), now)).toBe(false);
+    expect(syncWorks(access("unavailable"), now)).toBe(false);
+  });
+
+  it("does not know from an answer that says neither", () => {
+    expect(syncWorks(null, now)).toBeNull();
+    expect(syncWorks({ error: "billing_unavailable" }, now)).toBeNull();
   });
 });

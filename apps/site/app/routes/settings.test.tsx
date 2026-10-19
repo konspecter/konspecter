@@ -157,7 +157,11 @@ describe("settings", () => {
     account: { name: string; recentSignIn: boolean },
     devices: unknown[],
     billing: unknown = null,
+    syncing: boolean | null = true,
+    // What a reload after the action answers, if not the same.
+    reloaded?: { devicesFailed: boolean; syncing: boolean | null },
   ) {
+    let reloads = 0;
     const Stub = createRoutesStub([
       {
         id: "root",
@@ -172,6 +176,8 @@ describe("settings", () => {
               account: { email: "ann@example.com", ...account },
               devices,
               devicesFailed: false,
+              syncing,
+              ...(reloads++ > 0 ? reloaded : {}),
               billing,
               gateways: [],
               now: Date.parse("2026-10-05T12:00:00Z"),
@@ -241,6 +247,46 @@ describe("settings", () => {
     }
   });
 
+  const linux = {
+    id: "d1",
+    name: "Firefox on Linux",
+    platform: "linux",
+    clientVersion: "0.2.0",
+    createdAt: "2026-10-01T10:00:00Z",
+    lastUsedAt: "2026-10-05T11:00:00Z",
+    lastSyncAt: "2026-10-05T11:55:00Z",
+  };
+
+  it("connects no new app while the account does not sync, but disconnects", async () => {
+    renderSettings({ name: "Ann", recentSignIn: true }, [linux], null, false);
+    expect(await screen.findByText(/no new app can be connected/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show QR code" })).toBeDisabled();
+    const list = screen.getByRole("list", { name: "Connected devices" });
+    expect(within(list).getByRole("listitem")).toHaveTextContent("Firefox on Linux");
+    expect(screen.getByRole("button", { name: "Disconnect Firefox on Linux" })).toBeEnabled();
+  });
+
+  it("asks for no device while the account does not sync", async () => {
+    renderSettings({ name: "Ann", recentSignIn: true }, [], null, false);
+    expect(await screen.findByText(/no new app can be connected/)).toBeInTheDocument();
+    expect(screen.queryByText(/No devices yet/)).toBeNull();
+  });
+
+  it("keeps what it showed when a reload cannot say", async () => {
+    renderSettings({ name: "Ann", recentSignIn: true }, [linux], null, true, {
+      devicesFailed: true,
+      syncing: null,
+    });
+    await userEvent
+      .setup()
+      .click(await screen.findByRole("button", { name: "Disconnect Firefox on Linux" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("is disconnected");
+    // The reload failed: no error, no change of state.
+    expect(screen.queryByText(/could not be loaded/)).toBeNull();
+    expect(screen.queryByText(/Sync is not active/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Show QR code" })).toBeEnabled();
+  });
+
   it("asks to sign in again before deleting after an old sign-in", async () => {
     renderSettings({ name: "", recentSignIn: false }, []);
     expect(await screen.findByText(/No devices yet/)).toBeInTheDocument();
@@ -273,11 +319,17 @@ describe("activate", () => {
         Response.json({ device: { name: "Firefox on Linux", platform: "linux" } }),
       "GET /api/devices/pending?user_code=XXXX-XXXX": () =>
         Response.json({ error: { code: "invalid_user_code", message: "" } }, { status: 404 }),
+      "GET /api/subscription?locale=en": () =>
+        Response.json({ paid: false, access: { state: "free", until: null } }),
     });
     const found = await activateLoader(
       args(new Request("http://site.test/activate?code=bcdfghjk")),
     );
-    expect(found).toMatchObject({ code: "BCDF-GHJK", device: { name: "Firefox on Linux" } });
+    expect(found).toMatchObject({
+      code: "BCDF-GHJK",
+      device: { name: "Firefox on Linux" },
+      syncing: true,
+    });
     const wrong = await activateLoader(
       args(new Request("http://site.test/activate?code=XXXX-XXXX")),
     );
@@ -286,6 +338,18 @@ describe("activate", () => {
       code: "",
       device: null,
     });
+  });
+
+  it("knows when the account does not sync", async () => {
+    stubApi({
+      "GET /api/devices/pending?user_code=BCDF-GHJK": () =>
+        Response.json({ device: { name: "Firefox on Linux", platform: "linux" } }),
+      "GET /api/subscription?locale=en": () =>
+        Response.json({ paid: true, access: { state: "expired", until: null } }),
+    });
+    expect(
+      await activateLoader(args(new Request("http://site.test/activate?code=BCDF-GHJK"))),
+    ).toMatchObject({ device: { name: "Firefox on Linux" }, syncing: false });
   });
 
   it("approves or denies the app", async () => {
@@ -307,7 +371,7 @@ describe("activate", () => {
     ]);
   });
 
-  it("shows the code to compare, then the outcome", async () => {
+  function renderActivate(syncing: boolean) {
     const Stub = createRoutesStub([
       {
         id: "root",
@@ -323,6 +387,7 @@ describe("activate", () => {
               code: "BCDF-GHJK",
               device: { name: "Firefox on Linux", platform: "linux", clientVersion: "0.2.0" },
               error: null,
+              syncing,
             }),
             action: () => ({
               decision: "approved",
@@ -334,10 +399,25 @@ describe("activate", () => {
       },
     ]);
     render(<Stub initialEntries={["/activate?code=BCDF-GHJK"]} />);
+  }
+
+  it("shows the code to compare, then the outcome", async () => {
+    renderActivate(true);
     expect(await screen.findByLabelText("Code BCDF-GHJK")).toHaveTextContent("BCDF-GHJK");
     expect(screen.getByText("Linux, version 0.2.0")).toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole("button", { name: "Approve" }));
     expect(await screen.findByRole("heading", { name: "Device connected" })).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Firefox on Linux can now sync");
+  });
+
+  it("approves no app while the account does not sync, and says where to start it", async () => {
+    renderActivate(false);
+    expect(await screen.findByText(/this app cannot be connected yet/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Deny" })).toBeEnabled();
+    expect(screen.getByRole("link", { name: "Start sync in the settings" })).toHaveAttribute(
+      "href",
+      "/settings#subscription",
+    );
   });
 });

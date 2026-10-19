@@ -5,6 +5,11 @@
 - **A quieter splash screen:** a start quicker than 150 ms no longer flashes the logo; on a
   slower one the logo fades in, now at a ninth of the screen's area, with a soft shadow under
   it.
+- **New apps connect only while sync is on:** where sync is paid for, an account whose sync is
+  not active (never started, or its time is over) cannot connect another app: the settings and
+  the `/activate` page say so and link to the subscription. The apps connected already can
+  still be disconnected. The settings no longer blink an error while they check for a newly
+  connected app.
 
 ## 0.11.0 — 2026-10-20
 

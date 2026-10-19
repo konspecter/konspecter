@@ -138,6 +138,37 @@ func (a *api) entitledDevice(next deviceHandler) deviceHandler {
 	}
 }
 
+// addsDevice lets next connect a device only to an account that may sync
+// now: a device is connected to sync, and with none it would only wait.
+// Disconnecting one is always allowed. Unlike a sync request, connecting
+// never starts the trial; the site's Try button does.
+func (a *api) addsDevice(next userHandler) userHandler {
+	if a.billing == nil && a.syncOff {
+		return func(w http.ResponseWriter, _ *http.Request, _ auth.User) { syncUnavailable(w) }
+	}
+	if a.billing == nil {
+		return next
+	}
+	return func(w http.ResponseWriter, r *http.Request, user auth.User) {
+		held, err := a.entitlement(r.Context(), user.ID, false)
+		if err != nil {
+			a.logger.ErrorContext(r.Context(), "the billing service did not say whether an account may sync", "error", err)
+			writeError(w, http.StatusServiceUnavailable, "billing_unavailable", "whether this account may sync is not known yet; try again later")
+			return
+		}
+		if held.Allowed(a.billing.now()) {
+			next(w, r, user)
+			return
+		}
+		if sells, known := a.sells(r.Context(), user.ID); known && !sells {
+			syncUnavailable(w)
+			return
+		}
+		writeError(w, http.StatusPaymentRequired, "subscription_required",
+			"connecting a device needs sync; the devices connected already can still be disconnected")
+	}
+}
+
 // syncAllowed answers 402, and false, when the user may not sync: time the
 // account has always counts; without any, an account in a language that
 // sells nothing gets sync_unavailable, and the others subscription_required.

@@ -786,3 +786,47 @@ func TestTheBillingServiceReadsAUserByID(t *testing.T) {
 		t.Errorf("without the token = %d %v", r.status, r.body)
 	}
 }
+
+func TestOnlyAnAccountThatMaySyncConnectsDevices(t *testing.T) {
+	s := newBillingServer(t)
+	s.service.trial = 14 * 24 * time.Hour
+	session := s.ann(t)
+	_, userCode := authorize(t, s.accountSetup)
+	if r := siteCall(t, s.server.URL, http.MethodPost, "/api/devices/connect-codes", session, nil); r.status != http.StatusPaymentRequired || errorCode(r) != "subscription_required" {
+		t.Errorf("connect code = %d %v", r.status, r.body)
+	}
+	if r := siteCall(t, s.server.URL, http.MethodPost, "/api/devices/approve", session, map[string]any{"user_code": userCode}); r.status != http.StatusPaymentRequired || errorCode(r) != "subscription_required" {
+		t.Errorf("approve = %d %v", r.status, r.body)
+	}
+	if s.service.trials != 0 {
+		t.Errorf("connecting started a trial: %d", s.service.trials)
+	}
+	// The devices it has can still be disconnected.
+	list, _ := siteCall(t, s.server.URL, http.MethodGet, "/api/devices", session, nil).body["devices"].([]any)
+	if len(list) != 1 {
+		t.Fatalf("devices = %v", list)
+	}
+	id, _ := list[0].(map[string]any)["id"].(string)
+	if r := siteCall(t, s.server.URL, http.MethodDelete, "/api/devices/"+id, session, nil); r.status != http.StatusNoContent {
+		t.Errorf("disconnect = %d %v", r.status, r.body)
+	}
+
+	// With time, both work.
+	if r := siteCall(t, s.server.URL, http.MethodPost, "/api/subscription/trial", session, nil); syncState(t, r) != "trialing" {
+		t.Fatalf("trial = %d %v", r.status, r.body)
+	}
+	if r := siteCall(t, s.server.URL, http.MethodPost, "/api/devices/connect-codes", session, nil); r.status != http.StatusOK {
+		t.Errorf("connect code with time = %d %v", r.status, r.body)
+	}
+	if r := siteCall(t, s.server.URL, http.MethodPost, "/api/devices/approve", session, map[string]any{"user_code": userCode}); r.status != http.StatusOK {
+		t.Errorf("approve with time = %d %v", r.status, r.body)
+	}
+}
+
+func TestNoDevicesConnectWhereSyncIsOff(t *testing.T) {
+	s := newBillingServerWith(t, true)
+	session := s.ann(t)
+	if r := siteCall(t, s.server.URL, http.MethodPost, "/api/devices/connect-codes", session, nil); r.status != http.StatusPaymentRequired || errorCode(r) != "sync_unavailable" {
+		t.Errorf("connect code = %d %v", r.status, r.body)
+	}
+}

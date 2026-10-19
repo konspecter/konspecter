@@ -164,7 +164,9 @@ it may not, `GET /api/me` adds `sync: {state, until}`, and the site's `/api/bill
 `/api/subscription*` requests are passed on to it. Sync is sold per language: an account
 whose language the service sells nothing in cannot start syncing (`402 sync_unavailable`,
 `sync.state: "unavailable"`), though time it already has lasts. Deleting an account then waits for that
-service to forget it (`502` keeps the account). The server refuses to start without
+service to forget it (`502` keeps the account). An account that may not sync connects no
+new app either: `POST /api/devices/approve` and `/connect-codes` answer the same `402`, and
+start no trial; disconnecting a device always works. The server refuses to start without
 `KONSPECTER_BILLING_URL` and `KONSPECTER_BILLING_TOKEN`.
 
 With `free`, sync is free and the billing settings are ignored: the sync routes never answer
