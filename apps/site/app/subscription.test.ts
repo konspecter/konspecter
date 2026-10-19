@@ -74,6 +74,12 @@ describe("parseBilling", () => {
       payments: [
         { amount: "3.00", currency: "USD", status: "succeeded", at: "2026-10-06T12:00:00Z" },
         { amount: "3.00", currency: "USD", status: "pending", at: "2026-10-06T12:00:00Z" },
+        {
+          amount: "3.00",
+          currency: "USD",
+          status: "partially_refunded",
+          at: "2026-09-06T12:00:00Z",
+        },
       ],
     });
     expect(billing?.access).toEqual({ state: "active", until: "2026-11-06T12:00:00Z" });
@@ -84,7 +90,10 @@ describe("parseBilling", () => {
       amount: 3,
     });
     expect(billing?.checkout).toBeNull();
-    expect(billing?.payments).toHaveLength(1);
+    expect(billing?.payments.map((payment) => payment.status)).toEqual([
+      "succeeded",
+      "partially_refunded",
+    ]);
   });
 
   it("refuses what is not an answer about sync", () => {

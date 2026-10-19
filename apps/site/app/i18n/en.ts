@@ -499,6 +499,7 @@ export const en = {
   "subscription.payment.succeeded": "Paid",
   "subscription.payment.failed": "Declined",
   "subscription.payment.refunded": "Refunded",
+  "subscription.payment.partially_refunded": "Partly refunded",
   "subscription.unit.day": "day",
   "subscription.unit.week": "week",
   "subscription.unit.month": "month",

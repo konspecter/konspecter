@@ -58,7 +58,7 @@ export interface Subscription {
 export interface Payment {
   readonly amount: string;
   readonly currency: string;
-  readonly status: "succeeded" | "failed" | "refunded";
+  readonly status: "succeeded" | "failed" | "refunded" | "partially_refunded";
   readonly at: string;
 }
 
@@ -92,7 +92,12 @@ const STATUSES: readonly SubscriptionStatus[] = [
   "canceled",
   "ended",
 ];
-const PAYMENT_STATUSES: readonly Payment["status"][] = ["succeeded", "failed", "refunded"];
+const PAYMENT_STATUSES: readonly Payment["status"][] = [
+  "succeeded",
+  "failed",
+  "refunded",
+  "partially_refunded",
+];
 
 function record(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};

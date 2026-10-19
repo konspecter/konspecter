@@ -505,6 +505,7 @@ export const ru: Dictionary = {
   "subscription.payment.succeeded": "Оплачено",
   "subscription.payment.failed": "Отклонено",
   "subscription.payment.refunded": "Возвращено",
+  "subscription.payment.partially_refunded": "Частично возвращено",
   "subscription.unit.day": "день",
   "subscription.unit.week": "неделю",
   "subscription.unit.month": "месяц",

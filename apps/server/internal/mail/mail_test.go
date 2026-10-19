@@ -287,7 +287,7 @@ func TestSubscriptionLetters(t *testing.T) {
 			GraceStarted(locale, site, "a@example.com", charge), Paused(locale, site, "a@example.com", Charge{}),
 			Subscribed(locale, site, "a@example.com", once), RenewalDue(locale, site, "a@example.com", once),
 			GraceStarted(locale, site, "a@example.com", once), Paused(locale, site, "a@example.com", once),
-			Refunded(locale, site, "a@example.com", charge), SyncGranted(locale, site, "a@example.com", until),
+			Refunded(locale, site, "a@example.com", charge, until), SyncGranted(locale, site, "a@example.com", until),
 			LifetimeGranted(locale, site, "a@example.com"), GrantEnded(locale, site, "a@example.com", until),
 			GrantEnded(locale, site, "a@example.com", time.Time{}),
 			PriceChanged(locale, site, "a@example.com", charge, "249.00"), PriceChanged(locale, site, "a@example.com", charge, ""),
@@ -378,7 +378,7 @@ func TestBillingNotices(t *testing.T) {
 	until := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
 	subjects := map[string]bool{}
 	for _, kind := range NoticeKinds {
-		m, ok := BillingNotice(English, site, "a@example.com", Notice{Kind: kind, Amount: "3.00", Currency: "USD", Period: "1m", Until: &until})
+		m, ok := BillingNotice(English, site, "a@example.com", Notice{Kind: kind, Amount: "3.00", Currency: "USD", Period: "1m", Until: &until}, until)
 		if !ok || m.To != "a@example.com" || m.Subject == "" {
 			t.Errorf("%s: %v %+v", kind, ok, m)
 		}
@@ -387,10 +387,47 @@ func TestBillingNotices(t *testing.T) {
 	if len(subjects) != len(NoticeKinds) {
 		t.Errorf("subjects = %v", subjects)
 	}
-	if m, _ := BillingNotice(Russian, site, "a@example.com", Notice{Kind: "paused"}); m.Subject != Paused(Russian, site, "a@example.com", Charge{}).Subject {
+	if m, _ := BillingNotice(Russian, site, "a@example.com", Notice{Kind: "paused"}, until); m.Subject != Paused(Russian, site, "a@example.com", Charge{}).Subject {
 		t.Errorf("russian = %q", m.Subject)
 	}
-	if _, ok := BillingNotice(English, site, "a@example.com", Notice{Kind: "cancelled"}); ok {
+	if _, ok := BillingNotice(English, site, "a@example.com", Notice{Kind: "cancelled"}, until); ok {
 		t.Error("an unknown kind was written")
+	}
+	if m, _ := BillingNotice(English, site, "a@example.com", Notice{Kind: "refunded", Amount: "3.00", Currency: "USD", Partial: true}, until); !strings.Contains(m.Text, "part of your payment") {
+		t.Errorf("partial refund = %q", m.Text)
+	}
+}
+
+func TestRefundLetters(t *testing.T) {
+	const site = "https://notes.example.com"
+	now := time.Date(2026, 10, 7, 12, 0, 0, 0, time.UTC)
+	refund := Charge{Amount: "299.00", Currency: "RUB", Period: "1m"}
+
+	// Recorded only: nothing is said of the paid time.
+	got := Refunded(English, site, "a@example.com", refund, now).Text
+	if !strings.Contains(got, "We refunded 299 ₽.") || strings.Contains(got, "paid time") || strings.Contains(got, "conspects") {
+		t.Errorf("refunded = %q", got)
+	}
+	partial := refund
+	partial.Partial = true
+	if got := Refunded(Russian, site, "a@example.com", partial, now).Text; !strings.Contains(got, "Мы вернули часть платежа на сумму 299 ₽.") || strings.Contains(got, "аннулировано") {
+		t.Errorf("russian partial = %q", got)
+	}
+
+	// Its time taken back, with time left or none.
+	left := refund
+	left.Until = time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
+	got = Refunded(English, site, "a@example.com", left, now).Text
+	if !strings.Contains(got, "you will not be charged again") || !strings.Contains(got, "Your paid time now ends on 6 November 2026.") || !strings.Contains(got, "Your conspects are safe") {
+		t.Errorf("time left = %q", got)
+	}
+	over := refund
+	over.Until = time.Date(2026, 10, 6, 12, 0, 0, 0, time.UTC)
+	got = Refunded(English, site, "a@example.com", over, now).Text
+	if !strings.Contains(got, "Your paid time is over.") || strings.Contains(got, "now ends on") {
+		t.Errorf("time over = %q", got)
+	}
+	if got := Refunded(Russian, site, "a@example.com", over, now).Text; !strings.Contains(got, "деньги больше не спишутся") || !strings.Contains(got, "Оплаченное время закончилось.") {
+		t.Errorf("russian time over = %q", got)
 	}
 }

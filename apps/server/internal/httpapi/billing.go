@@ -476,6 +476,8 @@ func (a *api) sendNotice(w http.ResponseWriter, r *http.Request) {
 		Until          *time.Time `json:"until"`
 		// AutoRenew is false for a payment for one period (absent: true).
 		AutoRenew *bool `json:"auto_renew"`
+		// Partial: part of the payment was refunded.
+		Partial bool `json:"partial"`
 	}
 	if !a.decode(w, r, &body) {
 		return
@@ -492,7 +494,8 @@ func (a *api) sendNotice(w http.ResponseWriter, r *http.Request) {
 	message, ok := mail.BillingNotice(mail.ParseLocale(locale), a.accounts.PublicURL, email, mail.Notice{
 		Kind: body.Kind, Amount: body.Amount, PreviousAmount: body.PreviousAmount, Currency: body.Currency,
 		Period: body.Period, Until: body.Until, Gateway: body.Gateway, Once: body.AutoRenew != nil && !*body.AutoRenew,
-	})
+		Partial: body.Partial,
+	}, a.billing.now())
 	if !ok {
 		writeError(w, http.StatusBadRequest, "unknown_kind", "no email for that kind of event")
 		return

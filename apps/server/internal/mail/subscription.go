@@ -26,6 +26,8 @@ type Charge struct {
 	Gateway string
 	// Once: paid for one period, which does not renew.
 	Once bool
+	// Partial: part of the payment was refunded (refunded).
+	Partial bool
 }
 
 // renewable reports whether the email can link to buying the period again.
@@ -286,17 +288,47 @@ func Paused(locale Locale, siteURL, to string, c Charge) Message {
 	return l.message(to)
 }
 
-// Refunded: a payment was returned.
-func Refunded(locale Locale, siteURL, to string, c Charge) Message {
+// Refunded: a payment was returned. A refund with c.Until took back the
+// time the payment paid for, which now ends at c.Until (perhaps before now);
+// c.Partial returned part of it.
+func Refunded(locale Locale, siteURL, to string, c Charge, now time.Time) Message {
 	l := subscriptionLetter(locale, siteURL)
+	amount := money(locale, c.Amount, c.Currency)
 	if locale == Russian {
 		l.subject = "Возврат платежа Konspecter"
 		l.title = "Платёж возвращён"
-		l.intro = []string{fmt.Sprintf("Мы вернули %s. Деньги придут туда, откуда была оплата, обычно в течение нескольких дней.", money(locale, c.Amount, c.Currency))}
+		refund := fmt.Sprintf("Мы вернули %s.", amount)
+		if c.Partial {
+			refund = fmt.Sprintf("Мы вернули часть платежа на сумму %s.", amount)
+		}
+		l.intro = []string{refund + " Деньги придут туда, откуда была оплата, обычно в течение нескольких дней."}
+		if !c.Until.IsZero() {
+			l.intro = append(l.intro, "Время, оплаченное этим платежом, аннулировано, и деньги больше не спишутся.")
+			if c.Until.After(now) {
+				l.intro = append(l.intro, fmt.Sprintf("Оплаченное время теперь действует до %s.", date(locale, c.Until)))
+			} else {
+				l.intro = append(l.intro, "Оплаченное время закончилось.")
+			}
+		}
 	} else {
 		l.subject = "Your Konspecter payment was refunded"
 		l.title = "Payment refunded"
-		l.intro = []string{fmt.Sprintf("We refunded %s. It goes back to where you paid from, usually within a few days.", money(locale, c.Amount, c.Currency))}
+		refund := fmt.Sprintf("We refunded %s.", amount)
+		if c.Partial {
+			refund = fmt.Sprintf("We refunded part of your payment of %s.", amount)
+		}
+		l.intro = []string{refund + " It goes back to where you paid from, usually within a few days."}
+		if !c.Until.IsZero() {
+			l.intro = append(l.intro, "The time this payment paid for is cancelled, and you will not be charged again.")
+			if c.Until.After(now) {
+				l.intro = append(l.intro, fmt.Sprintf("Your paid time now ends on %s.", date(locale, c.Until)))
+			} else {
+				l.intro = append(l.intro, "Your paid time is over.")
+			}
+		}
+	}
+	if !c.Until.IsZero() {
+		l.outro = []string{notesKept(locale)}
 	}
 	return l.message(to)
 }
@@ -494,6 +526,8 @@ type Notice struct {
 	// Once: the payment was for one period, which does not renew
 	// (subscribed: auto_renew false).
 	Once bool
+	// Partial: part of the payment was returned (refunded).
+	Partial bool
 }
 
 // NoticeKinds are the kinds of billing events there is an email for.
@@ -503,14 +537,14 @@ var NoticeKinds = []string{
 	"sync_granted", "lifetime_granted", "grant_ended", "price_changed", "renewal_due",
 }
 
-// BillingNotice is the email that tells of a billing event; false for a
-// kind it does not know.
-func BillingNotice(locale Locale, siteURL, to string, n Notice) (Message, bool) {
+// BillingNotice is the email that tells of a billing event at now; false
+// for a kind it does not know.
+func BillingNotice(locale Locale, siteURL, to string, n Notice, now time.Time) (Message, bool) {
 	var until time.Time
 	if n.Until != nil {
 		until = *n.Until
 	}
-	charge := Charge{Amount: n.Amount, Currency: n.Currency, Period: n.Period, Until: until, Gateway: n.Gateway, Once: n.Once}
+	charge := Charge{Amount: n.Amount, Currency: n.Currency, Period: n.Period, Until: until, Gateway: n.Gateway, Once: n.Once, Partial: n.Partial}
 	switch n.Kind {
 	case "trial_started":
 		return TrialStarted(locale, siteURL, to, until), true
@@ -531,7 +565,7 @@ func BillingNotice(locale Locale, siteURL, to string, n Notice) (Message, bool) 
 	case "paused":
 		return Paused(locale, siteURL, to, charge), true
 	case "refunded":
-		return Refunded(locale, siteURL, to, charge), true
+		return Refunded(locale, siteURL, to, charge, now), true
 	case "sync_granted":
 		return SyncGranted(locale, siteURL, to, until), true
 	case "lifetime_granted":

@@ -628,6 +628,11 @@ func TestBillingNoticesAreEmailedInTheAccountsLanguage(t *testing.T) {
 	if m := s.mailer.last(t); r.status != http.StatusOK || !strings.Contains(m.Text, site+"/settings?plan=acme%3A1m&renew=once#subscription") {
 		t.Errorf("renewal due = %d %q", r.status, m.Text)
 	}
+	// A refund of part of a payment: the subscription goes on.
+	r = notice(annID, `{"id":"e7","kind":"refunded","amount":"299.00","currency":"RUB","period":"1m","gateway":"acme","partial":true}`)
+	if m := s.mailer.last(t); r.status != http.StatusOK || !strings.Contains(m.Text, "часть платежа на сумму 299 ₽") || strings.Contains(m.Text, "аннулировано") {
+		t.Errorf("partial refund = %d %q", r.status, m.Text)
+	}
 	if r := notice(annID, `{"id":"e2","kind":"cancelled"}`); r.status != http.StatusBadRequest || errorCode(r) != "unknown_kind" {
 		t.Errorf("unknown kind = %d %v", r.status, r.body)
 	}
