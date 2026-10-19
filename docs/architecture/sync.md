@@ -71,7 +71,9 @@ resolution, the note store) works with plain Markdown, exactly as before.
 - **Locked:** without the key nothing is sent or read, and the engine's state is `locked`:
   `lock: "setup"` (no key on the server: set encryption up on the site) or `"unlock"`
   (enter the passphrase). `unlock(passphrase)` fetches the wrapped key (`GET /api/keys`),
-  unwraps it and stores it.
+  unwraps it and stores it. A cycle while locked (every minute, or woken by the stream) only
+  looks at the server's key and never passes through `syncing`; nor does a check while
+  `unpaid`. So Settings keeps its passphrase form, and what is typed in it, all along.
 - **A new key** (the first one, or one set up after a reset) means the server's notes were
   made without this device: unlocking it runs `resetSync()`, and every local note is
   uploaded again under it. Unlocking the key the device held before carries on.

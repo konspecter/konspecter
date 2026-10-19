@@ -619,7 +619,10 @@ export class SyncEngine {
       return; // The "online" event starts the next cycle.
     }
     const wasUnpaid = this.#status.state === "unpaid";
-    this.#setStatus({ state: "syncing" });
+    // Locked or unpaid, a cycle only looks whether that is still so: the
+    // status stays as it is meanwhile, so Settings keeps its form (and what
+    // is typed in it) instead of flashing the syncing state.
+    if (this.#cipher && !wasUnpaid) this.#setStatus({ state: "syncing" });
     const client = this.#client(config);
     try {
       if (!this.#cipher) {

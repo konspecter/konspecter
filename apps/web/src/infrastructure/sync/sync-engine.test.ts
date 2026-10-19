@@ -780,6 +780,20 @@ describe("SyncEngine and paid sync", () => {
     a.engine.stop();
   });
 
+  it("stays unpaid while it checks again, without showing a sync", async () => {
+    const server = new FakeServer();
+    const a = await device(server);
+    await connected(a.engine, config);
+    server.access = { state: "expired", until: null };
+    await a.engine.syncNow();
+    const states: string[] = [];
+    a.engine.subscribe(() => states.push(a.engine.getStatus().state));
+
+    await a.engine.syncNow();
+    expect(states.every((state) => state === "unpaid")).toBe(true);
+    a.engine.stop();
+  });
+
   it("keeps the connection while unpaid, across restarts", async () => {
     const server = new FakeServer();
     const a = await device(server);
@@ -843,6 +857,21 @@ describe("SyncEngine and end-to-end encryption", () => {
     await a.engine.unlock(TEST_PASSPHRASE);
     expect(a.engine.getStatus()).toMatchObject({ state: "idle", lock: null, pending: 0 });
     expect(server.notes.get("n1")?.markdown).toBe(await markdownOf(a.store, "n1"));
+  });
+
+  it("stays locked while it checks again, without showing a sync", async () => {
+    const server = new FakeServer();
+    const a = await device(server);
+    await a.engine.connect(config);
+    const states: string[] = [];
+    a.engine.subscribe(() => states.push(a.engine.getStatus().state));
+
+    // The check now and then (and one the change stream asks for).
+    a.scheduler.pending.find((task) => task.delayMs === 60_000)?.callback();
+    await a.engine.syncNow();
+    expect(states.length).toBeGreaterThan(0);
+    expect(states.every((state) => state === "locked")).toBe(true);
+    expect(a.engine.getStatus()).toMatchObject({ state: "locked", lock: "unlock" });
   });
 
   it("refuses a wrong passphrase and stays locked", async () => {
