@@ -61,7 +61,7 @@ with a contextual formatting toolbar and Markdown-style shortcuts.
   `openInBrowser`). Only `http(s)` addresses get it, as the desktop shell opens nothing else.
 - **Shortcuts:** typing `#`–`######` + space makes a heading, `>` a quote, `-`/`*`/`+` a
   list, `1.` a numbered list, and ` ```lang ` + space a code block (any info string: `c++`, `c#`). Backspace right
-  after a shortcut undoes it. `Mod-B/I/\`` toggle marks, `Mod-Z`/`Mod-Shift-Z`undo and redo,`Mod-[`/`Mod-]`outdent and indent list items, and`Shift-Enter` inserts a line break.
+  after a shortcut undoes it. `Mod-B/I/\`` toggle marks, `Mod-Z`/`Mod-Shift-Z`undo and redo,`Mod-[`/`Mod-]`and`Shift-Tab`/`Tab` outdent and indent list items (in a list Tab never moves focus away; elsewhere it does), and`Shift-Enter` inserts a line break.
 - **Moving rows:** `Alt-↑`/`Alt-↓` (⌥ on macOS) move the row at the caret, or the rows the
   selection covers, one row up or down, as the Markdown editor moves lines (`move-rows.ts`).
   A row is a text block, or the list item it starts (with its nested items), so an item moves

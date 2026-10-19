@@ -410,6 +410,20 @@ function typing(): Plugin {
   });
 }
 
+/**
+ * `command` in a list item, where the key is taken even when the item cannot
+ * move (the first item does not nest), so focus never leaves the text from
+ * inside a list. Elsewhere the key is left alone: Tab moves focus on.
+ */
+function inListItem(command: Command): Command {
+  return (state, dispatch) => {
+    const { $from, $to } = state.selection;
+    if (!$from.blockRange($to, (node) => node.firstChild?.type === nodes.list_item)) return false;
+    command(state, dispatch);
+    return true;
+  };
+}
+
 /** A first line shorter than this becomes the title when Enter ends it. */
 export const TITLE_MAX_LENGTH = 50;
 
@@ -534,6 +548,8 @@ export function createTextEditorState(
         "Mod-Enter": toggleTask,
         "Mod-[": liftListItem(nodes.list_item),
         "Mod-]": sinkListItem(nodes.list_item),
+        Tab: inListItem(sinkListItem(nodes.list_item)),
+        "Shift-Tab": inListItem(liftListItem(nodes.list_item)),
         "Shift-Enter": chainCommands(exitCode, insertHardBreak),
         "Alt-ArrowUp": moveRow(-1),
         "Alt-ArrowDown": moveRow(1),

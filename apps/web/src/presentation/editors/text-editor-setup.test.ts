@@ -547,6 +547,25 @@ describe("task lists", () => {
     expect(view.dom.querySelector("input[type=checkbox]")).toBeNull();
   });
 
+  it("nests an item deeper with Tab and brings it back with Shift-Tab", () => {
+    const { view } = editorWith("- one\n- two");
+    caretAt(view, 11);
+    expect(press(view, "Tab")).toBe(true);
+    expect(textDocToMarkdown(view.state.doc)).toBe("* one\n  * two");
+    expect(press(view, "Tab", { shiftKey: true })).toBe(true);
+    expect(textDocToMarkdown(view.state.doc)).toBe("* one\n* two");
+  });
+
+  it("keeps Tab in a list even where the item cannot nest, and leaves it alone elsewhere", () => {
+    const { view } = editorWith("- one\n\ntext");
+    caretAt(view, 4);
+    expect(press(view, "Tab")).toBe(true);
+    expect(textDocToMarkdown(view.state.doc)).toBe("* one\n\ntext");
+    caretAt(view, view.state.doc.content.size - 1);
+    expect(press(view, "Tab")).toBeFalsy();
+    expect(press(view, "Tab", { shiftKey: true })).toBeFalsy();
+  });
+
   it("ticks the task at the caret with Mod-Enter", () => {
     const { view } = editorWith("- [ ] one\n- two");
     caretAt(view, 4);
