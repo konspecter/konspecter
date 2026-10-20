@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.1 — 2026-10-20
+
+- **Bump vite to 8.3.4 for GHSA-698v-4r3x-3vcv**
+
 ## 0.13.0 — 2026-10-20
 
 - **Let the operator's legal details differ by language**
