@@ -104,6 +104,8 @@ During a phase:
 
 - Implement only the current phase. No future features, no "just in case" abstractions.
 - Add tests. Keep the architecture consistent.
+- Describe every new feature in `README.md` (under Features, or the section it belongs to),
+  written for the people who use it.
 - Do not create empty packages, folders or layers. A package appears when it has an
   independent responsibility.
 
@@ -309,5 +311,5 @@ must print nothing.
 ## Definition of done
 
 Implementation complete, tests added, formatting/lint/typecheck/build/tests all pass, no
-unnecessary abstractions, and docs (an ADR if applicable) updated when an architectural
-decision is involved.
+unnecessary abstractions, every new feature described in `README.md`, and docs (an ADR if
+applicable) updated when an architectural decision is involved.
