@@ -31,6 +31,15 @@ export type SyncAccess = {
   readonly until: string | null;
 };
 
+/** How many bytes the account's notes take on the server, and how many they may: its quota. */
+export type SyncStorage = { readonly used: number; readonly quota: number };
+
+/**
+ * What the server says of the account: whether it may sync, and how full its
+ * storage is (null from a server that sets no quota).
+ */
+export type AccountState = { readonly access: SyncAccess; readonly storage: SyncStorage | null };
+
 const ACCESS_STATES: readonly SyncAccess["state"][] = [
   "free",
   "trialing",
@@ -169,12 +178,22 @@ export class ApiClient {
     return { id, email };
   }
 
-  /** Whether the account may sync; a server without paid sync says nothing: free. */
-  async access(): Promise<SyncAccess> {
-    const { sync } = asRecord(await this.#request("GET", "api/me"));
+  /**
+   * Whether the account may sync (a server without paid sync says nothing:
+   * free), and how full its storage is.
+   */
+  async accountState(): Promise<AccountState> {
+    const { sync, storage } = asRecord(await this.#request("GET", "api/me"));
     const { state, until } = asRecord(sync);
     const known = ACCESS_STATES.find((value) => value === state);
-    return { state: known ?? "free", until: typeof until === "string" ? until : null };
+    const { used, quota } = asRecord(storage);
+    return {
+      access: { state: known ?? "free", until: typeof until === "string" ? until : null },
+      storage:
+        typeof used === "number" && typeof quota === "number" && used >= 0 && quota >= 0
+          ? { used, quota }
+          : null,
+    };
   }
 
   /** The server's version of a note, or null if it has none (or deleted it). */

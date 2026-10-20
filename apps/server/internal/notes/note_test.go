@@ -48,3 +48,25 @@ func TestConflictErrorMessage(t *testing.T) {
 		t.Errorf("Error() = %q, want %q", got, want)
 	}
 }
+
+func TestStorageAllowsOnlyWhatFits(t *testing.T) {
+	cases := []struct {
+		name          string
+		storage       Storage
+		before, after int64
+		want          bool
+	}{
+		{"a new note that fits", Storage{Used: 60, Quota: 100}, 0, 40, true},
+		{"a new note one byte too big", Storage{Used: 60, Quota: 100}, 0, 41, false},
+		{"an edit that grows within the quota", Storage{Used: 90, Quota: 100}, 30, 40, true},
+		{"an edit that grows past the quota", Storage{Used: 90, Quota: 100}, 30, 41, false},
+		{"an edit that shrinks over a lowered quota", Storage{Used: 500, Quota: 100}, 300, 200, true},
+		{"an edit of the same size over the quota", Storage{Used: 500, Quota: 100}, 300, 300, true},
+		{"a new note over the quota", Storage{Used: 500, Quota: 100}, 0, 1, false},
+	}
+	for _, c := range cases {
+		if got := c.storage.Allows(c.before, c.after); got != c.want {
+			t.Errorf("%s: Allows(%d, %d) = %v; want %v", c.name, c.before, c.after, got, c.want)
+		}
+	}
+}

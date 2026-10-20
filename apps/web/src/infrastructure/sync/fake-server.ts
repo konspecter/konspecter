@@ -58,6 +58,8 @@ export class FakeServer {
   readonly requests: string[] = [];
   /** Tests use a tiny limit to exercise rejected notes; the real server allows 5 MB. */
   maxMarkdownLength = 1000;
+  /** How many bytes of envelopes the account may store; as the real server, 507 past it. */
+  quota = 1 << 30;
   /** Serves `GET /api/events`; off by default, like an older server (404). */
   eventStreams = false;
   /**
@@ -121,7 +123,11 @@ export class FakeServer {
     const noteId = /^\/api\/notes\/([^/]+)$/.exec(url.pathname)?.[1];
 
     if (method === "GET" && url.pathname === "/api/me") {
-      return json(200, { ...user, sync: this.access });
+      return json(200, {
+        ...user,
+        sync: this.access,
+        storage: { used: this.used, quota: this.quota },
+      });
     }
     const paidRoute =
       url.pathname === "/api/sync" ||
@@ -307,6 +313,17 @@ export class FakeServer {
     return new Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } });
   }
 
+  /** The bytes of every stored envelope (a deleted note's is cleared). */
+  get used(): number {
+    return [...this.notes.values()].reduce((sum, note) => sum + note.content.length, 0);
+  }
+
+  /** Whether a note of `before` bytes may become `content`, as the real server checks. */
+  #fits(before: number, content: unknown): boolean {
+    const after = String(content).length;
+    return after <= before || this.used - before + after <= this.quota;
+  }
+
   /** A change made by another device, directly on the server. */
   async write(id: string, markdown: string): Promise<void> {
     await this.#ready;
@@ -329,6 +346,7 @@ export class FakeServer {
     const markdown = await this.#open(id, body.content);
     if (markdown instanceof Response) return markdown;
     const existing = this.notes.get(id);
+    if (!this.#fits(existing?.content.length ?? 0, body.content)) return full();
     if (existing) return conflict(existing);
     const note = {
       id,
@@ -346,6 +364,7 @@ export class FakeServer {
     const markdown = await this.#open(id, body.content);
     if (markdown instanceof Response) return markdown;
     const note = this.notes.get(id);
+    if (!this.#fits(note?.content.length ?? 0, body.content)) return full();
     if (!note) return json(404, error("not_found", "note not found"));
     if (note.revision !== body.base_revision) return conflict(note);
     // At a deleted note's own revision, an update brings it back.
@@ -364,6 +383,7 @@ export class FakeServer {
     if (!note || note.deletedAt !== null) return json(404, error("not_found", "note not found"));
     if (note.revision !== base) return conflict(note);
     Object.assign(note, {
+      content: "",
       revision: note.revision + 1,
       deletedAt: "2026-09-28T10:00:00Z",
       seq: this.#nextSeq(),
@@ -385,6 +405,13 @@ export class FakeServer {
       key_id: this.#key?.record.keyId ?? null,
     });
   }
+}
+
+function full(): Response {
+  return json(
+    507,
+    error("quota_exceeded", "the account's storage is full: delete notes to make room"),
+  );
 }
 
 function wire(note: StoredNote): Json {

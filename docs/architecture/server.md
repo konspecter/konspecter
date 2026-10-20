@@ -18,7 +18,7 @@ on the visitor's behalf.
 
 ```text
 apps/server/
-├── cmd/server/             entry point: serve, migrate, create-user, create-token, revoke-tokens
+├── cmd/server/             entry point: serve, migrate, create-user, create-token, revoke-tokens, set-quota
 ├── internal/config/        typed settings from the environment and .env
 ├── internal/notes/         Note, ids, the encrypted envelope (ParseEnvelope), errors
 ├── internal/keys/          an account's wrapped content key and its validation
@@ -58,7 +58,8 @@ in-memory fakes.
 | `sync_changes`          | the change log: `(user_id, seq)`, `note_id`, `revision`, `operation`                                     |
 | `entitlements`          | paid sync: whether each account may sync, and until when                                                 |
 
-`users` also keeps `locale`, the language of its emails.
+`users` also keeps `locale`, the language of its emails, and `sync_quota`: a storage quota
+of the account's own (null: the server's `KONSPECTER_SYNC_QUOTA`).
 
 Every secret (session ids, codes, reset tokens, API tokens, device, user and connect codes) is stored
 as a SHA-256 hash only.
@@ -66,7 +67,14 @@ as a SHA-256 hash only.
 - **Note ids are chosen by clients** (UUIDs), because local-first clients create notes
   offline. They are unique per user.
 - **Revisions** start at 1 and increase by one with every change, including deletion.
-- **Deletion is soft:** `deleted_at` is set and the content is kept.
+- **Deletion is soft:** `deleted_at` is set and the content is cleared (no client reads a
+  deleted note's text, and deleting frees the account's storage).
+- **Storage quota:** what an account stores is the size of its envelopes
+  (`octet_length(content)`), summed when needed rather than kept as a counter. A create or
+  update that grows the account past its quota is refused (`507 quota_exceeded`), checked
+  under the user's row lock with the change sequence, so racing writes are counted one after
+  the other. A write that does not grow (an edit that shrinks, a deletion) always goes
+  through, even over a quota lowered below the usage (`notes.Storage.Allows`).
 - **The server cannot read a note.** It checks the envelope's shape and that it names the
   account's current key, in the same transaction as the write.
 - Migrations run in file order, each in a transaction under a table lock (safe with several
@@ -94,17 +102,18 @@ may not contain unknown fields. Errors look like `{"error": {"code": "…", "mes
 
 ### Notes and sync (bearer token)
 
-| Method & path                | Body / query                 | Success                                                   | Errors                                                |
-| ---------------------------- | ---------------------------- | --------------------------------------------------------- | ----------------------------------------------------- |
-| `GET /healthz`               | (no auth)                    | 200                                                       |                                                       |
-| `GET /api/notes`             |                              | 200 `{notes: [...]}` (not deleted)                        | 401                                                   |
-| `GET /api/notes/{id}`        |                              | 200 note                                                  | 404                                                   |
-| `POST /api/notes`            | `{id, content}`              | 201 note, `Location`                                      | 400, 409 `revision_conflict` (id taken), 409 key (\*) |
-| `PUT /api/notes/{id}`        | `{content, base_revision}`   | 200 note (restores a deleted note at its revision)        | 404, 409 `revision_conflict`, 409 key (\*)            |
-| `DELETE /api/notes/{id}`     | `?base_revision=N`           | 204                                                       | 404, 409 `revision_conflict`                          |
-| `GET /api/sync`              | `?since=cursor&limit=1..500` | 200 `{notes, cursor, more, key_id}` (tombstones included) | 400                                                   |
-| `GET /api/events`            |                              | 200 `text/event-stream` (see below)                       | 401, 429 `too_many_streams`, 503                      |
-| `DELETE /api/tokens/current` |                              | 204 (this device signs out and leaves the account's list) | 401                                                   |
+| Method & path                | Body / query                 | Success                                                   | Errors                                                                      |
+| ---------------------------- | ---------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `GET /healthz`               | (no auth)                    | 200                                                       |                                                                             |
+| `GET /api/notes`             |                              | 200 `{notes: [...]}` (not deleted)                        | 401                                                                         |
+| `GET /api/notes/{id}`        |                              | 200 note                                                  | 404                                                                         |
+| `POST /api/notes`            | `{id, content}`              | 201 note, `Location`                                      | 400, 409 `revision_conflict` (id taken), 409 key (\*), 507 `quota_exceeded` |
+| `PUT /api/notes/{id}`        | `{content, base_revision}`   | 200 note (restores a deleted note at its revision)        | 404, 409 `revision_conflict`, 409 key (\*), 507 `quota_exceeded`            |
+| `GET /api/quota`             | (no auth)                    | 200 `{quota}`: the server's quota in bytes, for the terms |                                                                             |
+| `DELETE /api/notes/{id}`     | `?base_revision=N`           | 204                                                       | 404, 409 `revision_conflict`                                                |
+| `GET /api/sync`              | `?since=cursor&limit=1..500` | 200 `{notes, cursor, more, key_id}` (tombstones included) | 400                                                                         |
+| `GET /api/events`            |                              | 200 `text/event-stream` (see below)                       | 401, 429 `too_many_streams`, 503                                            |
+| `DELETE /api/tokens/current` |                              | 204 (this device signs out and leaves the account's list) | 401                                                                         |
 
 A note is `{id, content, revision, created_at, updated_at, deleted_at?}`, where `content` is
 the envelope `ksp1.<key_id>.<base64url>`. (\*) Content that is not an envelope is
@@ -146,7 +155,7 @@ needs a reset (`DELETE`) first. See [ADR-017](decisions/ADR-017-end-to-end-encry
 | `GET /api/auth/{provider}/start`      | redirect to the provider (state and PKCE in a short-lived cookie)           |
 | `GET /api/auth/{provider}/callback`   | back from the provider: signs in, or redirects to `/complete`               |
 | `GET`, `POST /api/auth/complete`      | the pending provider sign-in; email a code that links it                    |
-| `GET /api/me`                         | `{id, email, name}` (also with a bearer token)                              |
+| `GET /api/me`                         | `{id, email, name, storage: {used, quota}}` (also with a bearer token)      |
 | `GET`, `PATCH`, `DELETE /api/account` | the account (`recent_sign_in`), rename, delete (recent sign-in + address)   |
 
 Answers never reveal whether an account exists.
@@ -248,11 +257,14 @@ lists them all:
 | `KONSPECTER_RATE_LOGIN_PER_IP/_PER_EMAIL`, `_EMAIL_PER_ADDRESS/_PER_IP`, `_DEVICE_PER_IP` | abuse limits                                     |
 | `KONSPECTER_SYNC_MODE` (`free`, `paid`, `none`)                                           | how sync is offered (default `free`)             |
 | `KONSPECTER_BILLING_URL`, `KONSPECTER_BILLING_TOKEN`                                      | the billing service: required for `paid`         |
+| `KONSPECTER_SYNC_QUOTA` (`512MB`, `2GB`; units of 1024)                                   | what an account may store (default 512 MB)       |
 
 ```sh
 KONSPECTER_DATABASE_URL=postgres://… ./server            # migrate + serve on :8080
 ./server create-user -email ada@example.com               # prints a token (a "Command line token" device)
 ./server revoke-tokens -email ada@example.com             # disconnect every device of a user
+./server set-quota -email ada@example.com -size 2GB       # a quota of the user's own; prints it and the usage
+./server set-quota -email ada@example.com -size default   # the server's quota again (no -size: only print)
 ```
 
 The whole stack (PostgreSQL, this server, the site and Caddy on one origin, plus the web app

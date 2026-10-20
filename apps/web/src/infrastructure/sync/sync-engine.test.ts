@@ -1033,3 +1033,39 @@ describe("SyncEngine with a credential store", () => {
     engine.stop();
   });
 });
+
+describe("SyncEngine and the storage quota", () => {
+  it("shows how full the account's storage is", async () => {
+    const server = new FakeServer();
+    server.quota = 100_000;
+    const a = await device(server);
+    await a.store.put(createNote("# Stored", date, "n1"));
+    await connected(a.engine, config);
+
+    expect(server.used).toBeGreaterThan(0);
+    expect(a.engine.getStatus().storage).toEqual({ used: server.used, quota: 100_000 });
+  });
+
+  it("keeps a change that does not fit waiting, sends the rest, and sends it once there is room", async () => {
+    const server = new FakeServer();
+    const a = await device(server);
+    await a.store.put(createNote("# First", date, "n1"));
+    await connected(a.engine, config);
+    // Room for a short note, not for a long one.
+    server.quota = server.used + 400;
+    await a.store.put(createNote(`# Long\n\n${"x".repeat(600)}`, date, "long"));
+    await a.store.put(createNote("# Short", date, "short"));
+    await a.engine.syncNow();
+
+    expect(a.engine.getStatus()).toMatchObject({ state: "full", pending: 1, blocked: 0 });
+    expect(server.notes.has("short")).toBe(true);
+    expect(server.notes.has("long")).toBe(false);
+    expect(a.engine.getStatus().storage?.used).toBe(server.used);
+
+    // The owner deletes a note elsewhere, or gets a larger quota.
+    server.quota = 1 << 30;
+    await a.engine.syncNow();
+    expect(a.engine.getStatus()).toMatchObject({ state: "idle", pending: 0, blocked: 0 });
+    expect(server.notes.get("long")?.markdown).toContain("x".repeat(600));
+  });
+});

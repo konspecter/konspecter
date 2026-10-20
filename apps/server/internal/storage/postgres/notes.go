@@ -67,8 +67,10 @@ func (db *DB) currentNote(ctx context.Context, q querier, userID, id string) (no
 // CreateNote stores a new note at revision 1, encrypted with the key keyID.
 // If the id is taken, by a live or a deleted note, it returns a
 // *notes.ConflictError with that note; if keyID is not the account's
-// current key, notes.ErrEncryptionRequired or notes.ErrKeyMismatch.
-func (db *DB) CreateNote(ctx context.Context, userID, id, content, keyID string) (notes.Note, error) {
+// current key, notes.ErrEncryptionRequired or notes.ErrKeyMismatch; if the
+// note does not fit the account's quota (defaultQuota unless the account has
+// its own), notes.ErrQuotaExceeded.
+func (db *DB) CreateNote(ctx context.Context, userID, id, content, keyID string, defaultQuota int64) (notes.Note, error) {
 	var result notes.Note
 	err := pgx.BeginFunc(ctx, db.pool, func(tx pgx.Tx) error {
 		seq, err := nextChange(ctx, tx, userID)
@@ -76,6 +78,9 @@ func (db *DB) CreateNote(ctx context.Context, userID, id, content, keyID string)
 			return err
 		}
 		if err := checkKey(ctx, tx, userID, keyID); err != nil {
+			return err
+		}
+		if err := checkQuota(ctx, tx, userID, id, int64(len(content)), defaultQuota); err != nil {
 			return err
 		}
 		n, err := scanNote(tx.QueryRow(ctx, `
@@ -129,6 +134,56 @@ func checkKey(ctx context.Context, tx pgx.Tx, userID, keyID string) error {
 	return nil
 }
 
+// checkQuota refuses to make the note id size bytes when that grows the
+// account past its quota. Called under the user's row lock (nextChange), so
+// writes that race are counted one after the other.
+func checkQuota(ctx context.Context, tx pgx.Tx, userID, id string, size, defaultQuota int64) error {
+	var storage notes.Storage
+	var before int64
+	err := tx.QueryRow(ctx, `SELECT
+		coalesce((SELECT sum(octet_length(content)) FROM notes WHERE user_id = $1), 0),
+		coalesce((SELECT octet_length(content) FROM notes WHERE user_id = $1 AND id = $2), 0),
+		coalesce((SELECT sync_quota FROM users WHERE id = $1), $3)`,
+		userID, id, defaultQuota).Scan(&storage.Used, &before, &storage.Quota)
+	if err != nil {
+		return fmt.Errorf("check quota: %w", err)
+	}
+	if !storage.Allows(before, size) {
+		return notes.ErrQuotaExceeded
+	}
+	return nil
+}
+
+// Storage returns how much the user's notes take, and the user's quota:
+// their own, or defaultQuota.
+func (db *DB) Storage(ctx context.Context, userID string, defaultQuota int64) (notes.Storage, error) {
+	var storage notes.Storage
+	err := db.pool.QueryRow(ctx, `SELECT
+		coalesce((SELECT sum(octet_length(content)) FROM notes WHERE user_id = users.id), 0),
+		coalesce(sync_quota, $2)
+		FROM users WHERE id = $1`, userID, defaultQuota).Scan(&storage.Used, &storage.Quota)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return notes.Storage{}, ErrUserNotFound
+	}
+	if err != nil {
+		return notes.Storage{}, fmt.Errorf("read storage: %w", err)
+	}
+	return storage, nil
+}
+
+// SetQuota gives the user a quota of their own, or with nil takes it away:
+// the server's default applies again.
+func (db *DB) SetQuota(ctx context.Context, userID string, quota *int64) error {
+	tag, err := db.pool.Exec(ctx, `UPDATE users SET sync_quota = $2 WHERE id = $1`, userID, quota)
+	if err != nil {
+		return fmt.Errorf("set quota: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrUserNotFound
+	}
+	return nil
+}
+
 func recordChange(ctx context.Context, tx pgx.Tx, userID string, seq int64, n notes.Note, operation string) error {
 	_, err := tx.Exec(ctx, `INSERT INTO sync_changes (user_id, seq, note_id, revision, operation)
 		VALUES ($1, $2, $3, $4, $5)`, userID, seq, n.ID, n.Revision, operation)
@@ -140,36 +195,43 @@ func recordChange(ctx context.Context, tx pgx.Tx, userID string, seq int64, n no
 
 // UpdateNote replaces the content if the note is still at baseRevision. A
 // deleted note at baseRevision is restored: edits beat deletions. Otherwise it
-// returns a *notes.ConflictError with the current version. keyID is checked
-// as for CreateNote.
-func (db *DB) UpdateNote(ctx context.Context, userID, id, content, keyID string, baseRevision int64) (notes.Note, error) {
-	return db.change(ctx, userID, id, baseRevision, "update", keyID, `
+// returns a *notes.ConflictError with the current version. keyID and the
+// quota are checked as for CreateNote.
+func (db *DB) UpdateNote(ctx context.Context, userID, id, content, keyID string, baseRevision, defaultQuota int64) (notes.Note, error) {
+	check := func(tx pgx.Tx) error {
+		if err := checkKey(ctx, tx, userID, keyID); err != nil {
+			return err
+		}
+		return checkQuota(ctx, tx, userID, id, int64(len(content)), defaultQuota)
+	}
+	return db.change(ctx, userID, id, baseRevision, "update", check, `
 		UPDATE notes SET content = $5, key_id = $6, revision = revision + 1, updated_at = now(), deleted_at = NULL, change_seq = $4
 		WHERE user_id = $1 AND id = $2 AND revision = $3
 		RETURNING `+noteColumns, content, keyID)
 }
 
-// DeleteNote marks the note deleted if it is still at baseRevision. The
-// content is kept.
+// DeleteNote marks the note deleted if it is still at baseRevision, and
+// clears its content: that frees its space.
 func (db *DB) DeleteNote(ctx context.Context, userID, id string, baseRevision int64) (notes.Note, error) {
-	return db.change(ctx, userID, id, baseRevision, "delete", "", `
-		UPDATE notes SET revision = revision + 1, updated_at = now(), deleted_at = now(), change_seq = $4
+	return db.change(ctx, userID, id, baseRevision, "delete", nil, `
+		UPDATE notes SET content = '', revision = revision + 1, updated_at = now(), deleted_at = now(), change_seq = $4
 		WHERE user_id = $1 AND id = $2 AND revision = $3 AND deleted_at IS NULL
 		RETURNING `+noteColumns)
 }
 
 // change runs a conditional UPDATE. When no row matches, it reports why: the
 // note does not exist, or it changed (or, for a deletion, was already
-// deleted) since baseRevision. A keyID, when given, must be the current key.
-func (db *DB) change(ctx context.Context, userID, id string, baseRevision int64, operation, keyID, sql string, extra ...any) (notes.Note, error) {
+// deleted) since baseRevision. check, when given, may refuse the change
+// first, under the user's row lock.
+func (db *DB) change(ctx context.Context, userID, id string, baseRevision int64, operation string, check func(pgx.Tx) error, sql string, extra ...any) (notes.Note, error) {
 	var result notes.Note
 	err := pgx.BeginFunc(ctx, db.pool, func(tx pgx.Tx) error {
 		seq, err := nextChange(ctx, tx, userID)
 		if err != nil {
 			return err
 		}
-		if keyID != "" {
-			if err := checkKey(ctx, tx, userID, keyID); err != nil {
+		if check != nil {
+			if err := check(tx); err != nil {
 				return err
 			}
 		}

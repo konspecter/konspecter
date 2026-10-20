@@ -12,7 +12,7 @@ import { day, durationText, money, periodText, type Plans } from "./subscription
  */
 
 /** When the texts last changed. */
-export const LEGAL_UPDATED = "2026-10-06";
+export const LEGAL_UPDATED = "2026-10-20";
 
 export interface LegalSection {
   readonly id: string;
@@ -33,6 +33,26 @@ export interface LegalContext {
   /** The site's address, as people type it ("notes.example.com"). */
   readonly host: string;
   readonly plans: Plans;
+  /** How many bytes each account may store on the server; null if the server did not say. */
+  readonly quota: number | null;
+}
+
+const SIZE_UNITS = ["byte", "kilobyte", "megabyte", "gigabyte", "terabyte"] as const;
+
+/** A size in the page's language, in units of 1024 as the server counts them: "512 MB", "2 ГБ". */
+export function sizeText(bytes: number, locale: Locale): string {
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < SIZE_UNITS.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return new Intl.NumberFormat(locale, {
+    style: "unit",
+    unit: SIZE_UNITS[unit],
+    unitDisplay: "short",
+    maximumFractionDigits: 1,
+  }).format(value);
 }
 
 /** The cookies the site sets: each one needed for it to work. */
@@ -133,6 +153,11 @@ function termsEn(c: LegalContext): LegalDocument {
         paragraphs: [
           "Konspecter is a notebook. The apps keep your conspects on your devices and work without an account. An account on this server adds sync: the conspects are kept in step between your devices, through the server.",
           "Conspects are encrypted on your devices before they are synced, with a key only your passphrase opens. The server stores them encrypted and cannot read them.",
+          ...(c.quota === null
+            ? []
+            : [
+                `Each account may store up to ${sizeText(c.quota, c.locale)} of conspects on the server, counted as they are stored: encrypted, which takes somewhat more than their text. When it is full, the server takes no new conspects and no changes that need more room until some are deleted; nothing already stored is removed. The operator may give an account more.`,
+              ]),
         ],
       },
       {
@@ -241,6 +266,11 @@ function termsRu(c: LegalContext): LegalDocument {
         paragraphs: [
           "Konspecter — записная книжка. Приложения хранят конспекты на ваших устройствах и работают без аккаунта. Аккаунт на этом сервере добавляет синхронизацию: конспекты одинаковы на всех ваших устройствах.",
           "Конспекты шифруются на устройствах до синхронизации ключом, который открывает только ваш пароль шифрования. Сервер хранит их зашифрованными и прочитать не может.",
+          ...(c.quota === null
+            ? []
+            : [
+                `Каждый аккаунт может хранить на сервере до ${sizeText(c.quota, c.locale)} конспектов в том виде, в котором они хранятся: в зашифрованном, а это несколько больше их текста. Когда место заканчивается, сервер не принимает новые конспекты и изменения, которым нужно больше места, пока часть конспектов не будет удалена; уже сохранённое не удаляется. Исполнитель может увеличить объём отдельному аккаунту.`,
+              ]),
         ],
       },
       {

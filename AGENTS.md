@@ -80,6 +80,7 @@ All planned phases are done. New work needs a new plan in `.claude/plans/`.
 | Outline    | Tree notes list their h1–h3 headings, nested; a heading scrolls the note    | Done   |
 | Releases   | The desktop app checks GitHub daily; a banner links to a newer release      | Done   |
 | Splash     | Logo at start-up, bookmark fills with the progress, version under it        | Done   |
+| Quota      | Sync storage quota per account (env, `set-quota`), usage in %, in the terms | Done   |
 
 Where the packages are described: UI architecture: `docs/architecture/ui.md`; languages:
 `docs/architecture/i18n.md`; server and API: `docs/architecture/server.md`; sync:
@@ -144,7 +145,8 @@ apps/mobile/              Capacitor 8 Android app around apps/web (android/: gen
 apps/desktop/             Tauri 2 desktop shell around apps/web
   src-tauri/src/          Rust: lib.rs (commands), folder.rs (File Mode file access)
 apps/server/              Go HTTP server (module konspecter/server)
-  cmd/server/             entry point (serve, migrate, create-user, create-token, revoke-tokens)
+  cmd/server/             entry point (serve, migrate, create-user, create-token, revoke-tokens,
+                          set-quota)
   internal/               config (env + .env), notes, keys, auth, accounts, devices, oauth, mail,
                           entitlements (paid sync: whether an account may sync),
                           httpapi, storage/postgres

@@ -41,6 +41,7 @@ func TestLoadUsesDefaults(t *testing.T) {
 		OAuth:            map[string]OAuthClient{},
 		LoginProviders:   map[string][]string{"en": {"google", "github", "linkedin", "x"}, "ru": {"yandex", "vk", "github"}},
 		Billing:          Billing{Mode: SyncFree},
+		SyncQuota:        512 << 20,
 	}
 	if !reflect.DeepEqual(cfg, want) {
 		t.Errorf("Load() = %+v, want %+v", cfg, want)
@@ -134,6 +135,7 @@ func TestLoadReportsEveryBadSetting(t *testing.T) {
 		"KONSPECTER_TRUSTED_PROXIES":   "proxy.local",
 		"KONSPECTER_MAIL_TRANSPORT":    "pigeon",
 		"KONSPECTER_RATE_EMAIL_PER_IP": "0",
+		"KONSPECTER_SYNC_QUOTA":        "a lot",
 	}))
 	if err == nil {
 		t.Fatal("Load() accepted bad settings")
@@ -141,6 +143,7 @@ func TestLoadReportsEveryBadSetting(t *testing.T) {
 	for _, name := range []string{
 		"KONSPECTER_PUBLIC_URL", "KONSPECTER_REGISTRATION", "KONSPECTER_SESSION_TTL", "KONSPECTER_SMTP_PORT",
 		"KONSPECTER_TRUSTED_PROXIES", "KONSPECTER_MAIL_TRANSPORT", "KONSPECTER_RATE_EMAIL_PER_IP",
+		"KONSPECTER_SYNC_QUOTA",
 	} {
 		if !strings.Contains(err.Error(), name) {
 			t.Errorf("the error does not name %s:\n%v", name, err)
@@ -367,6 +370,43 @@ func TestLoadReportsBadBillingSettings(t *testing.T) {
 		_, err := Load(env(settings))
 		if err == nil || !strings.Contains(err.Error(), name) {
 			t.Errorf("%v: error %v does not mention %q", settings, err, name)
+		}
+	}
+}
+
+func TestLoadReadsTheSyncQuota(t *testing.T) {
+	t.Chdir(t.TempDir())
+	cfg, err := Load(env(map[string]string{"KONSPECTER_SYNC_QUOTA": "2GB"}))
+	if err != nil || cfg.SyncQuota != 2<<30 {
+		t.Errorf("SyncQuota = %d, %v; want 2 GB", cfg.SyncQuota, err)
+	}
+	if _, err := Load(env(map[string]string{"KONSPECTER_SYNC_QUOTA": "0"})); err == nil {
+		t.Error("Load() accepted a quota of nothing")
+	}
+}
+
+func TestParseSize(t *testing.T) {
+	cases := []struct {
+		value string
+		want  int64
+	}{
+		{"1048576", 1 << 20},
+		{"512MB", 512 << 20},
+		{"512mb", 512 << 20},
+		{" 2 GB ", 2 << 30},
+		{"10KB", 10 << 10},
+		{"1TB", 1 << 40},
+		{"100B", 100},
+		{"0", 0},
+	}
+	for _, c := range cases {
+		if got, err := ParseSize(c.value); err != nil || got != c.want {
+			t.Errorf("ParseSize(%q) = %d, %v; want %d", c.value, got, err, c.want)
+		}
+	}
+	for _, bad := range []string{"", "MB", "1.5GB", "-1MB", "2 PB", "12 34", "99999999999TB", "unlimited"} {
+		if got, err := ParseSize(bad); err == nil {
+			t.Errorf("ParseSize(%q) = %d; want an error", bad, got)
 		}
 	}
 }

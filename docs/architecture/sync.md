@@ -109,6 +109,7 @@ resolution, the note store) works with plain Markdown, exactly as before.
 | offline (`navigator.onLine`, or fetch fails)                  | state `offline`; the `online` event triggers a cycle                                                                                                          |
 | `409 key_mismatch` / `encryption_required`, new `key_id`      | state `locked` until the passphrase unlocks the current key                                                                                                   |
 | `401` (disconnected on the site, account deleted)             | state `disconnected`: token and key forgotten, **every note and pending change kept**                                                                         |
+| `507 quota_exceeded` on push (the account's storage is full)  | that note **waits** (not held back), the rest still go; state `full` after the cycle, until a later cycle finds room                                          |
 | `402` (paid sync: no time left, or none sold in the language) | state `unpaid`: token, key and **every pending change kept**, nothing held back; the stream stops, a check every 10 min, and sync resumes by itself once paid |
 | `5xx`, `429`, timeouts, a note that fails to decrypt          | state `error`, retry with backoff                                                                                                                             |
 
@@ -220,6 +221,11 @@ Settings → **Sync**:
 2. **Unlock** (unless the link handed the key over): the passphrase prompt, or, while the
    account has no encryption, a button to the site's encryption settings.
 3. Then the status, last sync, waiting and held-back counts, _Sync now_ and _Disconnect_.
+   Under them, how full the account's storage on the server is, from `/api/me`: a share in
+   whole percent, rounded down (`domain/sync/storage.ts`) and a bar, never a size; asked
+   again after a cycle that sent or received anything. When it is full, a notice says that
+   changes needing more room wait until conspects are deleted. The size itself is stated
+   only in the site's terms (`GET /api/quota`).
 
 Connecting to a different account queues every local note for upload to it. Disconnecting
 signs the device out on the server and keeps all notes. A device disconnected on the site
@@ -228,8 +234,8 @@ signs the device out on the server and keeps all notes. A device disconnected on
 how long the account's time lasts (trial, paid until, cancelled, grace), from `/api/me`, with
 _Manage subscription_ to the site; when the time is over, sync shows as paused, says every
 conspect is safe, and offers _Subscribe_ (the site's `/settings#subscription`) and _Check
-again_. The top bar shows "Sync failed", "Sync locked", "Sync stopped", "Sync paused" or "N
-not synced" when sync needs attention, and its antenna transmits while a sync cycle runs.
+again_. The top bar shows "Sync failed", "Sync locked", "Sync stopped", "Sync paused", "Sync storage
+full" or "N not synced" when sync needs attention, and its antenna transmits while a sync cycle runs.
 
 ## Testing
 

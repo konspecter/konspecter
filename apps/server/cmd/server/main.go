@@ -5,6 +5,9 @@
 //	server create-user -email ADDR create a user and print an API token
 //	server create-token -email ADDR print a new API token for a user
 //	server revoke-tokens -email ADDR disconnect every device of a user
+//	server set-quota -email ADDR [-size SIZE|default]
+//	                               give a user a sync quota of their own (2GB),
+//	                               or the server's again; prints it and the usage
 //	server version                 print the version
 //
 // Configuration comes from the environment and from an optional .env file
@@ -19,6 +22,7 @@
 //	KONSPECTER_OAUTH_*, KONSPECTER_LOGIN_PROVIDERS_*  sign-in with other services
 //	KONSPECTER_SYNC_MODE     "free" (default), "paid" or "none" (off); paid sync
 //	                         needs KONSPECTER_BILLING_URL and KONSPECTER_BILLING_TOKEN
+//	KONSPECTER_SYNC_QUOTA    how much an account may store (default 512MB)
 package main
 
 import (
@@ -32,6 +36,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -90,6 +96,7 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout 
 				TrustedProxies: cfg.TrustedProxies,
 				Accounts:       accounts,
 				SyncOff:        cfg.Billing.Mode == config.SyncNone,
+				SyncQuota:      cfg.SyncQuota,
 			}
 			if cfg.Billing.Service() {
 				options.Billing = &httpapi.Billing{URL: cfg.Billing.URL, Token: cfg.Billing.Token, Store: db}
@@ -132,8 +139,19 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout 
 			_, err = fmt.Fprintf(stdout, "revoked %d token(s) of %s\n", count, user.Email)
 			return err
 		})
+	case "set-quota":
+		email, size, err := parseQuota(args)
+		if err != nil {
+			return err
+		}
+		return withDB(ctx, cfg.DatabaseURL, func(db *postgres.DB) error {
+			if err := db.Migrate(ctx); err != nil {
+				return err
+			}
+			return setQuota(ctx, db, email, size, cfg.SyncQuota, stdout)
+		})
 	default:
-		return fmt.Errorf("unknown command %q (want serve, migrate, create-user, create-token or revoke-tokens)", command)
+		return fmt.Errorf("unknown command %q (want serve, migrate, create-user, create-token, revoke-tokens or set-quota)", command)
 	}
 }
 
@@ -227,6 +245,67 @@ func parseEmail(command string, args []string) (string, error) {
 		return "", fmt.Errorf("%s: -email is required", command)
 	}
 	return *email, nil
+}
+
+// parseQuota reads set-quota's flags. size is "" to only show the quota,
+// "default" to give the server's back, or a size.
+func parseQuota(args []string) (email, size string, err error) {
+	flags := flag.NewFlagSet("set-quota", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	flags.StringVar(&email, "email", "", "the user's email address")
+	flags.StringVar(&size, "size", "", `the user's quota, such as 2GB, or "default"`)
+	if err := flags.Parse(args); err != nil {
+		return "", "", fmt.Errorf("set-quota: %w", err)
+	}
+	if email == "" {
+		return "", "", errors.New("set-quota: -email is required")
+	}
+	if size != "" && size != "default" {
+		if _, err := config.ParseSize(size); err != nil {
+			return "", "", fmt.Errorf("set-quota: -size: %w", err)
+		}
+	}
+	return email, size, nil
+}
+
+// setQuota changes a user's quota as size says (see parseQuota), then prints
+// the quota and how much of it the user's notes take.
+func setQuota(ctx context.Context, db *postgres.DB, email, size string, defaultQuota int64, stdout io.Writer) error {
+	user, err := db.UserByEmail(ctx, email)
+	if err != nil {
+		return err
+	}
+	switch size {
+	case "":
+	case "default":
+		if err := db.SetQuota(ctx, user.ID, nil); err != nil {
+			return err
+		}
+	default:
+		quota, _ := config.ParseSize(size) // parseQuota checked it
+		if err := db.SetQuota(ctx, user.ID, &quota); err != nil {
+			return err
+		}
+	}
+	storage, err := db.Storage(ctx, user.ID, defaultQuota)
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(stdout, "quota of %s: %s (the server's default is %s), %s used\n",
+		user.Email, formatSize(storage.Quota), formatSize(defaultQuota), formatSize(storage.Used))
+	return err
+}
+
+// formatSize writes a number of bytes for people: "512 MB", "1.5 GB".
+func formatSize(n int64) string {
+	units := []string{"B", "KB", "MB", "GB", "TB"}
+	value, unit := float64(n), 0
+	for value >= 1024 && unit < len(units)-1 {
+		value /= 1024
+		unit++
+	}
+	text := strconv.FormatFloat(value, 'f', 1, 64)
+	return strings.TrimSuffix(text, ".0") + " " + units[unit]
 }
 
 // issueToken prints a new API token, creating the user first if asked to.

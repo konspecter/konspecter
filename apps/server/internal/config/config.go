@@ -67,7 +67,14 @@ type Config struct {
 	LoginProviders map[string][]string
 	// Billing is how sync is offered, and the billing service that sells it.
 	Billing Billing
+	// SyncQuota is how many bytes of notes an account may store, unless it
+	// has a quota of its own (KONSPECTER_SYNC_QUOTA, default 512 MB; server
+	// set-quota sets an account's).
+	SyncQuota int64
 }
+
+// DefaultSyncQuota leaves room for tens of thousands of text notes.
+const DefaultSyncQuota int64 = 512 << 20
 
 // SyncMode is how the server offers sync (KONSPECTER_SYNC_MODE).
 type SyncMode string
@@ -175,6 +182,7 @@ func Load(getenv func(string) string) (Config, error) {
 			EmailsPerIP:           r.integer("KONSPECTER_RATE_EMAIL_PER_IP", 20),
 			DeviceRequestsPerIP:   r.integer("KONSPECTER_RATE_DEVICE_PER_IP", 20),
 		},
+		SyncQuota: r.size("KONSPECTER_SYNC_QUOTA", DefaultSyncQuota),
 	}
 	cfg.OAuth = r.oauthClients()
 	cfg.LoginProviders = map[string][]string{
@@ -252,6 +260,36 @@ func (r *reader) integer(name string, fallback int) int {
 		return fallback
 	}
 	return n
+}
+
+func (r *reader) size(name string, fallback int64) int64 {
+	value := r.lookup(name)
+	if value == "" {
+		return fallback
+	}
+	n, err := ParseSize(value)
+	if err != nil || n <= 0 {
+		r.fail("%s must be a size above zero such as 512MB or 2GB, not %q", name, value)
+		return fallback
+	}
+	return n
+}
+
+// sizeUnits are the units ParseSize takes, in powers of 1024.
+var sizeUnits = map[string]int64{"": 1, "B": 1, "KB": 1 << 10, "MB": 1 << 20, "GB": 1 << 30, "TB": 1 << 40}
+
+// ParseSize reads a number of bytes, written as a whole number with an
+// optional unit: "512MB", "2 GB", "1048576". Units count in 1024s (KB, MB,
+// GB, TB) and their case does not matter.
+func ParseSize(value string) (int64, error) {
+	text := strings.ToUpper(strings.TrimSpace(value))
+	digits := strings.TrimRightFunc(text, func(r rune) bool { return r < '0' || r > '9' })
+	unit, ok := sizeUnits[strings.TrimSpace(text[len(digits):])]
+	n, err := strconv.ParseInt(digits, 10, 64)
+	if !ok || err != nil || n < 0 || n > (1<<62)/unit {
+		return 0, fmt.Errorf("%q is not a size such as 512MB or 2GB", value)
+	}
+	return n * unit, nil
 }
 
 // origin reads an http(s) URL and keeps its origin (scheme and host).

@@ -6,7 +6,8 @@ import { t, tn } from "../i18n/i18n";
 /**
  * A quiet header hint when sync needs attention: failing, held back,
  * stopped because the server disconnected this device, locked until the
- * passphrase is entered, or paused until it is paid. No connection shows
+ * passphrase is entered, paused until it is paid, or out of storage on the
+ * server. No connection shows
  * only on the antenna (crossed out).
  */
 export function SyncIndicator({ sync }: { sync: SyncEngine }) {
@@ -22,7 +23,9 @@ export function SyncIndicator({ sync }: { sync: SyncEngine }) {
             ? t("syncHint.locked")
             : status.state === "unpaid"
               ? t("syncHint.unpaid")
-              : null;
+              : status.state === "full"
+                ? t("syncHint.full")
+                : null;
   if (!text) return null;
   return (
     <Link to="/settings" className="sync-indicator" aria-label={t("syncHint.label", { text })}>

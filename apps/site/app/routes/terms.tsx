@@ -12,7 +12,7 @@ export function loader({ request }: Route.LoaderArgs) {
 export default function Terms() {
   const t = useT();
   const locale = useLocale();
-  const { operator, host, plans } = useLoaderData<typeof loader>();
-  const context = { locale, t, operator, host, plans };
+  const { operator, host, plans, quota } = useLoaderData<typeof loader>();
+  const context = { locale, t, operator, host, plans, quota };
   return <LegalPage document={terms(context)} updated={updatedText(context)} />;
 }

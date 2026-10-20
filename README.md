@@ -123,6 +123,8 @@ Konspecter can synchronize your library through a Konspecter Sync Server. Sync i
 
 Conspects are end-to-end encrypted before they leave your device. When the same conspect changes on two devices, the later edit wins, and an edit always beats a deletion, so one conspect stays one conspect. See [Sync](docs/architecture/sync.md) for the details.
 
+Each account has a storage quota on the server (512 MB unless the server sets another; the site's terms state it). Settings → Sync shows how full it is, in percent. When it is full, changes that need more room wait on your device until you delete conspects you no longer need; nothing is lost, and everything else keeps syncing.
+
 ### Self-hosting
 
 The Sync Server is open source and can be self-hosted, free of charge. Each release publishes images for amd64 and arm64: the API, the account site and the web app, run with Docker Compose behind Caddy, which gets HTTPS certificates by itself.

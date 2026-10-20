@@ -11,9 +11,14 @@ import {
 import { WrongSecretError } from "@konspecter/crypto";
 import { PasswordInput } from "@konspecter/ui/password-input";
 import { parseConnectLink, type ConnectLink } from "../../domain/sync/connect-link";
+import { usedPercent } from "../../domain/sync/storage";
 import { cameraAvailable } from "../../infrastructure/camera/qr-scanner";
 import { appInfo, isDesktop, openInBrowser } from "../../infrastructure/desktop/desktop";
-import { ApiError, type DeviceAuthorization } from "../../infrastructure/http/api-client";
+import {
+  ApiError,
+  type DeviceAuthorization,
+  type SyncStorage,
+} from "../../infrastructure/http/api-client";
 import { isNativeMobile } from "../../infrastructure/mobile/mobile";
 import {
   defaultServerUrl,
@@ -85,6 +90,8 @@ function SyncState({ sync, status }: { sync: SyncEngine; status: SyncStatus }) {
         )}
       </p>
       <AccessNote status={status} />
+      {status.storage && <StorageUse storage={status.storage} />}
+      {status.state === "full" && <p className="setting-hint">{t("sync.full")}</p>}
       {errorText !== null && <p className="inline-error">{errorText}</p>}
       {status.blocked > 0 && <p className="setting-hint">{t("sync.heldBack")}</p>}
       <div className="actions">
@@ -105,6 +112,33 @@ function SyncState({ sync, status }: { sync: SyncEngine; status: SyncStatus }) {
         </button>
       </div>
     </>
+  );
+}
+
+const percentFormat = new Intl.NumberFormat(undefined, { style: "percent" });
+
+/** How full the account's storage on the server is: its share in percent (never sizes), and a bar. */
+function StorageUse({ storage }: { storage: SyncStorage }) {
+  const id = useId();
+  const percent = usedPercent(storage);
+  const shown = Math.min(percent, 100);
+  return (
+    <div className="sync-storage">
+      <p id={id} className="setting-hint">
+        {t("sync.storage", { percent: percentFormat.format(percent / 100) })}
+      </p>
+      <div
+        role="meter"
+        aria-labelledby={id}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={shown}
+        className="sync-storage-bar"
+        data-full={percent >= 100 ? "" : undefined}
+      >
+        <span style={{ width: `${String(shown)}%` }} />
+      </div>
+    </div>
   );
 }
 

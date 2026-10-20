@@ -31,6 +31,7 @@ type fakeRepository struct {
 	lastSeq int64
 	fail    error
 	keys    map[string]keys.Key // by user id
+	quotas  map[string]int64    // by user id: a quota of the user's own
 }
 
 // testKeyID is the key ada's and bob's notes are encrypted with.
@@ -162,10 +163,45 @@ func (f *fakeRepository) GetNote(_ context.Context, userID, id string) (notes.No
 	return n, nil
 }
 
-func (f *fakeRepository) CreateNote(_ context.Context, userID, id, content, keyID string) (notes.Note, error) {
+// storage is what the user's notes take, and their quota. Call it locked.
+func (f *fakeRepository) storage(userID string, defaultQuota int64) notes.Storage {
+	s := notes.Storage{Quota: defaultQuota}
+	if quota, ok := f.quotas[userID]; ok {
+		s.Quota = quota
+	}
+	for key, n := range f.notes {
+		if strings.HasPrefix(key, userID+"/") {
+			s.Used += int64(len(n.Content))
+		}
+	}
+	return s
+}
+
+func (f *fakeRepository) Storage(_ context.Context, userID string, defaultQuota int64) (notes.Storage, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.fail != nil {
+		return notes.Storage{}, f.fail
+	}
+	return f.storage(userID, defaultQuota), nil
+}
+
+// fits checks the quota as the PostgreSQL repository does. Call it locked.
+func (f *fakeRepository) fits(userID, id, content string, defaultQuota int64) error {
+	before := int64(len(f.notes[userID+"/"+id].Content))
+	if !f.storage(userID, defaultQuota).Allows(before, int64(len(content))) {
+		return notes.ErrQuotaExceeded
+	}
+	return nil
+}
+
+func (f *fakeRepository) CreateNote(_ context.Context, userID, id, content, keyID string, defaultQuota int64) (notes.Note, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if err := f.checkKey(userID, keyID); err != nil {
+		return notes.Note{}, err
+	}
+	if err := f.fits(userID, id, content, defaultQuota); err != nil {
 		return notes.Note{}, err
 	}
 	key := userID + "/" + id
@@ -181,11 +217,11 @@ func (f *fakeRepository) CreateNote(_ context.Context, userID, id, content, keyI
 
 // change applies a change at base. Only an update may change a deleted note
 // (restoring it); a deletion of one conflicts.
-func (f *fakeRepository) change(userID, id, keyID string, base int64, restores bool, apply func(*notes.Note)) (notes.Note, error) {
+func (f *fakeRepository) change(userID, id string, base int64, restores bool, check func() error, apply func(*notes.Note)) (notes.Note, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if keyID != "" {
-		if err := f.checkKey(userID, keyID); err != nil {
+	if check != nil {
+		if err := check(); err != nil {
 			return notes.Note{}, err
 		}
 	}
@@ -204,17 +240,24 @@ func (f *fakeRepository) change(userID, id, keyID string, base int64, restores b
 	return n, nil
 }
 
-func (f *fakeRepository) UpdateNote(_ context.Context, userID, id, content, keyID string, base int64) (notes.Note, error) {
-	return f.change(userID, id, keyID, base, true, func(n *notes.Note) {
+func (f *fakeRepository) UpdateNote(_ context.Context, userID, id, content, keyID string, base, defaultQuota int64) (notes.Note, error) {
+	check := func() error {
+		if err := f.checkKey(userID, keyID); err != nil {
+			return err
+		}
+		return f.fits(userID, id, content, defaultQuota)
+	}
+	return f.change(userID, id, base, true, check, func(n *notes.Note) {
 		n.Content = content
 		n.DeletedAt = nil
 	})
 }
 
 func (f *fakeRepository) DeleteNote(_ context.Context, userID, id string, base int64) (notes.Note, error) {
-	return f.change(userID, id, "", base, false, func(n *notes.Note) {
+	return f.change(userID, id, base, false, nil, func(n *notes.Note) {
 		now := time.Now()
 		n.DeletedAt = &now
+		n.Content = ""
 	})
 }
 
@@ -527,6 +570,9 @@ func newTestHandler(options Options) (*Handler, *fakeRepository) {
 	known.add(adaToken, auth.User{ID: "user-ada", Email: "ada@example.com"}, devices.Client{Name: "Ada's laptop", Platform: "macos"})
 	known.add(bobToken, auth.User{ID: "user-bob", Email: "bob@example.com"}, devices.Client{Name: "Bob's phone", Platform: "android"})
 	options.AllowedOrigins = append(options.AllowedOrigins, "https://app.example.com")
+	if options.SyncQuota == 0 {
+		options.SyncQuota = 1 << 30 // more than any test stores
+	}
 	return NewHandler(repository, known, slog.New(slog.DiscardHandler), options), repository
 }
 
@@ -750,6 +796,53 @@ func TestRequiresJSONContentType(t *testing.T) {
 	res.Body.Close()
 	if res.StatusCode != http.StatusUnsupportedMediaType {
 		t.Errorf("status = %d, want 415", res.StatusCode)
+	}
+}
+
+func TestTheQuotaBoundsWhatAnAccountStores(t *testing.T) {
+	note := int64(len(sealed("# One")))
+	server, repository, _ := newTestServerWith(t, Options{SyncQuota: note})
+
+	if r := call(t, server, "POST", "/api/notes", adaToken, noteBody("n1", "# One")); r.status != http.StatusCreated {
+		t.Fatalf("create within the quota = %d %v", r.status, r.body)
+	}
+	r := call(t, server, "GET", "/api/me", adaToken, "")
+	if storage, _ := r.body["storage"].(map[string]any); storage["used"] != float64(note) || storage["quota"] != float64(note) {
+		t.Errorf("/api/me storage = %v; want %d of %d", r.body["storage"], note, note)
+	}
+	for _, write := range []struct{ method, path, body string }{
+		{"POST", "/api/notes", noteBody("n2", "x")},
+		{"PUT", "/api/notes/n1", updateBody("# One, longer", 1)},
+	} {
+		r := call(t, server, write.method, write.path, adaToken, write.body)
+		if r.status != http.StatusInsufficientStorage || errorCode(r) != "quota_exceeded" {
+			t.Errorf("%s %s past the quota = %d %v; want 507 quota_exceeded", write.method, write.path, r.status, r.body)
+		}
+	}
+
+	// Each account has its own room; deleting frees it.
+	if r := call(t, server, "POST", "/api/notes", bobToken, noteBody("n1", "# One")); r.status != http.StatusCreated {
+		t.Errorf("another account's create = %d %v", r.status, r.body)
+	}
+	if r := call(t, server, "DELETE", "/api/notes/n1?base_revision=1", adaToken, ""); r.status != http.StatusNoContent {
+		t.Fatalf("delete = %d %v", r.status, r.body)
+	}
+	if r := call(t, server, "POST", "/api/notes", adaToken, noteBody("n2", "x")); r.status != http.StatusCreated {
+		t.Errorf("create after deleting = %d %v", r.status, r.body)
+	}
+
+	// The site's terms state the server's quota; anyone may ask.
+	if r := call(t, server, "GET", "/api/quota", "", ""); r.status != http.StatusOK || r.body["quota"] != float64(note) {
+		t.Errorf("/api/quota = %d %v; want %d", r.status, r.body, note)
+	}
+
+	// An account's own quota wins over the server's.
+	repository.mu.Lock()
+	repository.quotas = map[string]int64{"user-ada": 3 * note}
+	repository.mu.Unlock()
+	r = call(t, server, "GET", "/api/me", adaToken, "")
+	if storage, _ := r.body["storage"].(map[string]any); storage["quota"] != float64(3*note) {
+		t.Errorf("/api/me storage = %v; want the account's own quota", r.body["storage"])
 	}
 }
 

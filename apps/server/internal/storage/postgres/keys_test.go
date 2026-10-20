@@ -23,7 +23,7 @@ func TestTheKeyIsSetUpOnceAndReWrappedOptimistically(t *testing.T) {
 	if id, err := db.CurrentKeyID(ctx, user.ID); err != nil || id != "" {
 		t.Errorf("CurrentKeyID = %q, %v", id, err)
 	}
-	if _, err := db.CreateNote(ctx, user.ID, "n1", "ksp1.k1.x", "k1"); !errors.Is(err, notes.ErrEncryptionRequired) {
+	if _, err := db.CreateNote(ctx, user.ID, "n1", "ksp1.k1.x", "k1", testQuota); !errors.Is(err, notes.ErrEncryptionRequired) {
 		t.Errorf("a note before the key = %v", err)
 	}
 
@@ -52,13 +52,13 @@ func TestTheKeyIsSetUpOnceAndReWrappedOptimistically(t *testing.T) {
 		t.Errorf("a re-wrap to another key = %v", err)
 	}
 
-	if _, err := db.CreateNote(ctx, user.ID, "n1", "ksp1.k1.x", "k1"); err != nil {
+	if _, err := db.CreateNote(ctx, user.ID, "n1", "ksp1.k1.x", "k1", testQuota); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.CreateNote(ctx, user.ID, "n2", "ksp1.k0.x", "k0"); !errors.Is(err, notes.ErrKeyMismatch) {
+	if _, err := db.CreateNote(ctx, user.ID, "n2", "ksp1.k0.x", "k0", testQuota); !errors.Is(err, notes.ErrKeyMismatch) {
 		t.Errorf("a note under another key = %v", err)
 	}
-	if _, err := db.UpdateNote(ctx, user.ID, "n1", "ksp1.k0.x", "k0", 1); !errors.Is(err, notes.ErrKeyMismatch) {
+	if _, err := db.UpdateNote(ctx, user.ID, "n1", "ksp1.k0.x", "k0", 1, testQuota); !errors.Is(err, notes.ErrKeyMismatch) {
 		t.Errorf("an update under another key = %v", err)
 	}
 	var stored string
@@ -73,11 +73,11 @@ func TestResettingTheKeyDeletesTheNotes(t *testing.T) {
 	ann := createUser(t, db, "ann@example.com")
 	bob := createUser(t, db, "bob@example.com")
 	for _, id := range []string{"a", "b"} {
-		if _, err := db.CreateNote(ctx, ann.ID, id, "ksp1.k1.x", testKeyID); err != nil {
+		if _, err := db.CreateNote(ctx, ann.ID, id, "ksp1.k1.x", testKeyID, testQuota); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := db.CreateNote(ctx, bob.ID, "a", "ksp1.k1.x", testKeyID); err != nil {
+	if _, err := db.CreateNote(ctx, bob.ID, "a", "ksp1.k1.x", testKeyID, testQuota); err != nil {
 		t.Fatal(err)
 	}
 
@@ -103,7 +103,7 @@ func TestResettingTheKeyDeletesTheNotes(t *testing.T) {
 	if _, err := db.PutKey(ctx, ann.ID, testKey("k2"), nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.CreateNote(ctx, ann.ID, "a", "ksp1.k2.x", "k2"); err != nil {
+	if _, err := db.CreateNote(ctx, ann.ID, "a", "ksp1.k2.x", "k2", testQuota); err != nil {
 		t.Errorf("a note under the new key = %v", err)
 	}
 	if _, cursor, _ := db.Changes(ctx, ann.ID, 0, 10); cursor <= 2 {
@@ -120,7 +120,7 @@ func TestAResetAndNoteWritesDoNotInterleave(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := range 8 {
 		wg.Go(func() {
-			_, _ = db.CreateNote(ctx, user.ID, string(rune('a'+i)), "ksp1.k1.x", testKeyID)
+			_, _ = db.CreateNote(ctx, user.ID, string(rune('a'+i)), "ksp1.k1.x", testKeyID, testQuota)
 		})
 	}
 	wg.Go(func() { _ = db.DeleteKey(ctx, user.ID) })

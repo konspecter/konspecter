@@ -59,6 +59,7 @@ export const en = {
   "syncHint.disconnected": "Sync stopped",
   "syncHint.locked": "Sync locked",
   "syncHint.unpaid": "Sync paused",
+  "syncHint.full": "Sync storage full",
   "syncHint.blocked": { one: "{count} not synced", other: "{count} not synced" },
   "syncHint.label": "Sync: {text}",
 
@@ -385,6 +386,10 @@ source, or delete this conspect when you are done.
   "sync.state.disconnected": "Disconnected",
   "sync.state.locked": "Locked",
   "sync.state.unpaid": "Paused",
+  "sync.state.full": "Storage full",
+  "sync.full":
+    "Your storage on the server is full. Changes that need more room wait on this device: delete conspects you no longer need to make room.",
+  "sync.storage": "Storage: {percent} used",
   "sync.paused": "Sync is paused: the subscription has ended.",
   "sync.unpaid": "Sync on this server needs a subscription.",
   "sync.unavailable": "This server does not offer sync to your account.",

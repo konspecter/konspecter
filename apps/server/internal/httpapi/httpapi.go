@@ -25,10 +25,11 @@ import (
 type NoteRepository interface {
 	ListNotes(ctx context.Context, userID string) ([]notes.Note, error)
 	GetNote(ctx context.Context, userID, id string) (notes.Note, error)
-	CreateNote(ctx context.Context, userID, id, content, keyID string) (notes.Note, error)
-	UpdateNote(ctx context.Context, userID, id, content, keyID string, baseRevision int64) (notes.Note, error)
+	CreateNote(ctx context.Context, userID, id, content, keyID string, defaultQuota int64) (notes.Note, error)
+	UpdateNote(ctx context.Context, userID, id, content, keyID string, baseRevision, defaultQuota int64) (notes.Note, error)
 	DeleteNote(ctx context.Context, userID, id string, baseRevision int64) (notes.Note, error)
 	Changes(ctx context.Context, userID string, cursor int64, limit int) ([]notes.Note, int64, error)
+	Storage(ctx context.Context, userID string, defaultQuota int64) (notes.Storage, error)
 	Key(ctx context.Context, userID string) (keys.Key, error)
 	CurrentKeyID(ctx context.Context, userID string) (string, error)
 	PutKey(ctx context.Context, userID string, key keys.Key, base *time.Time) (keys.Key, error)
@@ -62,6 +63,7 @@ type api struct {
 	accounts  *accountAPI
 	billing   *billingAPI
 	syncOff   bool
+	quota     int64
 	hub       *hub
 	heartbeat time.Duration
 }
@@ -81,6 +83,9 @@ type Options struct {
 	// SyncOff lets no account start syncing (KONSPECTER_SYNC_MODE=none).
 	// With Billing, time accounts already have lasts; without, none syncs.
 	SyncOff bool
+	// SyncQuota is how many bytes of notes an account may store, unless it
+	// has a quota of its own.
+	SyncQuota int64
 	// now overrides the clock of paid sync (tests).
 	now func() time.Time
 	// heartbeat overrides defaultHeartbeat (tests).
@@ -107,6 +112,7 @@ func NewHandler(repository NoteRepository, authenticator Authenticator, logger *
 		hub:       newHub(),
 		heartbeat: defaultHeartbeat,
 		syncOff:   options.SyncOff,
+		quota:     options.SyncQuota,
 	}
 	if options.heartbeat > 0 {
 		a.heartbeat = options.heartbeat
@@ -131,6 +137,7 @@ func NewHandler(repository NoteRepository, authenticator Authenticator, logger *
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 	mux.Handle("GET /api/me", a.withTokenOrSession(a.me))
+	mux.HandleFunc("GET /api/quota", a.defaultQuota)
 	a.registerAccountRoutes(mux)
 	mux.Handle("GET /api/notes", a.authenticated(a.entitled(a.listNotes)))
 	mux.Handle("POST /api/notes", a.authenticated(a.entitled(a.createNote)))
@@ -326,11 +333,24 @@ func utc(t *time.Time) *time.Time {
 	return &u
 }
 
-// me is the signed-in user, and whether the account may sync.
+// me is the signed-in user, whether the account may sync, and how much of
+// its storage its notes take.
 func (a *api) me(w http.ResponseWriter, r *http.Request, user auth.User) {
+	storage, err := a.notes.Storage(r.Context(), user.ID, a.quota)
+	if err != nil {
+		a.internalError(w, r, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"id": user.ID, "email": user.Email, "name": user.Name, "sync": a.access(r, user.ID),
+		"storage": map[string]int64{"used": storage.Used, "quota": storage.Quota},
 	})
+}
+
+// defaultQuota is how much an account may store unless it has a quota of
+// its own: public, for the site's terms to state it.
+func (a *api) defaultQuota(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]int64{"quota": a.quota})
 }
 
 func (a *api) listNotes(w http.ResponseWriter, r *http.Request, user auth.User) {
@@ -372,7 +392,7 @@ func (a *api) createNote(w http.ResponseWriter, r *http.Request, user auth.User)
 	if !ok {
 		return
 	}
-	n, err := a.notes.CreateNote(r.Context(), user.ID, body.ID, *body.Content, keyID)
+	n, err := a.notes.CreateNote(r.Context(), user.ID, body.ID, *body.Content, keyID, a.quota)
 	if err != nil {
 		a.noteError(w, r, err)
 		return
@@ -399,7 +419,7 @@ func (a *api) updateNote(w http.ResponseWriter, r *http.Request, user auth.User)
 	if !ok {
 		return
 	}
-	n, err := a.notes.UpdateNote(r.Context(), user.ID, id, *body.Content, keyID, *body.BaseRevision)
+	n, err := a.notes.UpdateNote(r.Context(), user.ID, id, *body.Content, keyID, *body.BaseRevision, a.quota)
 	if err != nil {
 		a.noteError(w, r, err)
 		return
@@ -472,6 +492,8 @@ func (a *api) noteError(w http.ResponseWriter, r *http.Request, err error) {
 		writeError(w, http.StatusConflict, "encryption_required", "set up encryption before syncing notes")
 	case errors.Is(err, notes.ErrKeyMismatch):
 		writeError(w, http.StatusConflict, "key_mismatch", "the note is encrypted with a key that is no longer the account's")
+	case errors.Is(err, notes.ErrQuotaExceeded):
+		writeError(w, http.StatusInsufficientStorage, "quota_exceeded", "the account's storage is full: delete notes to make room")
 	case errors.As(err, &conflict):
 		// The client's copy is stale (or the id to create is taken); send the
 		// current version so nothing is overwritten and the client can reconcile.

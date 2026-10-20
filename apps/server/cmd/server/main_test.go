@@ -34,6 +34,18 @@ func TestRunRejectsUnknownCommandsAndMissingFlags(t *testing.T) {
 	if err := run(context.Background(), []string{"create-user"}, vars, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "-email is required") {
 		t.Errorf("missing email: %v", err)
 	}
+	if err := run(context.Background(), []string{"set-quota", "-email", "a@example.com", "-size", "lots"}, vars, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "-size") {
+		t.Errorf("bad size: %v", err)
+	}
+}
+
+func TestFormatSize(t *testing.T) {
+	cases := map[int64]string{0: "0 B", 1000: "1000 B", 512 << 20: "512 MB", 3 << 29: "1.5 GB", 12_900_000: "12.3 MB"}
+	for n, want := range cases {
+		if got := formatSize(n); got != want {
+			t.Errorf("formatSize(%d) = %q; want %q", n, got, want)
+		}
+	}
 }
 
 func TestServeShutsDownWhenContextIsCancelled(t *testing.T) {
@@ -121,6 +133,22 @@ func TestCommandsAgainstPostgres(t *testing.T) {
 	}
 	if err := run(ctx, []string{"create-token", "-email", "nobody@example.com"}, vars, &out); err == nil {
 		t.Error("create-token for an unknown user succeeded")
+	}
+
+	for _, c := range []struct{ size, want string }{
+		{"", "quota of " + email + ": 512 MB (the server's default is 512 MB), 0 B used"},
+		{"2GB", "quota of " + email + ": 2 GB (the server's default is 512 MB), 0 B used"},
+		{"", "quota of " + email + ": 2 GB"},
+		{"default", "quota of " + email + ": 512 MB"},
+	} {
+		out.Reset()
+		args := []string{"set-quota", "-email", email}
+		if c.size != "" {
+			args = append(args, "-size", c.size)
+		}
+		if err := run(ctx, args, vars, &out); err != nil || !strings.HasPrefix(out.String(), c.want) {
+			t.Errorf("set-quota -size %q = %q, %v; want %q", c.size, out.String(), err, c.want)
+		}
 	}
 }
 

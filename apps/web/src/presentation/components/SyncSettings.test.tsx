@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { createNote } from "../../domain/note/note";
 import { openNoteStore } from "../../infrastructure/storage/note-store";
 import { FakeServer, TEST_PASSPHRASE } from "../../infrastructure/sync/fake-server";
 import { SyncEngine, type Scheduler } from "../../infrastructure/sync/sync-engine";
@@ -61,7 +62,7 @@ async function setup(server = new FakeServer()) {
     return null;
   });
   render(<SyncSettings sync={engine} />);
-  return { server, engine, scheduler, opened };
+  return { server, store, engine, scheduler, opened };
 }
 
 it("signs in with the browser: shows the code, opens the page, connects once approved", async () => {
@@ -314,4 +315,34 @@ it("offers no subscription where the server offers no sync to the account", asyn
   );
   expect(screen.queryByRole("button", { name: "Subscribe" })).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Check again" })).toBeInTheDocument();
+});
+
+it("shows how full the account's storage is in percent, never in sizes", async () => {
+  const server = new FakeServer();
+  await server.write("n1", "# On the server");
+  server.quota = server.used * 4;
+  const { engine } = await setup(server);
+  await engine.connect({ serverUrl: "https://sync.example.com", token: "ksp_ada" });
+  await engine.unlock(TEST_PASSPHRASE);
+
+  const meter = await screen.findByRole("meter", { name: "Storage: 25% used" });
+  expect(meter).toHaveAttribute("aria-valuenow", "25");
+  const sync = screen.getByRole("region", { name: "Sync" });
+  expect(sync).not.toHaveTextContent(/\d\s*(?:B|KB|MB|GB|bytes)\b/);
+});
+
+it("says the storage is full and keeps the change waiting", async () => {
+  const server = new FakeServer();
+  await server.write("n1", "# On the server");
+  server.quota = server.used;
+  const { engine, store } = await setup(server);
+  await engine.connect({ serverUrl: "https://sync.example.com", token: "ksp_ada" });
+  await engine.unlock(TEST_PASSPHRASE);
+  await store.put(createNote("# Written here, past the quota", new Date(), "n2"));
+  await engine.syncNow();
+
+  expect(await screen.findByRole("meter", { name: "Storage: 100% used" })).toBeInTheDocument();
+  expect(screen.getByRole("status")).toHaveTextContent("Storage full");
+  expect(screen.getByText(/Your storage on the server is full/)).toBeInTheDocument();
+  expect(screen.getByRole("status")).toHaveTextContent("1 waiting to upload");
 });

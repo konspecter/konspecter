@@ -27,8 +27,8 @@ type Note struct {
 	Revision  int64
 	CreatedAt time.Time
 	UpdatedAt time.Time
-	// DeletedAt is set once the note is deleted. Deleted notes keep their
-	// content so that no version is lost.
+	// DeletedAt is set once the note is deleted. A deleted note's content is
+	// cleared: no client reads it, and deleting frees the account's storage.
 	DeletedAt *time.Time
 }
 
@@ -45,6 +45,25 @@ var ErrEncryptionRequired = errors.New("encryption is not set up")
 // ErrKeyMismatch means the note is encrypted with a key that is not the
 // account's current one (the key was reset since).
 var ErrKeyMismatch = errors.New("the note is encrypted with another key")
+
+// ErrQuotaExceeded means the write would take the account past its storage
+// quota.
+var ErrQuotaExceeded = errors.New("the account's storage is full")
+
+// Storage is how many bytes the server stores for an account (its notes'
+// envelopes), and how many it may: its quota.
+type Storage struct {
+	Used  int64
+	Quota int64
+}
+
+// Allows reports whether a note of before bytes may become after bytes (0
+// for a note that does not exist). A write that does not grow the note is
+// always allowed, so an account over a lowered quota can still edit down and
+// delete.
+func (s Storage) Allows(before, after int64) bool {
+	return after <= before || s.Used-before+after <= s.Quota
+}
 
 // ConflictError is returned when a change was based on an old revision, or
 // when a note to create already exists (possibly deleted). It carries the

@@ -1813,6 +1813,34 @@ kbd {
   font-size: 14px;
 }
 
+/* How full the account's storage is (SyncSettings): a bar under its share. */
+.sync-storage {
+  margin: 0.75rem 0;
+}
+
+.sync-storage .setting-hint {
+  margin: 0 0 0.35rem;
+}
+
+.sync-storage-bar {
+  height: 6px;
+  max-width: 320px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--color-field);
+}
+
+.sync-storage-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-accent);
+}
+
+.sync-storage-bar[data-full] > span {
+  background: var(--color-danger);
+}
+
 .recovery {
   margin-top: 1rem;
   padding: 0.6rem 0.8rem;

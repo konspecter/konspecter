@@ -75,6 +75,20 @@ docker compose exec server /server create-user -email ada@example.com
 
 then set `KONSPECTER_REGISTRATION=closed` in `.env` and `docker compose up -d`.
 
+## Storage quotas
+
+Each account may store up to `KONSPECTER_SYNC_QUOTA` of notes (default `512MB`): the size of
+its encrypted notes, which is about 1.35 times their text, and more with covers (each is an
+embedded image). Past it, the server refuses new notes and edits that grow, until notes are
+deleted; the apps keep those changes and show how full the account is under Settings → Sync.
+Give one account more (or less), and see how much it uses:
+
+```sh
+docker compose exec server /server set-quota -email ada@example.com -size 2GB
+docker compose exec server /server set-quota -email ada@example.com -size default
+docker compose exec server /server set-quota -email ada@example.com
+```
+
 ## Connecting the apps
 
 The web app on your server suggests it by itself. In the desktop and mobile apps, enter

@@ -13,8 +13,10 @@ import {
   type DeviceAuthorization,
   type DeviceDescription,
   type HandedKey,
+  type AccountState,
   type ServerConfig,
   type SyncAccess,
+  type SyncStorage,
 } from "../http/api-client";
 import type { NoteStore } from "../storage/note-store";
 import { ChangeStream } from "./change-stream";
@@ -32,9 +34,21 @@ import { deviceLogin } from "./device-login";
  * "unpaid": connected, but the server wants a subscription (paid sync).
  * Nothing is lost or held back: local changes wait, and sync carries on by
  * itself once the account is paid again.
+ *
+ * "full": the account's storage on the server is full (its quota). Changes
+ * that need more room wait, everything else syncs, and they go once there is
+ * room again (notes deleted, or a larger quota).
  */
 export type SyncState =
-  "disabled" | "idle" | "syncing" | "offline" | "error" | "disconnected" | "locked" | "unpaid";
+  | "disabled"
+  | "idle"
+  | "syncing"
+  | "offline"
+  | "error"
+  | "disconnected"
+  | "locked"
+  | "unpaid"
+  | "full";
 
 /** Why sync is locked: no key on the server yet ("setup"), or one to unlock ("unlock"). */
 export type SyncLock = "setup" | "unlock";
@@ -55,6 +69,8 @@ export type SyncStatus = {
   readonly lock: SyncLock | null;
   /** Whether the account may sync and until when, as the server last said. */
   readonly access: SyncAccess | null;
+  /** How full the account's storage is, as the server last said. */
+  readonly storage: SyncStorage | null;
 };
 
 /** There is no key to unlock: encryption is not set up on the server. */
@@ -212,6 +228,7 @@ export class SyncEngine {
     error: null,
     lock: null,
     access: null,
+    storage: null,
   };
   /** When the account's sync state was last asked (ms). */
   #accessAt = 0;
@@ -442,6 +459,7 @@ export class SyncEngine {
       error: null,
       lock: null,
       access: null,
+      storage: null,
     });
     return { done };
   }
@@ -631,21 +649,23 @@ export class SyncEngine {
         await this.#lock(record?.keyId ?? null, null);
         return;
       }
-      await this.#push(client);
-      await this.#pull(client);
+      let pushed = await this.#push(client);
+      let changed = pushed.tried + (await this.#pull(client));
       const released = (await this.#store.pulled?.()) ?? false;
       if ((await this.#resolveConflicts(client)) || released) {
         // Upload the local versions that won right away, and what the pull released.
-        await this.#push(client);
+        pushed = await this.#push(client);
+        changed += pushed.tried;
       }
       this.#failures = 0;
-      const access = await this.#currentAccess(client, wasUnpaid);
+      // What was sent or received changes how full the storage is.
+      const known = await this.#accountState(client, wasUnpaid || changed > 0);
       await this.#refreshCounts({
-        state: "idle",
+        state: pushed.full ? "full" : "idle",
         lastSyncedAt: this.#now().toISOString(),
         error: null,
         lock: null,
-        access,
+        ...known,
       });
       if (wasUnpaid) this.#openStream();
       this.#schedule(this.#streaming ? INTERVAL_MS : POLL_MS);
@@ -681,23 +701,28 @@ export class SyncEngine {
   async #becomeUnpaid(client: ApiClient): Promise<void> {
     this.#closeStream();
     this.#failures = 0;
-    const access = await this.#currentAccess(client, true);
-    await this.#refreshCounts({ state: "unpaid", error: null, lock: null, access });
+    const known = await this.#accountState(client, true);
+    await this.#refreshCounts({ state: "unpaid", error: null, lock: null, ...known });
     this.#schedule(UNPAID_CHECK_MS);
   }
 
-  /** The account's sync state: asked again when stale (or `fresh`), else as last known. */
-  async #currentAccess(client: ApiClient, fresh: boolean): Promise<SyncAccess | null> {
+  /**
+   * Whether the account may sync, and how full its storage is: asked again
+   * when stale (or `fresh`), else as last known.
+   */
+  async #accountState(
+    client: ApiClient,
+    fresh: boolean,
+  ): Promise<{ access: SyncAccess | null; storage: SyncStorage | null }> {
+    const known = { access: this.#status.access, storage: this.#status.storage };
     const at = this.#now().getTime();
-    if (!fresh && this.#status.access && at - this.#accessAt < ACCESS_TTL_MS) {
-      return this.#status.access;
-    }
+    if (!fresh && known.access && at - this.#accessAt < ACCESS_TTL_MS) return known;
     try {
-      const access = await client.access();
+      const state: AccountState = await client.accountState();
       this.#accessAt = at;
-      return access;
+      return state;
     } catch {
-      return this.#status.access; // Not worth failing a cycle over.
+      return known; // Not worth failing a cycle over.
     }
   }
 
@@ -716,22 +741,30 @@ export class SyncEngine {
     });
   }
 
-  async #push(client: ApiClient): Promise<void> {
-    for (const entry of await this.#store.pendingSync()) {
-      await this.#pushOne(client, entry);
+  /**
+   * Sends every local change. Returns how many it tried, and whether any of
+   * them waits for room in the account's storage.
+   */
+  async #push(client: ApiClient): Promise<{ tried: number; full: boolean }> {
+    const pending = await this.#store.pendingSync();
+    let full = false;
+    for (const entry of pending) {
+      if (await this.#pushOne(client, entry)) full = true;
     }
+    return { tried: pending.length, full };
   }
 
-  async #pushOne(client: ApiClient, entry: SyncEntry): Promise<void> {
+  /** Sends one change; returns true when it waits for room in the account's storage. */
+  async #pushOne(client: ApiClient, entry: SyncEntry): Promise<boolean> {
     const { noteId, baseRevision } = entry;
     try {
       if (entry.deleted) {
         if (baseRevision !== null) await client.deleteNote(noteId, baseRevision);
         await this.#store.markPushed(noteId, "deleted");
-        return;
+        return false;
       }
       const note = await this.#store.get(noteId);
-      if (!note) return; // Deleted meanwhile; its deletion is queued.
+      if (!note) return false; // Deleted meanwhile; its deletion is queued.
       const remote =
         baseRevision === null
           ? await client.createNote(noteId, note.markdown)
@@ -745,6 +778,8 @@ export class SyncEngine {
       ) {
         throw new KeyChangedError(null); // Not this note's fault: the key changed.
       }
+      // No room for this version: it waits (not held back), and the rest still go.
+      if (isQuotaExceeded(error)) return true;
       if (error instanceof RevisionConflictError && entry.deleted && error.current.deleted) {
         await this.#store.markPushed(noteId, "deleted"); // Deleted on both sides.
       } else if (error instanceof RevisionConflictError) {
@@ -772,19 +807,23 @@ export class SyncEngine {
         throw error;
       }
     }
+    return false;
   }
 
-  async #pull(client: ApiClient): Promise<void> {
+  /** Applies every change on the server; returns how many there were. */
+  async #pull(client: ApiClient): Promise<number> {
     let cursor = await this.#store.syncCursor();
+    let count = 0;
     for (;;) {
       const page = await client.changes(cursor);
       if (page.keyId !== this.#cipher?.keyId) throw new KeyChangedError(page.keyId);
       for (const remote of page.notes) {
         await this.#store.applyRemote(remote);
       }
+      count += page.notes.length;
       cursor = page.cursor;
       await this.#store.setSyncCursor(cursor);
-      if (!page.more) return;
+      if (!page.more) return count;
     }
   }
 
@@ -814,6 +853,11 @@ export class SyncEngine {
   #client(config: ServerConfig): ApiClient {
     return new ApiClient(config, this.#fetch, this.#cipher);
   }
+}
+
+/** The account's storage on the server has no room for the change (its quota). */
+export function isQuotaExceeded(error: unknown): boolean {
+  return error instanceof ApiError && error.code === "quota_exceeded";
 }
 
 /** The server wants a subscription before it syncs (paid sync). */
