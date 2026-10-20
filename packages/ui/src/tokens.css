@@ -28,6 +28,8 @@
   --color-success: #2e7a4b;
   /* What a longer period saves, on the site's prices: a soft orange. */
   --color-offer: #b4580f;
+  /* A newer version to get (the app's update banner): a soft lime green. */
+  --color-news: #d8f0bc;
   --color-shadow: rgb(31 32 35 / 14%);
 
   --font-ui:
@@ -59,6 +61,7 @@
     --color-danger: #f5c3ba;
     --color-success: #a9dbb8;
     --color-offer: #f2b27c;
+    --color-news: #46522f;
     --color-shadow: rgb(12 12 10 / 45%);
   }
 }
@@ -86,5 +89,6 @@
   --color-danger: #f5c3ba;
   --color-success: #a9dbb8;
   --color-offer: #f2b27c;
+  --color-news: #46522f;
   --color-shadow: rgb(12 12 10 / 45%);
 }

@@ -1472,7 +1472,7 @@ kbd {
   margin: 8px auto 0;
   padding: 0.6rem 0.8rem;
   border-radius: 10px;
-  background: var(--color-field);
+  background: var(--color-news);
   font-family: var(--font-ui);
   font-size: 14px;
 }
