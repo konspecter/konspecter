@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.13.0 — 2026-10-20
+
+- **Let the operator's legal details differ by language**
+- **Bound each account's sync storage with a quota**
+
 ## 0.12.0 — 2026-10-20
 
 - **A quieter splash screen:** a start quicker than 150 ms no longer flashes the logo; on a
