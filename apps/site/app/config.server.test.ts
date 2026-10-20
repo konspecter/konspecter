@@ -9,7 +9,10 @@ describe("readConfig", () => {
       publicOrigin: null,
       apiUrl: "http://localhost:8080",
       downloads: {},
-      operator: { name: "", id: "", address: "", email: "" },
+      operators: {
+        en: { name: "", id: "", address: "", email: "" },
+        ru: { name: "", id: "", address: "", email: "" },
+      },
     });
   });
 
@@ -29,11 +32,45 @@ describe("readConfig", () => {
       publicOrigin: "https://notes.example.com",
       apiUrl: "http://server:8080",
       downloads: { macos: "https://example.com/k.dmg", web: "https://app.example.com/" },
-      operator: {
+      operators: {
+        en: {
+          name: "Ivan Petrov, sole proprietor",
+          id: "123456789012",
+          address: "Moscow",
+          email: "support@example.com",
+        },
+        ru: {
+          name: "Ivan Petrov, sole proprietor",
+          id: "123456789012",
+          address: "Moscow",
+          email: "support@example.com",
+        },
+      },
+    });
+  });
+
+  it("gives each language its own operator details where they are set", () => {
+    const { operators } = readConfig({
+      KONSPECTER_LEGAL_NAME: "Ivan Petrov, sole proprietor",
+      KONSPECTER_LEGAL_NAME_RU: "ИП Петров Иван Иванович",
+      KONSPECTER_LEGAL_ID: "123456789012",
+      KONSPECTER_LEGAL_ADDRESS_EN: "Moscow, Russia",
+      KONSPECTER_LEGAL_ADDRESS_RU: "г. Москва",
+      KONSPECTER_LEGAL_EMAIL_RU: "help@example.ru",
+      KONSPECTER_LEGAL_EMAIL_EN: " ",
+    });
+    expect(operators).toEqual({
+      en: {
         name: "Ivan Petrov, sole proprietor",
         id: "123456789012",
-        address: "Moscow",
-        email: "support@example.com",
+        address: "Moscow, Russia",
+        email: "",
+      },
+      ru: {
+        name: "ИП Петров Иван Иванович",
+        id: "123456789012",
+        address: "г. Москва",
+        email: "help@example.ru",
       },
     });
   });

@@ -3,6 +3,7 @@
  * optional .env file (KONSPECTER_ENV_FILE, default ./.env). Variables set in
  * the real environment win over the file, as for the Go server.
  */
+import { LOCALES, type Locale } from "./i18n/i18n";
 import { PLATFORMS, type Platform } from "./platform";
 
 export interface SiteConfig {
@@ -12,13 +13,15 @@ export interface SiteConfig {
   readonly apiUrl: string;
   /** Download links by platform (KONSPECTER_DOWNLOAD_<PLATFORM>_URL); unset platforms are left out. */
   readonly downloads: Readonly<Partial<Record<Platform, string>>>;
-  /** Who runs the site, as the terms and the privacy policy name them. */
-  readonly operator: Operator;
+  /** Who runs the site, as the terms and the privacy policy name them, by language. */
+  readonly operators: Readonly<Record<Locale, Operator>>;
 }
 
 /**
  * The site's operator (KONSPECTER_LEGAL_NAME, _ID, _ADDRESS, _EMAIL); ""
  * where unset. The ID is a registration number (in Russia ИНН/ОГРН(ИП)).
+ * Each can be set for one language with its suffix (KONSPECTER_LEGAL_NAME_RU),
+ * which wins over the plain variable in that language.
  */
 export interface Operator {
   readonly name: string;
@@ -69,12 +72,21 @@ export function readConfig(env: Env): SiteConfig {
       value("KONSPECTER_API_URL") ?? "http://localhost:8080",
     ).href.replace(/\/$/, ""),
     downloads,
-    operator: {
-      name: value("KONSPECTER_LEGAL_NAME") ?? "",
-      id: value("KONSPECTER_LEGAL_ID") ?? "",
-      address: value("KONSPECTER_LEGAL_ADDRESS") ?? "",
-      email: value("KONSPECTER_LEGAL_EMAIL") ?? "",
-    },
+    operators: Object.fromEntries(
+      LOCALES.map((locale) => {
+        const legal = (name: string) =>
+          value(`KONSPECTER_LEGAL_${name}_${locale.toUpperCase()}`) ??
+          value(`KONSPECTER_LEGAL_${name}`) ??
+          "";
+        const operator: Operator = {
+          name: legal("NAME"),
+          id: legal("ID"),
+          address: legal("ADDRESS"),
+          email: legal("EMAIL"),
+        };
+        return [locale, operator];
+      }),
+    ) as Record<Locale, Operator>,
   };
 }
 

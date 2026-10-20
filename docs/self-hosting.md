@@ -51,6 +51,10 @@ The stack is five containers ([ADR-023](architecture/decisions/ADR-023-published
 
    `KONSPECTER_VERSION` and `KONSPECTER_REGISTRY` are already set to the release.
 
+   `KONSPECTER_LEGAL_*` name who runs the site in its terms (a public offer where sync is
+   paid) and privacy policy. Each can differ by language: `KONSPECTER_LEGAL_NAME_RU` (or
+   `_EN`) wins over `KONSPECTER_LEGAL_NAME` on that language's pages.
+
 3. Start it:
 
    ```sh

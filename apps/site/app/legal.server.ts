@@ -6,10 +6,10 @@ import { parsePlans } from "./subscription";
 /** What the terms and the privacy policy show: the operator, the site and the prices. */
 export async function loadLegal(request: Request) {
   const { locale } = readPreferences(request);
-  const { operator, publicOrigin } = siteConfig();
+  const { operators, publicOrigin } = siteConfig();
   const plans = await callApi(request, `/api/billing/plans?locale=${locale}`);
   return {
-    operator,
+    operator: operators[locale],
     host: new URL(publicOrigin ?? request.url).host,
     plans: parsePlans(plans.data),
   };
