@@ -1829,7 +1829,6 @@ kbd {
 
 .sync-storage-bar {
   height: 6px;
-  max-width: 320px;
   overflow: hidden;
   border-radius: 3px;
   background: var(--color-field);
