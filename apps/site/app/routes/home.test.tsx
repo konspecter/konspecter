@@ -241,6 +241,44 @@ it("leaves out the downloads when none are configured", async () => {
   expect(screen.queryByRole("link", { name: /Download for/ })).not.toBeInTheDocument();
 });
 
+it("offers an Android visitor RuStore beside the APK, in the hero and the downloads", async () => {
+  renderHome("ru", [{ platform: "android", url: "https://example.com/k.apk" }], "android");
+  await screen.findByRole("heading", { level: 1 });
+
+  const badges = screen.getAllByRole("link", { name: "Доступно в RuStore" });
+  expect(badges).toHaveLength(2);
+  for (const badge of badges) {
+    expect(badge).toHaveAttribute(
+      "href",
+      "https://www.rustore.ru/catalog/app/app.konspecter.mobile",
+    );
+  }
+  expect(badges[0]).toHaveClass("store-badge-large");
+  expect(screen.getAllByRole("link", { name: "Скачать для Android" })).toHaveLength(2);
+});
+
+it("leaves RuStore out of the hero for other visitors", async () => {
+  renderHome(
+    "ru",
+    [
+      { platform: "macos", url: "https://example.com/k.dmg" },
+      { platform: "android", url: "https://example.com/k.apk" },
+    ],
+    "macos",
+  );
+  await screen.findByRole("heading", { level: 1 });
+  const badges = screen.getAllByRole("link", { name: "Доступно в RuStore" });
+  expect(badges).toHaveLength(1);
+  expect(badges[0]).not.toHaveClass("store-badge-large");
+});
+
+it("offers no RuStore on the English site, not even to an Android visitor", async () => {
+  renderHome("en", [{ platform: "android", url: "https://example.com/k.apk" }], "android");
+  await screen.findByRole("heading", { level: 1 });
+  expect(screen.queryByRole("link", { name: /RuStore/ })).not.toBeInTheDocument();
+  expect(screen.getAllByRole("link", { name: "Download for Android" })).toHaveLength(2);
+});
+
 it("speaks Russian, with the language dropdown and the other theme", async () => {
   renderHome("ru", [{ platform: "linux", url: "https://example.com/k.AppImage" }]);
   expect(

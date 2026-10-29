@@ -114,6 +114,8 @@ export const en = {
     "The macOS app is not notarized by Apple yet. The first time, open it, then click Open Anyway in System Settings → Privacy & Security.",
   "home.get": "Download",
   "home.open": "Open",
+  "home.rustore": "Get it on RuStore",
+  "home.rustoreLead": "Get it on",
 
   "download.title": "Download Konspecter",
   "download.lead":
@@ -133,6 +135,7 @@ export const en = {
   "download.android.title": "Installing on Android",
   "download.android.text":
     "The app comes as an APK file. Open it once it has downloaded; if Android asks, allow your browser to install apps, then tap Install.",
+  "download.android.rustore": "Or install it from {rustore}, which keeps it up to date.",
   "download.web.title": "In the browser",
   "download.web.text":
     "The web app works in any modern browser and keeps working without the internet after the first visit. To have it as an app of its own, click Install in the address bar of Chrome or Edge, or use Add to Dock or Add to Home Screen in Safari.",

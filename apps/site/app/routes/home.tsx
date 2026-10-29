@@ -12,6 +12,7 @@ import { SELF_HOSTING } from "../links";
 import { useLocalePath } from "../pages";
 import type { Platform } from "../platform";
 import { PlatformList } from "../platform-list";
+import { RuStoreBadge } from "../rustore-badge";
 import { readPreferences } from "../preferences.server";
 import { discounts, durationText, money, parsePlans, pricePeriod } from "../subscription";
 import { SPECIMENS } from "../specimen";
@@ -126,13 +127,16 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               {suggested && suggested !== "web" && suggestedUrl ? (
                 // One short word, so both buttons fit on a line in every
                 // language; the platform is in its accessible name.
-                <a
-                  className="button button-primary"
-                  href={suggestedUrl}
-                  aria-label={t("home.download", { platform: platformName(suggested) })}
-                >
-                  {t("home.get")}
-                </a>
+                <>
+                  <a
+                    className="button button-primary"
+                    href={suggestedUrl}
+                    aria-label={t("home.download", { platform: platformName(suggested) })}
+                  >
+                    {t("home.get")}
+                  </a>
+                  {suggested === "android" && <RuStoreBadge large />}
+                </>
               ) : (
                 apps.length > 0 && (
                   <a className="button button-primary" href="#download">

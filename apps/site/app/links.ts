@@ -8,6 +8,9 @@ export const TAG_CHAIN_SPEC = `${SOURCE_CODE}/blob/main/TAG-CHAIN-SPEC.md`;
 export const TAG_RULES = `${SOURCE_CODE}/blob/main/docs/architecture/tags.md`;
 export const FOLDERS_FOLLOW_TAGS = `${SOURCE_CODE}/blob/main/docs/architecture/decisions/ADR-013-folders-follow-tags.md`;
 
+/** The Android app in RuStore, beside its APK. */
+export const RUSTORE = "https://www.rustore.ru/catalog/app/app.konspecter.mobile";
+
 /** Konspecter's channels: news and talk with the people who use it. */
 export const TELEGRAM = "https://t.me/konspecter";
 export const VK = "https://vk.ru/konspecter";

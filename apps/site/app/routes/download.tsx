@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { MARKDOWN_GUIDE } from "../cheatsheet";
 import { downloadsFor } from "../downloads.server";
 import { useLocale, useT } from "../i18n/i18n";
-import { RELEASES, SELF_HOSTING, SOURCE_CODE } from "../links";
+import { RELEASES, RUSTORE, SELF_HOSTING, SOURCE_CODE } from "../links";
 import { useLocalePath } from "../pages";
 import { PlatformList } from "../platform-list";
 import type { Route } from "./+types/download";
@@ -59,6 +59,14 @@ export default function Download({ loaderData }: Route.ComponentProps) {
           <section aria-labelledby="download-android">
             <h2 id="download-android">{t("download.android.title")}</h2>
             <p>{t("download.android.text")}</p>
+            {/* A Russian store: on the Russian site only. */}
+            {locale === "ru" && (
+              <p>
+                {richText(t("download.android.rustore"), {
+                  rustore: <a href={RUSTORE}>RuStore</a>,
+                })}
+              </p>
+            )}
           </section>
         )}
         {offers("web") && (

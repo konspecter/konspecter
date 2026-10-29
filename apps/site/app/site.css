@@ -775,6 +775,83 @@ main {
   font-size: 15px;
 }
 
+.platform-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/*
+ * A store badge (RuStore): black in either theme with a grey edge, as store
+ * badges are, the store's mark, then "Get it on" over the store's name. As
+ * tall as a button beside it; `-large`, as the hero's.
+ */
+.store-badge {
+  display: inline-flex;
+  box-sizing: border-box;
+  align-items: center;
+  gap: 0.45rem;
+  height: 34px;
+  padding: 0 0.8rem 0 0.4rem;
+  border: 1px solid #a6a6a6;
+  border-radius: 8px;
+  background: #000;
+  color: #fff;
+  font-family: var(--font-ui);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.store-badge:hover {
+  background: #1f1f1f;
+}
+
+.store-badge-mark {
+  flex: none;
+  width: 22px;
+  height: 22px;
+}
+
+.store-badge-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+
+.store-badge-lead {
+  font-size: 9.5px;
+  letter-spacing: 0.01em;
+}
+
+.store-badge-name {
+  margin-top: 1px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.store-badge-large {
+  gap: 0.55rem;
+  height: 48px;
+  padding: 0 1.1rem 0 0.6rem;
+  border-radius: 10px;
+}
+
+.store-badge-large .store-badge-mark {
+  width: 30px;
+  height: 30px;
+}
+
+.store-badge-large .store-badge-lead {
+  font-size: 11px;
+}
+
+.store-badge-large .store-badge-name {
+  font-size: 20px;
+}
+
 /* The note under its platform's row, across the whole row. */
 .platform-footnote {
   grid-column: 1 / -1;
@@ -2023,7 +2100,7 @@ main {
     font-size: 14px;
   }
 
-  .platform .button {
+  .platform-actions {
     grid-row: 1 / span 2;
     grid-column: 2;
   }

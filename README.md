@@ -128,7 +128,7 @@ comes back. If you hid the sidebar yourself, it stays hidden at any width.
 
 ### Mobile
 
-Konspecter runs on Android through Capacitor. The same knowledge base travels with you while remaining local-first. No Play Store needed — install the APK from the latest release or use the PWA.
+Konspecter runs on Android through Capacitor. The same knowledge base travels with you while remaining local-first. No Play Store needed — install it from [RuStore](https://www.rustore.ru/catalog/app/app.konspecter.mobile), install the APK from the latest release, or use the PWA.
 
 <p align="center">
   <img src="docs/assets/mobile.png" width="560" alt="Konspecter on a phone: the list of conspects and an open conspect">
@@ -243,7 +243,8 @@ while the folder is empty.
 
 ### Android
 
-Download the APK from the [latest release](https://github.com/konspecter/konspecter/releases).
+Install it from [RuStore](https://www.rustore.ru/catalog/app/app.konspecter.mobile), which keeps it
+up to date, or download the APK from the [latest release](https://github.com/konspecter/konspecter/releases).
 
 An APK from a release up to 0.4.1 was a debug build, signed with another key, so a newer one
 does not install over it: sync or export your conspects, uninstall the old app, then install

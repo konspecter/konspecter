@@ -50,7 +50,12 @@ it("lists the downloads with the visitor's first, and what helps after them", as
   expect(within(mac).getByText(/xattr -dr com.apple.quarantine/)).toBeInTheDocument();
   // The section says it all; the macOS row does not repeat it.
   expect(screen.queryByText(/click Open Anyway in System Settings/)).not.toBeInTheDocument();
-  expect(screen.getByRole("region", { name: "Installing on Android" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Download for Android" })).toHaveAttribute(
+    "href",
+    "https://example.com/k.apk",
+  );
+  // RuStore is on the Russian site only.
+  expect(screen.queryByRole("link", { name: /RuStore/ })).not.toBeInTheDocument();
   // No web app is offered, so nothing is said about installing it.
   expect(screen.queryByRole("region", { name: "In the browser" })).not.toBeInTheDocument();
   expect(screen.getByRole("region", { name: "Where your conspects are kept" })).toBeInTheDocument();
@@ -86,4 +91,17 @@ it("points to the releases on GitHub where no download is configured, in Russian
     "href",
     "/ru/markdown",
   );
+});
+
+it("offers RuStore beside the APK on the Russian site", async () => {
+  renderDownload("ru", [{ platform: "android", url: "https://example.com/k.apk" }], "android");
+  const rustore = "https://www.rustore.ru/catalog/app/app.konspecter.mobile";
+
+  const android = await screen.findByRole("region", { name: "Установка на Android" });
+  expect(screen.getByRole("link", { name: "Скачать для Android" })).toHaveAttribute(
+    "href",
+    "https://example.com/k.apk",
+  );
+  expect(screen.getByRole("link", { name: "Доступно в RuStore" })).toHaveAttribute("href", rustore);
+  expect(within(android).getByRole("link", { name: "RuStore" })).toHaveAttribute("href", rustore);
 });
