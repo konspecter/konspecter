@@ -18,6 +18,7 @@ import { ErrorState } from "../components/ErrorState";
 import { Details } from "../components/details-slot";
 import { NoteDetails } from "../components/NoteDetails";
 import { NoteNotFound } from "../components/NoteNotFound";
+import { newNoteMarkdown } from "../components/new-note";
 import { listFind, NoteFindContext } from "../components/note-find";
 import { TagSuggestContext } from "../components/tag-suggest";
 import { headingInHash, type HeadingTarget } from "../components/note-heading";
@@ -150,6 +151,7 @@ export function NotePage({
       readingPosition={readingPosition}
       heading={heading}
       listQuery={listFind(location.state)}
+      newMarkdown={id === undefined ? newNoteMarkdown(location.state) : ""}
       onAdopt={adopt}
     />
   );
@@ -168,6 +170,8 @@ type NoteSessionProps = {
   heading: HeadingTarget | null;
   /** The list's search the note was opened from, to search the note for. */
   listQuery: string | null;
+  /** The text a new note starts with: the tag the list was filtered by, or nothing. */
+  newMarkdown: string;
   onAdopt: (note: Note) => void;
 };
 
@@ -181,6 +185,7 @@ function NoteSession({
   readingPosition,
   heading,
   listQuery,
+  newMarkdown,
   onAdopt,
 }: NoteSessionProps) {
   const navigate = useNavigate();
@@ -195,6 +200,18 @@ function NoteSession({
   const [deletedElsewhere, setDeletedElsewhere] = useState(false);
   const [ready, setReady] = useState(false);
   const [showMetadata, setShowMetadata] = useState(false);
+  // A new note's text as it starts (the tag it was made with), and in the
+  // Markdown source the caret after its frontmatter, where the text begins.
+  const [startMarkdown] = useState(newMarkdown);
+  const startSelection: EditorSelection | null =
+    initial === null && startMarkdown !== "" && mode === "markdown"
+      ? {
+          editor: "markdown",
+          anchor: startMarkdown.length,
+          head: startMarkdown.length,
+          focused: true,
+        }
+      : null;
 
   // `onAdopt` stays the same for a session: its key is the session's key.
   const [autosave] = useState(() => {
@@ -384,7 +401,7 @@ function NoteSession({
       )}
       <TagSuggestContext value={suggestHere}>
         <LazyNoteEditor
-          initialMarkdown={initial?.markdown ?? ""}
+          initialMarkdown={initial?.markdown ?? startMarkdown}
           replacement={replacement}
           edit={edit}
           mode={mode}
@@ -394,7 +411,7 @@ function NoteSession({
           titleFromFirstLine={initial === null}
           saved={saved}
           showMetadata={showMetadata}
-          initialSelection={initialSelection}
+          initialSelection={initialSelection ?? startSelection}
           onSelectionChange={reading.rememberSelection}
           heading={heading}
           {...(finding ? { find: finding.find, onFindCount: finding.onCount } : {})}

@@ -1,4 +1,4 @@
-import { InvalidDocumentError } from "../../domain/document/document";
+import { InvalidDocumentError, parseDocument } from "../../domain/document/document";
 import { updateNote, type Note } from "../../domain/note/note";
 import type { NoteRepository } from "./note-repository";
 
@@ -27,6 +27,15 @@ export type AutosaveOptions = {
   createDelay?: number;
   now?: () => Date;
 };
+
+/** A text with nothing in it but, perhaps, a frontmatter block. */
+function blank(markdown: string): boolean {
+  try {
+    return parseDocument(markdown).body.trim() === "";
+  } catch {
+    return false; // Invalid: saving it says why.
+  }
+}
 
 /** Per repository and note id, the saves running or waiting to run. */
 const saving = new WeakMap<NoteRepository, Map<string, Promise<void>>>();
@@ -64,7 +73,7 @@ export async function savesSettled(store: NoteRepository, noteId: string): Promi
  * flight at a time, and the latest text wins. The editor hands over a
  * function that produces its text, so it is serialized only when saved.
  *
- * A new note (no base) is created by its first non-blank save. The last
+ * A new note (no base) is created by its first save with text in its body. The last
  * write wins: a save replaces whatever changed the stored version meanwhile
  * (sync, another program), since the edit being saved is the newest, and it
  * brings back a note deleted elsewhere.
@@ -249,7 +258,8 @@ export class Autosave {
     const now = this.#now();
     const base = this.#base;
     if (base === null) {
-      if (markdown.trim() === "") return;
+      // Nothing written yet: a frontmatter alone (the tag it started with) is not kept either.
+      if (blank(markdown)) return;
       // The first save may catch the title half typed: the file follows it until closed.
       const note = await this.#store.create(markdown, now, { followTitle: true });
       this.#adopt(note, markdown);

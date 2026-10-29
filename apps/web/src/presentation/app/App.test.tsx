@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import userEvent from "@testing-library/user-event";
 import { openDB } from "idb";
 import { MemoryRouter } from "react-router";
-import { parseDocument } from "../../domain/document/document";
+import { frontmatterTags, parseDocument } from "../../domain/document/document";
 import { parseQuery } from "../../domain/search/query";
 import { DEFAULT_SETTINGS, type Settings } from "../../domain/settings/settings";
 import { DEFAULT_IGNORE } from "../../domain/note/ignore";
@@ -1006,6 +1006,41 @@ describe("tags", () => {
     const untagged = within(tree).getByRole("link", { name: "Untagged" });
     expect(untagged).toHaveAttribute("href", "/conspects/plain");
     expect(untagged.closest("li")?.parentElement).toBe(tree.querySelector(".tree"));
+  });
+
+  it("starts a new note with the chain of the tree folder the list is filtered by", async () => {
+    const store = await storeWithTaggedNotes();
+    renderApp(store);
+
+    const tree = await tagTree();
+    await userEvent.click(within(tree).getByRole("button", { name: "Expand #java" }));
+    await userEvent.click(within(tree).getByRole("link", { name: "Collections" }));
+    await userEvent.click(within(sidebar()).getByRole("link", { name: "New conspect" }));
+    // Left blank, it is not stored: the tag alone is no text.
+    await textEditor();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(await store.list()).toHaveLength(3);
+
+    await userEvent.type(await textEditor(), "Hash maps");
+    await waitFor(async () => {
+      expect(await store.list()).toHaveLength(4);
+    });
+    const created = (await store.list()).find(
+      (note) => !["lists", "streams", "plain"].includes(note.id),
+    );
+    await stored(store, created?.id ?? "", (markdown) => markdown.includes("Hash maps"));
+    const markdown = (await store.get(created?.id ?? ""))?.markdown ?? "";
+    expect(frontmatterTags(markdown)).toEqual(["java#collections"]);
+    expect(parseDocument(markdown).body).toBe("Hash maps");
+  });
+
+  it("starts a new note with the tag alone when it was chosen outside the tree", async () => {
+    const store = await storeWithTaggedNotes();
+    renderApp(store, "/?q=%23collections");
+
+    await userEvent.click(within(sidebar()).getByRole("link", { name: "New conspect" }));
+    const source = await markdownEditor();
+    expect(sourceValue(source)).toBe("---\ntags:\n  - collections\n---\n\n");
   });
 
   it("lists the notes without a tag at the root, A to z, after the folders", async () => {

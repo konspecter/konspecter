@@ -68,6 +68,7 @@ export function TagTreeView({
         <TagFolder
           key={node.tag.name}
           node={node}
+          chain={node.tag.name}
           depth={0}
           activeTag={activeTag}
           currentNoteId={currentNoteId}
@@ -90,6 +91,8 @@ export function TagTreeView({
 
 type TagFolderProps = {
   node: TagNode;
+  /** The tags from the root to this folder, as a chain: `java#collections`. */
+  chain: string;
   depth: number;
   /** The name of the folder this one is in; ← goes there. */
   parent?: RefObject<HTMLAnchorElement | null>;
@@ -151,6 +154,7 @@ function toLabel(event: KeyboardEvent, label: RefObject<HTMLAnchorElement | null
 
 function TagFolder({
   node,
+  chain,
   depth,
   parent,
   activeTag,
@@ -209,6 +213,8 @@ function TagFolder({
         <Link
           ref={label}
           to={tagPath(tag)}
+          // A new note made from the list it opens starts with this chain (`new-note.ts`).
+          state={{ tagChain: chain }}
           className="tree-label"
           {...(activeTag === tag.name ? { "aria-current": "page" } : {})}
           onClick={() => {
@@ -227,6 +233,7 @@ function TagFolder({
             <TagFolder
               key={child.tag.name}
               node={child}
+              chain={`${chain}#${child.tag.name}`}
               depth={depth + 1}
               parent={label}
               activeTag={activeTag}

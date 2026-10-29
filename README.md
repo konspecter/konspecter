@@ -75,6 +75,11 @@ Start typing a tag — `#` and a letter — in the search box or in either edito
 already use are offered: choose one with ↑/↓ and press Enter (or click it), or Escape to
 close the list. It keeps one spelling for each tag across your library.
 
+Choose a folder in the tree, say Java › Collections, and a new conspect made from its list
+starts with that chain in its frontmatter (`java#collections` under `tags:`), so it lands in the same
+folder. A tag chosen elsewhere (a link, the search box) comes alone. A conspect you leave
+without writing anything is not kept.
+
 See [TAG-CHAIN-SPEC.md](TAG-CHAIN-SPEC.md) for the full specification and examples.
 
 ### Markdown-native

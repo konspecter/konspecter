@@ -24,6 +24,7 @@ import { recentWithPins } from "../../application/notes/note-pins";
 import type { TagNames, TreeHeadings } from "../../domain/settings/settings";
 import { formatKeys, SHORTCUTS } from "../app/shortcuts";
 import { ChevronIcon, GearIcon, NewNoteIcon, SidebarIcon } from "@konspecter/ui/icons";
+import type { NewNoteState } from "./new-note";
 import { TagTreeView, TreeDocument } from "./TagTreeView";
 import { useFold, type FoldEdge } from "../hooks/use-fold";
 import { isNarrow } from "../hooks/use-narrow";
@@ -38,6 +39,8 @@ type SidebarProps = {
   currentNoteId: string | null;
   /** The tag the note list is filtered by, if any. */
   activeTag: string | null;
+  /** What a new note starts with (the filter's tag), if anything. */
+  newNote?: NewNoteState | undefined;
   tagNames: TagNames;
   treeHeadings?: TreeHeadings;
   onToggle: () => void;
@@ -139,6 +142,7 @@ export const Sidebar = memo(function Sidebar({
   open,
   currentNoteId,
   activeTag,
+  newNote,
   tagNames,
   treeHeadings = "hidden",
   onToggle,
@@ -197,6 +201,7 @@ export const Sidebar = memo(function Sidebar({
         </Link>
         <Link
           to="/conspects/new"
+          state={newNote}
           className="icon-button"
           aria-label={t("sidebar.newNote")}
           title={withShortcut(t("sidebar.newNote"), SHORTCUTS.newNote.keys)}

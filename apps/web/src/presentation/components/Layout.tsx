@@ -23,6 +23,7 @@ import { useSwipe } from "../hooks/use-swipe";
 import { Antenna } from "./Antenna";
 import { DetailsSlot } from "./details-slot";
 import { IslandSlot } from "./island-slot";
+import { newNoteState } from "./new-note";
 import { GearIcon, ListIcon, NewNoteIcon, SearchIcon, SidebarIcon } from "@konspecter/ui/icons";
 import { NO_FIND, NoteFindContext, type NoteFind, type NoteFindChannel } from "./note-find";
 import { SearchBox } from "./SearchBox";
@@ -188,6 +189,11 @@ export function Layout({
       ? (parsed.tags[0]?.name ?? null)
       : null;
   }, [query]);
+  // A new note starts with the tag the list is filtered by, as its tree folder's chain.
+  const newNote = useMemo(
+    () => newNoteState(activeTag, location.state),
+    [activeTag, location.state],
+  );
 
   const toggleSidebar = useCallback(() => {
     // The focus moves only if it would disappear with the sidebar or with the
@@ -253,7 +259,7 @@ export function Layout({
     setLibraryScope(false);
     focusSearch();
   };
-  const newNote = () => void navigate("/conspects/new");
+  const openNewNote = () => void navigate("/conspects/new", { state: newNote });
   const openRecent = (step: 1 | -1) => {
     const library = catalog.getSnapshot();
     if (library.status !== "ready") return;
@@ -336,8 +342,8 @@ export function Layout({
     quickSearch: openSearch,
     // Elsewhere Mod+F stays the browser's.
     ...(onNote ? { find: openFind } : {}),
-    newNote,
-    quickNewNote: newNote,
+    newNote: openNewNote,
+    quickNewNote: openNewNote,
     settings: () => void navigate(SETTINGS_PATH),
     toggleSidebar: toggleSidebarByKey,
     editorMode: () => {
@@ -408,6 +414,7 @@ export function Layout({
           open={sidebarOpen}
           currentNoteId={currentNoteId}
           activeTag={activeTag}
+          newNote={newNote}
           tagNames={tagNames}
           treeHeadings={treeHeadings}
           onToggle={toggleSidebar}
@@ -434,6 +441,7 @@ export function Layout({
                   </button>
                   <Link
                     to="/conspects/new"
+                    state={newNote}
                     className="icon-button"
                     aria-label={t("sidebar.newNote")}
                     title={withShortcut(t("sidebar.newNote"), SHORTCUTS.newNote.keys)}
@@ -521,6 +529,7 @@ export function Layout({
                 <span ref={setIslandSlot} className="island-slot" />
                 <Link
                   to="/conspects/new"
+                  state={newNote}
                   className="island-button"
                   aria-label={t("sidebar.newNote")}
                   onClick={closeSidebarOnNarrow}

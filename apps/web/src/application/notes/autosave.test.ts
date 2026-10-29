@@ -18,6 +18,21 @@ function events() {
 }
 
 describe("a new note", () => {
+  it("is not created while it has only a frontmatter (the tag it started with)", async () => {
+    const store = await newStore();
+    const on = events();
+    const autosave = new Autosave(store, null, on, { now: at("2024-05-01T10:00:00Z") });
+
+    autosave.change(() => "---\ntags:\n  - java#collections\n---\n\n  \n");
+    await autosave.flush();
+    expect(await store.list()).toEqual([]);
+
+    autosave.change(() => "---\ntags:\n  - java#collections\n---\n\nLists");
+    await autosave.flush();
+    expect(on.onCreated).toHaveBeenCalledTimes(1);
+    expect((await store.list())[0]?.markdown).toContain("java#collections");
+  });
+
   it("is created by the first non-blank save, then updated in place", async () => {
     const store = await newStore();
     const on = events();
