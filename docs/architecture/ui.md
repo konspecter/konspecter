@@ -184,7 +184,8 @@ breakpoint in the CSS), in the browser, the PWA and the Android app alike.
   is a vertical strip beside the text block holding the caret (in the island on small
   screens), shown only while the text has focus, absolutely positioned (no layout space, no shift); flat and pale until pointed at,
   and folded to one tool by default. The editing area is a slightly darker panel with room at
-  the sides (setting "Editing area"). Changes save themselves
+  the sides (setting "Editing area"); that room, the space under the title and the space in
+  and between the text's blocks follow the text size setting. Changes save themselves
   ([ADR-010](decisions/ADR-010-autosave-editor-first.md)).
 
 ## Shared state

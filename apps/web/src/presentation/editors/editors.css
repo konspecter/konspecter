@@ -226,11 +226,11 @@
  * the page, with a narrower gap at the sides than at the top and bottom (the
  * width goes to the text), and as tall as the note (no empty space forced
  * below the text). The toolbar stays on the left, in the column's margin
- * beside the panel.
+ * beside the panel. The gaps grow and shrink with the text size setting.
  */
 .note-editor {
-  --editor-gap: 28px;
-  --editor-side-gap: 16px;
+  --editor-gap: calc(28px * var(--font-scale));
+  --editor-side-gap: calc(16px * var(--font-scale));
 }
 
 :root[data-editing-area="highlighted"] .note-editor {
@@ -269,8 +269,8 @@
  */
 @media (max-width: 760px) {
   .note-editor {
-    --editor-gap: 36px;
-    --editor-side-gap: 36px;
+    --editor-gap: calc(36px * var(--font-scale));
+    --editor-side-gap: calc(36px * var(--font-scale));
 
     padding-left: var(--editor-gap);
   }
@@ -344,7 +344,7 @@
 }
 
 .metadata-fields {
-  margin-bottom: 1rem;
+  margin-bottom: calc(16px * var(--font-scale));
 }
 
 .title-field {
@@ -458,10 +458,10 @@
  * code shows as selected. Their lines are set in by margins, not padding:
  * CodeMirror draws the selection across every line from the first line's
  * padding, so all lines keep CodeMirror's own (0 2px 0 6px), and the code
- * sits 12px in from the block's edges.
+ * sits 12px in from the block's edges (times the text size setting).
  */
 .markdown-source .cm-code-line {
-  margin-inline: 6px 10px;
+  margin-inline: calc(6px * var(--font-scale)) calc(10px * var(--font-scale));
 }
 
 .markdown-source .cm-code-block {
@@ -477,8 +477,8 @@
  */
 @media (max-width: 760px) {
   .note-editor {
-    --editor-gap: 4px;
-    --editor-side-gap: 8px;
+    --editor-gap: calc(4px * var(--font-scale));
+    --editor-side-gap: calc(8px * var(--font-scale));
     --editor-room: 8px;
 
     margin-top: calc(var(--editor-room) - var(--content-top));
@@ -512,6 +512,6 @@
   }
 
   .markdown-source .cm-code-line {
-    margin-inline: 8px;
+    margin-inline: calc(8px * var(--font-scale));
   }
 }

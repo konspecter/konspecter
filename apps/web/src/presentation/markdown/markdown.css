@@ -121,7 +121,7 @@
   padding: 0.05em 0.35em;
   border: 1px solid var(--color-border);
   border-radius: 4px;
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale));
 }
 
 .markdown pre {
@@ -146,7 +146,7 @@
 .markdown table {
   border-collapse: collapse;
   font-family: var(--font-ui);
-  font-size: 15px;
+  font-size: calc(15px * var(--font-scale));
 }
 
 .markdown th,
@@ -249,7 +249,7 @@
   .markdown h4,
   .markdown h5,
   .markdown h6 {
-    margin: calc(1em + 5px) 0 0.5em;
+    margin: calc(1em + 5px * var(--font-scale)) 0 0.5em;
     font-weight: 700;
     line-height: 1.1;
   }
