@@ -13,7 +13,7 @@ import {
   toolsInEffect,
   writtenAddressAt,
 } from "./text-editor-setup";
-import { textDocToMarkdown } from "./text-markdown";
+import { markdownToTextDoc, textDocToMarkdown } from "./text-markdown";
 import { caretButtonSpotFor, toolbarTopFor } from "./TextEditor";
 import { textMarkdownParser, textSchema } from "./text-schema";
 
@@ -293,6 +293,65 @@ describe("list tools", () => {
         }
       }
     }
+  });
+});
+
+describe("line tool", () => {
+  const rule = () => {
+    const action = toolbarActions.find((candidate) => candidate.label === "tool.rule");
+    if (!action) throw new Error("no line tool");
+    return action.command;
+  };
+  /** Draws a line with the caret (or the selection) at `at` in `markdown`'s first text. */
+  const drawn = (markdown: string, at: number, to = at) => {
+    const { view } = editorWith(markdown);
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, at, to)));
+    expect(rule()(view.state, view.dispatch)).toBe(true);
+    const { $from } = view.state.selection;
+    return { markdown: textDocToMarkdown(view.state.doc), caretIn: $from.parent.textContent };
+  };
+
+  it("goes between the halves of the block the caret is in, the caret after it", () => {
+    expect(drawn("before after", 8)).toEqual({
+      markdown: "before \n\n---\n\nafter",
+      caretIn: "after",
+    });
+  });
+
+  it("goes after a block the caret ends, the caret in a new paragraph", () => {
+    const { view } = editorWith("text");
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 5)));
+    rule()(view.state, view.dispatch);
+    view.dispatch(view.state.tr.insertText("next"));
+    expect(textDocToMarkdown(view.state.doc)).toBe("text\n\n---\n\nnext");
+  });
+
+  it("goes before a block the caret starts, and in place of an empty one", () => {
+    expect(drawn("text", 1)).toEqual({ markdown: "---\n\ntext", caretIn: "text" });
+    const { view } = editorWith("one\n\ntwo");
+    // An empty paragraph between the two: the line takes its place.
+    view.dispatch(view.state.tr.insert(5, textSchema.nodes.paragraph.create()));
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 6)));
+    rule()(view.state, view.dispatch);
+    expect(view.state.doc.childCount).toBe(4);
+    expect(textDocToMarkdown(view.state.doc)).toBe("one\n\n---\n\ntwo");
+    expect(view.state.selection.$from.parent.textContent).toBe("");
+  });
+
+  it("replaces the selection", () => {
+    expect(drawn("one two three", 4, 9).markdown).toBe("one\n\n---\n\nthree");
+  });
+
+  it("stays inside a list item, as the text editor reads it back", () => {
+    const { markdown } = drawn("- item", 7);
+    expect(markdown).toBe("* item\n\n  ---");
+    expect(markdownToTextDoc(markdown).supported).toBe(true);
+  });
+
+  it("is not drawn in code", () => {
+    const state = createTextEditorState(textMarkdownParser.parse("```\ncode\n```"));
+    const inCode = state.apply(state.tr.setSelection(TextSelection.create(state.doc, 2)));
+    expect(rule()(inCode)).toBe(false);
   });
 });
 

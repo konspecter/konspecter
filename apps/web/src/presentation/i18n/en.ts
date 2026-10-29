@@ -222,6 +222,7 @@ source, or delete this conspect when you are done.
   "tool.bulletList": "Bulleted list",
   "tool.orderedList": "Numbered list",
   "tool.codeBlock": "Code block",
+  "tool.rule": "Horizontal line",
   "tool.link": "Link",
 
   "settings.title": "Settings",

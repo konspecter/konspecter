@@ -245,6 +245,7 @@ Map<String, Integer> counts = new HashMap<>();
   "tool.bulletList": "Маркированный список",
   "tool.orderedList": "Нумерованный список",
   "tool.codeBlock": "Блок кода",
+  "tool.rule": "Горизонтальная линия",
   "tool.link": "Ссылка",
 
   "settings.title": "Настройки",

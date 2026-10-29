@@ -51,9 +51,12 @@ with a contextual formatting toolbar and Markdown-style shortcuts.
   the last one used, from the toolbar or by its shortcut (remembered per device), else Bold.
 
 - **Formatting:** bold, italic, inline code, link, heading (H2), subheading (H3), quote,
-  bulleted and numbered lists, and code block. The toolbar shows which marks and blocks
+  bulleted and numbered lists, code block, and a horizontal line. The toolbar shows which marks and blocks
   are active (a quote while the selection is inside one). A list tool toggles: in a list of its kind it takes the selected items out, in
   a list of the other kind it changes that list's kind (the innermost list, when nested).
+  The line tool draws `---` at the caret (`insertRule`): in place of an empty block, before
+  or after the block when the caret starts or ends it, else between its two halves; the
+  caret goes to the block after the line, a new paragraph if there is none. Not in code.
 - **Following links:** a click in text being edited places the caret, so links are opened
   with a button instead: while the text has focus and the caret is in a link, or in a web
   address written out in the text (which the reader links, as GFM does), a small button

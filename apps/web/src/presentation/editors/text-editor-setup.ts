@@ -15,7 +15,7 @@ import {
   wrappingInputRule,
 } from "prosemirror-inputrules";
 import { keymap } from "prosemirror-keymap";
-import type { MarkType, Node, NodeType } from "prosemirror-model";
+import { Fragment, type MarkType, type Node, type NodeType } from "prosemirror-model";
 import { liftListItem, sinkListItem, wrapInList } from "prosemirror-schema-list";
 import {
   EditorState,
@@ -622,6 +622,45 @@ function isListActive(state: EditorState, type: NodeType): boolean {
   return selectedList(state)?.list.type === type;
 }
 
+/**
+ * Draws a line (a thematic break, `---`) at the caret, over the selection:
+ * in place of an empty block, before a block the caret starts, after one it
+ * ends, else between the two halves of the block, split there. The caret goes
+ * to the block after the line, a new paragraph if there was none. Where a
+ * line cannot stand before the block, it goes after it. Not in code.
+ */
+const insertRule: Command = (state, dispatch) => {
+  const { $from } = state.selection;
+  if (!$from.parent.isTextblock || $from.parent.type.spec.code) return false;
+  if (!dispatch) return true;
+  const tr = state.tr.deleteSelection();
+  const $at = tr.selection.$from;
+  const block = $at.parent;
+  const container = $at.node(-1);
+  const index = $at.index(-1);
+  const rule = nodes.horizontal_rule.create();
+  const paragraph = nodes.paragraph.create();
+  /** The caret at the start of the text block that begins at `pos`. */
+  const caretInto = (pos: number) => tr.setSelection(TextSelection.create(tr.doc, pos + 1));
+  if (
+    block.content.size === 0 &&
+    container.canReplace(index, index + 1, Fragment.from([rule, paragraph]))
+  ) {
+    tr.replaceWith($at.before(), $at.after(), [rule, paragraph]);
+    caretInto($at.before() + rule.nodeSize);
+  } else if ($at.parentOffset === 0 && container.canReplaceWith(index, index, rule.type)) {
+    tr.insert($at.before(), rule);
+  } else if ($at.parentOffset === block.content.size || $at.parentOffset === 0) {
+    tr.insert($at.after(), [rule, paragraph]);
+    caretInto($at.after() + rule.nodeSize);
+  } else {
+    tr.split($at.pos).insert($at.pos + 1, rule);
+    caretInto($at.pos + 1 + rule.nodeSize);
+  }
+  dispatch(tr.scrollIntoView());
+  return true;
+};
+
 /** Meta of a transaction made by a toolbar tool's shortcut: the tool's label. */
 export const TOOL_USED = "konspecter.toolUsed";
 
@@ -716,6 +755,11 @@ export const toolbarActions: readonly ToolbarAction[] = [
     text: "{ }",
     command: toggleBlock(nodes.code_block),
     isActive: (state) => isBlockActive(state, nodes.code_block),
+  },
+  {
+    label: "tool.rule",
+    text: "—",
+    command: insertRule,
   },
 ];
 
