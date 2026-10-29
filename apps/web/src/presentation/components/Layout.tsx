@@ -267,14 +267,14 @@ export function Layout({
       window.removeEventListener("blur", settle);
     };
   }, []);
-  const switchNote = (): false | undefined => {
+  const switchNote = (direction: 1 | -1): false | undefined => {
     const library = catalog.getSnapshot();
     const held =
       switching.current ??
       (library.status === "ready"
         ? startSwitch(opened.current, library.notes, currentNoteId, new Date())
         : null);
-    const step = held && switchStep(held);
+    const step = held && switchStep(held, direction);
     if (!step) return false;
     switching.current = step.next;
     void navigate(`/conspects/${encodeURIComponent(step.id)}`);
@@ -334,7 +334,8 @@ export function Layout({
     nextRecent: () => {
       openRecent(1);
     },
-    switchNote,
+    switchNote: () => switchNote(1),
+    switchNoteBack: () => switchNote(-1),
     // Mod+Alt+1…0 (pinning) is the note page's: it edits the note.
     openPinned,
     help: () => {

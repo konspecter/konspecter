@@ -57,6 +57,12 @@ describe("matchesShortcut", () => {
     expect(
       matchesShortcut("Ctrl+Tab", key({ key: "Tab", ctrlKey: true, shiftKey: true }), false),
     ).toBe(false);
+    expect(
+      matchesShortcut("Ctrl+Shift+Tab", key({ key: "Tab", ctrlKey: true, shiftKey: true }), true),
+    ).toBe(true);
+    expect(matchesShortcut("Ctrl+Shift+Tab", key({ key: "Tab", ctrlKey: true }), false)).toBe(
+      false,
+    );
   });
 
   it("matches single keys only without modifiers", () => {
@@ -73,6 +79,8 @@ describe("formatKeys", () => {
     expect(formatKeys("?", true)).toBe("?");
     expect(formatKeys("Ctrl+Tab", true)).toBe("⌃Tab");
     expect(formatKeys("Ctrl+Tab", false)).toBe("Ctrl+Tab");
+    expect(formatKeys("Ctrl+Shift+Tab", true)).toBe("⌃⇧Tab");
+    expect(formatKeys("Ctrl+Shift+Tab", false)).toBe("Ctrl+Shift+Tab");
   });
 });
 

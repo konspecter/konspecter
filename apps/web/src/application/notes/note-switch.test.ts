@@ -17,15 +17,15 @@ function summary(id: string, daysAgo: number): NoteSummary {
   };
 }
 
-/** The notes the Tabs of one hold open, `count` presses. */
-function presses(state: NoteSwitch, count: number): string[] {
+/** The notes the Tabs of one hold open, `count` presses (Shift+Tab with -1). */
+function presses(state: NoteSwitch, count: number, step: 1 | -1 = 1): string[] {
   const ids: string[] = [];
   let current = state;
   for (let press = 0; press < count; press += 1) {
-    const step = switchStep(current);
-    if (step === null) break;
-    ids.push(step.id);
-    current = step.next;
+    const next = switchStep(current, step);
+    if (next === null) break;
+    ids.push(next.id);
+    current = next.next;
   }
   return ids;
 }
@@ -60,6 +60,15 @@ describe("startSwitch and switchStep", () => {
     expect(presses(startSwitch(opened, notes, "c", now), 4)).toEqual(["a", "b", "c", "a"]);
   });
 
+  it("steps back in the loop with Shift+Tab, round from the first to the last", () => {
+    const held = startSwitch(["c", "a", "b"], notes, "c", now);
+    const back = switchStep(held);
+    expect(back?.id).toBe("a");
+    expect(back && switchStep(back.next, -1)?.id).toBe("c");
+    expect(presses(held, 3, -1)).toEqual(["b", "a", "c"]);
+    expect(presses(startSwitch(["b", "a"], notes, null, now), 1, -1)).toEqual(["c"]);
+  });
+
   it("goes on into Recent, newest edit first, past the notes opened", () => {
     expect(presses(startSwitch(["c"], notes, "c", now), 3)).toEqual(["a", "b", "c"]);
     // A note opened is in the order even when it is older than Recent.
@@ -81,6 +90,7 @@ describe("startSwitch and switchStep", () => {
 
   it("has nowhere to go with one note or none", () => {
     expect(switchStep(startSwitch(["a"], [summary("a", 1)], "a", now))).toBeNull();
+    expect(switchStep(startSwitch(["a"], [summary("a", 1)], "a", now), -1)).toBeNull();
     expect(switchStep(startSwitch([], [], null, now))).toBeNull();
   });
 });

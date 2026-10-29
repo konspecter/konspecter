@@ -246,24 +246,25 @@ One registry, `presentation/app/shortcuts.ts`, used by the handlers and by the l
 `?` dialog and in Settings. `Mod` is ⌘ on macOS and Ctrl elsewhere, `Ctrl` is Ctrl (⌃) everywhere, `Alt` is ⌥; the physical key is also
 matched, so the shortcuts work on Cyrillic layouts.
 
-| Keys          | Action                                      | Where                          |
-| ------------- | ------------------------------------------- | ------------------------------ |
-| `Mod+P`       | Search                                      | everywhere, also in editors    |
-| `Mod+F`       | Search in the open note                     | the note page, also in editors |
-| `Mod+N`       | New note                                    | everywhere, also in editors    |
-| `Mod+,`       | Settings                                    | everywhere, also in editors    |
-| `Mod+\`       | Show or hide the sidebar                    | everywhere, also in editors    |
-| `Mod+/`       | Switch text editor and Markdown             | everywhere, also in editors    |
-| `Mod+←`       | Back (the search box's ‹)                   | outside text fields            |
-| `Mod+→`       | Forward (the search box's ›)                | outside text fields            |
-| `Mod+Alt+←`   | Previous note in Recent                     | everywhere, also in editors    |
-| `Mod+Alt+→`   | Next note in Recent                         | everywhere, also in editors    |
-| `Ctrl+Tab`    | The note opened before (held: further back) | everywhere, also in editors    |
-| `Mod+Alt+1…0` | Pin the note to Recent, unpin               | the note page, also in editors |
-| `Mod+1…0`     | Open the note pinned to the key             | everywhere, also in editors    |
-| `Mod+S`       | Save now                                    | the editor                     |
-| `/` `n`       | Search, new note                            | outside text fields            |
-| `?`           | Show the shortcuts                          | outside text fields            |
+| Keys             | Action                                      | Where                          |
+| ---------------- | ------------------------------------------- | ------------------------------ |
+| `Mod+P`          | Search                                      | everywhere, also in editors    |
+| `Mod+F`          | Search in the open note                     | the note page, also in editors |
+| `Mod+N`          | New note                                    | everywhere, also in editors    |
+| `Mod+,`          | Settings                                    | everywhere, also in editors    |
+| `Mod+\`          | Show or hide the sidebar                    | everywhere, also in editors    |
+| `Mod+/`          | Switch text editor and Markdown             | everywhere, also in editors    |
+| `Mod+←`          | Back (the search box's ‹)                   | outside text fields            |
+| `Mod+→`          | Forward (the search box's ›)                | outside text fields            |
+| `Mod+Alt+←`      | Previous note in Recent                     | everywhere, also in editors    |
+| `Mod+Alt+→`      | Next note in Recent                         | everywhere, also in editors    |
+| `Ctrl+Tab`       | The note opened before (held: further back) | everywhere, also in editors    |
+| `Ctrl+Shift+Tab` | Held: one step back in the loop             | everywhere, also in editors    |
+| `Mod+Alt+1…0`    | Pin the note to Recent, unpin               | the note page, also in editors |
+| `Mod+1…0`        | Open the note pinned to the key             | everywhere, also in editors    |
+| `Mod+S`          | Save now                                    | the editor                     |
+| `/` `n`          | Search, new note                            | outside text fields            |
+| `?`              | Show the shortcuts                          | outside text fields            |
 
 Modifier shortcuts are caught in the capture phase, before editors and the browser (no print
 dialog on `Mod+P`), and go no further (CodeMirror's own `Mod-/` does not comment the line).
@@ -278,7 +279,8 @@ it is Ctrl on macOS too, since ⌘Tab is the system's app switcher. The layout r
 in the order they were opened (the last 50, for the session). Pressed and let go, `Ctrl+Tab`
 opens the note opened before, so pressed again it comes back: a toggle between two notes. With
 Ctrl held, each further `Tab` opens the next one back, then the notes of Recent not opened yet
-(newest edit first), round in a loop; the order stays fixed while Ctrl is down, and only the note
+(newest edit first), round in a loop, and `Ctrl+Shift+Tab` one step back in the loop (towards the note the
+hold started from; at the start of a hold, round to the last); the order stays fixed while Ctrl is down, and only the note
 where Ctrl is let go (or the window loses the focus) counts as opened, so the next `Ctrl+Tab`
 returns to the note the hold started from. Browsers keep `Ctrl+Tab` for their own tabs, so in a
 browser tab the keys never reach the app; the desktop app gets them. `Mod+1…0` and `Mod+Alt+1…0` are matched by the physical key

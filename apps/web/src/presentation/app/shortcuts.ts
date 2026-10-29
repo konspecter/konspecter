@@ -26,6 +26,7 @@ export const SHORTCUTS = {
   nextRecent: { keys: "Mod+Alt+ArrowRight", label: "shortcut.nextRecent" },
   // Ctrl on macOS too, as in VS Code: ⌘Tab is the system's app switcher.
   switchNote: { keys: "Ctrl+Tab", label: "shortcut.switchNote" },
+  switchNoteBack: { keys: "Ctrl+Shift+Tab", label: "shortcut.switchNoteBack" },
   // As StarCraft's unit groups: one chord puts the open note on a digit, the other goes to it.
   pinNote: { keys: "Mod+Alt+Digit", label: "shortcut.pinNote" },
   openPinned: { keys: "Mod+Digit", label: "shortcut.openPinned" },
@@ -70,10 +71,11 @@ function modifierKeys(keys: string): { alt: boolean; key: string } {
 /**
  * "Mod+P" as the user sees it: "⌘P" on macOS, "Ctrl+P" elsewhere; arrow
  * keys are arrows ("⌘←", "⌥⌘←", "Ctrl+Alt+←"), and a
- * digit is "1…0" ("⌘1…0", "Ctrl+Alt+1…0"). "Ctrl+Tab" is "⌃Tab" on macOS.
+ * digit is "1…0" ("⌘1…0", "Ctrl+Alt+1…0"). "Ctrl+Tab" is "⌃Tab" on macOS,
+ * "Ctrl+Shift+Tab" "⌃⇧Tab".
  */
 export function formatKeys(keys: string, mac = isMac()): string {
-  if (keys.startsWith("Ctrl+")) return mac ? `⌃${keys.slice(5)}` : keys;
+  if (keys.startsWith("Ctrl+")) return mac ? `⌃${keys.slice(5).replace("Shift+", "⇧")}` : keys;
   if (!keys.startsWith("Mod+")) return keys;
   const { alt, key } = modifierKeys(keys);
   const shown = key === "Digit" ? "1…0" : (ARROWS[key] ?? key);
@@ -98,11 +100,16 @@ export function pinKeyOf(event: KeyboardEvent): PinKey | null {
   return digit !== undefined && isPinKey(digit) ? digit : null;
 }
 
-/** Whether `event` is the shortcut `keys` ("Mod+P", "Mod+Alt+ArrowLeft", "Mod+Digit", "Ctrl+Tab", "?"). */
+/**
+ * Whether `event` is the shortcut `keys` ("Mod+P", "Mod+Alt+ArrowLeft",
+ * "Mod+Digit", "Ctrl+Tab", "Ctrl+Shift+Tab", "?").
+ */
 export function matchesShortcut(keys: string, event: KeyboardEvent, mac = isMac()): boolean {
   if (keys.startsWith("Ctrl+")) {
-    const only = event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
-    return only && event.key === keys.slice(5);
+    const rest = keys.slice(5);
+    const shift = rest.startsWith("Shift+");
+    const only = event.ctrlKey && !event.metaKey && !event.altKey && event.shiftKey === shift;
+    return only && event.key === (shift ? rest.slice(6) : rest);
   }
   if (keys.startsWith("Mod+")) {
     const mod = mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;

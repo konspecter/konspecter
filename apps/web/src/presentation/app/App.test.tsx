@@ -208,7 +208,7 @@ describe("layout", () => {
     });
   });
 
-  it("toggles to the note opened before with Ctrl+Tab, and goes further back while Ctrl is held", async () => {
+  it("toggles to the note opened before with Ctrl+Tab, and goes round while Ctrl is held", async () => {
     const store = await newStore();
     await store.put(createNote("# Oldest\n\nOne.", daysAgo(3), "oldest"));
     await store.put(createNote("# Middle\n\nTwo.", daysAgo(2), "middle"));
@@ -240,7 +240,12 @@ describe("layout", () => {
     await opens("Newest");
     await user.keyboard("{Tab}");
     await opens("Middle");
-    await user.keyboard("{Tab}{Tab}{/Control}");
+    await user.keyboard("{Tab}{Tab}");
+    await opens("Newest");
+    // Shift steps back in the loop.
+    await user.keyboard("{Shift>}{Tab}{/Shift}");
+    await opens("Oldest");
+    await user.keyboard("{Tab}{/Control}");
     // Settled on Newest: the one it came from is the one before.
     await userEvent.keyboard("{Control>}{Tab}{/Control}");
     await opens("Middle");

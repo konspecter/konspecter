@@ -4,7 +4,8 @@ import { byMostRecentSummary, recentNotes, type NoteSummary } from "./note-catal
  * Ctrl+Tab goes from note to note as an editor's tabs do. Pressed and let go,
  * it opens the note opened before this one, so pressed again it comes back:
  * a toggle between two notes. With Ctrl held, each further Tab goes one note
- * further back, round in a loop; letting go of Ctrl settles on the note.
+ * further back, round in a loop, and Shift+Tab one step back in the loop;
+ * letting go of Ctrl settles on the note.
  * The order is the notes last opened, then those of Recent not opened yet.
  */
 
@@ -41,11 +42,19 @@ export function startSwitch(
   return { order, index: current === null ? -1 : order.indexOf(current) };
 }
 
-/** One Tab further: the note to open, and the hold after it; null when there is no other note. */
-export function switchStep(state: NoteSwitch): { id: string; next: NoteSwitch } | null {
+/**
+ * One Tab further (1) or Shift+Tab a step back in the loop (-1): the note to
+ * open, and the hold after it; null when there is no other note. A step back
+ * from the first note (or from away from a note) is round to the last.
+ */
+export function switchStep(
+  state: NoteSwitch,
+  step: 1 | -1 = 1,
+): { id: string; next: NoteSwitch } | null {
   const { order, index } = state;
   if (order.length === 0) return null;
-  const at = (index + 1) % order.length;
+  const from = index === -1 && step === -1 ? 0 : index;
+  const at = (from + step + order.length) % order.length;
   const id = order[at];
   if (id === undefined || at === index) return null;
   return { id, next: { order, index: at } };
