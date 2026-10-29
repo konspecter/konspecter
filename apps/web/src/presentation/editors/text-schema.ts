@@ -20,7 +20,8 @@ export const textSchema = new Schema<NodeName, MarkName>({
         tag: "li",
         getAttrs: (dom) => {
           const checked = dom.getAttribute("data-checked");
-          return { checked: checked === null ? null : checked === "true" };
+          if (checked !== null) return { checked: checked === "true" };
+          return { checked: pastedTaskBox(dom) };
         },
       },
     ],
@@ -32,6 +33,18 @@ export const textSchema = new Schema<NodeName, MarkName>({
   }),
   marks: commonMark.spec.marks,
 });
+
+/**
+ * A checklist item from a web page (GitHub, a rendered Markdown page): its
+ * checkbox, an `<input>` the item's text follows, says whether it is ticked.
+ * Null for an item without one; a box in a nested item is that item's. The
+ * box itself is not text, so the paste leaves it out.
+ */
+function pastedTaskBox(item: HTMLElement): boolean | null {
+  const box = item.querySelector<HTMLInputElement>("input[type=checkbox]");
+  if (!box || box.closest("li") !== item) return null;
+  return box.hasAttribute("checked") || box.checked;
+}
 
 /** `[ ]` or `[x]` at the start of an item's text, then a space (or nothing). */
 const TASK_MARKER = /^\[([ xX])\](?:[ \t]+|$)/;

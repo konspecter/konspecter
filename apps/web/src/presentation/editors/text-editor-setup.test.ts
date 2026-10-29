@@ -566,6 +566,48 @@ describe("task lists", () => {
     expect(press(view, "Tab", { shiftKey: true })).toBeFalsy();
   });
 
+  /** Pastes `html` as a browser does (jsdom has no ClipboardEvent). */
+  const paste = (view: EditorView, html: string) =>
+    view.pasteHTML(html, new Event("paste") as ClipboardEvent);
+
+  it("keeps the tasks of a checklist pasted from a web page", () => {
+    const { view } = editorWith("");
+    paste(
+      view,
+      '<ul class="contains-task-list">' +
+        '<li class="task-list-item"><input type="checkbox" disabled> todo</li>' +
+        '<li class="task-list-item"><input type="checkbox" checked disabled> done</li>' +
+        "<li>plain</li>" +
+        "</ul>",
+    );
+    const items: [string, unknown][] = [];
+    view.state.doc.descendants((node) => {
+      if (node.type.name === "list_item") items.push([node.textContent, node.attrs.checked]);
+    });
+    expect(items).toEqual([
+      ["todo", false],
+      ["done", true],
+      ["plain", null],
+    ]);
+    expect(view.dom.querySelectorAll("input[type=checkbox]")).toHaveLength(2);
+  });
+
+  it("keeps the tasks of a pasted loose checklist, and only the items that have boxes", () => {
+    const { view } = editorWith("");
+    paste(
+      view,
+      "<ul>" +
+        '<li><p><input type="checkbox" checked> parent</p>' +
+        '<ul><li><input type="checkbox"> child</li></ul></li>' +
+        "<li><p>plain</p>" +
+        '<ul><li><input type="checkbox" checked> nested</li></ul></li>' +
+        "</ul>",
+    );
+    expect(textDocToMarkdown(view.state.doc)).toBe(
+      "* [x] parent\n\n  * [ ] child\n\n* plain\n\n  * [x] nested",
+    );
+  });
+
   it("ticks the task at the caret with Mod-Enter", () => {
     const { view } = editorWith("- [ ] one\n- two");
     caretAt(view, 4);
