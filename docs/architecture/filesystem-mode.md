@@ -199,8 +199,8 @@ Konspecter  ⇄  ~/Notes/java.md  ⇄  VS Code / Vim / Neovim / …
 ```
 
 - **Open in external editor** (note page, File Mode) opens the file with the system's
-  default app for `.md`. **Show in Finder** reveals it (other platforms open the containing
-  folder). There is deliberately no "custom editor command" setting: a command line
+  default app for `.md`. **Show in folder** reveals it in Finder on macOS (other platforms
+  open the containing folder in their file manager). There is deliberately no "custom editor command" setting: a command line
   configurable from the web view would let injected script run programs.
 - Changes made in the other editor arrive through the watcher. The open note reloads (when
   nothing is unsaved in it), and the list, tags and search follow.

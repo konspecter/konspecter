@@ -51,7 +51,7 @@ The interface speaks English and Russian ([i18n](i18n.md)). The account site sha
   it from `tags`, applied through the open editor as an edit: `NoteEditor`'s `edit`), cover, the file
   (File Mode) and any other frontmatter fields (`otherMetadata`). Below, the actions as icon
   buttons with titles: properties, download or export (open externally and show in
-  Finder in File Mode), delete. Delete asks first in the app's own dialog
+  folder in File Mode), delete. Delete asks first in the app's own dialog
   (`ConfirmDialog.tsx`: Cancel focused, Escape cancels), since the browser's `confirm()` is
   not shown by every web view. Smaller (12px) and quieter (`--color-faint`, still WCAG AA)
   than the rest of the app.

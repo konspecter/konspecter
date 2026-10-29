@@ -142,7 +142,7 @@ export const ru: Dictionary = {
   "details.export": "Экспорт…",
   "details.download": "Скачать .md",
   "details.openExternally": "Открыть во внешнем редакторе",
-  "details.reveal": "Показать в Finder",
+  "details.reveal": "Показать в папке",
   "details.delete": "Удалить",
   "details.deleteTitle": "Удалить конспект?",
   "details.confirmDelete": "Конспект «{title}» будет удалён. Это нельзя отменить.",

@@ -2349,7 +2349,7 @@ describe("file mode", () => {
     show();
 
     await userEvent.click(await screen.findByRole("button", { name: "Open in external editor" }));
-    await userEvent.click(screen.getByRole("button", { name: "Show in Finder" }));
+    await userEvent.click(screen.getByRole("button", { name: "Show in folder" }));
 
     expect(folder.opened).toEqual(["ext.md"]);
     expect(folder.revealed).toEqual(["ext.md"]);

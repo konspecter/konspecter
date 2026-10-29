@@ -121,7 +121,7 @@ export const en = {
   "details.export": "Export…",
   "details.download": "Download .md",
   "details.openExternally": "Open in external editor",
-  "details.reveal": "Show in Finder",
+  "details.reveal": "Show in folder",
   "details.delete": "Delete",
   "details.deleteTitle": "Delete this conspect?",
   "details.confirmDelete": "“{title}” will be deleted. This cannot be undone.",
