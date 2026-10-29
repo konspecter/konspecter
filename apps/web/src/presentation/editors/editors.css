@@ -435,10 +435,13 @@
 /*
  * Code blocks in the source read as blocks, as in the reader: the block's
  * background is a layer under the selection (`source-marks.ts`), so selected
- * code shows as selected.
+ * code shows as selected. Their lines are set in by margins, not padding:
+ * CodeMirror draws the selection across every line from the first line's
+ * padding, so all lines keep CodeMirror's own (0 2px 0 6px), and the code
+ * sits 12px in from the block's edges.
  */
 .markdown-source .cm-code-line {
-  padding-inline: 12px;
+  margin-inline: 6px 10px;
 }
 
 .markdown-source .cm-code-block {
@@ -483,12 +486,12 @@
     line-height: 1.45;
   }
 
-  /* CodeMirror's own line padding would add to the editor's gap. */
-  .markdown-source .cm-content .cm-line:not(.cm-code-line) {
+  /* CodeMirror's own line padding would add to the editor's gap (on every line, see above). */
+  .markdown-source .cm-content .cm-line {
     padding-inline: 0;
   }
 
   .markdown-source .cm-code-line {
-    padding-inline: 8px;
+    margin-inline: 8px;
   }
 }
