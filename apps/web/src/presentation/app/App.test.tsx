@@ -1217,6 +1217,134 @@ describe("tags", () => {
   });
 });
 
+describe("tag suggestions", () => {
+  async function storeWithTags() {
+    const store = await newStore();
+    await store.put(createNote("# Lists\n\n#java #javascript", new Date("2020-01-01"), "lists"));
+    await store.put(
+      createNote("# Scripts\n\n#JavaScript #jakarta", new Date("2020-01-02"), "scripts"),
+    );
+    await store.put(createNote("# Draft\n\nNo tags yet.", new Date("2020-01-03"), "draft"));
+    return store;
+  }
+  const suggestions = () => screen.queryByRole("listbox", { name: "Tags to choose from" });
+  const options = () =>
+    screen
+      .getAllByRole("option")
+      .map((option) => [option.textContent, option.getAttribute("aria-selected")]);
+
+  it("offers the library's tags in the search box, and the one taken becomes a filter", async () => {
+    renderApp(await storeWithTags());
+    await noteList();
+
+    await userEvent.click(searchBox());
+    await userEvent.keyboard("#ja");
+    // In most notes first, then by name; the count beside each.
+    expect(options()).toEqual([
+      ["#JavaScript2", "true"],
+      ["#jakarta1", "false"],
+      ["#java1", "false"],
+    ]);
+    expect(searchBox()).toHaveAttribute(
+      "aria-activedescendant",
+      screen.getByRole("option", { selected: true }).id,
+    );
+
+    await userEvent.keyboard("{ArrowDown}{ArrowDown}{Enter}");
+
+    expect(suggestions()).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("list", { name: "Tag filters" })).getByRole("listitem"),
+    ).toHaveTextContent("#java");
+    expect(searchBox()).toHaveValue("");
+    await waitFor(async () => {
+      expect(await listTitles()).toEqual(["Lists"]);
+    });
+  });
+
+  it("closes the suggestions with Escape, and takes one that is clicked", async () => {
+    renderApp(await storeWithTags());
+    await noteList();
+    await userEvent.click(searchBox());
+    await userEvent.keyboard("#ja");
+
+    await userEvent.keyboard("{Escape}");
+    expect(suggestions()).not.toBeInTheDocument();
+    expect(searchBox()).toHaveFocus();
+    expect(searchBox()).toHaveValue("#ja");
+
+    await userEvent.clear(searchBox());
+    await userEvent.keyboard("#jak");
+    await userEvent.click(screen.getByRole("option", { name: "#jakarta1" }));
+    expect(
+      within(screen.getByRole("list", { name: "Tag filters" })).getByRole("listitem"),
+    ).toHaveTextContent("#jakarta");
+  });
+
+  it("offers them in the text editor, and Enter writes the one chosen", async () => {
+    const store = await storeWithTags();
+    renderApp(store, "/conspects/draft");
+    const editor = await textEditor();
+    await userEvent.click(editor);
+    caretAtEnd(editor);
+
+    await userEvent.keyboard(" #ja");
+    expect(options().map(([name]) => name)).toEqual(["#JavaScript2", "#jakarta1", "#java1"]);
+    await userEvent.keyboard("{ArrowUp}{Enter}");
+
+    expect(suggestions()).not.toBeInTheDocument();
+    expect(editor).toHaveTextContent("No tags yet. #java");
+    expect(editor.querySelectorAll("p")).toHaveLength(1);
+    await stored(store, "draft", (markdown) => markdown.includes("No tags yet. #java"));
+  });
+
+  it("lets Enter on the very tag typed start a new line", async () => {
+    renderApp(await storeWithTags(), "/conspects/draft");
+    const editor = await textEditor();
+    await userEvent.click(editor);
+    caretAtEnd(editor);
+
+    await userEvent.keyboard(" #java");
+    expect(options().map(([name]) => name)).toEqual(["#java1", "#JavaScript2"]);
+    await userEvent.keyboard("{Enter}");
+
+    expect(suggestions()).not.toBeInTheDocument();
+    expect(editor.querySelectorAll("p")).toHaveLength(2);
+    expect(editor).toHaveTextContent("No tags yet. #java");
+  });
+
+  it("leaves out the open note's own tags", async () => {
+    renderApp(await storeWithTags(), "/conspects/scripts");
+    const editor = await textEditor();
+    await userEvent.click(editor);
+    caretAtEnd(editor);
+
+    await userEvent.keyboard(" #jak");
+    expect(suggestions()).not.toBeInTheDocument();
+  });
+
+  it("offers them in the Markdown editor too, not in code", async () => {
+    renderApp(await storeWithTags(), "/conspects/draft", {
+      ...DEFAULT_SETTINGS,
+      defaultEditor: "markdown",
+    });
+    const source = await screen.findByRole("textbox", { name: "Markdown" });
+    const view = sourceView(source);
+    view.focus();
+    view.dispatch({ selection: { anchor: view.state.doc.length } });
+
+    // Inside inline code "#" is no tag.
+    await userEvent.keyboard(" ``{ArrowLeft}#ja");
+    expect(suggestions()).not.toBeInTheDocument();
+    await userEvent.keyboard("{ArrowRight} #ja");
+    expect(options().map(([name]) => name)).toEqual(["#JavaScript2", "#jakarta1", "#java1"]);
+    await userEvent.keyboard("{ArrowDown}{Enter}");
+
+    expect(suggestions()).not.toBeInTheDocument();
+    expect(sourceValue(source)).toMatch(/No tags yet\. `#ja` #jakarta$/);
+  });
+});
+
 describe("headings in the tree", () => {
   const MAPS = [
     "# Hash maps",

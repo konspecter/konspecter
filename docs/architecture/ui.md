@@ -175,6 +175,11 @@ breakpoint in the CSS), in the browser, the PWA and the Android app alike.
   chip when a space follows it (or the field is left), a tag chosen in the sidebar arrives as
   one, and × or Backspace at the start of the field removes one. The URL (`?q=#java hash`)
   stays the truth; the box re-splits it when it changes from elsewhere.
+- **Tag suggestions** ([ADR-028](decisions/ADR-028-tag-suggestions.md)): a tag being typed in
+  the box (searching the library, not the note) lists the library's tags under it (`TagSuggestionList`;
+  above the island on small screens); Enter or a click takes one, which becomes a chip. The
+  layout hands the suggester (`tagSuggester` over the catalog) down through a context, so the
+  editors offer the same tags; the note page leaves its own note's tags out.
 - **Editing** ([editors](editors.md)): there is no permanent toolbar. The formatting toolbar
   is a vertical strip beside the text block holding the caret (in the island on small
   screens), shown only while the text has focus, absolutely positioned (no layout space, no shift); flat and pale until pointed at,

@@ -587,6 +587,8 @@ mark {
 
 /* One field: the icon, the tag chips, the text and the shortcut hint. */
 .search-box {
+  /* The tag suggestions open under it. */
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1063,6 +1065,67 @@ kbd {
 /* Tags in notes stand out a little: heavier than the text, lighter than bold. */
 .md-tag {
   font-weight: 560;
+}
+
+/* --- Tag suggestions ----------------------------------------------------- */
+
+/* The tags offered while one is typed: under the search box, or at the caret in an editor. */
+.tag-suggestions {
+  position: absolute;
+  z-index: 30;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 160px;
+  max-width: 240px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border-radius: 9px;
+  background: var(--color-bg);
+  box-shadow:
+    0 0 0 1px var(--color-border),
+    0 6px 24px var(--color-shadow);
+  color: var(--color-fg);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.search-box .tag-suggestions {
+  top: calc(100% + 4px);
+  left: 0;
+}
+
+/* The island is at the bottom of the screen: the list opens above it. */
+.island .search-box .tag-suggestions {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
+
+.tag-suggestions li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.tag-suggestions li:hover,
+.tag-suggestions li[aria-selected="true"] {
+  background: var(--color-hover);
+}
+
+.tag-suggestion-name {
+  overflow: hidden;
+  font-weight: 560;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tag-suggestion-count {
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 /* --- Tag tree ------------------------------------------------------------ */

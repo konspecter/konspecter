@@ -1,10 +1,13 @@
 import { useId, useState, type Ref } from "react";
 import { useLocation, useMatch, useNavigate, useSearchParams } from "react-router";
 import { joinQuery, queryParts, takeTags, type QueryParts } from "../../domain/search/query";
+import { typedTag } from "../../domain/tag/tag-suggestions";
 import type { Tag } from "../../domain/tag/tags";
 import { formatKeys, SHORTCUTS } from "../app/shortcuts";
 import { ChevronIcon, CloseIcon, SearchIcon } from "@konspecter/ui/icons";
 import { t } from "../i18n/i18n";
+import { useTagCompletion, type TagTyping } from "../hooks/use-tag-completion";
+import { TagSuggestionList } from "./TagSuggestions";
 
 type Shown = QueryParts & {
   /** The query the chips and text make up. */
@@ -118,6 +121,22 @@ export function SearchBox({
     return [...tags, ...added.filter((tag) => !known.has(tag.name))];
   }
 
+  // The library's tags, offered as one is typed (not when searching the note):
+  // the text typed and the caret after it, while that is what the field shows.
+  const [typed, setTyped] = useState<{ value: string; caret: number } | null>(null);
+  let tagTyping: TagTyping | null = null;
+  if (!find && typed?.value === text) {
+    const found = typedTag(text.slice(0, typed.caret), text.slice(typed.caret));
+    if (found) tagTyping = { from: found.start, to: typed.caret, prefix: found.prefix };
+  }
+  // A tag taken becomes a chip, like one typed in full.
+  const tagCompletion = useTagCompletion(tagTyping, (tag, at) => {
+    const next = `${text.slice(0, at.from)}${tag.spelling} ${text.slice(at.to).trimStart()}`;
+    const parts = takeTags(next);
+    setTyped(null);
+    change(withTags(parts.tags), parts.text);
+  });
+
   return (
     <form
       role="search"
@@ -164,6 +183,9 @@ export function SearchBox({
         }
         autoComplete="off"
         spellCheck={false}
+        aria-autocomplete={find ? undefined : "list"}
+        aria-controls={tagCompletion.typing ? tagCompletion.listId : undefined}
+        aria-activedescendant={tagCompletion.activeId}
         onFocus={() => {
           if (!onList && !onNote) void navigate("/");
         }}
@@ -172,10 +194,20 @@ export function SearchBox({
             find.onQuery(event.target.value);
             return;
           }
-          const typed = takeTags(event.target.value);
+          const { value, selectionStart } = event.target;
+          setTyped({ value, caret: selectionStart ?? value.length });
+          const typed = takeTags(value);
           change(withTags(typed.tags), typed.text);
         }}
+        onSelect={(event) => {
+          // The caret moved away from what was typed: no more suggestions.
+          const { selectionStart, selectionEnd } = event.currentTarget;
+          if (typed && (selectionStart !== typed.caret || selectionEnd !== typed.caret)) {
+            setTyped(null);
+          }
+        }}
         onBlur={() => {
+          setTyped(null);
           onLeave?.();
           if (find) return;
           // A tag typed at the end becomes a chip too once the field is left.
@@ -184,6 +216,7 @@ export function SearchBox({
         }}
         onKeyDown={(event) => {
           const input = event.currentTarget;
+          if (tagCompletion.keyDown(event)) return;
           if (find && ["ArrowDown", "ArrowUp", "Enter"].includes(event.key)) {
             event.preventDefault();
             find.onStep(
@@ -221,6 +254,7 @@ export function SearchBox({
         </kbd>
       )}
       {find && find.query !== "" && <FindControls find={find} />}
+      <TagSuggestionList completion={tagCompletion} />
       {onClose && (
         <button
           type="button"

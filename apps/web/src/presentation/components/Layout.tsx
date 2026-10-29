@@ -11,6 +11,7 @@ import {
   type NoteSwitch,
 } from "../../application/notes/note-switch";
 import type { NoteRepository } from "../../application/notes/note-repository";
+import { tagSuggester } from "../../application/notes/tag-suggester";
 import type { SyncEngine } from "../../infrastructure/sync/sync-engine";
 import type { Activity } from "../app/activity";
 import { rememberLocation } from "../app/last-location";
@@ -28,6 +29,7 @@ import { SearchBox } from "./SearchBox";
 import { ShortcutsDialog } from "./ShortcutsDialog";
 import { inOpenPane, Sidebar, SIDEBAR_ROWS, withShortcut } from "./Sidebar";
 import { SyncIndicator } from "./SyncIndicator";
+import { TagSuggestContext } from "./tag-suggest";
 import { ModeToggle, ThemeToggle, useDarkTheme } from "./TopBarControls";
 import { UpdateBanner } from "./UpdateBanner";
 import { t } from "../i18n/i18n";
@@ -162,6 +164,8 @@ export function Layout({
     () => ({ find: shownFind, onCount: setFindCount, onClose: closeFind, onFind: startFind }),
     [shownFind, closeFind, startFind],
   );
+  // The library's tags, offered while one is typed in the search box or a note.
+  const suggestTags = useMemo(() => tagSuggester(catalog), [catalog]);
   useScrollbarGutter();
   // The app opens where it was last time.
   useEffect(() => {
@@ -393,149 +397,151 @@ export function Layout({
   );
 
   return (
-    <div className="app" data-sidebar={sidebarOpen ? "open" : "closed"}>
-      <a className="skip-link" href="#content">
-        {t("app.skipToContent")}
-      </a>
-      <Sidebar
-        store={store}
-        catalog={catalog}
-        open={sidebarOpen}
-        currentNoteId={currentNoteId}
-        activeTag={activeTag}
-        tagNames={tagNames}
-        treeHeadings={treeHeadings}
-        onToggle={toggleSidebar}
-        onNavigate={closeSidebarOnNarrow}
-        toggleRef={sidebarToggleRef}
-        detailsRef={setDetailsSlot}
-      />
-      <div className="main">
-        <header className="topbar" data-tauri-drag-region="">
-          <div className="topbar-start" data-tauri-drag-region="">
-            {!narrow && !sidebarOpen && (
+    <TagSuggestContext value={suggestTags}>
+      <div className="app" data-sidebar={sidebarOpen ? "open" : "closed"}>
+        <a className="skip-link" href="#content">
+          {t("app.skipToContent")}
+        </a>
+        <Sidebar
+          store={store}
+          catalog={catalog}
+          open={sidebarOpen}
+          currentNoteId={currentNoteId}
+          activeTag={activeTag}
+          tagNames={tagNames}
+          treeHeadings={treeHeadings}
+          onToggle={toggleSidebar}
+          onNavigate={closeSidebarOnNarrow}
+          toggleRef={sidebarToggleRef}
+          detailsRef={setDetailsSlot}
+        />
+        <div className="main">
+          <header className="topbar" data-tauri-drag-region="">
+            <div className="topbar-start" data-tauri-drag-region="">
+              {!narrow && !sidebarOpen && (
+                <>
+                  <button
+                    ref={barToggleRef}
+                    type="button"
+                    className="icon-button"
+                    aria-label={t("sidebar.show")}
+                    aria-expanded="false"
+                    aria-controls="sidebar"
+                    title={withShortcut(t("sidebar.show"), SHORTCUTS.toggleSidebar.keys)}
+                    onClick={toggleSidebar}
+                  >
+                    <SidebarIcon />
+                  </button>
+                  <Link
+                    to="/conspects/new"
+                    className="icon-button"
+                    aria-label={t("sidebar.newNote")}
+                    title={withShortcut(t("sidebar.newNote"), SHORTCUTS.newNote.keys)}
+                  >
+                    <NewNoteIcon />
+                  </Link>
+                </>
+              )}
+              {/* Always here, right before the search: the list is what the search filters. */}
+              {!narrow && (
+                <Link
+                  to="/"
+                  className="icon-button topbar-list"
+                  aria-label={t("sidebar.allNotes")}
+                  title={t("sidebar.allNotes")}
+                >
+                  <ListIcon />
+                </Link>
+              )}
+            </div>
+            {!narrow && searchBox()}
+            <div className="topbar-end" data-tauri-drag-region="">
+              <ThemeToggle
+                dark={dark}
+                onToggle={() => {
+                  onThemeChange(dark ? "light" : "dark");
+                }}
+              />
+              <ModeToggle mode={mode} onChange={onModeChange} />
+              <span className="topbar-space" data-tauri-drag-region="" />
+              {sync && <SyncIndicator sync={sync} />}
+              <Antenna activity={activity} sync={sync} />
+            </div>
+          </header>
+          {updates && <UpdateBanner updates={updates} />}
+          <main id="content" className="content" tabIndex={-1}>
+            <DetailsSlot value={detailsSlot}>
+              <IslandSlot value={islandSlot}>
+                <NoteFindContext value={findChannel}>
+                  <Outlet />
+                </NoteFindContext>
+              </IslandSlot>
+            </DetailsSlot>
+          </main>
+        </div>
+        {narrow && (
+          <nav className="island" aria-label={t("topbar.actions")}>
+            {islandSearchShown ? (
+              searchBox(() => {
+                setIslandSearch(false);
+              })
+            ) : (
               <>
                 <button
-                  ref={barToggleRef}
                   type="button"
-                  className="icon-button"
-                  aria-label={t("sidebar.show")}
-                  aria-expanded="false"
+                  className="island-button"
+                  aria-label={sidebarOpen ? t("sidebar.hide") : t("sidebar.show")}
+                  aria-expanded={sidebarOpen}
                   aria-controls="sidebar"
-                  title={withShortcut(t("sidebar.show"), SHORTCUTS.toggleSidebar.keys)}
                   onClick={toggleSidebar}
                 >
                   <SidebarIcon />
                 </button>
                 <Link
+                  to="/"
+                  className="island-button"
+                  aria-label={t("sidebar.allNotes")}
+                  onClick={closeSidebarOnNarrow}
+                >
+                  <ListIcon />
+                </Link>
+                <button
+                  type="button"
+                  className="island-button"
+                  aria-label={onNote ? t("topbar.find") : t("topbar.search")}
+                  onClick={() => {
+                    closeSidebarOnNarrow();
+                    setLibraryScope(false);
+                    setIslandSearch(true);
+                  }}
+                >
+                  <SearchIcon />
+                </button>
+                {/* The open editor's tools, when it has any. */}
+                <span ref={setIslandSlot} className="island-slot" />
+                <Link
                   to="/conspects/new"
-                  className="icon-button"
+                  className="island-button"
                   aria-label={t("sidebar.newNote")}
-                  title={withShortcut(t("sidebar.newNote"), SHORTCUTS.newNote.keys)}
+                  onClick={closeSidebarOnNarrow}
                 >
                   <NewNoteIcon />
                 </Link>
+                <Link
+                  to={SETTINGS_PATH}
+                  className="island-button island-settings"
+                  aria-label={t("sidebar.settings")}
+                  onClick={closeSidebarOnNarrow}
+                >
+                  <GearIcon />
+                </Link>
               </>
             )}
-            {/* Always here, right before the search: the list is what the search filters. */}
-            {!narrow && (
-              <Link
-                to="/"
-                className="icon-button topbar-list"
-                aria-label={t("sidebar.allNotes")}
-                title={t("sidebar.allNotes")}
-              >
-                <ListIcon />
-              </Link>
-            )}
-          </div>
-          {!narrow && searchBox()}
-          <div className="topbar-end" data-tauri-drag-region="">
-            <ThemeToggle
-              dark={dark}
-              onToggle={() => {
-                onThemeChange(dark ? "light" : "dark");
-              }}
-            />
-            <ModeToggle mode={mode} onChange={onModeChange} />
-            <span className="topbar-space" data-tauri-drag-region="" />
-            {sync && <SyncIndicator sync={sync} />}
-            <Antenna activity={activity} sync={sync} />
-          </div>
-        </header>
-        {updates && <UpdateBanner updates={updates} />}
-        <main id="content" className="content" tabIndex={-1}>
-          <DetailsSlot value={detailsSlot}>
-            <IslandSlot value={islandSlot}>
-              <NoteFindContext value={findChannel}>
-                <Outlet />
-              </NoteFindContext>
-            </IslandSlot>
-          </DetailsSlot>
-        </main>
+          </nav>
+        )}
+        {showShortcuts && <ShortcutsDialog onClose={closeShortcuts} />}
       </div>
-      {narrow && (
-        <nav className="island" aria-label={t("topbar.actions")}>
-          {islandSearchShown ? (
-            searchBox(() => {
-              setIslandSearch(false);
-            })
-          ) : (
-            <>
-              <button
-                type="button"
-                className="island-button"
-                aria-label={sidebarOpen ? t("sidebar.hide") : t("sidebar.show")}
-                aria-expanded={sidebarOpen}
-                aria-controls="sidebar"
-                onClick={toggleSidebar}
-              >
-                <SidebarIcon />
-              </button>
-              <Link
-                to="/"
-                className="island-button"
-                aria-label={t("sidebar.allNotes")}
-                onClick={closeSidebarOnNarrow}
-              >
-                <ListIcon />
-              </Link>
-              <button
-                type="button"
-                className="island-button"
-                aria-label={onNote ? t("topbar.find") : t("topbar.search")}
-                onClick={() => {
-                  closeSidebarOnNarrow();
-                  setLibraryScope(false);
-                  setIslandSearch(true);
-                }}
-              >
-                <SearchIcon />
-              </button>
-              {/* The open editor's tools, when it has any. */}
-              <span ref={setIslandSlot} className="island-slot" />
-              <Link
-                to="/conspects/new"
-                className="island-button"
-                aria-label={t("sidebar.newNote")}
-                onClick={closeSidebarOnNarrow}
-              >
-                <NewNoteIcon />
-              </Link>
-              <Link
-                to={SETTINGS_PATH}
-                className="island-button island-settings"
-                aria-label={t("sidebar.settings")}
-                onClick={closeSidebarOnNarrow}
-              >
-                <GearIcon />
-              </Link>
-            </>
-          )}
-        </nav>
-      )}
-      {showShortcuts && <ShortcutsDialog onClose={closeShortcuts} />}
-    </div>
+    </TagSuggestContext>
   );
 }
 

@@ -19,6 +19,7 @@ import { Details } from "../components/details-slot";
 import { NoteDetails } from "../components/NoteDetails";
 import { NoteNotFound } from "../components/NoteNotFound";
 import { listFind, NoteFindContext } from "../components/note-find";
+import { TagSuggestContext } from "../components/tag-suggest";
 import { headingInHash, type HeadingTarget } from "../components/note-heading";
 import { displayTitle } from "../components/note-title";
 import { LazyNoteEditor, preloadEditor } from "../editors/LazyNoteEditor";
@@ -300,6 +301,15 @@ function NoteSession({
     },
   });
 
+  // The library's tags are offered as one is typed, but not this note's own:
+  // a tag half typed, saved by a pause, is not offered back.
+  const suggestTags = use(TagSuggestContext);
+  const noteId = saved?.id ?? null;
+  const suggestHere = useMemo(
+    () => suggestTags && ((prefix: string) => suggestTags(prefix, noteId)),
+    [suggestTags, noteId],
+  );
+
   // The top bar's search searches this note; it ends with the session.
   const finding = use(NoteFindContext);
   const closeFind = finding?.onClose;
@@ -372,22 +382,24 @@ function NoteSession({
           </button>
         </div>
       )}
-      <LazyNoteEditor
-        initialMarkdown={initial?.markdown ?? ""}
-        replacement={replacement}
-        edit={edit}
-        mode={mode}
-        onChange={handleChange}
-        onReady={handleReady}
-        autoFocus={initial === null}
-        titleFromFirstLine={initial === null}
-        saved={saved}
-        showMetadata={showMetadata}
-        initialSelection={initialSelection}
-        onSelectionChange={reading.rememberSelection}
-        heading={heading}
-        {...(finding ? { find: finding.find, onFindCount: finding.onCount } : {})}
-      />
+      <TagSuggestContext value={suggestHere}>
+        <LazyNoteEditor
+          initialMarkdown={initial?.markdown ?? ""}
+          replacement={replacement}
+          edit={edit}
+          mode={mode}
+          onChange={handleChange}
+          onReady={handleReady}
+          autoFocus={initial === null}
+          titleFromFirstLine={initial === null}
+          saved={saved}
+          showMetadata={showMetadata}
+          initialSelection={initialSelection}
+          onSelectionChange={reading.rememberSelection}
+          heading={heading}
+          {...(finding ? { find: finding.find, onFindCount: finding.onCount } : {})}
+        />
+      </TagSuggestContext>
       {problemText !== null && (
         <p role="alert" className="inline-error">
           {problem instanceof InvalidDocumentError

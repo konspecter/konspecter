@@ -21,6 +21,7 @@ export const ru: Dictionary = {
   "sidebar.allNotes": "Все конспекты",
   "sidebar.newNote": "Новый конспект",
   "sidebar.tags": "Goto",
+  "tags.suggestions": "Теги на выбор",
   "sidebar.noRecent": "Нет активности за 7 дней",
   "sidebar.tagsHint": "Напишите в конспекте {tag} или {nested}.",
   "sidebar.recent": "Недавние",

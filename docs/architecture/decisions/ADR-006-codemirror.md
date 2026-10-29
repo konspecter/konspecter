@@ -1,6 +1,7 @@
 # ADR-006: CodeMirror 6 for the Markdown editor
 
-Status: accepted (2026-09-28)
+Status: accepted (2026-09-28); autocompletion narrowed by
+[ADR-028](ADR-028-tag-suggestions.md): tags are suggested as they are typed.
 
 ## Context
 

@@ -20,6 +20,8 @@ import { reportError } from "../app/errors";
 import { InIsland } from "../components/island-slot";
 import { NO_FIND, revealMatch, type NoteFind } from "../components/note-find";
 import { revealHeading, type HeadingTarget } from "../components/note-heading";
+import { CaretTagSuggestions } from "../components/TagSuggestions";
+import { useTagCompletion } from "../hooks/use-tag-completion";
 import {
   createTextEditorState,
   findTransaction,
@@ -29,6 +31,7 @@ import {
   linkAtCaret,
   linkCommand,
   replaceDocument,
+  tagAtCaret,
   TOOL_USED,
   toolbarActions,
   toolsInEffect,
@@ -101,6 +104,9 @@ type Tool = {
   /** What it does; null for the link tool, which asks for an address. */
   readonly command: Command | null;
 };
+
+/** A transaction that writes a tag taken from the suggestions: it does not offer them again. */
+const TAG_TAKEN = "tagTaken";
 
 const TOOLBAR_KEY = "konspecter.toolbar";
 const LAST_TOOL_KEY = "konspecter.toolbar.last";
@@ -263,6 +269,8 @@ export const TextEditor = memo(function TextEditor({
   const onChangeRef = useRef(onChange);
   const onSelectionRef = useRef(onSelectionChange);
   const onLeaveRef = useRef(onLeave);
+  // The keys of the tag suggestions, before the editor's own.
+  const tagKeys = useRef<(event: KeyboardEvent) => boolean>(() => false);
   const [arrive] = useState(() => arrival);
   const [editorState, setEditorState] = useState(() => {
     const state = createTextEditorState(initialDoc, { titleFromFirstLine });
@@ -274,6 +282,8 @@ export const TextEditor = memo(function TextEditor({
   const [initialState] = useState(editorState);
   const [initialFocus] = useState(autoFocus || initialSelection?.focused === true);
   const [focused, setFocused] = useState(false);
+  // Whether the caret got where it is by typing: only then are tags offered.
+  const [typing, setTyping] = useState(false);
   const narrow = useNarrow();
   const [toolbarTop, setToolbarTop] = useState<number | null>(null);
   const [linkButtonSpot, setLinkButtonSpot] = useState<{ top: number; left: number } | null>(null);
@@ -319,10 +329,18 @@ export const TextEditor = memo(function TextEditor({
         if (transaction.docChanged && !transaction.getMeta(FROM_ELSEWHERE)) {
           onChangeRef.current(next.doc);
         }
-        if (transaction.selectionSet || transaction.docChanged) report();
+        if (transaction.selectionSet || transaction.docChanged) {
+          report();
+          setTyping(
+            transaction.docChanged &&
+              !transaction.getMeta(FROM_ELSEWHERE) &&
+              !transaction.getMeta(TAG_TAKEN),
+          );
+        }
         const tool: unknown = transaction.getMeta(TOOL_USED);
         if (typeof tool === "string") noteToolUsed(tool as TextKey);
       },
+      handleKeyDown: (_view, event) => tagKeys.current(event),
       handleDOMEvents: {
         focus: () => {
           report(true);
@@ -464,6 +482,38 @@ export const TextEditor = memo(function TextEditor({
     };
   }, [link, placeLinkButton]);
 
+  // The library's tags, offered as one is typed; Enter on the very tag typed is a new line.
+  const tagCompletion = useTagCompletion(
+    focused && typing ? tagAtCaret(editorState) : null,
+    (tag, typed) => {
+      const view = viewRef.current;
+      if (!view) return;
+      const { tr } = view.state;
+      view.dispatch(
+        tr.insertText(tag.spelling, typed.from, typed.to).setMeta(TAG_TAKEN, true).scrollIntoView(),
+      );
+    },
+    { passExact: true },
+  );
+  useEffect(() => {
+    tagKeys.current = tagCompletion.keyDown;
+  });
+  const tagListAt = useCallback((position: number) => {
+    const view = viewRef.current;
+    return view ? view.coordsAtPos(position) : null;
+  }, []);
+  useEffect(() => {
+    const dom = viewRef.current?.dom;
+    if (!dom) return;
+    if (tagCompletion.activeId === undefined) {
+      dom.removeAttribute("aria-activedescendant");
+      dom.removeAttribute("aria-controls");
+    } else {
+      dom.setAttribute("aria-activedescendant", tagCompletion.activeId);
+      dom.setAttribute("aria-controls", tagCompletion.listId);
+    }
+  }, [tagCompletion.activeId, tagCompletion.listId]);
+
   function handleFocus() {
     setFocused(true);
   }
@@ -526,6 +576,7 @@ export const TextEditor = memo(function TextEditor({
   return (
     <div ref={containerRef} className="text-editor" onFocus={handleFocus} onBlur={handleBlur}>
       <div ref={mountRef} />
+      <CaretTagSuggestions completion={tagCompletion} at={tagListAt} />
       {link && (
         <button
           ref={linkButtonRef}

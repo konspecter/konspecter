@@ -153,8 +153,12 @@ CodeMirror 6 over the whole document, frontmatter included (`MarkdownSourceEdito
   `<>`, `""`, `''`, backticks, `**`, `__`, `~~` and the typographic `«»`, `“”`, `‘’` (the
   system's substitution for a typed quote; in code the quotes stay straight). Every
   selection of a multiple selection is wrapped (`source-marks.ts`).
-- **No autocompletion**, by design, and no bracket closing without a selection, so what you
-  type is what is saved.
+- **No autocompletion** but tags, and no bracket closing without a selection, so what you
+  type is what is saved. Typing `#` and a character lists the library's tags that match
+  ([ADR-028](decisions/ADR-028-tag-suggestions.md)); only a tag taken with Enter or a click is
+  written. Both editors share the list (`useTagCompletion`, `CaretTagSuggestions`) and find the
+  tag being typed by the tag rules (`tagAtCaret`: ProseMirror skips code, CodeMirror code,
+  HTML, URLs and the frontmatter).
 
 Markdown mode is always available. It is the way to edit whatever Text mode would change.
 Text mode is the default for new and existing notes.

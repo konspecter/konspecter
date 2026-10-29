@@ -81,6 +81,7 @@ All planned phases are done. New work needs a new plan in `.claude/plans/`.
 | Releases   | The desktop app checks GitHub daily; a banner links to a newer release      | Done   |
 | Splash     | Logo at start-up, bookmark fills with the progress, version under it        | Done   |
 | Quota      | Sync storage quota per account (env, `set-quota`), usage in %, in the terms | Done   |
+| Tag hints  | Tags suggested as `#x` is typed: search box and both editors (ADR-028)      | Done   |
 
 Where the packages are described: UI architecture: `docs/architecture/ui.md`; languages:
 `docs/architecture/i18n.md`; server and API: `docs/architecture/server.md`; sync:
@@ -89,8 +90,8 @@ Where the packages are described: UI architecture: `docs/architecture/ui.md`; la
 `docs/architecture/decisions/`: last write wins (ADR-011), change events (ADR-012), folders follow
 tags (ADR-013), the account site and end-to-end encrypted sync (ADR-014 to ADR-017), connecting by
 QR code (ADR-019), published images (ADR-023), desktop folder sync (ADR-024), the key handed
-over by QR code (ADR-025), the canonical domain with an address per language (ADR-026) and
-pins in the frontmatter (ADR-027).
+over by QR code (ADR-025), the canonical domain with an address per language (ADR-026),
+pins in the frontmatter (ADR-027) and tags suggested as they are typed (ADR-028).
 
 ## Working rules
 
@@ -119,7 +120,7 @@ Changes / Tests / Lint / Typecheck / Build / Known limitations
 Then stop and wait for the next instruction.
 
 Never implement anything explicitly out of scope (AI, backlinks, wiki links, collaboration,
-plugins, templates, tag autocomplete, GraphQL, gRPC, Protobuf, microservices, …) without a
+plugins, templates, GraphQL, gRPC, Protobuf, microservices, …) without a
 separate decision.
 
 ## Repository layout

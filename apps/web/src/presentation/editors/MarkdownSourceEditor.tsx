@@ -28,10 +28,12 @@ import {
   type DecorationSet,
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
-import { memo, useEffect, useLayoutEffect, useRef } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { codeHighlighter, codeLanguages } from "./code-highlight";
 import { textChanges } from "./diff";
-import { sourceEditorMarks } from "./source-marks";
+import { sourceEditorMarks, tagAtCaret } from "./source-marks";
+import { CaretTagSuggestions } from "../components/TagSuggestions";
+import { useTagCompletion, type TagTyping } from "../hooks/use-tag-completion";
 import { t } from "../i18n/i18n";
 import { TITLE_MAX_LENGTH } from "./text-editor-setup";
 import { parseDocument } from "../../domain/document/document";
@@ -184,13 +186,20 @@ export function createSourceExtensions(
     titleFromFirstLine = false,
     onSelectionChange,
     onFindCount,
+    onTagTyping,
+    onKey,
   }: {
     titleFromFirstLine?: boolean;
     onSelectionChange?: (caret: Caret) => void;
     onFindCount?: (count: number) => void;
+    /** The tag being typed at the caret, after each change; null when none is. */
+    onTagTyping?: (typing: TagTyping | null) => void;
+    /** A key, before the editor's own handling; true when it was taken. */
+    onKey?: (event: KeyboardEvent) => boolean;
   } = {},
 ) {
   return [
+    Prec.highest(EditorView.domEventHandlers({ keydown: (event) => onKey?.(event) ?? false })),
     ...(titleFromFirstLine ? [Prec.high(keymap.of([{ key: "Enter", run: firstLineTitle }]))] : []),
     history(),
     drawSelection(),
@@ -227,6 +236,16 @@ export function createSourceExtensions(
       if (update.selectionSet || update.focusChanged || update.docChanged) {
         const { anchor, head } = update.state.selection.main;
         onSelectionChange?.({ anchor, head, focused: update.view.hasFocus });
+      }
+      if (update.docChanged || update.selectionSet || update.focusChanged) {
+        // Only typed text offers tags: not a caret moved, a paste or a tag just taken.
+        const typed =
+          update.view.hasFocus &&
+          update.transactions.some(
+            (transaction) =>
+              transaction.isUserEvent("input.type") || transaction.isUserEvent("delete"),
+          );
+        onTagTyping?.(typed ? tagAtCaret(update.state) : null);
       }
       const found = update.state.field(findField);
       if (found !== update.startState.field(findField)) onFindCount?.(found.matches.length);
@@ -274,7 +293,7 @@ function headingPosition(doc: Text, index: number): number | null {
   return doc.line(Math.min(first + heading.line, doc.lines)).from;
 }
 
-/** CodeMirror 6 editing the whole document as Markdown source. No autocompletion. */
+/** CodeMirror 6 editing the whole document as Markdown source. Only tags are offered as they are typed. */
 export const MarkdownSourceEditor = memo(function MarkdownSourceEditor({
   initialValue,
   onChange,
@@ -301,6 +320,9 @@ export const MarkdownSourceEditor = memo(function MarkdownSourceEditor({
   const initialSelectionRef = useRef(initialSelection);
   const autoFocusRef = useRef(autoFocus || initialSelection?.focused === true);
   const titleFromFirstLineRef = useRef(titleFromFirstLine);
+  const [tagTyping, setTagTyping] = useState<TagTyping | null>(null);
+  // The keys of the tag suggestions, before the editor's own.
+  const tagKeys = useRef<(event: KeyboardEvent) => boolean>(() => false);
 
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -329,6 +351,8 @@ export const MarkdownSourceEditor = memo(function MarkdownSourceEditor({
             titleFromFirstLine: titleFromFirstLineRef.current,
             onSelectionChange: (next) => onSelectionRef.current?.(next),
             onFindCount: (count) => onFindCountRef.current?.(count),
+            onTagTyping: setTagTyping,
+            onKey: (event) => tagKeys.current(event),
           },
         ),
       }),
@@ -404,5 +428,42 @@ export const MarkdownSourceEditor = memo(function MarkdownSourceEditor({
     if (next !== current) replaceInPlace(view, next);
   }, [saved]);
 
-  return <div ref={mountRef} className="markdown-source" />;
+  // The library's tags, offered as one is typed; Enter on the very tag typed is a new line.
+  const tagCompletion = useTagCompletion(
+    tagTyping,
+    (tag, typed) => {
+      viewRef.current?.dispatch({
+        changes: { from: typed.from, to: typed.to, insert: tag.spelling },
+        selection: { anchor: typed.from + tag.spelling.length },
+        userEvent: "input.complete",
+        scrollIntoView: true,
+      });
+    },
+    { passExact: true },
+  );
+  useEffect(() => {
+    tagKeys.current = tagCompletion.keyDown;
+  });
+  const tagListAt = useCallback(
+    (position: number) => viewRef.current?.coordsAtPos(position) ?? null,
+    [],
+  );
+  useEffect(() => {
+    const content = viewRef.current?.contentDOM;
+    if (!content) return;
+    if (tagCompletion.activeId === undefined) {
+      content.removeAttribute("aria-activedescendant");
+      content.removeAttribute("aria-controls");
+    } else {
+      content.setAttribute("aria-activedescendant", tagCompletion.activeId);
+      content.setAttribute("aria-controls", tagCompletion.listId);
+    }
+  }, [tagCompletion.activeId, tagCompletion.listId]);
+
+  return (
+    <>
+      <div ref={mountRef} className="markdown-source" />
+      <CaretTagSuggestions completion={tagCompletion} at={tagListAt} />
+    </>
+  );
 });

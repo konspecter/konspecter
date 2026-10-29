@@ -15,6 +15,7 @@ import {
   type DecorationSet,
   type ViewUpdate,
 } from "@codemirror/view";
+import { typedTag } from "../../domain/tag/tag-suggestions";
 import { tagRanges } from "../../domain/tag/tags";
 
 /** Where "#" is not a tag: code, HTML, URLs and the frontmatter (the tag rules). */
@@ -47,6 +48,25 @@ function within(
     if (names.has(node.name)) return true;
   }
   return false;
+}
+
+/**
+ * The tag being typed at the caret (`typedTag`): where its name starts and
+ * the caret, and the name so far. None where "#" is not a tag (code, HTML,
+ * URLs, the frontmatter), or over a selection.
+ */
+export function tagAtCaret(
+  state: EditorState,
+): { from: number; to: number; prefix: string } | null {
+  const { main } = state.selection;
+  if (!main.empty) return null;
+  const line = state.doc.lineAt(main.head);
+  const at = main.head - line.from;
+  const typed = typedTag(line.text.slice(0, at), line.text.slice(at));
+  if (!typed) return null;
+  const from = line.from + typed.start;
+  if (within(state, from, NOT_TAGGABLE)) return null;
+  return { from, to: main.head, prefix: typed.prefix };
 }
 
 const tagMark = Decoration.mark({ class: "md-tag" });

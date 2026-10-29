@@ -27,6 +27,7 @@ import {
 } from "prosemirror-state";
 import { Decoration, DecorationSet, type EditorView } from "prosemirror-view";
 import { findMatches, type Match } from "../../domain/search/find";
+import { typedTag } from "../../domain/tag/tag-suggestions";
 import { tagRanges } from "../../domain/tag/tags";
 import { blockDecorations, updatedBlockDecorations } from "./block-decorations";
 import { codeHighlighting } from "./code-highlight";
@@ -773,6 +774,24 @@ export function writtenAddressAt(text: string, offset: number): string | null {
   return (
     writtenAddresses(text).find(({ from, to }) => offset >= from && offset <= to)?.href ?? null
   );
+}
+
+/**
+ * The tag being typed at the caret (`typedTag`): where its name starts and
+ * the caret, and the name so far. None in code, or over a selection.
+ */
+export function tagAtCaret(
+  state: EditorState,
+): { from: number; to: number; prefix: string } | null {
+  const { empty, $head } = state.selection;
+  const { parent, parentOffset } = $head;
+  if (!empty || !parent.isTextblock || parent.type === nodes.code_block) return null;
+  // Inline code reads as spaces there: a "#" in it is no tag.
+  const text = blockText(parent);
+  const typed = typedTag(text.slice(0, parentOffset), text.slice(parentOffset));
+  if (!typed) return null;
+  const from = $head.start() + typed.start;
+  return { from, to: $head.pos, prefix: typed.prefix };
 }
 
 /**
