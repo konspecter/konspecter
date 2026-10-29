@@ -40,6 +40,8 @@ type AppProps = {
   sync?: SyncEngine | undefined;
   /** Reset to factory settings in Settings; absent in tests. */
   reset?: FactoryReset | undefined;
+  /** The desktop app (Tauri), not a browser or the mobile app. */
+  desktop?: boolean;
 };
 
 /** The device's storage, or none where reading it is refused (blocked site data). */
@@ -74,6 +76,7 @@ export function App({
   checkForRelease,
   sync,
   reset,
+  desktop = false,
 }: AppProps) {
   const [settings, setSettings] = useState(initialSettings);
   const [catalog] = useState(
@@ -166,6 +169,7 @@ export function App({
               treeHeadings={settings.treeHeadings}
               updates={updates}
               sync={sync}
+              desktop={desktop}
             />
           }
         >

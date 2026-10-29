@@ -111,6 +111,9 @@ The desktop application uses a real folder of Markdown files:
 
 They can be opened alongside the tools you already use — VS Code, Vim, Git, other Markdown tools. Konspecter should fit into your workflow, not lock you into its own database format.
 
+Make the desktop window narrow and the sidebar steps aside; make it wide again and the sidebar
+comes back. If you hid the sidebar yourself, it stays hidden at any width.
+
 ### Mobile
 
 Konspecter runs on Android through Capacitor. The same knowledge base travels with you while remaining local-first. No Play Store needed — install the APK from the latest release or use the PWA.

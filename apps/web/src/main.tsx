@@ -194,6 +194,7 @@ try {
           checkForRelease={checkForRelease}
           sync={sync}
           reset={reset}
+          desktop={isDesktop()}
         />
       </BrowserRouter>
     </StrictMode>,

@@ -51,18 +51,24 @@ type LayoutProps = {
   treeHeadings?: TreeHeadings;
   updates?: UpdateSource | undefined;
   sync?: SyncEngine | undefined;
+  /** The desktop app: the sidebar follows the window as it is made narrow or wide. */
+  desktop?: boolean;
 };
 
 const SIDEBAR_KEY = "konspecter.sidebar";
 
-/** Narrow screens start with the sidebar closed; wide ones remember the choice. */
-function initialSidebarOpen(): boolean {
-  if (isNarrow()) return false;
+/** Whether the sidebar was left shown on a wide screen (where the choice is remembered). */
+function rememberedSidebarOpen(): boolean {
   try {
     return localStorage.getItem(SIDEBAR_KEY) !== "closed";
   } catch {
     return true;
   }
+}
+
+/** Narrow screens start with the sidebar closed; wide ones remember the choice. */
+function initialSidebarOpen(): boolean {
+  return !isNarrow() && rememberedSidebarOpen();
 }
 
 function rememberSidebar(open: boolean): void {
@@ -109,6 +115,7 @@ export function Layout({
   treeHeadings = "hidden",
   updates,
   sync,
+  desktop = false,
 }: LayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -126,6 +133,14 @@ export function Layout({
   const barToggleRef = useRef<HTMLButtonElement>(null);
   const dark = useDarkTheme(theme);
   const narrow = useNarrow();
+  // In the desktop app a window made narrow hides the sidebar, which would
+  // cover it; made wide again, the sidebar is as it was left there: shown
+  // again, or still hidden if it was hidden.
+  const [wasNarrow, setWasNarrow] = useState(narrow);
+  if (desktop && narrow !== wasNarrow) {
+    setWasNarrow(narrow);
+    setSidebarOpen(!narrow && rememberedSidebarOpen());
+  }
   const historySteps = useHistorySteps();
   // The island's search: opened by its button, shown too while the list has a query.
   const [islandSearch, setIslandSearch] = useState(false);

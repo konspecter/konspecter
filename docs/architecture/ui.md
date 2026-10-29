@@ -42,7 +42,11 @@ The interface speaks English and Russian ([i18n](i18n.md)). The account site sha
   down to the details (and back up as they open). ↑/↓ move through the tree's rows, the headers and the rows of open panes as one list. What is folded is
   remembered per device (`localStorage`, `konspecter.sidebar.folded`); at first everything is
   open, except the details on small screens. Hidden or shown per device (`localStorage`); while it is hidden, its toggle and New note sit at the start of the top bar; on small screens it starts hidden
-  and covers the whole screen when opened (see [Small screens](#small-screens)).
+  and covers the whole screen when opened (see [Small screens](#small-screens)). In the desktop
+  app (`desktop` on `App`, from `isDesktop()`) the sidebar follows the window: made narrower than
+  760px, the window hides it; made wide again, the sidebar is as it was left on the wide window
+  (`konspecter.sidebar`), shown again or still hidden. Browsers and the mobile app keep it as it
+  is.
 - **Details** (`NoteDetails.tsx`, the sidebar's last pane): on the note page only (new or
   existing), the note page renders its details into the sidebar through a portal
   (`details-slot.tsx`: the layout provides the element, `<Details>` renders into it). What the

@@ -2926,6 +2926,76 @@ describe("keyboard shortcuts", () => {
   });
 });
 
+describe("the window's width", () => {
+  // A window that can be made narrow and wide again.
+  let narrow = false;
+  const listeners = new Set<EventListener>();
+  beforeEach(() => {
+    narrow = false;
+    vi.stubGlobal("matchMedia", (query: string): Partial<MediaQueryList> => ({
+      get matches() {
+        return narrow && query === "(max-width: 760px)";
+      },
+      media: query,
+      addEventListener: (_type: string, listener: EventListener) => {
+        listeners.add(listener);
+      },
+      removeEventListener: (_type: string, listener: EventListener) => {
+        listeners.delete(listener);
+      },
+    }));
+    vi.stubGlobal("scrollTo", vi.fn());
+  });
+  afterEach(() => {
+    listeners.clear();
+    vi.unstubAllGlobals();
+  });
+
+  const resize = (to: "narrow" | "wide") => {
+    act(() => {
+      narrow = to === "narrow";
+      for (const listener of listeners) listener(new Event("change"));
+    });
+  };
+  const sidebarShown = () => screen.queryByRole("complementary", { name: "Sidebar" }) !== null;
+  async function renderWindow(desktop: boolean) {
+    render(
+      <MemoryRouter>
+        <App store={await newStore()} desktop={desktop} />
+      </MemoryRouter>,
+    );
+    await screen.findByRole("complementary", { name: "Sidebar" });
+  }
+
+  it("hides the shown sidebar in the desktop app when the window is made narrow, and shows it again", async () => {
+    await renderWindow(true);
+    expect(sidebarShown()).toBe(true);
+
+    resize("narrow");
+    expect(sidebarShown()).toBe(false);
+    resize("wide");
+    expect(sidebarShown()).toBe(true);
+    expect(localStorage.getItem("konspecter.sidebar")).not.toBe("closed");
+  });
+
+  it("keeps the sidebar hidden at every width once it is hidden", async () => {
+    await renderWindow(true);
+    await userEvent.click(within(sidebar()).getByRole("button", { name: "Hide sidebar" }));
+
+    resize("narrow");
+    expect(sidebarShown()).toBe(false);
+    resize("wide");
+    expect(sidebarShown()).toBe(false);
+  });
+
+  it("leaves the sidebar as it is in a browser", async () => {
+    await renderWindow(false);
+
+    resize("narrow");
+    expect(sidebarShown()).toBe(true);
+  });
+});
+
 describe("small screens", () => {
   beforeEach(() => {
     vi.stubGlobal("matchMedia", (query: string): Partial<MediaQueryList> => ({
