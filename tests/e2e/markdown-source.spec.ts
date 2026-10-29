@@ -73,3 +73,70 @@ test.describe("Markdown mode", () => {
     });
   }
 });
+
+/** The contrast ratio of two CSS colours ("rgb(…)"), as WCAG defines it. */
+function contrast(a: string, b: string): number {
+  const luminance = (color: string) => {
+    const [r = 0, g = 0, bl = 0] = (color.match(/[\d.]+/g) ?? []).map(Number);
+    const channel = (value: number) => {
+      const c = value / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    };
+    return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(bl);
+  };
+  const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return ((light ?? 0) + 0.05) / ((dark ?? 0) + 0.05);
+}
+
+test.describe("the cursor", () => {
+  for (const colorScheme of ["light", "dark"] as const) {
+    test(`stands out from the editor in the ${colorScheme} theme, in either mode`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ colorScheme });
+      await page.goto("/conspects/new");
+      await page.getByRole("textbox", { name: "Conspect text" }).click();
+      await page.keyboard.type("Some text");
+      const background = () =>
+        page.evaluate(() => {
+          let element: Element | null = document.querySelector(".note-editor");
+          while (element) {
+            const color = getComputedStyle(element).backgroundColor;
+            if (color !== "rgba(0, 0, 0, 0)" && color !== "transparent") return color;
+            element = element.parentElement;
+          }
+          return getComputedStyle(document.body).backgroundColor;
+        });
+
+      const caret = await page
+        .locator(".text-editor-content")
+        .evaluate((element) => getComputedStyle(element).caretColor);
+      expect(contrast(caret, await background())).toBeGreaterThan(4.5);
+
+      await page.getByRole("banner").getByRole("button", { name: "Markdown" }).click();
+      await page.getByRole("textbox", { name: "Markdown" }).click();
+      const cursor = page.locator(".cm-cursor-primary");
+      await expect(cursor).toBeAttached();
+      const drawn = await cursor.evaluate((element) => getComputedStyle(element).borderLeftColor);
+      expect(contrast(drawn, await background())).toBeGreaterThan(4.5);
+    });
+  }
+
+  test("is wider on a touch screen", async ({ browser }) => {
+    const context = await browser.newContext({
+      viewport: { width: 390, height: 800 },
+      hasTouch: true,
+      isMobile: true,
+    });
+    const page = await context.newPage();
+    await page.goto("/conspects/new");
+    await page.getByRole("banner").getByRole("button", { name: "Markdown" }).click();
+    await page.getByRole("textbox", { name: "Markdown" }).click();
+    const cursor = page.locator(".cm-cursor-primary");
+    await expect(cursor).toBeAttached();
+    expect(await cursor.evaluate((element) => getComputedStyle(element).borderLeftWidth)).toBe(
+      "2px",
+    );
+    await context.close();
+  });
+});

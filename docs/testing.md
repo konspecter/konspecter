@@ -79,19 +79,20 @@ pnpm e2e
 
 ## Critical flows
 
-| Flow                                               | Unit / integration                                     | End to end                                                |
-| -------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------------------- |
-| Markdown → index → search                          | search index, store search                             | `critical-flows.spec.ts`                                  |
-| Markdown → tags → navigation                       | tag parser, tag index, App tags                        | `critical-flows.spec.ts`                                  |
-| global shortcuts from the editor                   | shortcut matching, App shortcuts                       | `critical-flows.spec.ts`                                  |
-| layout at any window size, phones                  | —                                                      | `accessibility.spec.ts`                                   |
-| splash: first paint, logo size and shape           | splash stages, hiding, stylesheets                     | `splash.spec.ts`                                          |
-| selection drawn over the Markdown source it covers | —                                                      | `markdown-source.spec.ts` (laptop and phone)              |
-| local edit → sync → server                         | sync engine vs fake server, vitest real-server test    | `sync.spec.ts` (two browser contexts)                     |
-| register → encrypt → connect → disconnect → delete | site and engine tests, Go handler tests                | `account.spec.ts` (live server, site and app)             |
-| external file edit → watcher → document            | FolderStore watcher tests, Rust real-watcher test      | — (needs the desktop app)                                 |
-| conflict → the later edit wins                     | conflict strategy, engine conflicts, App and File Mode | `critical-flows.spec.ts` (two tabs)                       |
-| offline                                            | fake network in engine tests                           | `critical-flows.spec.ts` (service worker, offline reload) |
+| Flow                                                     | Unit / integration                                     | End to end                                                |
+| -------------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------------------- |
+| Markdown → index → search                                | search index, store search                             | `critical-flows.spec.ts`                                  |
+| Markdown → tags → navigation                             | tag parser, tag index, App tags                        | `critical-flows.spec.ts`                                  |
+| global shortcuts from the editor                         | shortcut matching, App shortcuts                       | `critical-flows.spec.ts`                                  |
+| layout at any window size, phones                        | —                                                      | `accessibility.spec.ts`                                   |
+| splash: first paint, logo size and shape                 | splash stages, hiding, stylesheets                     | `splash.spec.ts`                                          |
+| selection drawn over the Markdown source it covers       | —                                                      | `markdown-source.spec.ts` (laptop and phone)              |
+| a cursor that stands out in either theme, wider on touch | —                                                      | `markdown-source.spec.ts`                                 |
+| local edit → sync → server                               | sync engine vs fake server, vitest real-server test    | `sync.spec.ts` (two browser contexts)                     |
+| register → encrypt → connect → disconnect → delete       | site and engine tests, Go handler tests                | `account.spec.ts` (live server, site and app)             |
+| external file edit → watcher → document                  | FolderStore watcher tests, Rust real-watcher test      | — (needs the desktop app)                                 |
+| conflict → the later edit wins                           | conflict strategy, engine conflicts, App and File Mode | `critical-flows.spec.ts` (two tabs)                       |
+| offline                                                  | fake network in engine tests                           | `critical-flows.spec.ts` (service worker, offline reload) |
 
 ## Conventions
 

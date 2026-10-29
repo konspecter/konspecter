@@ -157,6 +157,8 @@
 .text-editor-content {
   min-height: 55vh;
   outline: none;
+  /* The caret in the text's colour, whatever the theme. */
+  caret-color: var(--color-fg);
 }
 
 /*
@@ -306,6 +308,24 @@
 
 .markdown-source .cm-content {
   caret-color: var(--color-fg);
+}
+
+/*
+ * CodeMirror draws its own cursor (the browser's is hidden), black unless it
+ * is told the theme is dark, which it never is here: the cursor takes the
+ * text's colour instead, so it stands out in either theme.
+ */
+.markdown-source .cm-cursor,
+.markdown-source .cm-dropCursor {
+  border-left-color: var(--color-fg);
+}
+
+/* A finger's screen: a cursor wide enough to see at a glance. */
+@media (pointer: coarse) {
+  .markdown-source .cm-cursor {
+    border-left-width: 2px;
+    margin-left: -1px;
+  }
 }
 
 .markdown-source .cm-placeholder {
