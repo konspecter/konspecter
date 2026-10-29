@@ -580,15 +580,7 @@ describe("task lists", () => {
         "<li>plain</li>" +
         "</ul>",
     );
-    const items: [string, unknown][] = [];
-    view.state.doc.descendants((node) => {
-      if (node.type.name === "list_item") items.push([node.textContent, node.attrs.checked]);
-    });
-    expect(items).toEqual([
-      ["todo", false],
-      ["done", true],
-      ["plain", null],
-    ]);
+    expect(textDocToMarkdown(view.state.doc)).toBe("* [ ] todo\n* [x] done\n* plain");
     expect(view.dom.querySelectorAll("input[type=checkbox]")).toHaveLength(2);
   });
 
@@ -606,6 +598,26 @@ describe("task lists", () => {
     expect(textDocToMarkdown(view.state.doc)).toBe(
       "* [x] parent\n\n  * [ ] child\n\n* plain\n\n  * [x] nested",
     );
+  });
+
+  it("keeps a list pasted from a web page tight unless its items hold paragraphs", () => {
+    const { view } = editorWith("");
+    paste(
+      view,
+      "<ul><li>one</li><li>two</li></ul>" +
+        '<ol start="3"><li>three</li><li>four</li></ol>' +
+        "<ul><li><p>loose</p></li><li><p>list</p></li></ul>",
+    );
+    expect(textDocToMarkdown(view.state.doc)).toBe(
+      "* one\n* two\n\n3. three\n4. four\n\n* loose\n\n* list",
+    );
+  });
+
+  it("keeps a list copied in the text editor as it was, tight or loose", () => {
+    const markdown = "* tight\n* list\n\ntext\n\n* loose\n\n* list";
+    const { view } = editorWith("");
+    paste(view, editorWith(markdown).view.dom.innerHTML);
+    expect(textDocToMarkdown(view.state.doc)).toBe(markdown);
   });
 
   it("ticks the task at the caret with Mod-Enter", () => {

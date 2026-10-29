@@ -7,30 +7,59 @@ type NodeName = typeof commonMark extends Schema<infer N, string> ? N : never;
 type MarkName = typeof commonMark extends Schema<string, infer M> ? M : never;
 
 /**
+ * Whether a list is tight: the editor marks its own (`data-tight`); a list
+ * from a web page is tight unless its items hold paragraphs, which is how
+ * rendered Markdown shows a loose one.
+ */
+function tightList(list: HTMLElement): boolean {
+  if (list.hasAttribute("data-tight")) return true;
+  return ![...list.children].some(
+    (item) => item.tagName === "LI" && [...item.children].some((child) => child.tagName === "P"),
+  );
+}
+
+/**
  * The text editor's schema: prosemirror-markdown's CommonMark schema, with
  * GFM task list items. A list item's `checked` is true or false for a task
  * (`[x]`, `[ ]`) and null for an ordinary item.
  */
 export const textSchema = new Schema<NodeName, MarkName>({
-  nodes: commonMark.spec.nodes.update("list_item", {
-    ...commonMark.spec.nodes.get("list_item"),
-    attrs: { checked: { default: null } },
-    parseDOM: [
-      {
-        tag: "li",
-        getAttrs: (dom) => {
-          const checked = dom.getAttribute("data-checked");
-          if (checked !== null) return { checked: checked === "true" };
-          return { checked: pastedTaskBox(dom) };
+  nodes: commonMark.spec.nodes
+    .update("bullet_list", {
+      ...commonMark.spec.nodes.get("bullet_list"),
+      parseDOM: [{ tag: "ul", getAttrs: (dom) => ({ tight: tightList(dom) }) }],
+    })
+    .update("ordered_list", {
+      ...commonMark.spec.nodes.get("ordered_list"),
+      parseDOM: [
+        {
+          tag: "ol",
+          getAttrs: (dom) => ({
+            order: dom.hasAttribute("start") ? Number(dom.getAttribute("start")) : 1,
+            tight: tightList(dom),
+          }),
         },
-      },
-    ],
-    toDOM: (node) => [
-      "li",
-      node.attrs.checked === null ? {} : { "data-checked": String(node.attrs.checked) },
-      0,
-    ],
-  }),
+      ],
+    })
+    .update("list_item", {
+      ...commonMark.spec.nodes.get("list_item"),
+      attrs: { checked: { default: null } },
+      parseDOM: [
+        {
+          tag: "li",
+          getAttrs: (dom) => {
+            const checked = dom.getAttribute("data-checked");
+            if (checked !== null) return { checked: checked === "true" };
+            return { checked: pastedTaskBox(dom) };
+          },
+        },
+      ],
+      toDOM: (node) => [
+        "li",
+        node.attrs.checked === null ? {} : { "data-checked": String(node.attrs.checked) },
+        0,
+      ],
+    }),
   marks: commonMark.spec.marks,
 });
 
