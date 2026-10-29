@@ -208,7 +208,14 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             <div key={feature} className="feature">
               <dt>{t(`home.feature.${feature}.title`)}</dt>
               <dd>
-                {t(bySync(feature) ? SYNC_TEXT[feature][sync] : `home.feature.${feature}.text`)}
+                {richText(
+                  t(bySync(feature) ? SYNC_TEXT[feature][sync] : `home.feature.${feature}.text`),
+                  {
+                    tagChain: (
+                      <Link to={localePath("/tag-chain")}>{t("home.feature.tags.link")}</Link>
+                    ),
+                  },
+                )}
               </dd>
             </div>
           ))}

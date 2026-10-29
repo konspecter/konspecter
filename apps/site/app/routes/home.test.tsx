@@ -92,6 +92,11 @@ it("shows the landing page with the configured downloads", async () => {
   expect(within(downloads).getAllByRole("listitem")[0]).toHaveTextContent(
     "click Open Anyway in System Settings",
   );
+  // The tags feature links to the page on how tags build the tree.
+  expect(screen.getByRole("link", { name: "How tags build the tree" })).toHaveAttribute(
+    "href",
+    "/tag-chain",
+  );
   expect(
     screen.getByRole("figure", { name: "A conspect as Konspecter stores it" }),
   ).toHaveTextContent("title: Grandma's apple pie");
@@ -253,6 +258,10 @@ it("speaks Russian, with the language dropdown and the other theme", async () =>
     "dark",
   );
   expect(screen.getByRole("link", { name: "Главная Konspecter" })).toHaveAttribute("href", "/ru/");
+  expect(screen.getByRole("link", { name: "Как теги строят дерево" })).toHaveAttribute(
+    "href",
+    "/ru/tag-chain",
+  );
 });
 
 describe("buying sync", () => {

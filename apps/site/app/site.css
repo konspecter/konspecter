@@ -565,6 +565,15 @@ main {
   line-height: 1.62;
 }
 
+.feature dd a {
+  color: inherit;
+  text-underline-offset: 0.2em;
+}
+
+.feature dd a:hover {
+  color: var(--color-fg);
+}
+
 .section-lead {
   margin: 0.6rem 0 0;
   color: var(--color-muted);

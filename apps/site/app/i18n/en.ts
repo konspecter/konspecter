@@ -48,7 +48,8 @@ export const en = {
     "Type a word you remember and the conspect appears while you type, among everything you have ever written.",
   "home.feature.tags.title": "Tags instead of folders",
   "home.feature.tags.text":
-    "Write #recipes or #work#meetings anywhere in the text and the conspect files itself under that topic. One conspect can sit under several at once.",
+    "Write #recipes or #work#meetings anywhere in the text and the conspect files itself under that topic. One conspect can sit under several at once. {tagChain}",
+  "home.feature.tags.link": "How tags build the tree",
   "home.feature.offline.title": "No internet? No problem",
   "home.feature.offline.text":
     "Everything is kept on your device, so Konspecter opens at once and works on a plane or underground. It catches up when you are back online.",
