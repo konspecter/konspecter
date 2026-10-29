@@ -68,6 +68,14 @@ export function NotePage({
   const location = useLocation();
   const navigate = useNavigate();
   const [adopted, setAdopted] = useState<Adopted | null>(null);
+  // An adoption carries its session only over its own navigation. Gone to any
+  // other note, it ends: the note it holds is the version as it was adopted,
+  // and opening that note again later must read the latest from the store.
+  const [shownId, setShownId] = useState(id);
+  if (id !== shownId) {
+    setShownId(id);
+    if (adopted && id !== adopted.id) setAdopted(null);
+  }
   const continued =
     id !== undefined && (adopted?.id === id || adopted?.from === id) ? adopted : null;
   // A heading followed in the tree (`#heading-2`): each navigation to it scrolls there.

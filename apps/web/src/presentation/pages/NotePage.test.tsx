@@ -1,7 +1,7 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState, type ReactNode } from "react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router";
+import { Link, MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { parseDocument } from "../../domain/document/document";
 import { createNote } from "../../domain/note/note";
 import type { EditorMode } from "../../domain/settings/settings";
@@ -41,12 +41,16 @@ function WithDetails({ children }: { children: ReactNode }) {
   );
 }
 
-/** Both routes render one element, as in App, so a saved new note keeps its editor. */
+/**
+ * Both routes render one element, as in App, so a saved new note keeps its
+ * editor. `links` are paths to go to, as the sidebar's notes are.
+ */
 function renderNotePage(
   store: NoteRepository,
   path: string,
   activity = new Activity(),
   mode: EditorMode = "text",
+  links: readonly string[] = [],
 ) {
   const page = (
     <NotePage store={store} catalog={new NoteCatalog(store)} mode={mode} activity={activity} />
@@ -60,6 +64,11 @@ function renderNotePage(
         </Routes>
       </WithDetails>
       <Where />
+      {links.map((link) => (
+        <Link key={link} to={link}>
+          {link}
+        </Link>
+      ))}
     </MemoryRouter>,
   );
 }
@@ -108,6 +117,35 @@ describe("a new note", () => {
       expect((await store.get(note?.id ?? ""))?.markdown).toContain("Body text");
     });
     expect(await store.list()).toHaveLength(1);
+  });
+
+  it("shows all its text when opened again after another note", async () => {
+    const folder = new FakeFolder();
+    folder.edit("other.md", "# Other\n\nElsewhere");
+    const store = new FolderStore(folder, await newStore(), { graceMs: 5 });
+    const [other, mine] = ["/conspects/other.md", "/conspects/doc-one.md"];
+    renderNotePage(store, "/conspects/new", new Activity(), "text", [other, mine]);
+
+    await textBox();
+    // A pause after the title: the first save stores the note with only that.
+    await userEvent.keyboard("# Doc one{Enter}");
+    await waitFor(() => {
+      expect(location()).toHaveTextContent(mine);
+    });
+    await userEvent.keyboard("Body {Control>}b{/Control}bold");
+    await waitFor(() => {
+      expect(folder.files.get("doc-one.md")?.text).toContain("Body **bold**");
+    });
+
+    await userEvent.click(screen.getByRole("link", { name: other }));
+    expect(await screen.findByText("Elsewhere")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("link", { name: mine }));
+
+    const box = await screen.findByRole("textbox", { name: "Conspect text" });
+    await waitFor(() => {
+      expect(box).toHaveTextContent("Body bold");
+    });
+    expect(within(box).getByText("bold").tagName).toBe("STRONG");
   });
 
   it("stores nothing while it is blank", async () => {
@@ -305,6 +343,37 @@ describe("an existing note", () => {
       expect(box).toHaveFocus();
     }
     expect(folder.files.get("lang/java.md")?.text).toContain("Body #lang");
+  });
+
+  it("shows the edits made after its file moved when opened again after another note", async () => {
+    const folder = new FakeFolder();
+    folder.edit("java.md", "# Java\n\nBody");
+    folder.edit("other.md", "# Other\n\nElsewhere");
+    const store = new FolderStore(folder, await newStore(), { graceMs: 5 });
+    const [other, moved] = ["/conspects/other.md", `/conspects/${encodeURIComponent("l/java.md")}`];
+    renderNotePage(store, "/conspects/java.md", new Activity(), "text", [other, moved]);
+
+    const box = await textBox();
+    await userEvent.click(box);
+    caretAtEnd(box);
+    await userEvent.keyboard(" #l");
+    await waitFor(() => {
+      expect(location()).toHaveTextContent(moved);
+    });
+    await userEvent.keyboard(" later");
+    await waitFor(() => {
+      expect(folder.files.get("l/java.md")?.text).toContain("Body #l later");
+    });
+
+    await userEvent.click(screen.getByRole("link", { name: other }));
+    expect(await screen.findByText("Elsewhere")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("link", { name: moved }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("textbox", { name: "Conspect text" })).toHaveTextContent(
+        "Body #l later",
+      );
+    });
   });
 
   it("shows not found for an unknown note", async () => {
