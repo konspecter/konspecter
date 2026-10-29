@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.14.0 — 2026-10-30
+
+- **Switch between notes with Ctrl+Tab:** pressed once it goes back to the note opened before;
+  with Ctrl held, each Tab goes further back through the notes opened, then Recent, and
+  Ctrl+Shift+Tab steps the other way. It is Ctrl on macOS too.
+- **Tags suggested as you type:** `#` and a letter in the search box or in either editor list
+  the tags you already use; ↑/↓ choose one, Enter or a click takes it, Escape closes the list.
+- **A new conspect starts in the folder you chose:** with a folder of the tag tree chosen, say
+  Java › Collections, a new conspect starts with `java#collections` in its frontmatter. One you
+  leave without writing anything is not kept.
+- **Notes opened from search results show the match:** a note opened from the list's results
+  has the same words searched in it and opens at the first match.
+- **Copy code with one click:** in the text editor, with the caret in inline code or a code
+  block, a button under it copies the code.
+- **A horizontal line tool:** the text editor's toolbar draws a line (`---`) at the caret.
+- **Text size moves the spacing too:** the room around the text, under the title and in tables
+  and keyboard keys now grows and shrinks with Settings → Text size.
+- **Sync suggests Konspecter's server:** the server address in Settings → Sync starts filled in
+  with `https://konspecter.com`; a web app you host still suggests your own server.
+- **Encryption setup without retyping the key:** the site shows the recovery key once, with a
+  button to copy it, and Finish no longer asks you to type it back.
+- **The desktop sidebar makes room:** in a narrow window the desktop app hides the sidebar, and
+  shows it again when the window is wide, unless you hid it yourself.
+- **More on the site:** the Tags feature on the home page links to the Tag-Chain page; the
+  footer links to feedback on GitHub; on the Russian site the Android app can be installed from
+  RuStore, beside its APK.
+- **Device list shows current versions:** the site's list of connected apps shows the version
+  each one runs now, not the one it had when it was connected.
+- **Lists and checklists keep their shape:** a list or checklist pasted from a web page stays
+  tight and keeps its tasks, and a checklist split or extended in Text mode stays one list.
+- **Opened again, a note shows its latest text:** a new note, or one whose file was moved, no
+  longer comes back with an older copy when opened again.
+- **Smaller fixes:** the Markdown editor's caret takes the text's colour, wider on touch
+  screens, and its selection sits over the text it selects; the island stays above an
+  on-screen keyboard that covers the page; Mod+Alt+digit pressed again unpins at once; emptied
+  frontmatter fields hide with the others; the storage bar spans the Sync section, its percent
+  is written in the interface's language; a note's length takes a line each in the Details;
+  "Show in folder" is the same on every system.
+- **Security updates:** the server is built with Go 1.27.3, and markdown-it, vitest and several
+  packages they use are updated for advisories.
+
 ## 0.13.1 — 2026-10-20
 
 - **Bump vite to 8.3.4 for GHSA-698v-4r3x-3vcv**
