@@ -106,13 +106,12 @@ test("register, encrypt, connect two devices, disconnect one, delete the account
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByRole("link", { name: email })).toBeVisible();
 
-  // 2. Set up encryption: a passphrase, then the recovery key typed back.
+  // 2. Set up encryption: a passphrase, then the recovery key shown once.
   await page.goto(`${site ?? ""}/settings#encryption`);
   await page.getByLabel("New passphrase").fill(passphrase);
   await page.getByLabel("Repeat the passphrase").fill(passphrase);
   await page.getByRole("button", { name: "Set up encryption" }).click();
-  const recoveryKey = (await page.getByLabel("Recovery key", { exact: true }).textContent()) ?? "";
-  await page.getByLabel("Type the recovery key to confirm you saved it").fill(recoveryKey);
+  await expect(page.getByLabel("Recovery key", { exact: true })).toHaveText(/^[A-Z2-7-]+$/);
   await page.getByRole("button", { name: "Finish setting up" }).click();
   await expect(page.getByText(/Encryption is set up/)).toBeVisible();
   const session = await person.storageState();

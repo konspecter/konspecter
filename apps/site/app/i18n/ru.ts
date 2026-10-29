@@ -300,7 +300,6 @@ export const ru: Dictionary = {
   "encryption.recoveryKey": "Ключ восстановления",
   "encryption.copy": "Скопировать",
   "encryption.copied": "Скопировано",
-  "encryption.confirmRecovery": "Введите ключ восстановления, чтобы подтвердить, что сохранили его",
   "encryption.finishSetUp": "Завершить настройку",
   "encryption.setUpDone":
     "Шифрование настроено. Приложениям, подключённым QR-кодом из этого браузера, пароль не нужен; остальные спросят его один раз.",
@@ -334,8 +333,6 @@ export const ru: Dictionary = {
     "Шифрование сброшено, конспекты на сервере удалены. Настройте его снова, чтобы синхронизироваться.",
   "encryption.error.short": "Возьмите пароль подлиннее.",
   "encryption.error.mismatch": "Пароли не совпадают.",
-  "encryption.error.recoveryMismatch":
-    "Это не тот ключ восстановления, что показан выше. Проверьте его по буквам.",
   "encryption.error.wrongCurrent": "Текущий пароль неверный.",
   "encryption.error.wrongPassphrase": "Этот пароль не открывает ключ аккаунта.",
   "encryption.error.wrongRecovery": "Этот ключ восстановления не открывает ключ аккаунта.",

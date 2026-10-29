@@ -5,7 +5,6 @@ import {
   MIN_PASSPHRASE_LENGTH,
   openWithPassphrase,
   openWithRecoveryKey,
-  parseRecoveryKey,
   rewrap,
   WrongSecretError,
   type KeyRecord,
@@ -197,7 +196,7 @@ function ActionForm({
   submit: string;
   danger?: boolean;
   action: (form: HTMLFormElement) => Promise<void>;
-  children: ReactNode;
+  children?: ReactNode;
 }) {
   const { t } = useT();
   const [busy, setBusy] = useState(false);
@@ -293,7 +292,7 @@ function SetUp({
   );
 }
 
-/** The recovery key, shown once; the key is stored only after it is typed back. */
+/** The recovery key, shown once; the key is stored when the owner finishes. */
 function SaveRecoveryKey({
   record,
   recoveryKey,
@@ -326,24 +325,10 @@ function SaveRecoveryKey({
       </div>
       <ActionForm
         submit={t("encryption.finishSetUp")}
-        action={async (form) => {
-          const typed = parseRecoveryKey(text(form, "recovery"));
-          const shown = parseRecoveryKey(recoveryKey);
-          if (!typed || !shown || typed.some((byte, i) => byte !== shown[i])) {
-            throw new Problem("encryption.error.recoveryMismatch");
-          }
+        action={async () => {
           await onSaved(await saveKey(record));
         }}
-      >
-        <Field
-          label={t("encryption.confirmRecovery")}
-          name="recovery"
-          autoComplete="off"
-          spellCheck={false}
-          required
-          className="recovery-input"
-        />
-      </ActionForm>
+      />
     </>
   );
 }

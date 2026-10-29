@@ -93,7 +93,7 @@ function asRecord(json: Record<string, unknown>): KeyRecord {
   };
 }
 
-it("sets encryption up: a passphrase, then the recovery key typed back", async () => {
+it("sets encryption up: a passphrase, then the recovery key shown once", async () => {
   const server = stubKeys(null);
   renderSection();
   const user = userEvent.setup();
@@ -113,13 +113,6 @@ it("sets encryption up: a passphrase, then the recovery key typed back", async (
   expect(shown).toMatch(/^([A-Z2-7]{4}-){7}[A-Z2-7]{4}$/);
   expect(server.calls.map((c) => c.method)).toEqual(["GET"]); // Nothing stored yet.
 
-  const confirm = screen.getByLabelText("Type the recovery key to confirm you saved it");
-  await user.type(confirm, "AAAA-AAAA");
-  await user.click(screen.getByRole("button", { name: "Finish setting up" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("not the recovery key shown above");
-
-  await user.clear(confirm);
-  await user.type(confirm, shown.toLowerCase().replace(/-/g, " "));
   await user.click(screen.getByRole("button", { name: "Finish setting up" }));
   expect(await screen.findByRole("status")).toHaveTextContent("Encryption is set up.");
   expect(screen.getByText(/Encryption is on, since/)).toBeInTheDocument();

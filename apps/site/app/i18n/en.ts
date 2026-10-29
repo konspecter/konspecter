@@ -298,7 +298,6 @@ export const en = {
   "encryption.recoveryKey": "Recovery key",
   "encryption.copy": "Copy",
   "encryption.copied": "Copied",
-  "encryption.confirmRecovery": "Type the recovery key to confirm you saved it",
   "encryption.finishSetUp": "Finish setting up",
   "encryption.setUpDone":
     "Encryption is set up. Apps you connect with a QR code from this browser need no passphrase; others ask for it once.",
@@ -332,8 +331,6 @@ export const en = {
     "Encryption is reset and the server's conspects are deleted. Set it up again to sync.",
   "encryption.error.short": "Use a longer passphrase.",
   "encryption.error.mismatch": "The two passphrases are different.",
-  "encryption.error.recoveryMismatch":
-    "That is not the recovery key shown above. Check it, letter by letter.",
   "encryption.error.wrongCurrent": "The current passphrase is wrong.",
   "encryption.error.wrongPassphrase": "That passphrase does not open this account's key.",
   "encryption.error.wrongRecovery": "That recovery key does not open this account's key.",

@@ -46,7 +46,8 @@ the last-write-wins rule already runs on the clients, so the server never needs 
    wake the event streams, so a device notices a reset or a new key at once. A key it has
    not held before means everything is uploaded again (`resetSync`).
 6. **The site's Encryption section runs in the browser only** (`packages/crypto` on
-   WebCrypto): set up (the recovery key must be typed back before the key is stored),
+   WebCrypto): set up (the recovery key is shown once, with a button to copy it, and the
+   key is stored when the owner finishes),
    change the passphrase, set a new one with the recovery key, or reset.
 7. **Upgrading deletes the plaintext notes** the server held (migration `006_e2e.sql`).
    Every device re-uploads its copy, encrypted, after unlocking. The release notes say to
