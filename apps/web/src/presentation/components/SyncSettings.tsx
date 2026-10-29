@@ -34,7 +34,7 @@ import {
 import { useErrorMessage } from "../hooks/use-error-message";
 import { NoteDate } from "./NoteDate";
 import { QrScanDialog } from "./QrScanDialog";
-import { t, tn } from "../i18n/i18n";
+import { currentLocale, t, tn } from "../i18n/i18n";
 import { rich } from "../i18n/rich";
 
 export function syncSummary(status: SyncStatus): string {
@@ -115,8 +115,6 @@ function SyncState({ sync, status }: { sync: SyncEngine; status: SyncStatus }) {
   );
 }
 
-const percentFormat = new Intl.NumberFormat(undefined, { style: "percent" });
-
 /** How full the account's storage on the server is: its share in percent (never sizes), and a bar. */
 function StorageUse({ storage }: { storage: SyncStorage }) {
   const id = useId();
@@ -125,7 +123,12 @@ function StorageUse({ storage }: { storage: SyncStorage }) {
   return (
     <div className="sync-storage">
       <p id={id} className="setting-hint">
-        {t("sync.storage", { percent: percentFormat.format(percent / 100) })}
+        {t("sync.storage", {
+          // In the interface's language, not the system's: "25%" in English, "25 %" in Russian.
+          percent: new Intl.NumberFormat(currentLocale(), { style: "percent" }).format(
+            percent / 100,
+          ),
+        })}
       </p>
       <div
         role="meter"
