@@ -68,7 +68,10 @@ async function setup(server = new FakeServer()) {
 it("signs in with the browser: shows the code, opens the page, connects once approved", async () => {
   const { server, scheduler, opened } = await setup();
   const user = userEvent.setup();
-  await user.type(screen.getByRole("textbox", { name: "Server URL" }), "https://sync.example.com");
+  const field = screen.getByRole("textbox", { name: "Server URL" });
+  expect(field).toHaveValue("https://konspecter.com");
+  await user.clear(field);
+  await user.type(field, "https://sync.example.com");
   await user.click(screen.getByRole("button", { name: "Sign in with browser" }));
 
   const code = (await screen.findByText(/^BCDF-/)).textContent;
@@ -126,7 +129,9 @@ it("leaves a server URL the owner typed before the suggestion came", async () =>
   );
   await setup();
   const field = screen.getByRole("textbox", { name: "Server URL" });
-  await userEvent.setup().type(field, "https://mine.example.com");
+  const user = userEvent.setup();
+  await user.clear(field);
+  await user.type(field, "https://mine.example.com");
   answer(Response.json({ serverUrl: "https://notes.example.com" }));
   // Let the suggestion arrive.
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -143,11 +148,16 @@ it("sends the owner to the site when encryption is not set up", async () => {
 
 it("keeps the token form under Advanced", async () => {
   await setup();
+  const user = userEvent.setup();
   const advanced = screen.getByText("Advanced: connect with an access token");
-  await userEvent.setup().click(advanced);
+  await user.click(advanced);
   expect(screen.getByLabelText("Access token")).toBeVisible();
-  const form = advanced.closest("details");
-  expect(within(form as HTMLElement).getByRole("button", { name: "Connect" })).toBeDisabled(); // No server yet.
+  const connect = within(advanced.closest("details") as HTMLElement).getByRole("button", {
+    name: "Connect",
+  });
+  expect(connect).toBeEnabled();
+  await user.clear(screen.getByRole("textbox", { name: "Server URL" }));
+  expect(connect).toBeDisabled(); // No server.
 });
 
 it("scans the site's QR code and connects to its server", async () => {

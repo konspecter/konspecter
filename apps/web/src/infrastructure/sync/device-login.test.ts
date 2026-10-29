@@ -136,6 +136,14 @@ describe("the suggested server", () => {
     }
   });
 
+  it("is Konspecter's own when neither the host nor the build names one", async () => {
+    vi.stubEnv("VITE_KONSPECTER_SERVER_URL", "");
+    await expect(
+      suggestedServerUrl({ native: false, ...host(() => new Response("", { status: 404 })) }),
+    ).resolves.toBe("https://konspecter.com");
+    await expect(suggestedServerUrl({ native: true })).resolves.toBe("https://konspecter.com");
+  });
+
   it("is the build's in the desktop and mobile apps, without asking", async () => {
     vi.stubEnv("VITE_KONSPECTER_SERVER_URL", "https://build.example.com");
     const { fetch, asked } = host(() => Response.json({ serverUrl: "https://notes.example.com" }));

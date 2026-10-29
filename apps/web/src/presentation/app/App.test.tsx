@@ -2325,6 +2325,7 @@ describe("sync", () => {
       </MemoryRouter>,
     );
 
+    await userEvent.clear(screen.getByLabelText("Server URL"));
     await userEvent.type(screen.getByLabelText("Server URL"), "https://sync.example.com");
     await userEvent.type(screen.getByLabelText("Access token"), "ksp_ada");
     await userEvent.click(screen.getByRole("button", { name: "Connect" }));
@@ -2370,6 +2371,7 @@ describe("sync", () => {
       </MemoryRouter>,
     );
 
+    await userEvent.clear(screen.getByLabelText("Server URL"));
     await userEvent.type(screen.getByLabelText("Server URL"), "https://sync.example.com");
     await userEvent.type(screen.getByLabelText("Access token"), "ksp_wrong");
     await userEvent.click(screen.getByRole("button", { name: "Connect" }));

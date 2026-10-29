@@ -205,7 +205,8 @@ syncedHash, blocked }`. `path` is null while a deletion is queued; `syncedHash` 
 Settings → **Sync**:
 
 1. **Sign in with browser** (the server URL defaults to the one the web app's host names
-   in `/config.json`, else the build's `VITE_KONSPECTER_SERVER_URL`;
+   in `/config.json`, else the build's `VITE_KONSPECTER_SERVER_URL`, else Konspecter's own
+   `https://konspecter.com`;
    [ADR-023](decisions/ADR-023-published-images.md)): the app shows a code and opens the site's `/activate`
    page in the browser (a tab on the web, the system browser on desktop and mobile). Once
    the code is approved there, it connects. A token from `server create-token` can still

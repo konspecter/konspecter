@@ -67,9 +67,13 @@ export async function deviceLogin(
 /** The build's version, from package.json (vite.config.ts). */
 const VERSION = __KONSPECTER_VERSION__;
 
-/** The server the build suggests (VITE_KONSPECTER_SERVER_URL), or "". */
+/** Konspecter's own sync service (ADR-026), suggested when the build names no other. */
+const KONSPECTER_SERVER_URL = "https://konspecter.com";
+
+/** The server the build suggests (VITE_KONSPECTER_SERVER_URL), else Konspecter's own. */
 export function defaultServerUrl(): string {
-  return import.meta.env.VITE_KONSPECTER_SERVER_URL ?? "";
+  const built = import.meta.env.VITE_KONSPECTER_SERVER_URL ?? "";
+  return built === "" ? KONSPECTER_SERVER_URL : built;
 }
 
 /**

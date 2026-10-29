@@ -150,7 +150,7 @@ cp .env.example .env   # fill in the addresses, a database password and email
 docker compose up -d
 ```
 
-Open your site to create an account. Then, in the app, enter the site's URL under **Settings → Sync** and sign in with the browser, or scan the QR code in the site's settings.
+Open your site to create an account. Then, in the app, enter the site's URL under **Settings → Sync** (the field starts with Konspecter's own `https://konspecter.com`; the web app you host fills in your site by itself) and sign in with the browser, or scan the QR code in the site's settings.
 
 See the [self-hosting guide](docs/self-hosting.md) for the settings, a private server, upgrades and backups.
 
