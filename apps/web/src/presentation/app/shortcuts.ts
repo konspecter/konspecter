@@ -5,8 +5,8 @@ import type { TextKey } from "../i18n/i18n";
  * Every keyboard shortcut in the app, in one place: the handlers (Layout and
  * the note page) and the lists shown to the user read the same table.
  *
- * `Mod` is ⌘ on macOS and Ctrl elsewhere, `Alt` is ⌥, and `Digit` any of
- * 1…0. Modifier shortcuts work
+ * `Mod` is ⌘ on macOS and Ctrl elsewhere, `Ctrl` is Ctrl (⌃) everywhere,
+ * `Alt` is ⌥, and `Digit` any of 1…0. Modifier shortcuts work
  * everywhere, also while typing in an editor, unless they are `outsideText`
  * (in text ⌘←/⌘→ go to the line's ends, Ctrl+←/→ by words); single keys only
  * outside text fields. Escape is never ours: it closes dialogs and lets go
@@ -24,6 +24,8 @@ export const SHORTCUTS = {
   forward: { keys: "Mod+ArrowRight", label: "shortcut.forward", outsideText: true },
   previousRecent: { keys: "Mod+Alt+ArrowLeft", label: "shortcut.previousRecent" },
   nextRecent: { keys: "Mod+Alt+ArrowRight", label: "shortcut.nextRecent" },
+  // Ctrl on macOS too, as in VS Code: ⌘Tab is the system's app switcher.
+  switchNote: { keys: "Ctrl+Tab", label: "shortcut.switchNote" },
   // As StarCraft's unit groups: one chord puts the open note on a digit, the other goes to it.
   pinNote: { keys: "Mod+Alt+Digit", label: "shortcut.pinNote" },
   openPinned: { keys: "Mod+Digit", label: "shortcut.openPinned" },
@@ -68,9 +70,10 @@ function modifierKeys(keys: string): { alt: boolean; key: string } {
 /**
  * "Mod+P" as the user sees it: "⌘P" on macOS, "Ctrl+P" elsewhere; arrow
  * keys are arrows ("⌘←", "⌥⌘←", "Ctrl+Alt+←"), and a
- * digit is "1…0" ("⌘1…0", "Ctrl+Alt+1…0").
+ * digit is "1…0" ("⌘1…0", "Ctrl+Alt+1…0"). "Ctrl+Tab" is "⌃Tab" on macOS.
  */
 export function formatKeys(keys: string, mac = isMac()): string {
+  if (keys.startsWith("Ctrl+")) return mac ? `⌃${keys.slice(5)}` : keys;
   if (!keys.startsWith("Mod+")) return keys;
   const { alt, key } = modifierKeys(keys);
   const shown = key === "Digit" ? "1…0" : (ARROWS[key] ?? key);
@@ -95,8 +98,12 @@ export function pinKeyOf(event: KeyboardEvent): PinKey | null {
   return digit !== undefined && isPinKey(digit) ? digit : null;
 }
 
-/** Whether `event` is the shortcut `keys` ("Mod+P", "Mod+Alt+ArrowLeft", "Mod+Digit", "?"). */
+/** Whether `event` is the shortcut `keys` ("Mod+P", "Mod+Alt+ArrowLeft", "Mod+Digit", "Ctrl+Tab", "?"). */
 export function matchesShortcut(keys: string, event: KeyboardEvent, mac = isMac()): boolean {
+  if (keys.startsWith("Ctrl+")) {
+    const only = event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
+    return only && event.key === keys.slice(5);
+  }
   if (keys.startsWith("Mod+")) {
     const mod = mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
     const { alt, key: name } = modifierKeys(keys);

@@ -238,17 +238,24 @@ Konspecter is designed to be fast to use from the keyboard.
 
 On macOS, use `⌘`; elsewhere, use `Ctrl`.
 
-| Shortcut        | Action         |
-| --------------- | -------------- |
-| `⌘P` / `Ctrl+P` | Search         |
-| `⌘N` / `Ctrl+N` | New conspect   |
-| `⌘,` / `Ctrl+,` | Settings       |
-| `⌘S` / `Ctrl+S` | Save now       |
-| `/`             | Search         |
-| `n`             | New conspect   |
-| `?`             | Show shortcuts |
+| Shortcut            | Action                     |
+| ------------------- | -------------------------- |
+| `⌘P` / `Ctrl+P`     | Search                     |
+| `⌘N` / `Ctrl+N`     | New conspect               |
+| `⌘,` / `Ctrl+,`     | Settings                   |
+| `⌘S` / `Ctrl+S`     | Save now                   |
+| `⌃Tab` / `Ctrl+Tab` | The conspect opened before |
+| `/`                 | Search                     |
+| `n`                 | New conspect               |
+| `?`                 | Show shortcuts             |
 
 Outside text fields, `/`, `n` and `?` are available as quick shortcuts.
+
+`Ctrl+Tab` (Control on macOS too) works like switching tabs in an editor: press it once to go
+to the conspect you had open before, and again to come back. Keep Ctrl held and press Tab again
+to go further back through the conspects you opened, then the rest of Recent, round in a loop;
+let go of Ctrl to stay on the one you reached. Browsers keep `Ctrl+Tab` for their own tabs, so
+it works in the desktop app, not in a browser tab.
 
 ---
 

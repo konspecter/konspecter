@@ -74,6 +74,8 @@ export const en = {
   "shortcut.forward": "Forward (outside text fields)",
   "shortcut.previousRecent": "Previous conspect in Recent",
   "shortcut.nextRecent": "Next conspect in Recent",
+  "shortcut.switchNote":
+    "The conspect opened before; hold Ctrl and press Tab again to go further back",
   "shortcut.pinNote": "Pin the open conspect to the top of Recent under this key; again to unpin",
   "shortcut.openPinned": "Open the conspect pinned to this key",
   "shortcut.help": "Show these shortcuts",

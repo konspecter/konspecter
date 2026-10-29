@@ -19,7 +19,9 @@ function isTyping(target: EventTarget | null): boolean {
 function blocked(name: ShortcutName, target: EventTarget | null): boolean {
   const shortcut: { keys: string; outsideText?: boolean } = SHORTCUTS[name];
   const { keys } = shortcut;
-  if (keys.startsWith("Mod+")) return shortcut.outsideText === true && isTyping(target);
+  if (keys.startsWith("Mod+") || keys.startsWith("Ctrl+")) {
+    return shortcut.outsideText === true && isTyping(target);
+  }
   return isTyping(target);
 }
 

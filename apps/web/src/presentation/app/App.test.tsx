@@ -208,6 +208,44 @@ describe("layout", () => {
     });
   });
 
+  it("toggles to the note opened before with Ctrl+Tab, and goes further back while Ctrl is held", async () => {
+    const store = await newStore();
+    await store.put(createNote("# Oldest\n\nOne.", daysAgo(3), "oldest"));
+    await store.put(createNote("# Middle\n\nTwo.", daysAgo(2), "middle"));
+    await store.put(createNote("# Newest\n\nThree.", daysAgo(1), "newest"));
+    renderApp(store, "/conspects/oldest");
+    await textEditor();
+    await userEvent.click(within(recentNav()).getByRole("link", { name: "Middle" }));
+    const open = () =>
+      waitFor(() => within(recentNav()).getByRole("link", { current: "page" }).textContent);
+    const opens = async (title: string) => {
+      await waitFor(async () => {
+        expect(await open()).toBe(title);
+      });
+    };
+    expect(await open()).toBe("Middle");
+
+    // Pressed and let go, from the text too: a toggle between the last two.
+    await userEvent.click(await textEditor());
+    await userEvent.keyboard("{Control>}{Tab}{/Control}");
+    await opens("Oldest");
+    await userEvent.keyboard("{Control>}{Tab}{/Control}");
+    await opens("Middle");
+
+    // Held: the one before, then on into Recent, round in a loop.
+    const user = userEvent.setup();
+    await user.keyboard("{Control>}{Tab}");
+    await opens("Oldest");
+    await user.keyboard("{Tab}");
+    await opens("Newest");
+    await user.keyboard("{Tab}");
+    await opens("Middle");
+    await user.keyboard("{Tab}{Tab}{/Control}");
+    // Settled on Newest: the one it came from is the one before.
+    await userEvent.keyboard("{Control>}{Tab}{/Control}");
+    await opens("Middle");
+  });
+
   it("pins the open note to the top of Recent with Mod+Alt+1…0, in its frontmatter, and unpins it", async () => {
     const store = await newStore();
     await store.put(createNote("# Old\n\nA month ago.", daysAgo(30), "old"));

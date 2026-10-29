@@ -4,6 +4,12 @@ import { parseQuery } from "../../domain/search/query";
 import type { EditorMode, TagNames, Theme, TreeHeadings } from "../../domain/settings/settings";
 import type { NoteCatalog } from "../../application/notes/note-catalog";
 import { pinsOf, recentWithPins } from "../../application/notes/note-pins";
+import {
+  noteOpened,
+  startSwitch,
+  switchStep,
+  type NoteSwitch,
+} from "../../application/notes/note-switch";
 import type { NoteRepository } from "../../application/notes/note-repository";
 import type { SyncEngine } from "../../infrastructure/sync/sync-engine";
 import type { Activity } from "../app/activity";
@@ -237,6 +243,43 @@ export function Layout({
     );
     if (id !== null) void navigate(`/conspects/${encodeURIComponent(id)}`);
   };
+  // Ctrl+Tab: the notes in the order they were opened. While Ctrl is held the
+  // order stays as it was at the first Tab; letting go puts the note reached first.
+  const opened = useRef<string[]>([]);
+  const switching = useRef<NoteSwitch | null>(null);
+  useEffect(() => {
+    if (currentNoteId !== null && switching.current === null) {
+      opened.current = noteOpened(opened.current, currentNoteId);
+    }
+  }, [currentNoteId]);
+  useEffect(() => {
+    const settle = (event: Event) => {
+      const held = switching.current;
+      if (held === null || (event instanceof KeyboardEvent && event.key !== "Control")) return;
+      switching.current = null;
+      const id = held.order[held.index];
+      if (id !== undefined) opened.current = noteOpened(opened.current, id);
+    };
+    window.addEventListener("keyup", settle, { capture: true });
+    window.addEventListener("blur", settle);
+    return () => {
+      window.removeEventListener("keyup", settle, { capture: true });
+      window.removeEventListener("blur", settle);
+    };
+  }, []);
+  const switchNote = (): false | undefined => {
+    const library = catalog.getSnapshot();
+    const held =
+      switching.current ??
+      (library.status === "ready"
+        ? startSwitch(opened.current, library.notes, currentNoteId, new Date())
+        : null);
+    const step = held && switchStep(held);
+    if (!step) return false;
+    switching.current = step.next;
+    void navigate(`/conspects/${encodeURIComponent(step.id)}`);
+    return undefined;
+  };
   // The note on the key. A key with no note (or one that is gone) stays the browser's.
   const openPinned = (event: KeyboardEvent): false | undefined => {
     const key = pinKeyOf(event);
@@ -291,6 +334,7 @@ export function Layout({
     nextRecent: () => {
       openRecent(1);
     },
+    switchNote,
     // Mod+Alt+1…0 (pinning) is the note page's: it edits the note.
     openPinned,
     help: () => {

@@ -50,6 +50,15 @@ describe("matchesShortcut", () => {
     ).toBe(false);
   });
 
+  it("matches Ctrl+Tab by Ctrl on every platform, ⌘Tab being macOS's app switcher", () => {
+    expect(matchesShortcut("Ctrl+Tab", key({ key: "Tab", ctrlKey: true }), true)).toBe(true);
+    expect(matchesShortcut("Ctrl+Tab", key({ key: "Tab", ctrlKey: true }), false)).toBe(true);
+    expect(matchesShortcut("Ctrl+Tab", key({ key: "Tab", metaKey: true }), true)).toBe(false);
+    expect(
+      matchesShortcut("Ctrl+Tab", key({ key: "Tab", ctrlKey: true, shiftKey: true }), false),
+    ).toBe(false);
+  });
+
   it("matches single keys only without modifiers", () => {
     expect(matchesShortcut("?", key({ key: "?", shiftKey: true }), false)).toBe(true);
     expect(matchesShortcut("n", key({ key: "n" }), false)).toBe(true);
@@ -62,6 +71,8 @@ describe("formatKeys", () => {
     expect(formatKeys("Mod+P", true)).toBe("⌘P");
     expect(formatKeys("Mod+,", false)).toBe("Ctrl+,");
     expect(formatKeys("?", true)).toBe("?");
+    expect(formatKeys("Ctrl+Tab", true)).toBe("⌃Tab");
+    expect(formatKeys("Ctrl+Tab", false)).toBe("Ctrl+Tab");
   });
 });
 
