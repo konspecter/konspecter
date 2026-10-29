@@ -30,6 +30,7 @@ import { reportError } from "./presentation/app/errors";
 import { restoreLocation } from "./presentation/app/last-location";
 import type { LibraryControls } from "./presentation/app/library";
 import type { CheckForRelease, Update, UpdateSource } from "./presentation/app/updates";
+import { followKeyboard } from "./presentation/app/keyboard";
 import { isMac } from "./presentation/app/shortcuts";
 import { applyStyles, hideSplash, showStage } from "./presentation/app/splash";
 import { ErrorState } from "./presentation/components/ErrorState";
@@ -54,6 +55,8 @@ const root = createRoot(rootElement);
 if (isDesktop() && isMac()) document.documentElement.dataset.titlebar = "overlay";
 // iOS Safari would zoom in on every field and stay zoomed.
 stopFocusZoom();
+// The island stays above an on-screen keyboard that covers the page (iOS Safari).
+followKeyboard();
 
 // The service worker precaches the app so it works offline, and reports when
 // a new version is waiting.
