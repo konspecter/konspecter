@@ -140,9 +140,12 @@ export function Layout({
     setFind(NO_FIND);
     setFindCount(0);
   }, []);
+  const startFind = useCallback((query: string) => {
+    setFind((current) => ({ query, selected: 0, reveal: current.reveal + 1 }));
+  }, []);
   const findChannel = useMemo<NoteFindChannel>(
-    () => ({ find: shownFind, onCount: setFindCount, onClose: closeFind }),
-    [shownFind, closeFind],
+    () => ({ find: shownFind, onCount: setFindCount, onClose: closeFind, onFind: startFind }),
+    [shownFind, closeFind, startFind],
   );
   useScrollbarGutter();
   // The app opens where it was last time.

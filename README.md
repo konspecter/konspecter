@@ -91,6 +91,10 @@ Konspecter provides two ways to work with the same content: a distraction-free, 
 
 Combine tags with full-text search: `hashmap #java`. Search is local and works without an internet connection.
 
+Open a conspect from the results and the same words are already searched in it: the matches are
+marked and the page scrolls to the first one, so you land where the search found it. The arrows
+in the search box go on to the next match.
+
 ![Search for "leader" within the #distributed-systems tag, with the tag tree open](docs/assets/search.png)
 
 ### Desktop files

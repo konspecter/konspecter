@@ -18,7 +18,7 @@ import { ErrorState } from "../components/ErrorState";
 import { Details } from "../components/details-slot";
 import { NoteDetails } from "../components/NoteDetails";
 import { NoteNotFound } from "../components/NoteNotFound";
-import { NoteFindContext } from "../components/note-find";
+import { listFind, NoteFindContext } from "../components/note-find";
 import { headingInHash, type HeadingTarget } from "../components/note-heading";
 import { displayTitle } from "../components/note-title";
 import { LazyNoteEditor, preloadEditor } from "../editors/LazyNoteEditor";
@@ -148,6 +148,7 @@ export function NotePage({
       activity={activity}
       readingPosition={readingPosition}
       heading={heading}
+      listQuery={listFind(location.state)}
       onAdopt={adopt}
     />
   );
@@ -164,6 +165,8 @@ type NoteSessionProps = {
   readingPosition: ReadingPositionMode;
   /** The heading to scroll to, if one was followed. */
   heading: HeadingTarget | null;
+  /** The list's search the note was opened from, to search the note for. */
+  listQuery: string | null;
   onAdopt: (note: Note) => void;
 };
 
@@ -176,6 +179,7 @@ function NoteSession({
   activity,
   readingPosition,
   heading,
+  listQuery,
   onAdopt,
 }: NoteSessionProps) {
   const navigate = useNavigate();
@@ -314,14 +318,22 @@ function NoteSession({
     setReady(true);
   }, []);
 
-  // A note opened at a heading stays there rather than going back to where it was read.
+  // Opened from the list's search results: the same search in the note, once
+  // the editor is there, so it scrolls to the first match.
+  const [openedFromSearch] = useState(listQuery);
+  const startFind = finding?.onFind;
+  useEffect(() => {
+    if (ready && openedFromSearch !== null) startFind?.(openedFromSearch);
+  }, [ready, openedFromSearch, startFind]);
+
+  // A note opened at a heading or at a match stays there rather than going back to where it was read.
   const [openedAtHeading] = useState(heading !== null);
   const reading = useReadingPosition({
     store,
     noteId: saved?.id ?? "",
     mode: saved ? readingPosition : "off",
     ready,
-    restore: !openedAtHeading,
+    restore: !openedAtHeading && openedFromSearch === null,
   });
 
   const read = saved ? readNote(saved) : null;

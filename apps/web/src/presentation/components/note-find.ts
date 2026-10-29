@@ -24,9 +24,25 @@ export type NoteFindChannel = {
   readonly find: NoteFind;
   readonly onCount: (count: number) => void;
   readonly onClose: () => void;
+  /** Searches the note for `query`, at its first match (a note opened from the list's search). */
+  readonly onFind: (query: string) => void;
 };
 
 export const NoteFindContext = createContext<NoteFindChannel | null>(null);
+
+/**
+ * The words of the list's search a note was opened from, its result link's
+ * router state (`{ find }`); null when it was opened otherwise.
+ */
+export function listFind(state: unknown): string | null {
+  return typeof state === "object" &&
+    state !== null &&
+    "find" in state &&
+    typeof state.find === "string" &&
+    state.find.trim() !== ""
+    ? state.find
+    : null;
+}
 
 /**
  * Scrolls the page so that `rect` (a match, in window coordinates) is in the

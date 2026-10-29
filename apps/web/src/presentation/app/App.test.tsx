@@ -1620,6 +1620,35 @@ describe("search in the note", () => {
     expect(editor).toHaveTextContent("A HashMap maps keys.");
   });
 
+  it("opens a note from the list's search with its words searched there, at the first match", async () => {
+    const store = await newStore();
+    await store.put(maps);
+    renderApp(store, "/?q=treemap");
+    const result = within(await noteList()).getByRole("link", { name: "Hash maps" });
+    scrollTo.mockClear();
+
+    await userEvent.click(result);
+
+    const editor = await textEditor();
+    await waitFor(() => {
+      expect(marked(editor)).toEqual(["TreeMap"]);
+    });
+    expect(findBox()).toHaveValue("treemap");
+    expect(count()).toHaveTextContent("Match 1 of 1");
+    expect(scrollTo).toHaveBeenCalled();
+  });
+
+  it("opens a note from the list with nothing searched in it", async () => {
+    const store = await newStore();
+    await store.put(maps);
+    renderApp(store);
+    await userEvent.click(within(await noteList()).getByRole("link", { name: "Hash maps" }));
+
+    const editor = await textEditor();
+    expect(findBox()).toHaveValue("");
+    expect(marked(editor)).toEqual([]);
+  });
+
   it("moves between the matches with ↓, ↑, Enter and the buttons, around the ends", async () => {
     await openMaps();
     const editor = await textEditor();

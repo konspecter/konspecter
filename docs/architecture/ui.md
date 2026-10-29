@@ -161,7 +161,11 @@ breakpoint in the CSS), in the browser, the PWA and the Android app alike.
   with ProseMirror decorations, the Markdown editor with CodeMirror decorations (it scrolls
   itself, since it draws only the lines in view, and searches the source, frontmatter and
   marks included), the rendered view with the CSS Custom Highlight API (without it, matches
-  are counted and scrolled to but not marked). The search ends with the note.
+  are counted and scrolled to but not marked). The search ends with the note. A note opened
+  from the list's search results starts with the same words searched in it (the tag filters are
+  left out): the result link carries them as router state (`{ find }`, `listFind`), and once the
+  editor is ready the note page hands them to the layout (`onFind`), which scrolls to the first
+  match; the reading position is not restored then, as for a heading followed in the tree.
 - **Tag chips:** the query's tag filters are chips inside the search box, before the text
   (`queryParts`, `takeTags`, `joinQuery` in `domain/search/query.ts`). A typed tag becomes a
   chip when a space follows it (or the field is left), a tag chosen in the sidebar arrives as

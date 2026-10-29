@@ -150,7 +150,8 @@ export function NotesPage({ store, catalog, library: controls }: NotesPageProps)
   } else {
     const rows = searching && hitRows ? hitRows : noteRows;
     if (rows.length > 0) {
-      content = <ResultList rows={rows} />;
+      // A result opens with the same words searched in the note (tags are not text).
+      content = <ResultList rows={rows} find={searching ? parsed.words.join(" ") : ""} />;
     } else if (searching && found?.query === query) {
       content = <EmptyState title={t("list.noMatches")} />;
     } else if (!searching) {
@@ -226,11 +227,18 @@ function gridColumns(list: HTMLElement): number {
   return Math.max(1, tracks.length);
 }
 
-const ResultList = memo(function ResultList({ rows }: { rows: readonly Row[] }) {
+const ResultList = memo(function ResultList({
+  rows,
+  find,
+}: {
+  rows: readonly Row[];
+  /** The words searched for, to search the note opened for them too. */
+  find: string;
+}) {
   return (
     <ol className="note-results" aria-label={t("list.notes")} onKeyDown={moveFocus}>
       {rows.map((row) => (
-        <ResultRow key={row.id} row={row} />
+        <ResultRow key={row.id} row={row} find={find} />
       ))}
     </ol>
   );
@@ -241,12 +249,16 @@ const ResultList = memo(function ResultList({ rows }: { rows: readonly Row[] }) 
  * four lines of text, about as tall as the cover: the title; the date it was
  * last edited and its tags; two of the text (where a search matched it).
  */
-const ResultRow = memo(function ResultRow({ row }: { row: Row }) {
+const ResultRow = memo(function ResultRow({ row, find }: { row: Row; find: string }) {
   return (
     <li className="note-result">
       <ListCover id={row.id} cover={row.cover} title={row.title} />
       <div className="note-result-body">
-        <Link to={`/conspects/${encodeURIComponent(row.id)}`} className="note-result-title">
+        <Link
+          to={`/conspects/${encodeURIComponent(row.id)}`}
+          className="note-result-title"
+          {...(find !== "" ? { state: { find } } : {})}
+        >
           {row.title.map((part, index) =>
             part.match ? <mark key={index}>{part.text}</mark> : part.text,
           )}
