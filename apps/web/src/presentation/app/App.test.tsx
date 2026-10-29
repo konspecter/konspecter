@@ -1793,12 +1793,13 @@ describe("search in the note", () => {
     await userEvent.click(result);
 
     const editor = await textEditor();
+    // The marks come first; the count reaches the top bar a moment later.
     await waitFor(() => {
       expect(marked(editor)).toEqual(["TreeMap"]);
+      expect(count()).toHaveTextContent("Match 1 of 1");
+      expect(scrollTo).toHaveBeenCalled();
     });
     expect(findBox()).toHaveValue("treemap");
-    expect(count()).toHaveTextContent("Match 1 of 1");
-    expect(scrollTo).toHaveBeenCalled();
   });
 
   it("opens a note from the list with nothing searched in it", async () => {
