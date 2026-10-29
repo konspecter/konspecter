@@ -55,6 +55,7 @@ it("links to Konspecter's channels in the footer, each with its mark", async () 
   expect(links.map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
     ["Telegram", "https://t.me/konspecter"],
     ["VK", "https://vk.ru/konspecter"],
+    ["Leave feedback on GitHub", "https://github.com/konspecter/konspecter/issues/new"],
   ]);
   for (const link of links) expect(link.querySelector("svg")).not.toBeNull();
 });

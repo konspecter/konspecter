@@ -23,6 +23,7 @@ export const ru: Dictionary = {
   "contacts.label": "Контакты",
   "contacts.telegram": "Telegram",
   "contacts.vk": "ВКонтакте",
+  "contacts.github": "Оставить отзыв на GitHub",
 
   "home.title": "Познал. Сохранил. Вернулся.",
   "home.lead":

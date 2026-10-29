@@ -26,6 +26,7 @@ export const en = {
   "contacts.label": "Contacts",
   "contacts.telegram": "Telegram",
   "contacts.vk": "VK",
+  "contacts.github": "Leave feedback on GitHub",
 
   "home.title": "A notebook for everything worth keeping",
   "home.lead":

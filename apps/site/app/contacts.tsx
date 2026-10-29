@@ -1,7 +1,7 @@
-import { TelegramIcon, VkIcon } from "@konspecter/ui/icons";
+import { GitHubIcon, TelegramIcon, VkIcon } from "@konspecter/ui/icons";
 import type { ComponentType } from "react";
 import { useT } from "./i18n/i18n";
-import { TELEGRAM, VK } from "./links";
+import { FEEDBACK, TELEGRAM, VK } from "./links";
 
 /**
  * Where to find Konspecter, in the order the footer shows them. A new channel
@@ -11,6 +11,7 @@ import { TELEGRAM, VK } from "./links";
 export const CONTACTS = [
   { id: "telegram", href: TELEGRAM, Icon: TelegramIcon },
   { id: "vk", href: VK, Icon: VkIcon },
+  { id: "github", href: FEEDBACK, Icon: GitHubIcon },
 ] as const satisfies readonly { id: string; href: string; Icon: ComponentType }[];
 
 /** The channels, each a link with its mark and its name. */

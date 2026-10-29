@@ -1,6 +1,8 @@
 /** Konspecter on GitHub: the source code, the releases and the self-hosting guide. */
 export const SOURCE_CODE = "https://github.com/konspecter/konspecter";
 export const RELEASES = `${SOURCE_CODE}/releases`;
+/** A new issue: feedback, an idea or a bug, and the way to a pull request. */
+export const FEEDBACK = `${SOURCE_CODE}/issues/new`;
 export const SELF_HOSTING = `${SOURCE_CODE}/blob/main/docs/self-hosting.md`;
 
 /** Tag-Chain on GitHub: the specification, the app's tag rules, and folders that follow tags. */
