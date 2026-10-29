@@ -539,6 +539,20 @@ describe("task lists", () => {
     expect(textDocToMarkdown(view.state.doc)).toBe("* [x] one\n* [ ] two");
   });
 
+  it("keeps a checklist one tight list when Enter twice splits it or a task is typed above it", () => {
+    const { view } = editorWith("- [ ] a\n- [ ] b");
+    caretAt(view, 5);
+    press(view, "Enter");
+    press(view, "Enter");
+    expect(textDocToMarkdown(view.state.doc)).toBe("* [ ] a\n* [ ] b");
+
+    const above = editorWith("text\n\n- [ ] a");
+    caretAt(above.view, 5);
+    press(above.view, "Enter");
+    for (const key of "- [ ] z") above.type(above.view.state.selection.from, key, key);
+    expect(textDocToMarkdown(above.view.state.doc)).toBe("text\n\n* [ ] z\n* [ ] a");
+  });
+
   it("makes a task an ordinary item with Backspace at the start of its text", () => {
     const { view } = editorWith("- [ ] one");
     caretAt(view, 3);

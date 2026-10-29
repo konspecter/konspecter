@@ -1,7 +1,7 @@
 import MarkdownIt from "markdown-it";
 import type Token from "markdown-it/lib/token.mjs";
 import { defaultMarkdownSerializer, MarkdownSerializer } from "prosemirror-markdown";
-import type { Node } from "prosemirror-model";
+import { Fragment, type Node } from "prosemirror-model";
 import { t, type TextKey } from "../i18n/i18n";
 import { textMarkdownParser } from "./text-schema";
 
@@ -86,7 +86,46 @@ const serializer = new MarkdownSerializer(
 );
 
 export function textDocToMarkdown(doc: Node): string {
-  return serializer.serialize(doc);
+  return serializer.serialize(joinedLists(doc));
+}
+
+const isList = (node: Node | undefined): node is Node =>
+  node?.type.name === "bullet_list" || node?.type.name === "ordered_list";
+const isBlank = (node: Node | undefined) =>
+  node?.type.name === "paragraph" && node.content.size === 0;
+
+/**
+ * `node` with lists of a kind that follow one another, or have only blank
+ * lines between them, made one list: Markdown has no other way to read them
+ * (two such lists, or a blank line in a list, make one loose list). The text
+ * editor makes them when Enter twice splits a list, or a list is begun right
+ * above another. The list is tight if its parts are; it starts where the
+ * first one did.
+ */
+function joinedLists(node: Node): Node {
+  if (node.isTextblock || node.isLeaf) return node;
+  const blocks: Node[] = [];
+  node.forEach((child) => blocks.push(joinedLists(child)));
+  const joined: Node[] = [];
+  blocks.forEach((block, index) => {
+    const previous = joined.at(-1);
+    if (isList(previous) && isList(block) && previous.type === block.type) {
+      const tight = previous.attrs.tight === true && block.attrs.tight === true;
+      joined[joined.length - 1] = previous.type.create(
+        { ...previous.attrs, tight },
+        previous.content.append(block.content),
+      );
+      return;
+    }
+    if (isList(previous) && isBlank(block)) {
+      const next = blocks.slice(index + 1).find((later) => !isBlank(later));
+      if (next?.type === previous.type) return;
+    }
+    joined.push(block);
+  });
+  const same =
+    joined.length === node.childCount && joined.every((block, i) => block === node.child(i));
+  return same ? node : node.copy(Fragment.from(joined));
 }
 
 function flatten(tokens: readonly Token[]): Token[] {
