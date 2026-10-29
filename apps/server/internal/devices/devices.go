@@ -100,8 +100,13 @@ func NormalizeClient(c Client) Client {
 	if !known {
 		platform = "other"
 	}
-	return Client{Name: name, Platform: platform, ClientVersion: clean(c.ClientVersion, maxVersionLength)}
+	return Client{Name: name, Platform: platform, ClientVersion: CleanVersion(c.ClientVersion)}
 }
+
+// CleanVersion cleans the version an app reports, when it connects and in
+// the requests it makes later: trimmed, without control characters, cut to
+// length.
+func CleanVersion(version string) string { return clean(version, maxVersionLength) }
 
 // clean trims text, drops control characters and invalid UTF-8, and keeps at
 // most limit characters.

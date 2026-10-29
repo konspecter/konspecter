@@ -334,7 +334,7 @@ func (f *fakeDevices) addLocked(token string, user auth.User, client devices.Cli
 	return info
 }
 
-func (f *fakeDevices) DeviceByToken(_ context.Context, token string) (auth.Device, error) {
+func (f *fakeDevices) DeviceByToken(_ context.Context, token, clientVersion string) (auth.Device, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	d, ok := f.byToken[token]
@@ -346,6 +346,9 @@ func (f *fakeDevices) DeviceByToken(_ context.Context, token string) (auth.Devic
 	}
 	now := time.Now()
 	d.info.LastUsedAt = &now
+	if clientVersion != "" {
+		d.info.ClientVersion = clientVersion
+	}
 	return d.device, nil
 }
 

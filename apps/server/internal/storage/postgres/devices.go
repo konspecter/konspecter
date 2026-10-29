@@ -68,20 +68,23 @@ func (db *DB) RevokeUserTokens(ctx context.Context, userID string) (int64, error
 }
 
 // DeviceByToken resolves a bearer token to its device and user, and records
-// the use (at most once a minute, to spare the database a write per request).
+// the use (at most once a minute, to spare the database a write per request)
+// and the app's version when it changed (an empty one is not news).
 // auth.ErrDeviceRevoked if the device was disconnected.
-func (db *DB) DeviceByToken(ctx context.Context, token string) (auth.Device, error) {
+func (db *DB) DeviceByToken(ctx context.Context, token, clientVersion string) (auth.Device, error) {
 	var d auth.Device
 	var revoked bool
 	err := db.pool.QueryRow(ctx, `
 		WITH touched AS (
-			UPDATE devices SET last_used_at = now()
+			UPDATE devices SET last_used_at = now(),
+				client_version = CASE WHEN $2 = '' THEN client_version ELSE $2 END
 			WHERE token_hash = $1 AND revoked_at IS NULL
-				AND (last_used_at IS NULL OR last_used_at < now() - interval '1 minute')
+				AND (last_used_at IS NULL OR last_used_at < now() - interval '1 minute'
+					OR ($2 <> '' AND client_version <> $2))
 		)
 		SELECT d.id::text, d.revoked_at IS NOT NULL, u.id::text, u.email, u.display_name
 		FROM devices d JOIN users u ON u.id = d.user_id
-		WHERE d.token_hash = $1`, auth.HashToken(token),
+		WHERE d.token_hash = $1`, auth.HashToken(token), clientVersion,
 	).Scan(&d.ID, &revoked, &d.User.ID, &d.User.Email, &d.User.Name)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):

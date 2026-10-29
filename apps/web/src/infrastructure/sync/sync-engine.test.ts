@@ -84,6 +84,17 @@ describe("SyncEngine", () => {
     expect(a.engine.getStatus().account?.email).toBe("ada@example.com");
   });
 
+  it("names the app's version when it asks about the account, so the device list shows it", async () => {
+    const server = new FakeServer();
+    const a = await device(server);
+    await a.store.put(createNote("# Local", date, "n1"));
+
+    await connected(a.engine, config);
+
+    expect(server.clientVersions.length).toBeGreaterThan(0);
+    expect(new Set(server.clientVersions)).toEqual(new Set([__KONSPECTER_VERSION__]));
+  });
+
   it("uploads notes written before sync was set up", async () => {
     const server = new FakeServer();
     const a = await device(server);

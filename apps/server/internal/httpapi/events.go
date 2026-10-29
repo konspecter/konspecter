@@ -172,7 +172,7 @@ func (a *api) events(w http.ResponseWriter, r *http.Request, device auth.Device)
 			}
 		case <-heartbeat.C:
 			// Revoked from the command line, which this process does not hear of.
-			current, err := a.auth.DeviceByToken(r.Context(), token)
+			current, err := a.auth.DeviceByToken(r.Context(), token, "")
 			if err != nil && !errors.Is(err, auth.ErrUnauthorized) && !errors.Is(err, auth.ErrDeviceRevoked) && r.Context().Err() == nil {
 				a.logger.WarnContext(r.Context(), "event stream: token check failed", "error", err)
 			}

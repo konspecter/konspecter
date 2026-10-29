@@ -172,7 +172,7 @@ export class ApiClient {
   }
 
   async me(): Promise<Account> {
-    const body = await this.#request("GET", "api/me");
+    const body = await this.#request("GET", ME);
     const { id, email } = asRecord(body);
     if (typeof id !== "string" || typeof email !== "string") throw invalid("account");
     return { id, email };
@@ -183,7 +183,7 @@ export class ApiClient {
    * free), and how full its storage is.
    */
   async accountState(): Promise<AccountState> {
-    const { sync, storage } = asRecord(await this.#request("GET", "api/me"));
+    const { sync, storage } = asRecord(await this.#request("GET", ME));
     const { state, until } = asRecord(sync);
     const known = ACCESS_STATES.find((value) => value === state);
     const { used, quota } = asRecord(storage);
@@ -284,6 +284,12 @@ function parseKey(value: unknown): KeyRecord {
     throw invalid("key");
   }
 }
+
+/**
+ * `GET /api/me`, naming this app's version: the server keeps it, so the
+ * account's device list shows the version each app runs now.
+ */
+const ME = `api/me?client_version=${encodeURIComponent(__KONSPECTER_VERSION__)}`;
 
 /** Sends a JSON request and returns the JSON answer (null for 204), or throws its error. */
 async function send(

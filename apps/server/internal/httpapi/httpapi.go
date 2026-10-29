@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"konspecter/server/internal/auth"
+	"konspecter/server/internal/devices"
 	"konspecter/server/internal/keys"
 	"konspecter/server/internal/notes"
 )
@@ -37,9 +38,10 @@ type NoteRepository interface {
 }
 
 // Authenticator resolves bearer tokens to the devices (apps) they were
-// issued to, and keeps track of those devices.
+// issued to, and keeps track of those devices: their last use, and the
+// version of the app (clientVersion; empty keeps the one known).
 type Authenticator interface {
-	DeviceByToken(ctx context.Context, token string) (auth.Device, error)
+	DeviceByToken(ctx context.Context, token, clientVersion string) (auth.Device, error)
 	RevokeToken(ctx context.Context, token string) error
 	RecordSync(ctx context.Context, deviceID string) error
 }
@@ -267,7 +269,10 @@ func (a *api) authenticated(next userHandler) http.Handler {
 
 // withDevice runs next for the device of the request's bearer token. A
 // disconnected device hears so (401 device_revoked): its app then stops
-// syncing and keeps its notes.
+// syncing and keeps its notes. The app may name its version in the query
+// (`client_version`), so the device list shows the version it runs now, not
+// the one it was connected with. The query, not a header: an app updated
+// before its server would otherwise be refused by the server's CORS rules.
 func (a *api) withDevice(next deviceHandler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		client := clientAddress(r, a.trusted)
@@ -279,7 +284,8 @@ func (a *api) withDevice(next deviceHandler) http.Handler {
 		token, err := auth.BearerToken(r.Header.Get("Authorization"))
 		if err == nil {
 			var device auth.Device
-			device, err = a.auth.DeviceByToken(r.Context(), token)
+			version := devices.CleanVersion(r.URL.Query().Get("client_version"))
+			device, err = a.auth.DeviceByToken(r.Context(), token, version)
 			if err == nil {
 				next(w, r, device)
 				return

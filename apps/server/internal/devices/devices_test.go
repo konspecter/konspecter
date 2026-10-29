@@ -61,6 +61,15 @@ func TestNormalizeClient(t *testing.T) {
 	}
 }
 
+func TestCleanVersion(t *testing.T) {
+	if got := CleanVersion(" 0.14.0\n"); got != "0.14.0" {
+		t.Errorf("CleanVersion = %q", got)
+	}
+	if got := CleanVersion(strings.Repeat("9", 100)); len(got) != maxVersionLength {
+		t.Errorf("CleanVersion kept %d characters", len(got))
+	}
+}
+
 func TestHashCodeSeparatesCodes(t *testing.T) {
 	if string(HashCode("BCDFGHJK")) == string(HashCode("BCDFGHJL")) || len(HashCode("x")) != 32 {
 		t.Error("HashCode")

@@ -265,9 +265,35 @@ func TestListingAndDisconnectingDevices(t *testing.T) {
 		t.Errorf("a malformed id = %d", res.status)
 	}
 	// Another user's device is not this user's to disconnect.
-	ada, _ := s.devices.DeviceByToken(t.Context(), adaToken)
+	ada, _ := s.devices.DeviceByToken(t.Context(), adaToken, "")
 	if res := siteCall(t, s.server.URL, http.MethodDelete, "/api/devices/"+ada.ID, session, nil); res.status != http.StatusNotFound {
 		t.Errorf("another user's device = %d", res.status)
+	}
+}
+
+func TestTheDeviceListShowsTheVersionAnAppRunsNow(t *testing.T) {
+	s := newAccountServer(t, nil)
+	session := signedIn(t, s, "ann@example.com")
+	deviceCode, userCode := authorize(t, s)
+	siteCall(t, s.server.URL, http.MethodPost, "/api/devices/approve", session, map[string]any{"user_code": userCode})
+	token, _ := poll(t, s, deviceCode).body["token"].(string)
+	s.devices.connectToken(token)
+	version := func() any {
+		res := siteCall(t, s.server.URL, http.MethodGet, "/api/devices", session, nil)
+		list, _ := res.body["devices"].([]any)
+		device, _ := list[0].(map[string]any)
+		return device["client_version"]
+	}
+
+	// Connected with 0.2.0, then updated: the app names its version in the query.
+	res := call(t, s.server, http.MethodGet, "/api/me?client_version=%200.3.0%20", token, "")
+	if res.status != http.StatusOK || version() != "0.3.0" {
+		t.Errorf("after a request of 0.3.0: %d, version %v", res.status, version())
+	}
+	// A request that does not say keeps the version known.
+	call(t, s.server, http.MethodGet, "/api/sync", token, "")
+	if got := version(); got != "0.3.0" {
+		t.Errorf("after a request without a version: %v", got)
 	}
 }
 

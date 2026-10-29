@@ -87,6 +87,11 @@ as a SHA-256 hash only.
 - **Apps** send `Authorization: Bearer ksp_…`. A token belongs to a device (`auth.Device`:
   the device id and its user). A disconnected device gets `401 device_revoked`, an unknown
   token `401 unauthorized`. Failed authentication is rate-limited per client address.
+- **Apps name their version** in the query of `GET /api/me` (`?client_version=0.14.0`; any
+  request with a token may). The device keeps it when it changes, so the device list shows
+  the version each app runs now, not the one it was connected with. A request without it
+  keeps the version known. The query, not a header: an app updated before its server would
+  otherwise be refused by the server's CORS rules.
 - **Browsers** (the site) carry the session cookie `__Host-ksp_session` (`ksp_session` on
   plain http). Requests that change something must come with `Origin` equal to
   `KONSPECTER_PUBLIC_URL`.

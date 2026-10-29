@@ -142,10 +142,10 @@ func TestUsersAndTokens(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, err := db.DeviceByToken(ctx, token); err != nil || got.User != user || got.ID == "" {
+	if got, err := db.DeviceByToken(ctx, token, ""); err != nil || got.User != user || got.ID == "" {
 		t.Errorf("DeviceByToken = %+v, %v", got, err)
 	}
-	if _, err := db.DeviceByToken(ctx, "ksp_unknown"); !errors.Is(err, auth.ErrUnauthorized) {
+	if _, err := db.DeviceByToken(ctx, "ksp_unknown", ""); !errors.Is(err, auth.ErrUnauthorized) {
 		t.Errorf("unknown token error = %v", err)
 	}
 	var stored int
@@ -412,16 +412,16 @@ func TestRevokingTokens(t *testing.T) {
 	if err := db.RevokeToken(ctx, first); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.DeviceByToken(ctx, first); !errors.Is(err, auth.ErrUnauthorized) {
+	if _, err := db.DeviceByToken(ctx, first, ""); !errors.Is(err, auth.ErrUnauthorized) {
 		t.Errorf("revoked token still works: %v", err)
 	}
-	if _, err := db.DeviceByToken(ctx, second); err != nil {
+	if _, err := db.DeviceByToken(ctx, second, ""); err != nil {
 		t.Errorf("other token revoked too: %v", err)
 	}
 	if count, err := db.RevokeUserTokens(ctx, user.ID); err != nil || count != 1 {
 		t.Errorf("RevokeUserTokens = %d, %v", count, err)
 	}
-	if _, err := db.DeviceByToken(ctx, second); !errors.Is(err, auth.ErrDeviceRevoked) {
+	if _, err := db.DeviceByToken(ctx, second, ""); !errors.Is(err, auth.ErrDeviceRevoked) {
 		t.Errorf("token survived RevokeUserTokens: %v", err)
 	}
 }

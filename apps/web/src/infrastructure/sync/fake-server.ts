@@ -56,6 +56,8 @@ export class FakeServer {
   /** Runs before each request is answered (to simulate concurrent activity). */
   beforeRespond: ((method: string, path: string) => Promise<void> | void) | null = null;
   readonly requests: string[] = [];
+  /** The app version each `GET /api/me` named (`client_version` in its query). */
+  readonly clientVersions: (string | null)[] = [];
   /** Tests use a tiny limit to exercise rejected notes; the real server allows 5 MB. */
   maxMarkdownLength = 1000;
   /** How many bytes of envelopes the account may store; as the real server, 507 past it. */
@@ -123,6 +125,7 @@ export class FakeServer {
     const noteId = /^\/api\/notes\/([^/]+)$/.exec(url.pathname)?.[1];
 
     if (method === "GET" && url.pathname === "/api/me") {
+      this.clientVersions.push(url.searchParams.get("client_version"));
       return json(200, {
         ...user,
         sync: this.access,

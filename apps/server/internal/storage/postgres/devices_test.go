@@ -61,7 +61,7 @@ func TestConnectingADevice(t *testing.T) {
 	if _, _, err := db.ExchangeDeviceCode(ctx, []byte("dev"), []byte("again")); !errors.Is(err, devices.ErrExpiredToken) {
 		t.Errorf("used code = %v", err)
 	}
-	if got, err := db.DeviceByToken(ctx, token); err != nil || got.ID != device.ID || got.User != user {
+	if got, err := db.DeviceByToken(ctx, token, ""); err != nil || got.ID != device.ID || got.User != user {
 		t.Errorf("DeviceByToken = %+v, %v", got, err)
 	}
 }
@@ -107,6 +107,31 @@ func TestAnExpiredAuthorizationCannotBeApprovedOrUsed(t *testing.T) {
 	}
 }
 
+func TestADeviceKeepsTheVersionItsAppRunsNow(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	ann := createUser(t, db, "ann@example.com")
+	token, _ := db.CreateToken(ctx, ann.ID)
+	versionNow := func() string {
+		list, err := db.ListDevices(ctx, ann.ID)
+		if err != nil || len(list) != 1 {
+			t.Fatalf("ListDevices = %+v, %v", list, err)
+		}
+		return list[0].ClientVersion
+	}
+
+	if _, err := db.DeviceByToken(ctx, token, "0.13.0"); err != nil || versionNow() != "0.13.0" {
+		t.Errorf("version = %q, %v", versionNow(), err)
+	}
+	// Within the minute its use was just recorded in, a new version is still news.
+	if _, err := db.DeviceByToken(ctx, token, "0.14.0"); err != nil || versionNow() != "0.14.0" {
+		t.Errorf("updated version = %q, %v", versionNow(), err)
+	}
+	if _, err := db.DeviceByToken(ctx, token, ""); err != nil || versionNow() != "0.14.0" {
+		t.Errorf("a request without a version: %q, %v", versionNow(), err)
+	}
+}
+
 func TestListingAndRevokingDevices(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()
@@ -118,7 +143,7 @@ func TestListingAndRevokingDevices(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	used, err := db.DeviceByToken(ctx, first)
+	used, err := db.DeviceByToken(ctx, first, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,10 +170,10 @@ func TestListingAndRevokingDevices(t *testing.T) {
 	if err := db.RevokeDevice(ctx, ann.ID, used.ID); !errors.Is(err, devices.ErrNotFound) {
 		t.Errorf("revoking twice = %v", err)
 	}
-	if _, err := db.DeviceByToken(ctx, first); !errors.Is(err, auth.ErrDeviceRevoked) {
+	if _, err := db.DeviceByToken(ctx, first, ""); !errors.Is(err, auth.ErrDeviceRevoked) {
 		t.Errorf("revoked device = %v", err)
 	}
-	if _, err := db.DeviceByToken(ctx, second); err != nil {
+	if _, err := db.DeviceByToken(ctx, second, ""); err != nil {
 		t.Errorf("the other device = %v", err)
 	}
 	if list, _ := db.ListDevices(ctx, ann.ID); len(list) != 1 {
@@ -159,11 +184,11 @@ func TestListingAndRevokingDevices(t *testing.T) {
 	if _, err := db.pool.Exec(ctx, `UPDATE devices SET revoked_at = now() - interval '31 days' WHERE id = $1`, used.ID); err != nil {
 		t.Fatal(err)
 	}
-	other, _ := db.DeviceByToken(ctx, second)
+	other, _ := db.DeviceByToken(ctx, second, "")
 	if err := db.RevokeDevice(ctx, ann.ID, other.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.DeviceByToken(ctx, first); !errors.Is(err, auth.ErrUnauthorized) {
+	if _, err := db.DeviceByToken(ctx, first, ""); !errors.Is(err, auth.ErrUnauthorized) {
 		t.Errorf("pruned device = %v", err)
 	}
 }
@@ -208,7 +233,7 @@ func TestAccountNameAndDeletion(t *testing.T) {
 	if err := db.DeleteAccount(ctx, ann.ID); !errors.Is(err, ErrUserNotFound) {
 		t.Errorf("deleting twice = %v", err)
 	}
-	if _, err := db.DeviceByToken(ctx, token); !errors.Is(err, auth.ErrUnauthorized) {
+	if _, err := db.DeviceByToken(ctx, token, ""); !errors.Is(err, auth.ErrUnauthorized) {
 		t.Errorf("token after deletion = %v", err)
 	}
 	for table, where := range map[string]string{
@@ -250,7 +275,7 @@ func TestConnectingADeviceByCode(t *testing.T) {
 	if err != nil || owner.ID != user.ID || owner.Email != "ann@example.com" || owner.Name != "Ann" || device.Name != laptop.Name || key != nil {
 		t.Fatalf("redeem = %+v, %+v, %+v, %v", device, owner, key, err)
 	}
-	if d, err := db.DeviceByToken(ctx, token); err != nil || d.ID != device.ID {
+	if d, err := db.DeviceByToken(ctx, token, ""); err != nil || d.ID != device.ID {
 		t.Errorf("the new device's token = %+v, %v", d, err)
 	}
 	if _, _, _, err := db.RedeemConnectCode(ctx, []byte("second"), []byte("t2"), laptop); !errors.Is(err, devices.ErrInvalidConnectCode) {
