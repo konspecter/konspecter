@@ -175,6 +175,43 @@ describe("coalescing", () => {
   });
 });
 
+describe("the text", () => {
+  it("is the editor's text as last reported: waiting, being written, then stored", async () => {
+    const store = await newStore();
+    const base = createNote("# Note", new Date("2024-05-01T10:00:00Z"), "n1");
+    await store.put(base);
+    const autosave = new Autosave(store, base, {}, { delay: 1000 });
+    expect(autosave.text).toBe(base.markdown);
+
+    const waiting = `${base.markdown}\n\nWaiting`;
+    autosave.change(() => waiting);
+    expect(autosave.text).toBe(waiting);
+
+    let release = () => {};
+    const written = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const put = store.put.bind(store);
+    vi.spyOn(store, "put").mockImplementation(async (note) => {
+      await written;
+      return put(note);
+    });
+    const saving = autosave.flush();
+    expect(autosave.text).toBe(waiting);
+    release();
+    await saving;
+    // The stored version: the save moved its date on.
+    expect(autosave.text).toBe((await store.get("n1"))?.markdown);
+    expect(autosave.text).toContain("Waiting");
+    expect(autosave.dirty).toBe(false);
+  });
+
+  it("is null for a new note with nothing in it", async () => {
+    const autosave = new Autosave(await newStore(), null);
+    expect(autosave.text).toBeNull();
+  });
+});
+
 describe("savesSettled", () => {
   it("waits for a note's save that is still running, so a read gets the latest text", async () => {
     const store = await newStore();

@@ -5,7 +5,7 @@ import { readNote, withoutTag, type Note } from "../../domain/note/note";
 import type { EditorSelection, ReadingPositionMode } from "../../domain/reading/reading";
 import type { EditorMode } from "../../domain/settings/settings";
 import { Autosave, savesSettled } from "../../application/notes/autosave";
-import type { NoteCatalog } from "../../application/notes/note-catalog";
+import { summarize, type NoteCatalog } from "../../application/notes/note-catalog";
 import { pinChanges, setStoredPin } from "../../application/notes/note-pins";
 import type { NoteRepository } from "../../application/notes/note-repository";
 import { requestPersistence } from "../../infrastructure/storage/persistence";
@@ -270,14 +270,21 @@ function NoteSession({
     // Mod+Alt+1…0 pins this note to the key, or unpins it from the key it
     // holds. Its own frontmatter changes in the editor, so unsaved typing is
     // kept; other notes holding the key let go of it in the store. A note not
-    // stored yet has no pin: the keys stay the browser's.
+    // stored yet has no pin: the keys stay the browser's. Its pin is read from
+    // its text as edited, not from the list of notes, which learns of a save
+    // only once it is stored: pressed again before that, the key unpins.
     pinNote: (event: KeyboardEvent) => {
       const key = pinKeyOf(event);
       const current = autosave.note;
+      const text = autosave.text;
       const library = catalog.getSnapshot();
-      if (key === null || !current || library.status !== "ready") return false;
+      if (key === null || !current || text === null || library.status !== "ready") return false;
+      const notes = [
+        ...library.notes.filter((note) => note.id !== current.id),
+        summarize({ id: current.id, markdown: text }),
+      ];
       const now = new Date();
-      for (const { noteId, pin } of pinChanges(library.notes, key, current.id)) {
+      for (const { noteId, pin } of pinChanges(notes, key, current.id)) {
         if (noteId !== current.id) {
           setStoredPin(store, noteId, pin, now).catch(reportError);
           continue;

@@ -83,6 +83,8 @@ export class Autosave {
   #pending: (() => string) | null = null;
   /** Text whose write failed, tried again by the next change or flush. */
   #retry: string | null = null;
+  /** Text being written now. */
+  #writing: string | null = null;
   #pendingSince: number | null = null;
   #timer: ReturnType<typeof setTimeout> | undefined;
   #running: Promise<void> | null = null;
@@ -112,6 +114,22 @@ export class Autosave {
   /** The stored note being edited; null until a new note's first save. */
   get note(): Note | null {
     return this.#base;
+  }
+
+  /**
+   * The editor's text as last reported: waiting to be saved, being saved, or
+   * stored. Null for a new note that has nothing yet. Reading it serializes
+   * pending text, so read it for a decision (a key pressed), not per keystroke.
+   */
+  get text(): string | null {
+    if (this.#pending) {
+      try {
+        return this.#pending();
+      } catch {
+        // The editor cannot say; what is known of it follows.
+      }
+    }
+    return this.#retry ?? this.#writing ?? this.#base?.markdown ?? null;
   }
 
   /** Whether some of the editor's text is not stored yet. */
@@ -213,6 +231,7 @@ export class Autosave {
     // editor that took over the dates the last save wrote).
     const unchanged = markdown === this.#written || markdown === this.#base?.markdown;
     if (unchanged && !this.#unsaved) return;
+    this.#writing = markdown;
     try {
       await this.#write(markdown);
       this.#unsaved = false;
@@ -221,6 +240,8 @@ export class Autosave {
       // Keep the text: the next change or flush tries again.
       if (!(error instanceof InvalidDocumentError) && !this.#disposed) this.#retry = markdown;
       this.#problem(error);
+    } finally {
+      this.#writing = null;
     }
   }
 

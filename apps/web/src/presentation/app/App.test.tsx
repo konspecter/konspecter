@@ -257,6 +257,36 @@ describe("layout", () => {
     expect(await pinOf("middle")).toBeNull();
   });
 
+  it("unpins with the same key pressed again before the pin is stored", async () => {
+    const store = await newStore();
+    await store.put(createNote("# Old\n\nA month ago.", daysAgo(30), "old"));
+    renderApp(store, "/conspects/old");
+    await userEvent.click(await textEditor());
+    // A slow save (a big library, a file on a slow disk): the note list learns of the pin late.
+    let release = () => {};
+    const stored = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const put = store.put.bind(store);
+    const slowPut = vi.spyOn(store, "put").mockImplementation(async (note) => {
+      await stored;
+      return put(note);
+    });
+
+    await userEvent.keyboard("{Control>}{Alt>}3{/Alt}{/Control}");
+    await userEvent.keyboard("{Control>}{Alt>}3{/Alt}{/Control}");
+    release();
+
+    // Both saves are written: the pin, then its removal.
+    await waitFor(() => {
+      expect(slowPut).toHaveBeenCalledTimes(2);
+    });
+    await waitFor(async () => {
+      expect(parseDocument((await store.get("old"))?.markdown ?? "").metadata.pin).toBeNull();
+      expect(recentTitles()).toEqual(["Old"]);
+    });
+  });
+
   it("moves pins kept on the device into the notes", async () => {
     localStorage.setItem("konspecter.pins", JSON.stringify({ 2: "old" }));
     const store = await newStore();
