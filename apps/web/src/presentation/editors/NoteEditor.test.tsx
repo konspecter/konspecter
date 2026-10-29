@@ -13,7 +13,7 @@ vi.mock("../../infrastructure/files/cover-image", async (importOriginal) => ({
   coverDataUrl: vi.fn(),
 }));
 
-/** The editor with a mode switch, as the top bar drives it. */
+/** The editor with a mode switch, as the top bar drives it, and the Details' switch for the fields. */
 function Harness({
   initialMarkdown,
   initialMode,
@@ -28,8 +28,18 @@ function Harness({
   onSelectionChange: (selection: EditorSelection) => void;
 }) {
   const [mode, setMode] = useState(initialMode);
+  const [fields, setFields] = useState(showMetadata);
   return (
     <>
+      <button
+        type="button"
+        aria-pressed={fields}
+        onClick={() => {
+          setFields(!fields);
+        }}
+      >
+        Fields
+      </button>
       {(["text", "markdown"] as const).map((value) => (
         <button
           key={value}
@@ -46,7 +56,7 @@ function Harness({
         initialMarkdown={initialMarkdown}
         mode={mode}
         onChange={onChange}
-        showMetadata={showMetadata}
+        showMetadata={fields}
         onSelectionChange={onSelectionChange}
       />
     </>
@@ -541,6 +551,21 @@ describe("metadata fields", () => {
 
     expect(save()).toBe("---\n---\n\nBody");
     expect(coverField()).toHaveValue("");
+  });
+
+  it("hide the fields emptied while they were shown once they are hidden, not those with a value", async () => {
+    vi.mocked(coverDataUrl).mockResolvedValue("data:image/webp;base64,AQID");
+    renderEditor("Body", "text", true);
+    const image = new File(["img"], "c.png", { type: "image/png" });
+    await userEvent.upload(screen.getByLabelText("Upload…"), image);
+    await userEvent.click(screen.getByRole("button", { name: "Remove" }));
+    await userEvent.type(titleField(), "Kept");
+
+    await userEvent.click(screen.getByRole("button", { name: "Fields" }));
+
+    expect(screen.queryByRole("textbox", { name: "Cover image" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Upload…" })).not.toBeInTheDocument();
+    expect(titleField()).toHaveValue("Kept");
   });
 
   it("explains an image it cannot use and keeps the cover", async () => {

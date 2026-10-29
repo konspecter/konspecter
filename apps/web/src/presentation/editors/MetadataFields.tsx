@@ -66,15 +66,25 @@ export const MetadataFields = memo(function MetadataFields({
   }
 
   // Whether each field says something the body does not. A field that did
-  // once stays, also while its value is being cleared.
+  // once stays, also while its value is being cleared, until the fields are
+  // hidden: then the ones emptied meanwhile go too.
   const says = {
     title: title !== null && title.trim() !== firstLineTitle(document.body),
     author: author !== null,
     cover: cover !== null,
   };
-  const [had, setHad] = useState(says);
+  const [remembered, setRemembered] = useState(says);
+  const [wasExpanded, setWasExpanded] = useState(expanded);
+  let had = remembered;
+  if (expanded !== wasExpanded) {
+    setWasExpanded(expanded);
+    if (!expanded) {
+      had = says;
+      setRemembered(says);
+    }
+  }
   if ((Object.keys(says) as (keyof typeof says)[]).some((field) => says[field] && !had[field])) {
-    setHad({
+    setRemembered({
       title: had.title || says.title,
       author: had.author || says.author,
       cover: had.cover || says.cover,
