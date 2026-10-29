@@ -297,6 +297,28 @@ describe("an existing note", () => {
     expect((await store.get("broken"))?.markdown).toBe("---\ntitle: [\n---\n\nStill here.");
   });
 
+  it("shows its length in the Details a line each, kept as it is typed", async () => {
+    const store = await newStore();
+    await store.put(createNote("# Java\n\nBody", new Date("2020-01-01T00:00:00Z"), "java"));
+    renderNotePage(store, "/conspects/java");
+    const details = await screen.findByRole("region", { name: "Details" });
+    const length = () =>
+      [
+        ...(within(details)
+          .getByText("Length")
+          .nextElementSibling?.querySelectorAll(".details-length > span") ?? []),
+      ].map((line) => line.textContent);
+    expect(length()).toEqual(["2 words", "8 characters", "1 min read"]);
+
+    const box = await textBox();
+    await userEvent.click(box);
+    caretAtEnd(box);
+    await userEvent.keyboard(" text");
+    await waitFor(() => {
+      expect(length()).toEqual(["3 words", "13 characters", "1 min read"]);
+    });
+  });
+
   it("removes a tag only the frontmatter lists from the Details, in either editor", async () => {
     for (const mode of ["text", "markdown"] as const) {
       const store = await newStore();

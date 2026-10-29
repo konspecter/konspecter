@@ -87,15 +87,19 @@ export function NoteDetails({
       const { author } = read.document.metadata;
       if (author) rows.push([t("details.author"), author]);
       const stats = documentStats(read.document.body);
+      // A line each: one line of all three would wrap at other places as the
+      // numbers grow, and the panel would change its height while typing.
       rows.push([
         t("details.length"),
-        stats.words === 0
-          ? t("details.empty")
-          : [
-              tn("details.words", stats.words),
-              tn("details.characters", stats.characters),
-              t("details.readingTime", { minutes: stats.readingMinutes }),
-            ].join(" · "),
+        stats.words === 0 ? (
+          t("details.empty")
+        ) : (
+          <span className="details-length">
+            <span>{tn("details.words", stats.words)}</span>
+            <span>{tn("details.characters", stats.characters)}</span>
+            <span>{t("details.readingTime", { minutes: stats.readingMinutes })}</span>
+          </span>
+        ),
       ]);
       const tags = writtenTagList(noteWrittenTags(read));
       const removable = new Set(listedOnlyTags(read));
