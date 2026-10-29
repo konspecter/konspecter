@@ -113,7 +113,7 @@ test("a long server address and account stay inside the sync settings on a phone
   // Addresses without a hyphen or a dot to break at for a long way.
   const server = "https://syncserverwithanaddressfartoolongforaphone1234567890.example.com";
   await page.route(`${server}/**`, (route) =>
-    route.request().url().endsWith("/api/me")
+    new URL(route.request().url()).pathname === "/api/me"
       ? route.fulfill({
           json: { id: "u1", email: "anaccountnamefartoolongforaphonescreen@example.com" },
         })
