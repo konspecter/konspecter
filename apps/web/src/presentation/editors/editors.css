@@ -113,7 +113,7 @@
  * The button that opens the link at the caret: a small raised pill just under
  * the caret, showing where the link goes.
  */
-.link-open {
+.caret-button {
   position: absolute;
   z-index: 3;
   display: flex;
@@ -134,21 +134,21 @@
   cursor: pointer;
 }
 
-.link-open[hidden] {
+.caret-button[hidden] {
   display: none;
 }
 
-.link-open:hover {
+.caret-button:hover {
   background: var(--color-hover);
 }
 
-.link-open .icon {
+.caret-button .icon {
   flex: none;
   width: 15px;
   height: 15px;
 }
 
-.link-open-address {
+.caret-button-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

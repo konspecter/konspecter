@@ -204,6 +204,22 @@ describe("text mode", () => {
     open.mockRestore();
   });
 
+  it("copies the code at the caret with a button under it", async () => {
+    const user = userEvent.setup();
+    renderEditor("Run");
+
+    await typeAtEnd(" `pnpm dev`");
+    const button = screen.getByRole("button", { name: "Copy code" });
+    expect(button).toHaveTextContent("Copy");
+    await user.click(button);
+    expect(await navigator.clipboard.readText()).toBe("pnpm dev");
+    expect(button).toHaveTextContent("Copied");
+    expect(textBox()).toHaveFocus();
+
+    await userEvent.keyboard(" more");
+    expect(screen.queryByRole("button", { name: "Copy code" })).not.toBeInTheDocument();
+  });
+
   it("formats with the toolbar", async () => {
     const { save } = renderEditor("");
 

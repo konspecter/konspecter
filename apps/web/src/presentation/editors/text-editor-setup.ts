@@ -817,6 +817,34 @@ export function linkAtCaret(state: EditorState): string | null {
   return writtenAddressAt(text, parentOffset);
 }
 
+/**
+ * The code under the caret (not a selection): the whole code block it is
+ * in, or the inline code around it, at either end too. None when empty.
+ */
+export function codeAtCaret(state: EditorState): string | null {
+  const { empty, $head } = state.selection;
+  const { parent, parentOffset } = $head;
+  if (!empty || !parent.isTextblock) return null;
+  if (parent.type.spec.code) return parent.textContent === "" ? null : parent.textContent;
+  // Neighbouring text nodes in code (bold inside it, say) are one piece of code.
+  const runs: { from: number; to: number; text: string }[] = [];
+  let offset = 0;
+  parent.forEach((node) => {
+    const end = offset + node.nodeSize;
+    if (node.isText && marks.code.isInSet(node.marks)) {
+      const last = runs.at(-1);
+      if (last?.to === offset) {
+        last.to = end;
+        last.text += node.text ?? "";
+      } else {
+        runs.push({ from: offset, to: end, text: node.text ?? "" });
+      }
+    }
+    offset = end;
+  });
+  return runs.find(({ from, to }) => parentOffset >= from && parentOffset <= to)?.text ?? null;
+}
+
 const markTools: readonly (readonly [TextKey, MarkType])[] = [
   ["tool.bold", marks.strong],
   ["tool.italic", marks.em],

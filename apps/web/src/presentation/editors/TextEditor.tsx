@@ -13,7 +13,7 @@ import {
   type FocusEvent,
   type ReactNode,
 } from "react";
-import { ChevronIcon, ExternalIcon } from "@konspecter/ui/icons";
+import { ChevronIcon, CopyIcon, ExternalIcon } from "@konspecter/ui/icons";
 import { OUTLINE_DEPTH } from "../../domain/document/outline";
 import { openInBrowser } from "../../infrastructure/desktop/desktop";
 import { reportError } from "../app/errors";
@@ -23,6 +23,7 @@ import { revealHeading, type HeadingTarget } from "../components/note-heading";
 import { CaretTagSuggestions } from "../components/TagSuggestions";
 import { useTagCompletion } from "../hooks/use-tag-completion";
 import {
+  codeAtCaret,
   createTextEditorState,
   findTransaction,
   foundMatches,
@@ -217,11 +218,12 @@ export function toolbarTopFor(
 }
 
 /**
- * Where the button that opens a link goes, relative to its container: just
+ * Where the button under the caret (open the link, copy the code) goes,
+ * relative to its container: just
  * under the caret, starting at it, moved left as far as it must to stay
  * within the container.
  */
-export function linkButtonSpotFor(
+export function caretButtonSpotFor(
   caret: { left: number; bottom: number },
   container: DOMRect,
   width: number,
@@ -263,7 +265,7 @@ export const TextEditor = memo(function TextEditor({
 }: TextEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
-  const linkButtonRef = useRef<HTMLButtonElement>(null);
+  const caretButtonRef = useRef<HTMLButtonElement>(null);
   const mountRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -286,7 +288,9 @@ export const TextEditor = memo(function TextEditor({
   const [typing, setTyping] = useState(false);
   const narrow = useNarrow();
   const [toolbarTop, setToolbarTop] = useState<number | null>(null);
-  const [linkButtonSpot, setLinkButtonSpot] = useState<{ top: number; left: number } | null>(null);
+  const [caretButtonSpot, setCaretButtonSpot] = useState<{ top: number; left: number } | null>(
+    null,
+  );
   const [folded, setFolded] = useState(initialFolded);
   const [lastUsed, setLastUsed] = useState(initialLastUsed);
   /** A tool was used, from the toolbar or by its shortcut. */
@@ -455,32 +459,45 @@ export const TextEditor = memo(function TextEditor({
   }, [focused, narrow, place]);
 
   // Links cannot be followed by clicking in text being edited: while the caret
-  // is in one, a button under it opens it.
+  // is in one, a button under it opens it. In code, the button copies the code.
   const link = focused ? linkAtCaret(editorState) : null;
-  const placeLinkButton = useCallback(() => {
+  const code = focused && link === null ? codeAtCaret(editorState) : null;
+  const caretButton = link !== null || code !== null;
+  // The code just copied, while the button says so.
+  const [copied, setCopied] = useState<string | null>(null);
+  useEffect(() => {
+    if (copied === null) return;
+    const timer = setTimeout(() => {
+      setCopied(null);
+    }, 1500);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [copied]);
+  const placeCaretButton = useCallback(() => {
     const view = viewRef.current;
     const container = containerRef.current;
-    const button = linkButtonRef.current;
+    const button = caretButtonRef.current;
     if (!view || !container || !button) return;
-    setLinkButtonSpot(
-      linkButtonSpotFor(
+    setCaretButtonSpot(
+      caretButtonSpotFor(
         view.coordsAtPos(view.state.selection.head),
         container.getBoundingClientRect(),
         button.offsetWidth,
       ),
     );
   }, []);
-  const linkButtonPlaced = linkButtonSpot !== null;
+  const caretButtonPlaced = caretButtonSpot !== null;
   useLayoutEffect(() => {
-    if (link) placeLinkButton();
-  }, [link, editorState, linkButtonPlaced, placeLinkButton]);
+    if (caretButton) placeCaretButton();
+  }, [caretButton, editorState, copied, caretButtonPlaced, placeCaretButton]);
   useEffect(() => {
-    if (!link) return;
-    window.addEventListener("resize", placeLinkButton);
+    if (!caretButton) return;
+    window.addEventListener("resize", placeCaretButton);
     return () => {
-      window.removeEventListener("resize", placeLinkButton);
+      window.removeEventListener("resize", placeCaretButton);
     };
-  }, [link, placeLinkButton]);
+  }, [caretButton, placeCaretButton]);
 
   // The library's tags, offered as one is typed; Enter on the very tag typed is a new line.
   const tagCompletion = useTagCompletion(
@@ -579,13 +596,13 @@ export const TextEditor = memo(function TextEditor({
       <CaretTagSuggestions completion={tagCompletion} at={tagListAt} />
       {link && (
         <button
-          ref={linkButtonRef}
+          ref={caretButtonRef}
           type="button"
-          className="link-open"
+          className="caret-button"
           aria-label={t("editor.openLink", { address: link })}
           title={t("editor.openLinkHint")}
-          hidden={linkButtonSpot === null}
-          style={linkButtonSpot ?? undefined}
+          hidden={caretButtonSpot === null}
+          style={caretButtonSpot ?? undefined}
           // Keep the caret in the text when the button is clicked.
           onMouseDown={(event) => {
             event.preventDefault();
@@ -595,7 +612,32 @@ export const TextEditor = memo(function TextEditor({
           }}
         >
           <ExternalIcon />
-          <span className="link-open-address">{shownAddress(link)}</span>
+          <span className="caret-button-label">{shownAddress(link)}</span>
+        </button>
+      )}
+      {code !== null && (
+        <button
+          ref={caretButtonRef}
+          type="button"
+          className="caret-button"
+          aria-label={t("editor.copyCode")}
+          title={t("editor.copyCodeHint")}
+          hidden={caretButtonSpot === null}
+          style={caretButtonSpot ?? undefined}
+          // Keep the caret in the code when the button is clicked.
+          onMouseDown={(event) => {
+            event.preventDefault();
+          }}
+          onClick={() => {
+            navigator.clipboard.writeText(code).then(() => {
+              setCopied(code);
+            }, reportError);
+          }}
+        >
+          <CopyIcon />
+          <span className="caret-button-label">
+            {copied === code ? t("editor.copied") : t("editor.copy")}
+          </span>
         </button>
       )}
       {narrow ? (

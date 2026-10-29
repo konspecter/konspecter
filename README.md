@@ -89,6 +89,9 @@ Your library lives on your device and works offline: IndexedDB in the web app, i
 
 Konspecter provides two ways to work with the same content: a distraction-free, Telegraph-like editor, and a Markdown source editor powered by CodeMirror. Switching between them does not change what your conspect means.
 
+In the text editor, put the caret in a link and a button under it opens the link; put it in
+code, inline or a code block, and the button copies the code.
+
 ![The same conspect in the text editor and in the Markdown source editor](docs/assets/editors.png)
 
 ### Search

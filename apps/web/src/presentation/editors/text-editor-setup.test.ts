@@ -6,6 +6,7 @@ import {
   findTransaction,
   foundMatches,
   addressDecorations,
+  codeAtCaret,
   linkAtCaret,
   tagDecorations,
   toolbarActions,
@@ -13,7 +14,7 @@ import {
   writtenAddressAt,
 } from "./text-editor-setup";
 import { textDocToMarkdown } from "./text-markdown";
-import { linkButtonSpotFor, toolbarTopFor } from "./TextEditor";
+import { caretButtonSpotFor, toolbarTopFor } from "./TextEditor";
 import { textMarkdownParser, textSchema } from "./text-schema";
 
 function editorWith(markdown: string) {
@@ -424,18 +425,59 @@ describe("link at the caret", () => {
   });
 });
 
-describe("link button placement", () => {
+describe("code at the caret", () => {
+  /** The state of `markdown` with the caret `after` characters into the first `word`. */
+  const caretIn = (markdown: string, word: string, after = 1) => {
+    const state = createTextEditorState(textMarkdownParser.parse(markdown));
+    let at = -1;
+    state.doc.descendants((node, pos) => {
+      const index = node.isText ? (node.text ?? "").indexOf(word) : -1;
+      if (at < 0 && index >= 0) at = pos + index + after;
+    });
+    return state.apply(state.tr.setSelection(TextSelection.create(state.doc, at)));
+  };
+
+  it("is the inline code around the caret, at its ends too", () => {
+    const markdown = "Run `pnpm install` and `pnpm dev` now";
+    expect(codeAtCaret(caretIn(markdown, "install"))).toBe("pnpm install");
+    expect(codeAtCaret(caretIn(markdown, "pnpm install", 0))).toBe("pnpm install");
+    expect(codeAtCaret(caretIn(markdown, " and", 0))).toBe("pnpm install");
+    expect(codeAtCaret(caretIn(markdown, "dev"))).toBe("pnpm dev");
+    expect(codeAtCaret(caretIn(markdown, "Run"))).toBeNull();
+    expect(codeAtCaret(caretIn(markdown, "now"))).toBeNull();
+  });
+
+  it("is one piece of code across other marks inside it", () => {
+    expect(codeAtCaret(caretIn("See `a` **`b`** `c`", "b"))).toBe("b");
+    expect(codeAtCaret(caretIn("See *`ab`*`cd` x", "ab"))).toBe("abcd");
+  });
+
+  it("is the whole code block", () => {
+    expect(codeAtCaret(caretIn("Text\n\n```sh\nnpm i\nnpm test\n```", "test"))).toBe(
+      "npm i\nnpm test",
+    );
+  });
+
+  it("is none for a selection, an empty code block or plain text", () => {
+    const state = caretIn("`code`", "code");
+    const selected = state.apply(state.tr.setSelection(TextSelection.create(state.doc, 1, 3)));
+    expect(codeAtCaret(selected)).toBeNull();
+    expect(codeAtCaret(caretIn("Just text", "text"))).toBeNull();
+  });
+});
+
+describe("caret button placement", () => {
   const container = new DOMRect(100, 50, 600, 900);
 
   it("goes just under the caret, starting at it", () => {
-    expect(linkButtonSpotFor({ left: 250, bottom: 320 }, container, 200)).toEqual({
+    expect(caretButtonSpotFor({ left: 250, bottom: 320 }, container, 200)).toEqual({
       top: 274,
       left: 150,
     });
   });
 
   it("moves left to stay within the container", () => {
-    expect(linkButtonSpotFor({ left: 650, bottom: 320 }, container, 200)).toEqual({
+    expect(caretButtonSpotFor({ left: 650, bottom: 320 }, container, 200)).toEqual({
       top: 274,
       left: 400,
     });
