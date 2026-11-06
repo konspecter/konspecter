@@ -110,6 +110,9 @@ breakpoint in the CSS), in the browser, the PWA and the Android app alike.
   least 60px sideways, twice as far as up or down, within 600 ms (`swipeDirection`). It
   does not count when it starts in a dialog or in something that scrolls sideways (a code
   block, a table), or while text is selected.
+- **Android's back button** (the mobile app) closes what is open over the page (a dialog, the
+  island's search, the sidebar), else goes back as a swipe to the right does; on the list, with
+  nothing further back, the app goes to the background (see `clients.md`).
 - **Sidebar:** a full-screen menu, without its own bar (the island holds those buttons), in
   bigger text (16px, the tree 15px, the details 14px) and 36px pane headers. The note's details
   start folded behind their "Details" header.

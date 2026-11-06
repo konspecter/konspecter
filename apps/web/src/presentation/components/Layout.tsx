@@ -12,6 +12,7 @@ import {
 } from "../../application/notes/note-switch";
 import type { NoteRepository } from "../../application/notes/note-repository";
 import { tagSuggester } from "../../application/notes/tag-suggester";
+import type { BackButton } from "../../infrastructure/mobile/mobile";
 import type { SyncEngine } from "../../infrastructure/sync/sync-engine";
 import type { Activity } from "../app/activity";
 import { rememberLocation } from "../app/last-location";
@@ -56,6 +57,8 @@ type LayoutProps = {
   sync?: SyncEngine | undefined;
   /** The desktop app: the sidebar follows the window as it is made narrow or wide. */
   desktop?: boolean;
+  /** The mobile app: the system's back button, taken over by the app. */
+  backButton?: BackButton | undefined;
 };
 
 const SIDEBAR_KEY = "konspecter.sidebar";
@@ -119,6 +122,7 @@ export function Layout({
   updates,
   sync,
   desktop = false,
+  backButton,
 }: LayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -319,16 +323,17 @@ export function Layout({
     return undefined;
   };
   // Back or forward, but never into Settings (past it); with nothing further
-  // back in the app's history, back is to the list (if not there yet).
+  // back in the app's history, back is to the list (if not there yet), in
+  // place of the page left when `replace` is set.
   // Whether it went anywhere.
-  const goPastSettings = (direction: -1 | 1): boolean => {
+  const goPastSettings = (direction: -1 | 1, replace = false): boolean => {
     const delta = stepsAway(historySteps.steps, direction, passedBy);
     if (delta !== null) {
       void navigate(delta);
       return true;
     }
     if (direction === 1 || (location.pathname === "/" && location.search === "")) return false;
-    void navigate("/");
+    void navigate("/", { replace });
     return true;
   };
   // On touch screens a sideways swipe goes through the history: to the
@@ -337,6 +342,32 @@ export function Layout({
   useSwipe((direction) => {
     if (goPastSettings(direction === "right" ? -1 : 1)) closeSidebarOnNarrow();
   });
+  // The mobile app's back button first closes what is open over the page: a
+  // dialog (as Escape does), the island's search (as its × does), the
+  // sidebar covering the screen. Then it goes back as a swipe does, and on
+  // the list, with nowhere further back, it does nothing (the app goes to
+  // the background). The list comes in place of the page left, so the next
+  // back does not return to it.
+  const goBack = (): boolean => {
+    if (document.querySelector("[role='dialog']")) {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      return true;
+    }
+    if (narrow && islandSearchShown) {
+      document.querySelector<HTMLButtonElement>(".island .search-close")?.click();
+      return true;
+    }
+    if (narrow && sidebarOpen) {
+      setSidebarOpen(false);
+      return true;
+    }
+    return goPastSettings(-1, true);
+  };
+  const latestGoBack = useRef(goBack);
+  useEffect(() => {
+    latestGoBack.current = goBack;
+  });
+  useEffect(() => backButton?.(() => latestGoBack.current()), [backButton]);
   useShortcuts({
     search: openSearch,
     quickSearch: openSearch,

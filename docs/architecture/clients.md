@@ -101,7 +101,15 @@ apps/mobile/
 
 - **Everything is shared:** UI, domain rules, IndexedDB storage, search, tags, reading
   positions, settings, and sync with conflict handling. The only mobile-specific code is
-  `infrastructure/mobile/mobile.ts`, which detects the native shell to skip the service worker.
+  `infrastructure/mobile/mobile.ts`, which detects the native shell to skip the service worker
+  and takes over the back button.
+- **Back button:** without a listener, Android's back (button or gesture) closes the activity
+  from any page. `nativeBackButton` listens to Capacitor's App plugin (`@capacitor/app`, loaded
+  only in the mobile app) and hands each press to the layout (`goBack` in `Layout.tsx`): it
+  closes a dialog, the island's search or the full-screen sidebar, else goes back as a swipe
+  does (past Settings, to the list when nothing is further back, in place of the page left).
+  On the list with nowhere further back the layout does nothing, and the app goes to the
+  background (`minimizeApp`), as back does on an Android app's first screen.
 - **Sync:** the app's origin is `https://localhost`, so the server needs
   `KONSPECTER_ALLOWED_ORIGINS=https://localhost` (plus the web origin). Cleartext HTTP is not
   allowed, so use an `https://` server URL.

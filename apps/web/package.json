@@ -15,6 +15,8 @@
     "bench": "vitest run --config vitest.perf.config.ts"
   },
   "dependencies": {
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.2",
     "@codemirror/commands": "^6.11.1",
     "@codemirror/lang-markdown": "^6.5.2",
     "@codemirror/lang-yaml": "^6.1.3",

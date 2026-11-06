@@ -3321,4 +3321,70 @@ describe("small screens", () => {
     await markdownEditor();
     expect(within(island()).queryByRole("button", { name: "Formatting" })).not.toBeInTheDocument();
   });
+
+  describe("the mobile app's back button", () => {
+    /** Renders the app with a fake back button; `back()` presses it. */
+    function renderWithBackButton(store: NoteRepository, path = "/") {
+      let handle: (() => boolean) | null = null;
+      render(
+        <MemoryRouter initialEntries={[path]}>
+          <App
+            store={store}
+            backButton={(next) => {
+              handle = next;
+              return () => {
+                handle = null;
+              };
+            }}
+          />
+        </MemoryRouter>,
+      );
+      /** Presses back; whether the app did anything (else it goes to the background). */
+      return () => {
+        let handled = false;
+        act(() => {
+          handled = handle?.() ?? false;
+        });
+        return handled;
+      };
+    }
+
+    it("closes what is open, then goes back, and then leaves the app to the system", async () => {
+      const back = renderWithBackButton(await storeWithNotes());
+      await noteList();
+      await userEvent.click(screen.getByRole("link", { name: "Hash maps" }));
+      expect(await textEditor()).toHaveTextContent("Buckets.");
+
+      await userEvent.keyboard("?");
+      await screen.findByRole("dialog", { name: "Keyboard shortcuts" });
+      expect(back()).toBe(true);
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+      await userEvent.click(islandButton("Search in this conspect"));
+      expect(back()).toBe(true);
+      expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+      expect(screen.getByRole("textbox", { name: "Conspect text" })).toBeInTheDocument();
+
+      await userEvent.click(islandButton("Show sidebar"));
+      expect(back()).toBe(true);
+      expect(screen.queryByRole("complementary", { name: "Sidebar" })).not.toBeInTheDocument();
+      expect(screen.getByRole("textbox", { name: "Conspect text" })).toBeInTheDocument();
+
+      expect(back()).toBe(true);
+      expect(await listTitles()).toEqual(["Networking", "Hash maps"]);
+      expect(back()).toBe(false);
+      expect(await listTitles()).toEqual(["Networking", "Hash maps"]);
+    });
+
+    it("goes from a note the app opened on to the list, and no further", async () => {
+      const back = renderWithBackButton(await storeWithNotes(), "/conspects/maps");
+      await textEditor();
+
+      expect(back()).toBe(true);
+      expect(await listTitles()).toEqual(["Networking", "Hash maps"]);
+      // The list came in place of the note: back does not return to it.
+      expect(back()).toBe(false);
+      expect(screen.queryByRole("textbox", { name: "Conspect text" })).not.toBeInTheDocument();
+    });
+  });
 });

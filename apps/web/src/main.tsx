@@ -20,7 +20,7 @@ import {
 import { watchReleases } from "./infrastructure/desktop/releases";
 import { FolderStore } from "./infrastructure/folder/folder-store";
 import { FolderSync } from "./infrastructure/folder/folder-sync";
-import { isNativeMobile } from "./infrastructure/mobile/mobile";
+import { isNativeMobile, nativeBackButton } from "./infrastructure/mobile/mobile";
 import { openNoteStore } from "./infrastructure/storage/note-store";
 import { SyncEngine } from "./infrastructure/sync/sync-engine";
 import { App } from "./presentation/app/App";
@@ -195,6 +195,7 @@ try {
           sync={sync}
           reset={reset}
           desktop={isDesktop()}
+          backButton={isNativeMobile() ? nativeBackButton : undefined}
         />
       </BrowserRouter>
     </StrictMode>,

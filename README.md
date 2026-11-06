@@ -130,6 +130,10 @@ comes back. If you hid the sidebar yourself, it stays hidden at any width.
 
 Konspecter runs on Android through Capacitor. The same knowledge base travels with you while remaining local-first. No Play Store needed — install it from [RuStore](https://www.rustore.ru/catalog/app/app.konspecter.mobile), install the APK from the latest release, or use the PWA.
 
+The back button (or the back gesture) works inside the app: it closes an open search, the
+sidebar or a dialog, then goes back to the page you came from, and from a conspect back to the
+list. Only on the list, with nowhere further back, does it leave the app.
+
 <p align="center">
   <img src="docs/assets/mobile.png" width="560" alt="Konspecter on a phone: the list of conspects and an open conspect">
 </p>

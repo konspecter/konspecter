@@ -9,6 +9,7 @@ import {
 import { NoteCatalog } from "../../application/notes/note-catalog";
 import { movePinsIntoNotes } from "../../application/notes/note-pins";
 import type { NoteRepository } from "../../application/notes/note-repository";
+import type { BackButton } from "../../infrastructure/mobile/mobile";
 import type { SyncEngine } from "../../infrastructure/sync/sync-engine";
 import { Layout } from "../components/Layout";
 import { ReformatPrompt } from "../components/ReformatPrompt";
@@ -42,6 +43,8 @@ type AppProps = {
   reset?: FactoryReset | undefined;
   /** The desktop app (Tauri), not a browser or the mobile app. */
   desktop?: boolean;
+  /** The mobile app: the system's back button, taken over by the app. */
+  backButton?: BackButton | undefined;
 };
 
 /** The device's storage, or none where reading it is refused (blocked site data). */
@@ -77,6 +80,7 @@ export function App({
   sync,
   reset,
   desktop = false,
+  backButton,
 }: AppProps) {
   const [settings, setSettings] = useState(initialSettings);
   const [catalog] = useState(
@@ -170,6 +174,7 @@ export function App({
               updates={updates}
               sync={sync}
               desktop={desktop}
+              backButton={backButton}
             />
           }
         >
