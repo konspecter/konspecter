@@ -1,7 +1,8 @@
 # ADR-028: Tags are suggested as they are typed
 
-Status: accepted (2026-10-30). Narrows [ADR-006](ADR-006-codemirror.md), which left
-autocompletion out of the Markdown editor.
+Status: accepted (2026-10-30), amended 2026-11-06: tags that only contain the name typed are no
+longer offered after those starting with it. Narrows [ADR-006](ADR-006-codemirror.md), which
+left autocompletion out of the Markdown editor.
 
 ## Context
 
@@ -13,8 +14,7 @@ for the existing tags to be offered while one is typed, in the search box and in
 ## Decision
 
 1. **Only tags are suggested**, nothing else: typing `#` and a character (by the tag rules,
-   [tags](../tags.md)) lists the library's tags that start with the name typed, then those that
-   contain it, at most eight, each with how many notes have it (`domain/tag/tag-suggestions.ts`).
+   [tags](../tags.md)) lists the library's tags that start with the name typed, at most eight, each with how many notes have it (`domain/tag/tag-suggestions.ts`).
    In a chain (`#java#co`) the last name is completed.
 2. **Nothing is written unless a tag is taken:** ↑/↓ choose, Enter or a click takes the chosen
    tag in place of the name typed, Escape closes the list. Enter on the very tag typed is not

@@ -72,7 +72,7 @@ Java
 Tags are reusable: `#python#collections` puts the same `collections` tag under Python, while a bare `#collections` matches it under any parent. There's no separate taxonomy to keep in sync — the tree is whatever your conspects say.
 
 Start typing a tag — `#` and a letter — in the search box or in either editor and the tags you
-already use are offered: choose one with ↑/↓ and press Enter (or click it), or Escape to
+already use that start with those letters are offered: choose one with ↑/↓ and press Enter (or click it), or Escape to
 close the list. It keeps one spelling for each tag across your library.
 
 Choose a folder in the tree, say Java › Collections, and a new conspect made from its list

@@ -45,9 +45,10 @@ export function knownTags(noteTags: Iterable<readonly string[]>): KnownTag[] {
 }
 
 /**
- * The tags to offer for `prefix`, the name typed so far: those starting with
- * it (the very tag first, then the ones in most notes, then by name), then
- * those containing it, at most eight.
+ * The tags to offer for `prefix`, the name typed so far: only those starting
+ * with it (the very tag first, then the ones in most notes, then by name), at
+ * most eight. A tag merely containing it is not offered: `#ja` is not
+ * `kotlin-java`.
  */
 export function suggestTags(known: readonly KnownTag[], prefix: string): KnownTag[] {
   const typed = prefix.toLowerCase();
@@ -56,9 +57,8 @@ export function suggestTags(known: readonly KnownTag[], prefix: string): KnownTa
     Number(b.name === typed) - Number(a.name === typed) ||
     b.count - a.count ||
     (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
-  const starting = known.filter((tag) => tag.name.startsWith(typed)).sort(order);
-  const containing = known
-    .filter((tag) => !tag.name.startsWith(typed) && tag.name.includes(typed))
-    .sort(order);
-  return [...starting, ...containing].slice(0, SHOWN);
+  return known
+    .filter((tag) => tag.name.startsWith(typed))
+    .sort(order)
+    .slice(0, SHOWN);
 }

@@ -45,13 +45,18 @@ describe("suggestTags", () => {
   ];
   const names = (prefix: string) => suggestTags(known, prefix).map((tag) => tag.name);
 
-  it("offers the tags starting with the prefix, by notes, then those containing it", () => {
-    expect(names("ja")).toEqual(["javascript", "jakarta", "java", "kotlin-java"]);
-    expect(names("J")).toEqual(["jvm", "javascript", "jakarta", "java", "kotlin-java"]);
+  it("offers only the tags starting with the prefix, by notes, then by name", () => {
+    expect(names("ja")).toEqual(["javascript", "jakarta", "java"]);
+    expect(names("J")).toEqual(["jvm", "javascript", "jakarta", "java"]);
+  });
+
+  it("does not offer a tag that only contains the prefix", () => {
+    expect(names("java")).not.toContain("kotlin-java");
+    expect(names("script")).toEqual([]);
   });
 
   it("puts the very tag typed first", () => {
-    expect(names("java")).toEqual(["java", "javascript", "kotlin-java"]);
+    expect(names("java")).toEqual(["java", "javascript"]);
   });
 
   it("offers nothing for no prefix or no match, and at most eight", () => {

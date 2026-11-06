@@ -114,8 +114,8 @@ is matched only against plain text tokens. The `text_join` rule is disabled so a
 
 - **Suggestions** ([ADR-028](decisions/ADR-028-tag-suggestions.md)): typing `#` and a
   character in the search box or an editor lists the library's tags that start with the name
-  typed (the very tag first, then by notes, then by name), then those containing it, at most
-  eight (`suggestTags`). ↑/↓ choose, Enter or a click takes one, Escape closes the list; the
+  typed (the very tag first, then by notes, then by name), at most eight (`suggestTags`); a tag
+  that only contains it is not offered. ↑/↓ choose, Enter or a click takes one, Escape closes the list; the
   open note's own tags are not offered.
 - **In notes:** the editors and the reader mark tags (`tagRanges` finds them in plain text
   with the same rules; code, HTML, URLs and frontmatter are skipped), a little heavier than
