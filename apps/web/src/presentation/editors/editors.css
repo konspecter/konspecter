@@ -471,7 +471,8 @@
 
 /*
  * Small screens: the editor takes nearly the whole screen: 8px of room around
- * it (at the top and the sides, instead of the page's inset), its text 4px
+ * it (at the top and the sides, instead of the page's inset; the highlighted
+ * panel keeps a 10px margin at the top), its text 4px
  * inside it at the top and bottom and 8px at the sides. The toolbar is in the
  * island (`app.css`). The Markdown source is set tighter.
  */
@@ -486,7 +487,9 @@
     padding-inline: var(--editor-side-gap);
   }
 
+  /* The panel stands 10px clear of the top bar, not flush under it. */
   :root[data-editing-area="highlighted"] .note-editor {
+    margin-top: 10px;
     border-radius: 10px;
   }
 
