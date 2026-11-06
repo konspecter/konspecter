@@ -19,6 +19,39 @@ html {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Thin scrollbars that stay out of the way: a narrow rounded thumb on no track, darker under
+   the pointer. Chromium and WebKit (the desktop app's webviews too) draw it from the
+   ::-webkit-scrollbar parts, Firefox from scrollbar-width and scrollbar-color. Touch screens
+   keep their own overlay scrollbars. */
+@media (pointer: fine) {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--color-fg) 22%, transparent) padding-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in srgb, var(--color-fg) 40%, transparent);
+  }
+
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: color-mix(in srgb, var(--color-fg) 22%, transparent) transparent;
+    }
+  }
+}
+
 body {
   color: var(--color-fg);
   font-family: var(--font-text);
