@@ -1,5 +1,6 @@
 import { memo, useEffect, useId, useRef, useState } from "react";
 import { parseDocument, updateMetadata, type Metadata } from "../../domain/document/document";
+import { firstLineTitle } from "../../domain/note/note";
 import { coverDataUrl } from "../../infrastructure/files/cover-image";
 import { isEmbeddedCover, uploadedCoverLabel } from "../components/CoverImage";
 import { t } from "../i18n/i18n";
@@ -8,16 +9,17 @@ type MetadataFieldsProps = {
   /** The whole document; the fields read and write its frontmatter. */
   markdown: string;
   onChange: (markdown: string) => void;
-  /** Shows every field even when empty; otherwise only fields with a value appear. */
+  /** Shows the author and cover fields even when empty; otherwise only those with a value appear. */
   expanded?: boolean;
 };
 
 /**
- * Author and cover fields over the document's frontmatter. An empty field
- * removes the key. Everything else in the frontmatter is kept as written.
- * Fields stay out of the way unless `expanded` while they are empty. There is
- * no title field: the title is read in the editor itself (the body's first
- * line), and a `title` set apart from it is edited in Markdown mode. Tags are
+ * Title, author and cover fields over the document's frontmatter. An empty
+ * field removes the key, so the title follows the body's first line again.
+ * Everything else in the frontmatter is kept as written. Author and cover stay
+ * out of the way unless `expanded` while they are empty. The title is read in
+ * the editor itself (the body's first line), so its field shows only for a
+ * `title` set apart from that line, even when `expanded`. Tags are
  * not edited here: they are written in the text, and removed from the
  * frontmatter in the note's Details. A cover can be a URL or path typed in,
  * or an uploaded image stored as a `data:` URL.
@@ -27,9 +29,14 @@ export const MetadataFields = memo(function MetadataFields({
   onChange,
   expanded = false,
 }: MetadataFieldsProps) {
+  const titleId = useId();
   const authorId = useId();
   const coverId = useId();
-  const { author, cover } = parseDocument(markdown).metadata;
+  const document = parseDocument(markdown);
+  const { title, author, cover } = document.metadata;
+  // Compared within one version of the document: the text editor's body is
+  // written into it (and the title follows its first line) only as it saves.
+  const firstLine = firstLineTitle(document.body);
 
   // An upload finishes later; it applies to the frontmatter as it is by then.
   const latest = useRef(markdown);
@@ -39,7 +46,7 @@ export const MetadataFields = memo(function MetadataFields({
   const fileInput = useRef<HTMLInputElement>(null);
   const [uploadFailed, setUploadFailed] = useState(false);
 
-  function set(field: keyof Pick<Metadata, "author" | "cover">, value: string) {
+  function set(field: keyof Pick<Metadata, "title" | "author" | "cover">, value: string) {
     onChange(updateMetadata(latest.current, { [field]: value === "" ? null : value }));
   }
 
@@ -53,10 +60,11 @@ export const MetadataFields = memo(function MetadataFields({
     }
   }
 
-  // Whether each field has a value. A field that did once stays, also while
-  // its value is being cleared, until the fields are hidden: then the ones
-  // emptied meanwhile go too.
+  // Whether each field says something the body does not. A field that did
+  // once stays, also while its value is being cleared, until the fields are
+  // hidden: then the ones emptied meanwhile go too.
   const says = {
+    title: title !== null && title.trim() !== firstLine,
     author: author !== null,
     cover: cover !== null,
   };
@@ -72,18 +80,36 @@ export const MetadataFields = memo(function MetadataFields({
   }
   if ((Object.keys(says) as (keyof typeof says)[]).some((field) => says[field] && !had[field])) {
     setRemembered({
+      title: had.title || says.title,
       author: had.author || says.author,
       cover: had.cover || says.cover,
     });
   }
+  const showTitle = had.title || says.title;
   const showAuthor = expanded || had.author || says.author;
   const showCover = expanded || had.cover || says.cover;
-  if (!showAuthor && !showCover) return null;
+  if (!showTitle && !showAuthor && !showCover) return null;
   // An uploaded cover is shown by its size, not as a page of base64.
   const uploaded = cover !== null && isEmbeddedCover(cover) ? uploadedCoverLabel(cover) : null;
 
   return (
     <div className="metadata-fields">
+      {showTitle && (
+        <>
+          <label htmlFor={titleId} className="visually-hidden">
+            {t("editor.title")}
+          </label>
+          <input
+            id={titleId}
+            className="title-field"
+            value={title ?? ""}
+            placeholder={firstLine || t("editor.title")}
+            onChange={(event) => {
+              set("title", event.target.value);
+            }}
+          />
+        </>
+      )}
       {showAuthor && (
         <div className="metadata-row">
           <label htmlFor={authorId} className="metadata-label">

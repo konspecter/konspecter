@@ -215,6 +215,7 @@ Map<String, Integer> counts = new HashMap<>();
   "editor.source": "Markdown",
   "editor.placeholder": "Начните писать…",
   "editor.sourcePlaceholder": "# Заголовок",
+  "editor.title": "Заголовок",
   "editor.author": "Автор",
   "editor.cover": "Обложка",
   "editor.coverUpload": "Загрузить…",

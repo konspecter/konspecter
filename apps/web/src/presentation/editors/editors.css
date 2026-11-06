@@ -347,8 +347,27 @@
   margin-bottom: calc(16px * var(--font-scale));
 }
 
+.title-field {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-fg);
+  font-family: var(--font-text);
+  font-size: calc(32px * var(--font-scale));
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.title-field:focus,
 .metadata-input:focus {
   outline: none;
+}
+
+.title-field::placeholder {
+  color: var(--color-muted);
+  opacity: 0.6;
 }
 
 .metadata-row {
@@ -472,6 +491,10 @@
   :root[data-editing-area="highlighted"] .note-editor {
     margin-top: 10px;
     border-radius: 10px;
+  }
+
+  .title-field {
+    font-size: calc(26px * var(--font-scale));
   }
 
   .text-editor {

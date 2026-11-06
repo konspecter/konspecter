@@ -95,7 +95,7 @@ app library (`NoteStore`, IndexedDB) on web and mobile, and the desktop's folder
   stamps its dates. See [editors](editors.md).
 - The note page shows the cover image, the created and edited dates, and the author and cover
   fields over the frontmatter (collapsed while empty); the title is the body's first line,
-  read in the editor itself.
+  read in the editor itself, with a field only for a title set apart from it.
 - Notes with invalid frontmatter are listed and opened as "Unreadable note" so they can be
   fixed.
 - The app is an installable PWA that works fully offline. See [clients](clients.md).

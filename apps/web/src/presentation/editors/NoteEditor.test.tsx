@@ -497,6 +497,7 @@ describe("Markdown source editor", () => {
 });
 
 describe("metadata fields", () => {
+  const titleField = () => screen.getByRole("textbox", { name: "Title" });
   const authorField = () => screen.getByRole("textbox", { name: "Author" });
   const coverField = () => screen.getByRole("textbox", { name: "Cover image" });
 
@@ -512,10 +513,29 @@ describe("metadata fields", () => {
     expect(screen.queryByRole("textbox", { name: "Cover image" })).not.toBeInTheDocument();
   });
 
-  it("have no title field: the title is read in the editor, even one set apart from it", () => {
-    renderEditor("---\ntitle: Set apart\n---\n\n# Heading\n\nBody", "text", true);
+  it("have no title field while the title is the first line, even all shown", () => {
+    renderEditor("---\ntitle: Heading\n---\n\n# Heading\n\nBody", "text", true);
     expect(screen.queryByRole("textbox", { name: "Title" })).not.toBeInTheDocument();
     expect(authorField()).toBeInTheDocument();
+  });
+
+  it("show a title set apart from the first line, which is its placeholder", () => {
+    renderEditor("---\ntitle: Set apart\n---\n\n# Heading\n\nBody");
+    expect(titleField()).toHaveValue("Set apart");
+    expect(titleField()).toHaveAttribute("placeholder", "Heading");
+    expect(screen.queryByRole("textbox", { name: "Author" })).not.toBeInTheDocument();
+  });
+
+  it("edit a title set apart, and remove it when cleared, keeping the field", async () => {
+    const { save } = renderEditor("---\ntitle: Set apart\n---\n\n# Heading");
+
+    await userEvent.type(titleField(), "!");
+    expect(save()).toBe("---\ntitle: Set apart!\n---\n\n# Heading");
+
+    await userEvent.clear(titleField());
+    expect(titleField()).toHaveValue("");
+    expect(titleField()).toHaveFocus();
+    expect(save()).toBe("---\n---\n\n# Heading");
   });
 
   it("keep a field while its value is cleared", async () => {
@@ -646,6 +666,7 @@ describe("frontmatter following the text editor", () => {
     await typeAtEnd("er");
 
     expect(save()).toBe("---\ntitle: Own\n---\n\n# Older");
+    expect(screen.getByRole("textbox", { name: "Title" })).toHaveValue("Own");
   });
 
   it("adds a tag typed in the body next to the ones only listed in the frontmatter", async () => {

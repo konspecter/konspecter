@@ -768,7 +768,7 @@ describe("a note", () => {
 
     expect(await textEditor()).toHaveTextContent("Body");
     expect(screen.getByRole("heading", { level: 1, name: "Covered" })).toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: "Title" })).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Title" })).toHaveValue("Covered");
     expect(document.querySelector("img.note-cover")).toHaveAttribute(
       "src",
       "https://example.com/c.png",
@@ -781,7 +781,7 @@ describe("a note", () => {
     expect(screen.queryByRole("toolbar", { name: "Formatting" })).not.toBeInTheDocument();
   });
 
-  it("keeps empty cover fields out of the way until asked for, and has no title field", async () => {
+  it("keeps empty fields out of the way until asked for, and a title that is the first line", async () => {
     const store = await newStore();
     await store.put(javaNote);
     renderApp(store, "/conspects/java");

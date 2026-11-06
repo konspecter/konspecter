@@ -130,7 +130,7 @@ means. `markdownToTextDoc` checks two things:
 
 If either check fails, Text mode shows the note **rendered** (read-only, with GFM tables and
 highlighted code) with a notice that explains why ("This note uses tables, so it can only be
-edited in Markdown mode."); the author and cover fields still work. A note with invalid
+edited in Markdown mode."); the title, author and cover fields still work. A note with invalid
 frontmatter opens as source, where the frontmatter can be fixed.
 
 ## Markdown mode
@@ -168,13 +168,14 @@ Text mode is the default for new and existing notes.
 
 ## Properties
 
-`MetadataFields` edits `author` and `cover` in the frontmatter. There is no title field: the
-title is the body's first line, read in the editor itself, and a `title` set apart from it is
-edited in Markdown mode. There is no tags field: tags are written in the text, and a tag only the frontmatter lists is removed in the
-note's Details (the × next to it), which hands the editor an `edit` to apply in any mode. Text mode
-also writes the body's first line and tags into `title` and `tags` as it serializes
-(`withBody`). While the fields are empty they stay hidden; a note that has them shows
-them, and _Properties_ in the sidebar's Details opens all of them. The cover can be typed as a URL or path, or
+`MetadataFields` edits `title`, `author` and `cover` in the frontmatter. The title is the
+body's first line, read in the editor itself, so its field shows only for a `title` set apart
+from that line; cleared, the title follows the first line again. There is no tags field: tags
+are written in the text, and a tag only the frontmatter lists is removed in the note's Details
+(the × next to it), which hands the editor an `edit` to apply in any mode. Text mode also writes
+the body's first line and tags into `title` and `tags` as it serializes (`withBody`). While the
+author and cover are empty they stay hidden; a note that has them shows them, and _Properties_
+in the sidebar's Details opens both (never the title's field while it is the first line). The cover can be typed as a URL or path, or
 uploaded: the image is stored in the frontmatter as a base64 `data:` URL
 ([format](markdown-format.md#editing-metadata)).
 
