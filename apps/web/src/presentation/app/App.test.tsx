@@ -3377,6 +3377,18 @@ describe("small screens", () => {
       expect(await listTitles()).toEqual(["Networking", "Hash maps"]);
     });
 
+    it("closes the list's search as its × does, emptying the query", async () => {
+      const back = renderWithBackButton(await storeWithNotes());
+      await noteList();
+      await userEvent.click(islandButton("Search conspects"));
+      await userEvent.type(screen.getByRole("searchbox"), "buckets");
+      expect(await listTitles()).toEqual(["Hash maps"]);
+
+      expect(back()).toBe(true);
+      expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+      expect(await listTitles()).toEqual(["Networking", "Hash maps"]);
+    });
+
     it("cancels a confirmation, staying on the page", async () => {
       const back = renderWithBackButton(await storeWithNotes(), "/conspects/maps");
       await textEditor();

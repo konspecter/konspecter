@@ -136,6 +136,7 @@ export function Layout({
   const [detailsSlot, setDetailsSlot] = useState<HTMLDivElement | null>(null);
   const [islandSlot, setIslandSlot] = useState<HTMLSpanElement | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const closeIslandSearch = useRef<() => void>(null);
   const sidebarToggleRef = useRef<HTMLButtonElement>(null);
   const barToggleRef = useRef<HTMLButtonElement>(null);
   const dark = useDarkTheme(theme);
@@ -343,21 +344,27 @@ export function Layout({
     if (goPastSettings(direction === "right" ? -1 : 1)) closeSidebarOnNarrow();
   });
   // The mobile app's back button first closes what is open over the page: a
-  // dialog (as Escape does), the island's search (as its × does), the
+  // dialog (as its Escape does), the island's search (as its × does), the
   // sidebar covering the screen. Then it goes back as a swipe does, and on
   // the list, with nowhere further back, it does nothing (the app goes to
   // the background). The list comes in place of the page left, so the next
   // back does not return to it.
   const goBack = (): boolean => {
-    // Escape is pressed on the dialog itself: a confirmation (an alertdialog)
-    // listens on its own element, the others on the window it bubbles up to.
+    if (showShortcuts) {
+      setShowShortcuts(false);
+      return true;
+    }
+    // A page's own dialog gets Escape on itself: a confirmation (an
+    // alertdialog) listens on its own element, the others on the window it
+    // bubbles up to.
     const dialog = document.querySelector("[role='dialog'], [role='alertdialog']");
     if (dialog) {
       dialog.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
       return true;
     }
     if (narrow && islandSearchShown) {
-      document.querySelector<HTMLButtonElement>(".island .search-close")?.click();
+      if (closeIslandSearch.current) closeIslandSearch.current();
+      else setIslandSearch(false);
       return true;
     }
     if (narrow && sidebarOpen) {
@@ -432,6 +439,7 @@ export function Layout({
       onLeave={() => {
         setLibraryScope(false);
       }}
+      closeRef={closeIslandSearch}
       {...(onClose ? { onClose } : {})}
     />
   );

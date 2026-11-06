@@ -1,4 +1,4 @@
-import { useId, useState, type Ref } from "react";
+import { useId, useImperativeHandle, useState, type Ref } from "react";
 import { useLocation, useMatch, useNavigate, useSearchParams } from "react-router";
 import { joinQuery, queryParts, takeTags, type QueryParts } from "../../domain/search/query";
 import { typedTag } from "../../domain/tag/tag-suggestions";
@@ -48,6 +48,8 @@ type SearchBoxProps = {
   onLeave?: () => void;
   /** Ends the search: a close button at the end empties the query, then calls it (the island). */
   onClose?: () => void;
+  /** With `onClose`, set to what the close button does (for the mobile app's back button). */
+  closeRef?: Ref<() => void>;
   /** Back and forward buttons at the start, enabled where the history has somewhere to go. */
   history?: { readonly back: boolean; readonly forward: boolean } | null;
 };
@@ -75,6 +77,7 @@ export function SearchBox({
   find = null,
   onLeave,
   onClose,
+  closeRef,
   history = null,
 }: SearchBoxProps) {
   const id = useId();
@@ -136,6 +139,14 @@ export function SearchBox({
     setTyped(null);
     change(withTags(parts.tags), parts.text);
   });
+
+  // Ends the search: the query emptied, then the box closed.
+  const close = () => {
+    if (find) find.onQuery("");
+    else if (tags.length > 0 || text !== "") change([], "");
+    onClose?.();
+  };
+  useImperativeHandle(onClose ? closeRef : undefined, () => close);
 
   return (
     <form
@@ -261,11 +272,7 @@ export function SearchBox({
           className="search-close"
           aria-label={t("topbar.closeSearch")}
           title={t("topbar.closeSearch")}
-          onClick={() => {
-            if (find) find.onQuery("");
-            else if (tags.length > 0 || text !== "") change([], "");
-            onClose();
-          }}
+          onClick={close}
         >
           <CloseIcon />
         </button>
