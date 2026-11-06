@@ -497,53 +497,53 @@ describe("Markdown source editor", () => {
 });
 
 describe("metadata fields", () => {
-  const titleField = () => screen.getByRole("textbox", { name: "Title" });
+  const authorField = () => screen.getByRole("textbox", { name: "Author" });
   const coverField = () => screen.getByRole("textbox", { name: "Cover image" });
 
   it("stay out of the way while empty, and show when they have a value", () => {
     renderEditor("# Heading only\n\nBody");
-    expect(screen.queryByRole("textbox", { name: "Title" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Author" })).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Cover image" })).not.toBeInTheDocument();
   });
 
-  it("show a set title without an empty cover field", () => {
-    renderEditor("---\ntitle: Set\n---\n\nBody");
-    expect(titleField()).toHaveValue("Set");
+  it("show a set author without an empty cover field", () => {
+    renderEditor("---\nauthor: Ann\n---\n\nBody");
+    expect(authorField()).toHaveValue("Ann");
     expect(screen.queryByRole("textbox", { name: "Cover image" })).not.toBeInTheDocument();
+  });
+
+  it("have no title field: the title is read in the editor, even one set apart from it", () => {
+    renderEditor("---\ntitle: Set apart\n---\n\n# Heading\n\nBody", "text", true);
+    expect(screen.queryByRole("textbox", { name: "Title" })).not.toBeInTheDocument();
+    expect(authorField()).toBeInTheDocument();
   });
 
   it("keep a field while its value is cleared", async () => {
-    renderEditor("---\ntitle: Old\n---\n\nBody");
-    await userEvent.clear(titleField());
-    expect(titleField()).toHaveValue("");
-    expect(titleField()).toHaveFocus();
+    renderEditor("---\nauthor: Old\n---\n\nBody");
+    await userEvent.clear(authorField());
+    expect(authorField()).toHaveValue("");
+    expect(authorField()).toHaveFocus();
   });
 
-  it("shows the derived title as a placeholder until a title is set", () => {
-    renderEditor("# From heading\n\nBody", "text", true);
-
-    expect(titleField()).toHaveValue("");
-    expect(titleField()).toHaveAttribute("placeholder", "From heading");
-  });
-
-  it("writes the title and cover into the frontmatter, keeping other keys", async () => {
+  it("writes the cover into the frontmatter, keeping other keys", async () => {
     const { save } = renderEditor("---\n# mine\ntags: [a]\n---\n\nBody", "text", true);
 
-    await userEvent.type(titleField(), "Java: Collections");
     await userEvent.type(coverField(), "https://example.com/c.png");
 
-    expect(save()).toBe(
-      '---\n# mine\ntags: [a]\ntitle: "Java: Collections"\ncover: "https://example.com/c.png"\n---\n\nBody',
-    );
+    expect(save()).toBe('---\n# mine\ntags: [a]\ncover: "https://example.com/c.png"\n---\n\nBody');
   });
 
-  it("removes the key when a field is cleared", async () => {
-    const { save } = renderEditor("---\ntitle: Old\ncover: x.png\n---\n\nBody", "text", true);
+  it("removes the key when a field is cleared, keeping the title", async () => {
+    const { save } = renderEditor(
+      "---\ntitle: Old\nauthor: A\ncover: x.png\n---\n\nBody",
+      "text",
+      true,
+    );
 
-    await userEvent.clear(titleField());
+    await userEvent.clear(authorField());
     await userEvent.clear(coverField());
 
-    expect(save()).toBe("---\n---\n\nBody");
+    expect(save()).toBe("---\ntitle: Old\n---\n\nBody");
   });
 
   it("uploads a cover image into the frontmatter and shows it by size", async () => {
@@ -575,13 +575,13 @@ describe("metadata fields", () => {
     const image = new File(["img"], "c.png", { type: "image/png" });
     await userEvent.upload(screen.getByLabelText("Upload…"), image);
     await userEvent.click(screen.getByRole("button", { name: "Remove" }));
-    await userEvent.type(titleField(), "Kept");
+    await userEvent.type(authorField(), "Kept");
 
     await userEvent.click(screen.getByRole("button", { name: "Fields" }));
 
     expect(screen.queryByRole("textbox", { name: "Cover image" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Upload…" })).not.toBeInTheDocument();
-    expect(titleField()).toHaveValue("Kept");
+    expect(authorField()).toHaveValue("Kept");
   });
 
   it("explains an image it cannot use and keeps the cover", async () => {
@@ -597,18 +597,10 @@ describe("metadata fields", () => {
     expect(coverField()).toHaveValue("https://example.com/c.png");
   });
 
-  it("follows the body's first line as it is typed", async () => {
-    renderEditor("", "text", true);
-
-    await typeInText("# Fresh title");
-
-    expect(titleField()).toHaveAttribute("placeholder", "Fresh title");
-  });
-
   it("writes the author into the frontmatter", async () => {
     const { save } = renderEditor("---\ntitle: T\n---\n\nBody", "text", true);
 
-    await userEvent.type(screen.getByRole("textbox", { name: "Author" }), "Ann");
+    await userEvent.type(authorField(), "Ann");
 
     expect(save()).toBe("---\ntitle: T\nauthor: Ann\n---\n\nBody");
   });
@@ -617,10 +609,10 @@ describe("metadata fields", () => {
     renderEditor("Body", "text", true);
 
     await userEvent.click(screen.getByRole("button", { name: "Markdown" }));
-    setSourceValue(sourceBox(), "---\ntitle: Typed in source\n---\n\nBody");
+    setSourceValue(sourceBox(), "---\ncover: typed.png\n---\n\nBody");
     await userEvent.click(screen.getByRole("button", { name: "Text" }));
 
-    expect(titleField()).toHaveValue("Typed in source");
+    expect(coverField()).toHaveValue("typed.png");
   });
 
   it("reflects the author edited in Markdown mode, and has no tags field", async () => {
@@ -654,7 +646,6 @@ describe("frontmatter following the text editor", () => {
     await typeAtEnd("er");
 
     expect(save()).toBe("---\ntitle: Own\n---\n\n# Older");
-    expect(screen.getByRole("textbox", { name: "Title" })).toHaveValue("Own");
   });
 
   it("adds a tag typed in the body next to the ones only listed in the frontmatter", async () => {

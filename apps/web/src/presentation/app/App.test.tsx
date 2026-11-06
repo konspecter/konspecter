@@ -768,7 +768,7 @@ describe("a note", () => {
 
     expect(await textEditor()).toHaveTextContent("Body");
     expect(screen.getByRole("heading", { level: 1, name: "Covered" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Title" })).toHaveValue("Covered");
+    expect(screen.queryByRole("textbox", { name: "Title" })).not.toBeInTheDocument();
     expect(document.querySelector("img.note-cover")).toHaveAttribute(
       "src",
       "https://example.com/c.png",
@@ -781,19 +781,20 @@ describe("a note", () => {
     expect(screen.queryByRole("toolbar", { name: "Formatting" })).not.toBeInTheDocument();
   });
 
-  it("keeps empty title and cover fields out of the way until asked for", async () => {
+  it("keeps empty cover fields out of the way until asked for, and has no title field", async () => {
     const store = await newStore();
     await store.put(javaNote);
     renderApp(store, "/conspects/java");
 
     await textEditor();
-    expect(screen.queryByRole("textbox", { name: "Title" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Cover image" })).not.toBeInTheDocument();
     const toggle = screen.getByRole("button", { name: "Properties" });
     await userEvent.click(toggle);
 
     expect(toggle).toHaveAttribute("aria-expanded", "true");
-    await userEvent.type(screen.getByRole("textbox", { name: "Title" }), "Collections");
-    await stored(store, "java", (markdown) => markdown.includes("title: Collections"));
+    expect(screen.queryByRole("textbox", { name: "Title" })).not.toBeInTheDocument();
+    await userEvent.type(screen.getByRole("textbox", { name: "Cover image" }), "c.png");
+    await stored(store, "java", (markdown) => markdown.includes("cover: c.png"));
     expect(await textEditor()).toHaveTextContent("ArrayList");
   });
 

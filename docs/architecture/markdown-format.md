@@ -100,8 +100,9 @@ When a note is saved (`createNote`, `updateNote` in `domain/note/note.ts`):
 
 ## Editing metadata
 
-In Text mode, the editor shows **title**, **author**, **tags** and **cover** fields above the
-body (`editors/MetadataFields.tsx`). In Markdown mode the frontmatter is edited directly. Both
+In Text mode, the editor shows **author** and **cover** fields above the body
+(`editors/MetadataFields.tsx`). There is no title field: the title is the body's first line,
+read in the editor itself. In Markdown mode the frontmatter is edited directly. Both
 views read from the same document text, so switching modes always shows the current values.
 
 - Each field writes its key with `updateMetadata`, which keeps comments, unknown keys and
@@ -115,16 +116,15 @@ views read from the same document text, so switching modes always shows the curr
   the app shows are the document's own `title` and `tags`:
   - `title` is set to the body's first line as readable text (`# Using **maps**` →
     `Using maps`, `firstLineTitle`) while it is absent or still equal to the previous first
-    line. A title set to something else (in the field, in Markdown mode or by another program)
-    is the author's and stays; clearing the field lets it follow the first line again.
+    line. A title set to something else (in Markdown mode or by another program) is the
+    author's and stays; removing it there lets it follow the first line again.
   - `tags` lists every tag written in the body. A tag deleted from the body leaves the list;
     tags only ever listed in the frontmatter stay. A tag written in the body and also added by
     hand leaves the list with the body's.
   - Markdown mode edits the text as written and changes nothing by itself. Switching to it
     shows the frontmatter Text mode wrote.
-- The title field and the tags row stay hidden while they only repeat the body (the heading,
-  the tags written in it). Tags written in the body are listed without a remove button:
-  they are removed in the text.
+- The tags row stays hidden while it only repeats the body (the tags written in it). Tags
+  written in the body are listed without a remove button: they are removed in the text.
 - **Dates** are shown read-only under the text (`Created …`, `Edited …`), from the stored
   version. They are stamped on save as described above.
 - **Cover:** any text is stored, including paths for File Mode. The note page shows it when

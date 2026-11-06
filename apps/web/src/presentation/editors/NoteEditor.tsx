@@ -353,9 +353,6 @@ export const NoteEditor = memo(function NoteEditor({
   }, [session, carry]);
   const arriving = carry ? { arrival } : {};
 
-  // The title field's placeholder follows the body's first line as it is typed.
-  const firstLine = doc?.firstChild?.textContent.trim();
-
   return (
     <div
       className="note-editor"
@@ -375,7 +372,6 @@ export const NoteEditor = memo(function NoteEditor({
         <MetadataFields
           markdown={markdown}
           onChange={handleMetadataChange}
-          bodyTitle={firstLine}
           expanded={showMetadata}
         />
       )}

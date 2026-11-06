@@ -192,7 +192,6 @@ source, or delete this conspect when you are done.
   "editor.source": "Markdown",
   "editor.placeholder": "Start writing…",
   "editor.sourcePlaceholder": "# Title",
-  "editor.title": "Title",
   "editor.author": "Author",
   "editor.cover": "Cover image",
   "editor.coverUpload": "Upload…",
