@@ -349,8 +349,11 @@ export function Layout({
   // the background). The list comes in place of the page left, so the next
   // back does not return to it.
   const goBack = (): boolean => {
-    if (document.querySelector("[role='dialog']")) {
-      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    // Escape is pressed on the dialog itself: a confirmation (an alertdialog)
+    // listens on its own element, the others on the window it bubbles up to.
+    const dialog = document.querySelector("[role='dialog'], [role='alertdialog']");
+    if (dialog) {
+      dialog.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
       return true;
     }
     if (narrow && islandSearchShown) {

@@ -3377,6 +3377,19 @@ describe("small screens", () => {
       expect(await listTitles()).toEqual(["Networking", "Hash maps"]);
     });
 
+    it("cancels a confirmation, staying on the page", async () => {
+      const back = renderWithBackButton(await storeWithNotes(), "/conspects/maps");
+      await textEditor();
+      await userEvent.click(islandButton("Show sidebar"));
+      await userEvent.click(within(sidebar()).getByRole("button", { name: "Details" }));
+      await userEvent.click(within(sidebar()).getByRole("button", { name: "Delete" }));
+      await screen.findByRole("alertdialog", { name: "Delete this conspect?" });
+
+      expect(back()).toBe(true);
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+      expect(screen.getByRole("textbox", { name: "Conspect text" })).toBeInTheDocument();
+    });
+
     it("goes from a note the app opened on to the list, and no further", async () => {
       const back = renderWithBackButton(await storeWithNotes(), "/conspects/maps");
       await textEditor();
