@@ -482,6 +482,16 @@ impl Folder {
         }
         trash::delete(&path).map_err(|e| FolderError::Io(format!("move to trash: {e}")))
     }
+
+    /// Deletes the file for good, not to the trash: a device wiped from the
+    /// site must not keep its notes in a bin.
+    pub fn delete(&self, relative: &str) -> Result<(), FolderError> {
+        let path = self.resolve(relative)?;
+        if !path.is_file() {
+            return Err(FolderError::NotFound(relative.to_string()));
+        }
+        fs::remove_file(&path).map_err(|e| io("delete file", e))
+    }
 }
 
 /// What a changed path, as reported by the file watcher, means for the library.
@@ -892,6 +902,22 @@ mod tests {
             ));
         }
         assert!(root.exists());
+    }
+
+    #[test]
+    fn deletes_a_file_for_good() {
+        let (_dir, folder) = folder();
+        folder.create_at("sub/note.md", "# Note").unwrap();
+        folder.delete("sub/note.md").unwrap();
+        assert!(!folder.root().join("sub/note.md").exists());
+        assert!(matches!(
+            folder.delete("sub/note.md"),
+            Err(FolderError::NotFound(_))
+        ));
+        assert!(matches!(
+            folder.delete("../outside.md"),
+            Err(FolderError::InvalidPath(_))
+        ));
     }
 
     #[test]

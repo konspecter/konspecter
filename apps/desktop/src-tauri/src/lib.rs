@@ -417,6 +417,11 @@ fn folder_trash(state: State<'_, FolderState>, path: String) -> Result<(), Comma
 }
 
 #[tauri::command]
+fn folder_delete(state: State<'_, FolderState>, path: String) -> Result<(), CommandError> {
+    state.with(|f| f.delete(&path))
+}
+
+#[tauri::command]
 fn folder_remove_empty_dir(
     state: State<'_, FolderState>,
     path: String,
@@ -449,6 +454,7 @@ pub fn run() {
             folder_create_at,
             folder_rename,
             folder_trash,
+            folder_delete,
             folder_remove_empty_dir,
             folder_open_external,
             folder_reveal,

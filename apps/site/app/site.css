@@ -1827,8 +1827,56 @@ main {
   font-size: 14px;
 }
 
-.device form {
+.device-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
   flex-shrink: 0;
+}
+
+/* Narrow screens: the buttons go under the device. */
+@media (max-width: 560px) {
+  .device {
+    flex-wrap: wrap;
+  }
+
+  .device-actions {
+    justify-content: flex-start;
+  }
+}
+
+/* Disconnect and wipe asks first. */
+.wipe-dialog {
+  width: min(28rem, calc(100vw - 32px));
+  margin: auto;
+  padding: 1.25rem 1.35rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-raised);
+  color: var(--color-fg);
+  box-shadow: 0 18px 50px -24px var(--color-shadow);
+}
+
+/* Without JavaScript the dialog is not modal: it shows in place, over the page. */
+.wipe-dialog:not(:modal) {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  height: fit-content;
+}
+
+.wipe-dialog::backdrop {
+  background: rgb(0 0 0 / 35%);
+}
+
+.wipe-dialog h3 {
+  margin: 0 0 0.5rem;
+  font-size: 18px;
+}
+
+.wipe-dialog .actions {
+  justify-content: flex-end;
 }
 
 /* The subscription: price options, consent, the cancel step, payments. */

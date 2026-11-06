@@ -246,6 +246,28 @@ it("explains a disconnected device and offers to sign in again or stop", async (
   expect(await screen.findByRole("button", { name: "Sign in with browser" })).toBeInTheDocument();
 });
 
+it("says the device is being wiped, and offers nothing to do meanwhile", async () => {
+  const server = new FakeServer();
+  databases += 1;
+  const store = await openNoteStore(`sync-settings-${String(databases)}`);
+  const engine = new SyncEngine(store, {
+    fetch: server.fetch,
+    scheduler: new ManualScheduler(),
+    isOnline: () => true,
+    isVisible: () => true,
+    onWiped: () => new Promise<void>(() => undefined), // Still erasing.
+  });
+  render(<SyncSettings sync={engine} />);
+  await engine.connect({ serverUrl: "https://sync.example.com", token: "ksp_ada" });
+  server.wipeDevice("ksp_ada");
+  await engine.syncNow();
+
+  expect(await screen.findByRole("status")).toHaveTextContent(
+    "This device was disconnected and wiped from your account's settings.",
+  );
+  expect(screen.queryByRole("button")).toBeNull();
+});
+
 it("says when the trial ends, and links to the subscription", async () => {
   const server = new FakeServer();
   server.access = { state: "trialing", until: "2026-10-20T12:00:00Z" };

@@ -85,8 +85,11 @@ as a SHA-256 hash only.
 ## Authentication
 
 - **Apps** send `Authorization: Bearer ksp_…`. A token belongs to a device (`auth.Device`:
-  the device id and its user). A disconnected device gets `401 device_revoked`, an unknown
-  token `401 unauthorized`. Failed authentication is rate-limited per client address.
+  the device id and its user). A disconnected device gets `401 device_revoked`, one
+  disconnected to be wiped `401 device_wiped`
+  ([ADR-029](decisions/ADR-029-device-wipe.md)), an unknown token `401 unauthorized`. Failed authentication is rate-limited per client address;
+  a blocked address may still sign out a token that was asked to wipe, which says the wipe is
+  done.
 - **Apps name their version** in the query of `GET /api/me` (`?client_version=0.14.0`; any
   request with a token may). The device keeps it when it changes, so the device list shows
   the version each app runs now, not the one it was connected with. A request without it
@@ -107,18 +110,18 @@ may not contain unknown fields. Errors look like `{"error": {"code": "…", "mes
 
 ### Notes and sync (bearer token)
 
-| Method & path                | Body / query                 | Success                                                   | Errors                                                                      |
-| ---------------------------- | ---------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `GET /healthz`               | (no auth)                    | 200                                                       |                                                                             |
-| `GET /api/notes`             |                              | 200 `{notes: [...]}` (not deleted)                        | 401                                                                         |
-| `GET /api/notes/{id}`        |                              | 200 note                                                  | 404                                                                         |
-| `POST /api/notes`            | `{id, content}`              | 201 note, `Location`                                      | 400, 409 `revision_conflict` (id taken), 409 key (\*), 507 `quota_exceeded` |
-| `PUT /api/notes/{id}`        | `{content, base_revision}`   | 200 note (restores a deleted note at its revision)        | 404, 409 `revision_conflict`, 409 key (\*), 507 `quota_exceeded`            |
-| `GET /api/quota`             | (no auth)                    | 200 `{quota}`: the server's quota in bytes, for the terms |                                                                             |
-| `DELETE /api/notes/{id}`     | `?base_revision=N`           | 204                                                       | 404, 409 `revision_conflict`                                                |
-| `GET /api/sync`              | `?since=cursor&limit=1..500` | 200 `{notes, cursor, more, key_id}` (tombstones included) | 400                                                                         |
-| `GET /api/events`            |                              | 200 `text/event-stream` (see below)                       | 401, 429 `too_many_streams`, 503                                            |
-| `DELETE /api/tokens/current` |                              | 204 (this device signs out and leaves the account's list) | 401                                                                         |
+| Method & path                | Body / query                 | Success                                                                                                             | Errors                                                                      |
+| ---------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `GET /healthz`               | (no auth)                    | 200                                                                                                                 |                                                                             |
+| `GET /api/notes`             |                              | 200 `{notes: [...]}` (not deleted)                                                                                  | 401                                                                         |
+| `GET /api/notes/{id}`        |                              | 200 note                                                                                                            | 404                                                                         |
+| `POST /api/notes`            | `{id, content}`              | 201 note, `Location`                                                                                                | 400, 409 `revision_conflict` (id taken), 409 key (\*), 507 `quota_exceeded` |
+| `PUT /api/notes/{id}`        | `{content, base_revision}`   | 200 note (restores a deleted note at its revision)                                                                  | 404, 409 `revision_conflict`, 409 key (\*), 507 `quota_exceeded`            |
+| `GET /api/quota`             | (no auth)                    | 200 `{quota}`: the server's quota in bytes, for the terms                                                           |                                                                             |
+| `DELETE /api/notes/{id}`     | `?base_revision=N`           | 204                                                                                                                 | 404, 409 `revision_conflict`                                                |
+| `GET /api/sync`              | `?since=cursor&limit=1..500` | 200 `{notes, cursor, more, key_id}` (tombstones included)                                                           | 400                                                                         |
+| `GET /api/events`            |                              | 200 `text/event-stream` (see below)                                                                                 | 401, 429 `too_many_streams`, 503                                            |
+| `DELETE /api/tokens/current` |                              | 204 (this device signs out and leaves the account's list; also a device asked to wipe itself, which so says it has) | 401                                                                         |
 
 A note is `{id, content, revision, created_at, updated_at, deleted_at?}`, where `content` is
 the envelope `ksp1.<key_id>.<base64url>`. (\*) Content that is not an envelope is
@@ -201,8 +204,9 @@ site's subscription requests are still passed on; without it, no account syncs.
 | `POST /api/devices/approve`, `/deny`  | session | decide                                                                                                                                                                                                                                                                    |
 | `POST /api/devices/connect-codes`     | session | a code to show as a QR code ([ADR-019](decisions/ADR-019-connect-by-qr-code.md)): `{code, url, expires_in}`; an optional body `{key_id, sealed_key}` stores the content key sealed for the app ([ADR-025](decisions/ADR-025-connect-with-key.md)), else `400 invalid_key` |
 | `POST /api/devices/connect`           | none    | an app trades a scanned code for `{token, device, user, key}` (`key`: the sealed key, or `null`); else `400 invalid_connect_code`                                                                                                                                         |
-| `GET /api/devices`                    | session | the connected devices, most recently active first                                                                                                                                                                                                                         |
-| `DELETE /api/devices/{id}`            | session | disconnect: the token stops working and its streams end at once                                                                                                                                                                                                           |
+| `GET /api/devices`                    | session | the connected devices and those waiting to wipe themselves (`wipe_requested_at`, null for connected ones), most recently active first                                                                                                                                     |
+| `DELETE /api/devices/{id}`            | session | disconnect: the token stops working and its streams end at once; `?wipe=true` also asks its app to erase what it holds (`401 device_wiped`, [ADR-029](decisions/ADR-029-device-wipe.md)); the row stays until the app signs out                                           |
+| `DELETE /api/devices/{id}/wipe`       | session | removes a device waiting to wipe itself from the list, which withdraws the wipe: its token is unknown from then on; `404` for a device that does not wait                                                                                                                 |
 
 ## Change events
 

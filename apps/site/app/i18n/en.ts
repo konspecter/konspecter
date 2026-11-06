@@ -266,7 +266,7 @@ export const en = {
   "settings.connect.expired": "The code has expired. Show a new one to connect an app.",
   "settings.devices.title": "Connected devices",
   "settings.devices.lead":
-    "Apps that sync with this account. A disconnected device stops syncing and keeps its conspects.",
+    "Apps that sync with this account. A disconnected device stops syncing and keeps its conspects. One disconnected and wiped erases them.",
   "settings.devices.empty":
     "No devices yet. Connect one with a QR code above, or in the app open Settings, then Sync, and choose Sign in with browser.",
   "settings.devices.failed": "The devices could not be loaded. Reload the page to try again.",
@@ -278,6 +278,21 @@ export const en = {
   "settings.devices.disconnectNamed": "Disconnect {name}",
   "settings.devices.disconnected":
     "{name} is disconnected. It keeps its conspects and stops syncing.",
+  "settings.devices.wipe": "Disconnect and wipe…",
+  "settings.devices.wipeNamed": "Disconnect and wipe {name}",
+  "settings.devices.wipeTitle": "Disconnect and wipe {name}?",
+  "settings.devices.wipeText":
+    "{name} stops syncing at once. The next time it goes online, it erases the conspects it holds and signs out. On a computer, the Markdown files sync covers are deleted for good, not moved to the trash; other files in the folder stay. Changes it has not synced are lost. Your account and your other devices keep every conspect.",
+  "settings.devices.wipeCancel": "Cancel",
+  "settings.devices.wipeConfirm": "Disconnect and wipe",
+  "settings.devices.wiped":
+    "{name} is disconnected. It erases its conspects the next time it goes online.",
+  "settings.devices.waitingToWipe":
+    "Disconnected {when}. It erases its conspects the next time it goes online.",
+  "settings.devices.forget": "Remove from list",
+  "settings.devices.forgetNamed": "Remove {name} from the list",
+  "settings.devices.forgotten":
+    "{name} is removed from the list. If it goes online again, it is not wiped: it only stops syncing.",
   "settings.delete.title": "Delete account",
   "settings.delete.lead":
     "This deletes the account and every conspect it keeps on the server, and disconnects all devices. Your devices keep their own conspects. It cannot be undone.",

@@ -15,6 +15,8 @@ export const en = {
   "app.close": "Close",
   "app.cancel": "Cancel",
   "app.somethingWrong": "Oops, something went wrong.",
+  "app.wiped":
+    "This device was disconnected and wiped from your account's settings. Its conspects were erased.",
 
   "sidebar.label": "Sidebar",
   "sidebar.show": "Show sidebar",
@@ -61,6 +63,7 @@ export const en = {
   "syncHint.locked": "Sync locked",
   "syncHint.unpaid": "Sync paused",
   "syncHint.full": "Sync storage full",
+  "syncHint.wiping": "Wiping this device…",
   "syncHint.blocked": { one: "{count} not synced", other: "{count} not synced" },
   "syncHint.label": "Sync: {text}",
 
@@ -396,6 +399,9 @@ source, or delete this conspect when you are done.
   "sync.state.locked": "Locked",
   "sync.state.unpaid": "Paused",
   "sync.state.full": "Storage full",
+  "sync.state.wiping": "Wiping this device…",
+  "sync.wiping":
+    "This device was disconnected and wiped from your account's settings. Its conspects are being erased; the app restarts when it is done.",
   "sync.full":
     "Your storage on the server is full. Changes that need more room wait on this device: delete conspects you no longer need to make room.",
   "sync.storage": "Storage: {percent} used",

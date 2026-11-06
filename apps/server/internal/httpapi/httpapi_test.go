@@ -341,6 +341,8 @@ func (f *fakeDevices) DeviceByToken(_ context.Context, token, clientVersion stri
 	switch {
 	case !ok:
 		return auth.Device{}, auth.ErrUnauthorized
+	case d.info.WipeRequestedAt != nil:
+		return auth.Device{}, auth.ErrDeviceWiped
 	case d.revoked:
 		return auth.Device{}, auth.ErrDeviceRevoked
 	}
@@ -507,7 +509,7 @@ func (f *fakeDevices) ListDevices(_ context.Context, userID string) ([]devices.D
 	defer f.mu.Unlock()
 	var list []devices.Device
 	for _, d := range f.byToken {
-		if d.device.User.ID == userID && !d.revoked {
+		if d.device.User.ID == userID && (!d.revoked || d.info.WipeRequestedAt != nil) {
 			list = append(list, d.info)
 		}
 	}
@@ -515,12 +517,28 @@ func (f *fakeDevices) ListDevices(_ context.Context, userID string) ([]devices.D
 	return list, nil
 }
 
-func (f *fakeDevices) RevokeDevice(_ context.Context, userID, deviceID string) error {
+func (f *fakeDevices) RevokeDevice(_ context.Context, userID, deviceID string, wipe bool) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	for _, d := range f.byToken {
 		if d.device.ID == deviceID && d.device.User.ID == userID && !d.revoked {
 			d.revoked = true
+			if wipe {
+				now := time.Now()
+				d.info.WipeRequestedAt = &now
+			}
+			return nil
+		}
+	}
+	return devices.ErrNotFound
+}
+
+func (f *fakeDevices) ForgetWaitingDevice(_ context.Context, userID, deviceID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for token, d := range f.byToken {
+		if d.device.ID == deviceID && d.device.User.ID == userID && d.info.WipeRequestedAt != nil {
+			delete(f.byToken, token)
 			return nil
 		}
 	}

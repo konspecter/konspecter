@@ -4,7 +4,7 @@ import { createNote, updateNote, type Note } from "../../domain/note/note";
 import { openNoteStore, type NoteStore } from "../storage/note-store";
 import { FakeServer, TEST_PASSPHRASE } from "./fake-server";
 import { DeviceLoginError } from "./device-login";
-import { NoKeyError, SyncEngine, type Scheduler } from "./sync-engine";
+import { NoKeyError, SyncEngine, type Scheduler, type WipeReceipt } from "./sync-engine";
 import { mustGet } from "../storage/test-utils";
 import { summarize } from "../../application/notes/note-catalog";
 import { pinChanges, pinsOf, setStoredPin } from "../../application/notes/note-pins";
@@ -736,6 +736,85 @@ describe("SyncEngine and the account's devices", () => {
     expect(server.notes.get("n1")?.markdown).toContain("edited while disconnected");
     expect(restarted.getStatus().state).toBe("idle");
     restarted.stop();
+  });
+
+  function wipingEngine(
+    server: FakeServer,
+    a: Device,
+    onWiped: (receipt: WipeReceipt) => Promise<void>,
+  ) {
+    return new SyncEngine(a.store, {
+      fetch: server.fetch,
+      scheduler: a.scheduler,
+      random: () => 0.5,
+      now: () => date,
+      isOnline: () => true,
+      isVisible: () => true,
+      onWiped,
+    });
+  }
+
+  it("stops for good and hands its receipt to onWiped when the device is to be wiped", async () => {
+    const server = new FakeServer();
+    const a = await device(server);
+    const onWiped = vi.fn(() => Promise.resolve());
+    const engine = wipingEngine(server, a, onWiped);
+    await connected(engine, config);
+    server.wipeDevice("ksp_ada");
+
+    await engine.syncNow();
+
+    await vi.waitFor(() => {
+      expect(onWiped).toHaveBeenCalledWith({ serverUrl: config.serverUrl, token: "ksp_ada" });
+    });
+    expect(engine.getStatus()).toMatchObject({ state: "wiping", error: null });
+    expect(a.scheduler.pending).toEqual([]);
+    await engine.syncNow();
+    expect(onWiped).toHaveBeenCalledOnce();
+    expect(server.wiped.has("ksp_ada")).toBe(true); // Not confirmed until the receipt is sent.
+
+    expect(await engine.confirmWiped({ serverUrl: config.serverUrl, token: "ksp_ada" })).toBe(true);
+    expect(server.wiped.has("ksp_ada")).toBe(false);
+    // Sent twice (an answer lost on the way): the server no longer knows it, which is as good.
+    expect(await engine.confirmWiped({ serverUrl: config.serverUrl, token: "ksp_ada" })).toBe(true);
+  });
+
+  it("tries the receipt again later when the server cannot hear it now", async () => {
+    const server = new FakeServer();
+    const a = await device(server, () => Promise.reject(new TypeError("Failed to fetch")));
+    expect(await a.engine.confirmWiped({ serverUrl: config.serverUrl, token: "ksp_ada" })).toBe(
+      false,
+    );
+  });
+
+  it("shows a wipe that failed as the status's error", async () => {
+    const server = new FakeServer();
+    const a = await device(server);
+    const engine = wipingEngine(server, a, () => Promise.reject(new Error("blocked")));
+    await connected(engine, config);
+    server.wipeDevice("ksp_ada");
+
+    await engine.syncNow();
+
+    await vi.waitFor(() => {
+      expect(engine.getStatus()).toMatchObject({ state: "wiping", error: { message: "blocked" } });
+    });
+  });
+
+  it("only disconnects a device told to wipe itself when nothing can wipe it", async () => {
+    const server = new FakeServer();
+    const a = await device(server);
+    await a.store.put(createNote("# Kept", date, "n1"));
+    await connected(a.engine, config);
+    server.wipeDevice("ksp_ada");
+
+    await a.engine.syncNow();
+
+    expect(a.engine.getStatus()).toMatchObject({
+      state: "disconnected",
+      error: { code: "device_wiped" },
+    });
+    expect(await a.store.get("n1")).toBeDefined();
   });
 
   it("signs the device out of the server when disconnecting", async () => {

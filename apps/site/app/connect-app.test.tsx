@@ -15,6 +15,7 @@ const phone: Device = {
   createdAt: "2026-10-06T10:00:00Z",
   lastUsedAt: null,
   lastSyncAt: null,
+  wipeRequestedAt: null,
 };
 
 const url = "https://notes.example.com/connect#ksc_abcdefghijklmnopqrstuvwxyz012345";

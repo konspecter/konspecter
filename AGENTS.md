@@ -82,6 +82,7 @@ All planned phases are done. New work needs a new plan in `.claude/plans/`.
 | Splash     | Logo at start-up, bookmark fills with the progress, version under it        | Done   |
 | Quota      | Sync storage quota per account (env, `set-quota`), usage in %, in the terms | Done   |
 | Tag hints  | Tags suggested as `#x` is typed: search box and both editors (ADR-028)      | Done   |
+| Wipe       | Site: Disconnect and wipe a device; it erases its notes when online (029)   | Done   |
 
 Where the packages are described: UI architecture: `docs/architecture/ui.md`; languages:
 `docs/architecture/i18n.md`; server and API: `docs/architecture/server.md`; sync:
@@ -91,7 +92,8 @@ Where the packages are described: UI architecture: `docs/architecture/ui.md`; la
 tags (ADR-013), the account site and end-to-end encrypted sync (ADR-014 to ADR-017), connecting by
 QR code (ADR-019), published images (ADR-023), desktop folder sync (ADR-024), the key handed
 over by QR code (ADR-025), the canonical domain with an address per language (ADR-026),
-pins in the frontmatter (ADR-027) and tags suggested as they are typed (ADR-028).
+pins in the frontmatter (ADR-027), tags suggested as they are typed (ADR-028) and disconnecting
+and wiping a device (ADR-029).
 
 ## Working rules
 

@@ -1,12 +1,23 @@
 import { richText } from "@konspecter/i18n/rich";
-import { useState } from "react";
-import { data, Form, redirect, useActionData, useLoaderData, useNavigation } from "react-router";
+import { useEffect, useId, useRef, useState } from "react";
+import {
+  data,
+  Form,
+  Link,
+  redirect,
+  useActionData,
+  useLoaderData,
+  useLocation,
+  useNavigate,
+  useNavigation,
+  useSearchParams,
+} from "react-router";
 import { requireUser, signInPath } from "../account.server";
 import { callApi, withCookies, type ApiResult } from "../api.server";
 import { Field, FormMessage, formError, Submit, textField, type FormError } from "../auth-form";
 import { startCheckout, startTrial } from "../checkout.server";
 import { ConnectApp, parseConnectCode, type ConnectCode } from "../connect-app";
-import { parseDevices, timeAgo, type Device } from "../devices";
+import { connectedDevices, parseDevices, timeAgo, type Device } from "../devices";
 import { Encryption } from "../encryption";
 import { useLocale, useT } from "../i18n/i18n";
 import { homePath, readPreferences } from "../preferences.server";
@@ -25,8 +36,9 @@ import type { Route } from "./+types/settings";
 /**
  * The account's settings: its name, the subscription (where sync is paid),
  * connecting an app by QR code, the connected devices (each can be
- * disconnected: it stops syncing and keeps its conspects; no new one is
- * connected while the account does not sync), encryption, and
+ * disconnected: it stops syncing and keeps its conspects; or disconnected
+ * and wiped, after a dialog, so it erases them the next time it goes online;
+ * no new one is connected while the account does not sync), encryption, and
  * deleting the account. Plain forms, so the page works without JavaScript,
  * except the encryption, which runs in the browser (encryption.tsx).
  */
@@ -72,7 +84,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     // No app is connected while the account does not sync; null when not known.
     syncing: syncWorks(billing.data, now),
     // What is left to set up before sync runs, said once it is paid.
-    setup: setupStep(encryptedOf(keys), devices.error ? null : parsedDevices.length),
+    setup: setupStep(
+      encryptedOf(keys),
+      devices.error ? null : connectedDevices(parsedDevices).length,
+    ),
     // Shown only where sync is paid.
     billing: subscription?.paid ? subscription : null,
     gateways: parsePlans(plans.data).gateways,
@@ -87,13 +102,26 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 }
 
 type Intent =
-  "rename" | "connect" | "disconnect" | "delete" | "subscribe" | "trial" | "cancel" | "resume";
+  | "rename"
+  | "connect"
+  | "disconnect"
+  | "wipe"
+  | "forget"
+  | "delete"
+  | "subscribe"
+  | "trial"
+  | "cancel"
+  | "resume";
 
 interface ActionResult {
   readonly intent: Intent;
   readonly error: FormError | null;
   /** The disconnected device's name, for the notice. */
   readonly disconnected?: string;
+  /** The name of the device disconnected to be wiped, for the notice. */
+  readonly wiped?: string;
+  /** The name of the device waiting to be wiped that was removed from the list. */
+  readonly forgotten?: string;
   /** The code to connect an app with. */
   readonly connect?: ConnectCode;
   /** Where to pay for the subscription just started. */
@@ -151,6 +179,32 @@ export async function action({ request }: Route.ActionArgs) {
     } satisfies ActionResult;
   }
 
+  if (intent === "wipe") {
+    const id = textField(form, "id");
+    const result = await callApi(request, `/api/devices/${encodeURIComponent(id)}?wipe=true`, {
+      method: "DELETE",
+    });
+    signInAgainOn401(request, result);
+    // Not "already gone": a device disconnected without the wipe would keep its conspects.
+    if (result.error) return failed("wipe", result);
+    return { intent: "wipe", error: null, wiped: textField(form, "name") } satisfies ActionResult;
+  }
+
+  if (intent === "forget") {
+    const id = textField(form, "id");
+    const result = await callApi(request, `/api/devices/${encodeURIComponent(id)}/wipe`, {
+      method: "DELETE",
+    });
+    signInAgainOn401(request, result);
+    // Already gone (it said it is wiped, or another tab) is as good as done.
+    if (result.error && result.status !== 404) return failed("forget", result);
+    return {
+      intent: "forget",
+      error: null,
+      forgotten: textField(form, "name"),
+    } satisfies ActionResult;
+  }
+
   if (intent === "subscribe") {
     const { url, result } = await startCheckout(request, form);
     signInAgainOn401(request, result);
@@ -205,6 +259,10 @@ export default function Settings() {
   // Checking for a connected app reloads all this every few seconds: an answer
   // that fails then keeps what the page showed, not to blink an error or a state.
   const shownDevices = useLastKnown(devicesFailed ? null : devices);
+  const connected = shownDevices ? connectedDevices(shownDevices) : null;
+  // The device whose wipe the dialog asks about (a link, so it works without JavaScript).
+  const [searchParams] = useSearchParams();
+  const wipeAsked = searchParams.get("wipe");
   const syncs = useLastKnown(syncing) ?? true;
   const errorOf = (intent: Intent) => (result?.intent === intent ? result.error : null);
   const billingIntent =
@@ -225,7 +283,7 @@ export default function Settings() {
           })}
         </p>
       </header>
-      <SectionNav billing={billing} devices={shownDevices ? shownDevices.length : null} />
+      <SectionNav billing={billing} devices={connected ? connected.length : null} />
       <div className="settings-body">
         {billing && (
           <SubscriptionSection
@@ -264,7 +322,7 @@ export default function Settings() {
             account={account.email}
             code={result?.connect ?? null}
             error={errorOf("connect")}
-            devices={shownDevices ?? devices}
+            devices={connected ?? connectedDevices(devices)}
             disabled={!syncs}
           />
         </section>
@@ -273,11 +331,15 @@ export default function Settings() {
           <h2 id="devices-heading">{t("settings.devices.title")}</h2>
           <p className="settings-text">{t("settings.devices.lead")}</p>
           <FormMessage
-            error={errorOf("disconnect")}
+            error={errorOf("disconnect") ?? errorOf("wipe") ?? errorOf("forget")}
             notice={
               result?.disconnected !== undefined
                 ? t("settings.devices.disconnected", { name: result.disconnected })
-                : null
+                : result?.wiped !== undefined
+                  ? t("settings.devices.wiped", { name: result.wiped })
+                  : result?.forgotten !== undefined
+                    ? t("settings.devices.forgotten", { name: result.forgotten })
+                    : null
             }
           />
           {!shownDevices ? (
@@ -287,7 +349,12 @@ export default function Settings() {
           ) : (
             <ul className="device-list" aria-labelledby="devices-heading">
               {shownDevices.map((device) => (
-                <DeviceRow key={device.id} device={device} now={now} />
+                <DeviceRow
+                  key={device.id}
+                  device={device}
+                  now={now}
+                  confirmWipe={wipeAsked === device.id}
+                />
               ))}
             </ul>
           )}
@@ -442,20 +509,36 @@ function shortDay(value: string, locale: string): string {
   }).format(date);
 }
 
-function DeviceRow({ device, now }: { device: Device; now: number }) {
+/**
+ * A device: Disconnect at once, or Disconnect and wipe, which asks first in a
+ * dialog. One waiting to wipe itself can only be removed from the list (for
+ * one that never comes online again), which withdraws the wipe.
+ */
+function DeviceRow({
+  device,
+  now,
+  confirmWipe,
+}: {
+  device: Device;
+  now: number;
+  confirmWipe: boolean;
+}) {
   const { t } = useT();
   const locale = useLocale();
   const navigation = useNavigation();
-  const busy =
+  const { pathname } = useLocation();
+  const busyWith = (intent: Intent) =>
     navigation.state === "submitting" &&
-    navigation.formData?.get("intent") === "disconnect" &&
+    navigation.formData?.get("intent") === intent &&
     navigation.formData.get("id") === device.id;
   const platform = t(`device.platform.${device.platform}`);
-  const activity = device.lastSyncAt
-    ? t("settings.devices.lastSynced", { when: timeAgo(device.lastSyncAt, now, locale) })
-    : device.lastUsedAt
-      ? t("settings.devices.lastActive", { when: timeAgo(device.lastUsedAt, now, locale) })
-      : t("settings.devices.connected", { when: timeAgo(device.createdAt, now, locale) });
+  const activity = device.wipeRequestedAt
+    ? t("settings.devices.waitingToWipe", { when: timeAgo(device.wipeRequestedAt, now, locale) })
+    : device.lastSyncAt
+      ? t("settings.devices.lastSynced", { when: timeAgo(device.lastSyncAt, now, locale) })
+      : device.lastUsedAt
+        ? t("settings.devices.lastActive", { when: timeAgo(device.lastUsedAt, now, locale) })
+        : t("settings.devices.connected", { when: timeAgo(device.createdAt, now, locale) });
   return (
     <li className="device">
       <div className="device-about">
@@ -467,21 +550,110 @@ function DeviceRow({ device, now }: { device: Device; now: number }) {
         </p>
         <p className="device-meta">{activity}</p>
       </div>
-      <Form method="post">
+      {device.wipeRequestedAt ? (
+        <div className="device-actions">
+          <Form method="post">
+            <input type="hidden" name="id" value={device.id} />
+            <input type="hidden" name="name" value={device.name} />
+            <button
+              type="submit"
+              name="intent"
+              value="forget"
+              className="button"
+              disabled={navigation.state === "submitting"}
+              aria-label={t("settings.devices.forgetNamed", { name: device.name })}
+            >
+              {busyWith("forget") ? t("auth.working") : t("settings.devices.forget")}
+            </button>
+          </Form>
+        </div>
+      ) : (
+        <div className="device-actions">
+          <Form method="post">
+            <input type="hidden" name="id" value={device.id} />
+            <input type="hidden" name="name" value={device.name} />
+            <button
+              type="submit"
+              name="intent"
+              value="disconnect"
+              className="button"
+              disabled={navigation.state === "submitting"}
+              aria-label={t("settings.devices.disconnectNamed", { name: device.name })}
+            >
+              {busyWith("disconnect") ? t("auth.working") : t("settings.devices.disconnect")}
+            </button>
+          </Form>
+          <Link
+            to={{ pathname, search: `?wipe=${encodeURIComponent(device.id)}`, hash: "#devices" }}
+            preventScrollReset
+            className="button button-danger"
+            aria-label={t("settings.devices.wipeNamed", { name: device.name })}
+          >
+            {t("settings.devices.wipe")}
+          </Link>
+          {confirmWipe && <WipeDialog device={device} />}
+        </div>
+      )}
+    </li>
+  );
+}
+
+/**
+ * Asks before a device is disconnected and wiped, naming it and saying what
+ * goes. Rendered open by the server, a plain box without JavaScript; with it,
+ * a modal dialog. Cancel (the focus) and Escape go back to the list.
+ */
+function WipeDialog({ device }: { device: Device }) {
+  const { t } = useT();
+  const navigation = useNavigation();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  const textId = useId();
+  const back = { pathname, hash: "#devices" };
+  const busy = navigation.state === "submitting" && navigation.formData?.get("intent") === "wipe";
+
+  useEffect(() => {
+    const dialog = ref.current;
+    if (!dialog || typeof dialog.showModal !== "function") return;
+    dialog.close();
+    dialog.showModal();
+  }, []);
+
+  return (
+    <dialog
+      ref={ref}
+      open
+      className="wipe-dialog"
+      aria-labelledby={titleId}
+      aria-describedby={textId}
+      onCancel={(event) => {
+        event.preventDefault();
+        void navigate(back, { replace: true, preventScrollReset: true });
+      }}
+    >
+      <h3 id={titleId}>{t("settings.devices.wipeTitle", { name: device.name })}</h3>
+      <p id={textId} className="settings-text">
+        {t("settings.devices.wipeText", { name: device.name })}
+      </p>
+      <Form method="post" action={pathname} className="actions">
         <input type="hidden" name="id" value={device.id} />
         <input type="hidden" name="name" value={device.name} />
+        <Link to={back} replace preventScrollReset className="button" autoFocus>
+          {t("settings.devices.wipeCancel")}
+        </Link>
         <button
           type="submit"
           name="intent"
-          value="disconnect"
-          className="button"
+          value="wipe"
+          className="button button-danger"
           disabled={navigation.state === "submitting"}
-          aria-label={t("settings.devices.disconnectNamed", { name: device.name })}
         >
-          {busy ? t("auth.working") : t("settings.devices.disconnect")}
+          {busy ? t("auth.working") : t("settings.devices.wipeConfirm")}
         </button>
       </Form>
-    </li>
+    </dialog>
   );
 }
 

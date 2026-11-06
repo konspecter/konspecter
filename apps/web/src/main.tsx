@@ -25,7 +25,13 @@ import { openNoteStore } from "./infrastructure/storage/note-store";
 import { SyncEngine } from "./infrastructure/sync/sync-engine";
 import { App } from "./presentation/app/App";
 import { flushBeforeClosing } from "./presentation/app/closing";
-import { factoryReset, type FactoryReset } from "./presentation/app/factory-reset";
+import {
+  factoryReset,
+  sendWipeReceipt,
+  takeWipedNotice,
+  wipe,
+  type FactoryReset,
+} from "./presentation/app/factory-reset";
 import { reportError } from "./presentation/app/errors";
 import { restoreLocation } from "./presentation/app/last-location";
 import type { LibraryControls } from "./presentation/app/library";
@@ -157,11 +163,28 @@ try {
 
   // Sync runs in the background for the app library; the UI never waits for it.
   // On the desktop the access token lives in the OS keychain.
-  const sync = new SyncEngine(
-    folderSync ?? store,
-    isDesktop() ? { credentials: keychainCredentials } : {},
-  );
+  // Disconnected on the site to be wiped, the device erases the notes it
+  // holds (on the desktop, the files sync covers) and what the app keeps.
+  // A wipe that fails is reported and tried again at the next start.
+  const sync: SyncEngine = new SyncEngine(folderSync ?? store, {
+    ...(isDesktop() ? { credentials: keychainCredentials } : {}),
+    async onWiped(receipt) {
+      await wipe({
+        deleteFiles: folderSync ? () => folderSync.wipeFiles() : undefined,
+        store,
+        closeFolder: folder ? closeFolder : undefined,
+        sync,
+        storage: localStorage,
+        receipt,
+        report: reportError,
+      });
+      window.location.replace("/");
+    },
+  });
   void sync.start();
+  // The start that follows a wipe says so, once, and tells the server it is done.
+  const wiped = takeWipedNotice(localStorage);
+  void sendWipeReceipt(localStorage, (receipt) => sync.confirmWiped(receipt)).catch(reportError);
   // Clears what the app keeps, never the folder's files.
   const reset: FactoryReset = {
     appNotes: async () => (await store.list()).length,
@@ -194,6 +217,7 @@ try {
           checkForRelease={checkForRelease}
           sync={sync}
           reset={reset}
+          wiped={wiped}
           desktop={isDesktop()}
           backButton={isNativeMobile() ? nativeBackButton : undefined}
         />

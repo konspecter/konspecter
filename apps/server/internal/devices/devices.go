@@ -73,6 +73,10 @@ type Device struct {
 	LastUsedAt *time.Time
 	// LastSyncAt is its last pull of changes (kept to the minute); nil if none yet.
 	LastSyncAt *time.Time
+	// WipeRequestedAt is when its owner disconnected it and asked its app to
+	// erase what it holds; nil for a connected device. It stays listed until
+	// the app says it has.
+	WipeRequestedAt *time.Time
 }
 
 // Platforms the apps report; anything else is "other".

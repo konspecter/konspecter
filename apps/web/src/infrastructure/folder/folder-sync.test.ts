@@ -280,6 +280,25 @@ describe("FolderSync", () => {
     restarted.engine.stop();
   });
 
+  it("deletes for good every file sync covers when wiped, and nothing else", async () => {
+    const server = new FakeServer();
+    const d = await desktop(server);
+    d.folder.edit("java.md", "# Java");
+    d.folder.edit("tags/go.md", "# Go");
+    d.folder.ignoreFile = "drafts/\n";
+    d.folder.edit("drafts/secret.md", "# Not synced");
+    await d.files.refresh();
+    await connected(d.engine);
+
+    expect(await d.sync.wipeFiles()).toBe(2);
+
+    expect([...d.folder.erased].sort()).toEqual(["java.md", "tags/go.md"]);
+    expect(d.folder.trashed).toEqual([]);
+    expect([...d.folder.files.keys()]).toEqual(["drafts/secret.md"]);
+    expect(await d.sync.syncEntries()).toEqual([]);
+    expect(await d.db.folderLinks()).toEqual([]);
+  });
+
   it("starts over with another folder", async () => {
     const server = new FakeServer();
     const d = await desktop(server);

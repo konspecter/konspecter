@@ -10,12 +10,16 @@ export interface DeviceClient {
   readonly clientVersion: string;
 }
 
-/** A connected app. Times are ISO 8601. */
+/**
+ * A connected app, or one disconnected to be wiped that has not wiped itself
+ * yet (`wipeRequestedAt`). Times are ISO 8601.
+ */
 export interface Device extends DeviceClient {
   readonly id: string;
   readonly createdAt: string;
   readonly lastUsedAt: string | null;
   readonly lastSyncAt: string | null;
+  readonly wipeRequestedAt: string | null;
 }
 
 export const PLATFORMS = ["web", "macos", "windows", "linux", "android", "ios", "other"] as const;
@@ -62,9 +66,15 @@ export function parseDevices(value: unknown): Device[] {
       createdAt,
       lastUsedAt: time(entry.last_used_at),
       lastSyncAt: time(entry.last_sync_at),
+      wipeRequestedAt: time(entry.wipe_requested_at),
     });
   }
   return devices;
+}
+
+/** The devices still connected: not those waiting to wipe themselves. */
+export function connectedDevices(devices: readonly Device[]): Device[] {
+  return devices.filter((device) => device.wipeRequestedAt === null);
 }
 
 const UNITS: readonly [Intl.RelativeTimeFormatUnit, number][] = [

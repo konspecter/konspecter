@@ -14,7 +14,8 @@ import (
 )
 
 // revokedKept is how long a disconnected device's row stays, so its app
-// hears "device_revoked" rather than a bare "unauthorized".
+// hears "device_revoked" rather than a bare "unauthorized". A device asked to
+// wipe itself stays until its app signs out: it must hear "device_wiped".
 const revokedKept = "30 days"
 
 // cliDevice describes a token issued from the command line.
@@ -38,17 +39,22 @@ func insertDevice(ctx context.Context, q querier, userID string, tokenHash []byt
 	err := q.QueryRow(ctx, `
 		INSERT INTO devices (token_hash, user_id, name, platform, client_version) VALUES ($1, $2, $3, $4, $5)
 		RETURNING `+deviceColumns, tokenHash, userID, client.Name, client.Platform, client.ClientVersion,
-	).Scan(&d.ID, &d.Name, &d.Platform, &d.ClientVersion, &d.CreatedAt, &d.LastUsedAt, &d.LastSyncAt)
+	).Scan(deviceFields(&d)...)
 	if err != nil {
 		return devices.Device{}, fmt.Errorf("create device: %w", err)
 	}
 	return d, nil
 }
 
-const deviceColumns = `id::text, name, platform, client_version, created_at, last_used_at, last_sync_at`
+const deviceColumns = `id::text, name, platform, client_version, created_at, last_used_at, last_sync_at, wipe_requested_at`
 
-// RevokeToken deletes one token's device: the app signed itself out.
-// Revoking an unknown token is not an error.
+// deviceFields are the destinations of deviceColumns.
+func deviceFields(d *devices.Device) []any {
+	return []any{&d.ID, &d.Name, &d.Platform, &d.ClientVersion, &d.CreatedAt, &d.LastUsedAt, &d.LastSyncAt, &d.WipeRequestedAt}
+}
+
+// RevokeToken deletes one token's device: the app signed itself out, or
+// told it has wiped itself. Revoking an unknown token is not an error.
 func (db *DB) RevokeToken(ctx context.Context, token string) error {
 	if _, err := db.pool.Exec(ctx, `DELETE FROM devices WHERE token_hash = $1`, auth.HashToken(token)); err != nil {
 		return fmt.Errorf("revoke token: %w", err)
@@ -70,10 +76,11 @@ func (db *DB) RevokeUserTokens(ctx context.Context, userID string) (int64, error
 // DeviceByToken resolves a bearer token to its device and user, and records
 // the use (at most once a minute, to spare the database a write per request)
 // and the app's version when it changed (an empty one is not news).
-// auth.ErrDeviceRevoked if the device was disconnected.
+// auth.ErrDeviceRevoked if the device was disconnected, auth.ErrDeviceWiped
+// if it was disconnected to be wiped.
 func (db *DB) DeviceByToken(ctx context.Context, token, clientVersion string) (auth.Device, error) {
 	var d auth.Device
-	var revoked bool
+	var revoked, wipe bool
 	err := db.pool.QueryRow(ctx, `
 		WITH touched AS (
 			UPDATE devices SET last_used_at = now(),
@@ -82,15 +89,18 @@ func (db *DB) DeviceByToken(ctx context.Context, token, clientVersion string) (a
 				AND (last_used_at IS NULL OR last_used_at < now() - interval '1 minute'
 					OR ($2 <> '' AND client_version <> $2))
 		)
-		SELECT d.id::text, d.revoked_at IS NOT NULL, u.id::text, u.email, u.display_name
+		SELECT d.id::text, d.revoked_at IS NOT NULL, d.wipe_requested_at IS NOT NULL,
+			u.id::text, u.email, u.display_name
 		FROM devices d JOIN users u ON u.id = d.user_id
 		WHERE d.token_hash = $1`, auth.HashToken(token), clientVersion,
-	).Scan(&d.ID, &revoked, &d.User.ID, &d.User.Email, &d.User.Name)
+	).Scan(&d.ID, &revoked, &wipe, &d.User.ID, &d.User.Email, &d.User.Name)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		return auth.Device{}, auth.ErrUnauthorized
 	case err != nil:
 		return auth.Device{}, fmt.Errorf("authenticate: %w", err)
+	case wipe:
+		return auth.Device{}, auth.ErrDeviceWiped
 	case revoked:
 		return auth.Device{}, auth.ErrDeviceRevoked
 	}
@@ -108,17 +118,18 @@ func (db *DB) RecordSync(ctx context.Context, deviceID string) error {
 	return nil
 }
 
-// ListDevices returns the user's connected devices, most recently active first.
+// ListDevices returns the user's connected devices and those waiting to wipe
+// themselves, most recently active first.
 func (db *DB) ListDevices(ctx context.Context, userID string) ([]devices.Device, error) {
 	rows, err := db.pool.Query(ctx, `SELECT `+deviceColumns+` FROM devices
-		WHERE user_id = $1 AND revoked_at IS NULL
+		WHERE user_id = $1 AND (revoked_at IS NULL OR wipe_requested_at IS NOT NULL)
 		ORDER BY coalesce(last_used_at, created_at) DESC, id`, userID)
 	if err != nil {
 		return nil, fmt.Errorf("list devices: %w", err)
 	}
 	list, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (devices.Device, error) {
 		var d devices.Device
-		err := row.Scan(&d.ID, &d.Name, &d.Platform, &d.ClientVersion, &d.CreatedAt, &d.LastUsedAt, &d.LastSyncAt)
+		err := row.Scan(deviceFields(&d)...)
 		return d, err
 	})
 	if err != nil {
@@ -128,12 +139,14 @@ func (db *DB) ListDevices(ctx context.Context, userID string) ([]devices.Device,
 }
 
 // RevokeDevice disconnects one of the user's devices: its token stops
-// working at once. devices.ErrNotFound if the user has no such connected
-// device. Rows of devices disconnected long ago are dropped meanwhile.
-func (db *DB) RevokeDevice(ctx context.Context, userID, deviceID string) error {
+// working at once. With wipe, its app is also told to erase what it holds.
+// devices.ErrNotFound if the user has no such connected device. Rows of
+// devices disconnected long ago are dropped meanwhile.
+func (db *DB) RevokeDevice(ctx context.Context, userID, deviceID string, wipe bool) error {
 	return pgx.BeginFunc(ctx, db.pool, func(tx pgx.Tx) error {
-		tag, err := tx.Exec(ctx, `UPDATE devices SET revoked_at = now()
-			WHERE id = $2 AND user_id = $1 AND revoked_at IS NULL`, userID, deviceID)
+		tag, err := tx.Exec(ctx, `UPDATE devices SET revoked_at = now(),
+				wipe_requested_at = CASE WHEN $3 THEN now() END
+			WHERE id = $2 AND user_id = $1 AND revoked_at IS NULL`, userID, deviceID, wipe)
 		if err != nil {
 			return fmt.Errorf("revoke device: %w", err)
 		}
@@ -141,11 +154,27 @@ func (db *DB) RevokeDevice(ctx context.Context, userID, deviceID string) error {
 			return devices.ErrNotFound
 		}
 		if _, err := tx.Exec(ctx, `DELETE FROM devices
-			WHERE user_id = $1 AND revoked_at < now() - interval '`+revokedKept+`'`, userID); err != nil {
+			WHERE user_id = $1 AND revoked_at < now() - interval '`+revokedKept+`'
+				AND wipe_requested_at IS NULL`, userID); err != nil {
 			return fmt.Errorf("prune devices: %w", err)
 		}
 		return nil
 	})
+}
+
+// ForgetWaitingDevice removes a device that waits to wipe itself from the
+// user's list: the wipe is no longer asked, and its token is unknown from now
+// on. devices.ErrNotFound if the user has no such device waiting.
+func (db *DB) ForgetWaitingDevice(ctx context.Context, userID, deviceID string) error {
+	tag, err := db.pool.Exec(ctx, `DELETE FROM devices
+		WHERE id = $2 AND user_id = $1 AND wipe_requested_at IS NOT NULL`, userID, deviceID)
+	if err != nil {
+		return fmt.Errorf("forget device: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return devices.ErrNotFound
+	}
+	return nil
 }
 
 // CreateDeviceAuthorization stores an app's request to be connected, under

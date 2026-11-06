@@ -271,6 +271,125 @@ func TestListingAndDisconnectingDevices(t *testing.T) {
 	}
 }
 
+func TestDisconnectingAndWipingADevice(t *testing.T) {
+	s := newAccountServer(t, nil)
+	session := signedIn(t, s, "ann@example.com")
+	deviceCode, userCode := authorize(t, s)
+	siteCall(t, s.server.URL, http.MethodPost, "/api/devices/approve", session, map[string]any{"user_code": userCode})
+	token, _ := poll(t, s, deviceCode).body["token"].(string)
+	s.devices.connectToken(token)
+	list, _ := siteCall(t, s.server.URL, http.MethodGet, "/api/devices", session, nil).body["devices"].([]any)
+	device, _ := list[0].(map[string]any)
+	id, _ := device["id"].(string)
+	if _, ok := device["wipe_requested_at"]; !ok || device["wipe_requested_at"] != nil {
+		t.Errorf("a connected device = %v", device)
+	}
+
+	if res := siteCall(t, s.server.URL, http.MethodDelete, "/api/devices/"+id+"?wipe=maybe", session, nil); res.status != http.StatusBadRequest {
+		t.Errorf("wipe=maybe = %d %v", res.status, res.body)
+	}
+	stream := openStreamWithHeartbeat(t, s, token)
+	if res := siteCall(t, s.server.URL, http.MethodDelete, "/api/devices/"+id+"?wipe=true", session, nil); res.status != http.StatusNoContent {
+		t.Fatalf("disconnect and wipe = %d %v", res.status, res.body)
+	}
+	if !stream.ends() {
+		t.Error("the device's stream is still open")
+	}
+	res := call(t, s.server, http.MethodGet, "/api/sync", token, "")
+	if res.status != http.StatusUnauthorized || errorCode(res) != "device_wiped" {
+		t.Errorf("sync after wiping = %d %v", res.status, res.body)
+	}
+	// Listed, waiting, until its app says it has wiped itself.
+	list, _ = siteCall(t, s.server.URL, http.MethodGet, "/api/devices", session, nil).body["devices"].([]any)
+	if len(list) != 1 || list[0].(map[string]any)["wipe_requested_at"] == nil {
+		t.Errorf("devices while waiting = %v", list)
+	}
+	if res := siteCall(t, s.server.URL, http.MethodDelete, "/api/devices/"+id, session, nil); res.status != http.StatusNotFound {
+		t.Errorf("disconnecting a wiped device = %d", res.status)
+	}
+	if res := call(t, s.server, http.MethodDelete, "/api/tokens/current", token, ""); res.status != http.StatusNoContent {
+		t.Fatalf("signing out after the wipe = %d %v", res.status, res.body)
+	}
+	list, _ = siteCall(t, s.server.URL, http.MethodGet, "/api/devices", session, nil).body["devices"].([]any)
+	if len(list) != 0 {
+		t.Errorf("devices after the wipe = %v", list)
+	}
+	if res := call(t, s.server, http.MethodGet, "/api/sync", token, ""); errorCode(res) != "unauthorized" {
+		t.Errorf("sync after signing out = %d %v", res.status, res.body)
+	}
+}
+
+func TestAWaitingDeviceCanBeRemovedFromTheList(t *testing.T) {
+	s := newAccountServer(t, nil)
+	session := signedIn(t, s, "ann@example.com")
+	deviceCode, userCode := authorize(t, s)
+	siteCall(t, s.server.URL, http.MethodPost, "/api/devices/approve", session, map[string]any{"user_code": userCode})
+	token, _ := poll(t, s, deviceCode).body["token"].(string)
+	s.devices.connectToken(token)
+	list, _ := siteCall(t, s.server.URL, http.MethodGet, "/api/devices", session, nil).body["devices"].([]any)
+	id, _ := list[0].(map[string]any)["id"].(string)
+
+	// A connected device is not waiting: disconnect it first.
+	if res := siteCall(t, s.server.URL, http.MethodDelete, "/api/devices/"+id+"/wipe", session, nil); res.status != http.StatusNotFound {
+		t.Errorf("removing a connected device = %d %v", res.status, res.body)
+	}
+	siteCall(t, s.server.URL, http.MethodDelete, "/api/devices/"+id+"?wipe=true", session, nil)
+	if res := siteCall(t, s.server.URL, http.MethodDelete, "/api/devices/"+id+"/wipe", session, nil); res.status != http.StatusNoContent {
+		t.Fatalf("removing a waiting device = %d %v", res.status, res.body)
+	}
+	list, _ = siteCall(t, s.server.URL, http.MethodGet, "/api/devices", session, nil).body["devices"].([]any)
+	if len(list) != 0 {
+		t.Errorf("devices after removing = %v", list)
+	}
+	if res := call(t, s.server, http.MethodGet, "/api/sync", token, ""); errorCode(res) != "unauthorized" {
+		t.Errorf("the removed device = %d %v", res.status, res.body)
+	}
+	if res := siteCall(t, s.server.URL, http.MethodDelete, "/api/devices/not-a-uuid/wipe", session, nil); res.status != http.StatusNotFound {
+		t.Errorf("a malformed id = %d", res.status)
+	}
+}
+
+func TestAWipedDeviceSaysItIsDoneFromABlockedAddress(t *testing.T) {
+	s := newAccountServer(t, nil)
+	session := signedIn(t, s, "ann@example.com")
+	deviceCode, userCode := authorize(t, s)
+	siteCall(t, s.server.URL, http.MethodPost, "/api/devices/approve", session, map[string]any{"user_code": userCode})
+	token, _ := poll(t, s, deviceCode).body["token"].(string)
+	s.devices.connectToken(token)
+	list, _ := siteCall(t, s.server.URL, http.MethodGet, "/api/devices", session, nil).body["devices"].([]any)
+	id, _ := list[0].(map[string]any)["id"].(string)
+	siteCall(t, s.server.URL, http.MethodDelete, "/api/devices/"+id+"?wipe=true", session, nil)
+
+	for i := 0; i < authFailuresPerMinute; i++ {
+		call(t, s.server, http.MethodGet, "/api/me", "ksp_wrong", "")
+	}
+	if res := call(t, s.server, http.MethodGet, "/api/sync", token, ""); res.status != http.StatusTooManyRequests {
+		t.Errorf("syncing from the blocked address = %d %v", res.status, res.body)
+	}
+	if res := call(t, s.server, http.MethodDelete, "/api/tokens/current", "ksp_wrong", ""); res.status != http.StatusTooManyRequests {
+		t.Errorf("signing out a wrong token from the blocked address = %d %v", res.status, res.body)
+	}
+	if res := call(t, s.server, http.MethodDelete, "/api/tokens/current", token, ""); res.status != http.StatusNoContent {
+		t.Errorf("telling the wipe is done from the blocked address = %d %v", res.status, res.body)
+	}
+}
+
+func TestOnlyAWipedDeviceSignsOutWithoutBeingConnected(t *testing.T) {
+	s := newAccountServer(t, nil)
+	session := signedIn(t, s, "ann@example.com")
+	deviceCode, userCode := authorize(t, s)
+	siteCall(t, s.server.URL, http.MethodPost, "/api/devices/approve", session, map[string]any{"user_code": userCode})
+	token, _ := poll(t, s, deviceCode).body["token"].(string)
+	s.devices.connectToken(token)
+	list, _ := siteCall(t, s.server.URL, http.MethodGet, "/api/devices", session, nil).body["devices"].([]any)
+	id, _ := list[0].(map[string]any)["id"].(string)
+	siteCall(t, s.server.URL, http.MethodDelete, "/api/devices/"+id, session, nil)
+	res := call(t, s.server, http.MethodDelete, "/api/tokens/current", token, "")
+	if res.status != http.StatusUnauthorized || errorCode(res) != "device_revoked" {
+		t.Errorf("a disconnected device signing out = %d %v", res.status, res.body)
+	}
+}
+
 func TestTheDeviceListShowsTheVersionAnAppRunsNow(t *testing.T) {
 	s := newAccountServer(t, nil)
 	session := signedIn(t, s, "ann@example.com")

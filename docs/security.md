@@ -90,6 +90,15 @@ What Konspecter protects, from whom, and how. Every item below has tests unless 
   sign-out, a reset or another key.
 - **Revocation**: the site disconnects a device (its token stops working and its open event
   streams end at once; its app hears `401 device_revoked` and keeps its notes).
+- **Remote wipe**: the site can also disconnect a device and have it wipe itself
+  ([ADR-029](architecture/decisions/ADR-029-device-wipe.md)). Its app hears `401 device_wiped`
+  the next time it reaches the server. It then deletes the files sync covers for good and
+  erases what a factory reset erases, including notes that never synced. So the server of a
+  device's own connection can make it erase itself. Only that server can, and only with the
+  device's own token. A device that never comes online again is never wiped, and the site
+  shows it as waiting until its owner removes it from the list. Once wiped, the app keeps
+  that token in `localStorage` until the server has heard the wipe is done. The server
+  takes the token for nothing but signing out.
   `DELETE /api/tokens/current` signs the calling device out;
   `server revoke-tokens -email …` disconnects every device of a user. A change stream also
   re-checks its token on every heartbeat (25 s).

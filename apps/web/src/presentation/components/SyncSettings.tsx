@@ -55,6 +55,11 @@ export function SyncSettings({ sync }: { sync: SyncEngine }) {
         <div className="setting-block">
           {status.state === "disabled" ? (
             <ConnectForm sync={sync} />
+          ) : status.state === "wiping" ? (
+            // Nothing to do: the conspects are being erased, then the app restarts.
+            <p role="status" className="sync-status">
+              {t("sync.wiping")}
+            </p>
           ) : status.state === "disconnected" ? (
             <Disconnected sync={sync} status={status} />
           ) : status.state === "locked" ? (

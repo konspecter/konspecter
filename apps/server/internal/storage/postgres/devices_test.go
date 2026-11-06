@@ -161,13 +161,13 @@ func TestListingAndRevokingDevices(t *testing.T) {
 		t.Errorf("command line device = %+v", list[1])
 	}
 
-	if err := db.RevokeDevice(ctx, bob.ID, used.ID); !errors.Is(err, devices.ErrNotFound) {
+	if err := db.RevokeDevice(ctx, bob.ID, used.ID, false); !errors.Is(err, devices.ErrNotFound) {
 		t.Errorf("revoking another user's device = %v", err)
 	}
-	if err := db.RevokeDevice(ctx, ann.ID, used.ID); err != nil {
+	if err := db.RevokeDevice(ctx, ann.ID, used.ID, false); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.RevokeDevice(ctx, ann.ID, used.ID); !errors.Is(err, devices.ErrNotFound) {
+	if err := db.RevokeDevice(ctx, ann.ID, used.ID, false); !errors.Is(err, devices.ErrNotFound) {
 		t.Errorf("revoking twice = %v", err)
 	}
 	if _, err := db.DeviceByToken(ctx, first, ""); !errors.Is(err, auth.ErrDeviceRevoked) {
@@ -185,11 +185,88 @@ func TestListingAndRevokingDevices(t *testing.T) {
 		t.Fatal(err)
 	}
 	other, _ := db.DeviceByToken(ctx, second, "")
-	if err := db.RevokeDevice(ctx, ann.ID, other.ID); err != nil {
+	if err := db.RevokeDevice(ctx, ann.ID, other.ID, false); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.DeviceByToken(ctx, first, ""); !errors.Is(err, auth.ErrUnauthorized) {
 		t.Errorf("pruned device = %v", err)
+	}
+}
+
+func TestADeviceAskedToWipeItselfWaitsForItsApp(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	ann := createUser(t, db, "ann@example.com")
+	token, _ := db.CreateToken(ctx, ann.ID)
+	other, _ := db.CreateToken(ctx, ann.ID)
+	device, _ := db.DeviceByToken(ctx, token, "")
+	if list, _ := db.ListDevices(ctx, ann.ID); len(list) != 2 || list[0].WipeRequestedAt != nil {
+		t.Fatalf("connected devices = %+v", list)
+	}
+
+	if err := db.RevokeDevice(ctx, ann.ID, device.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.DeviceByToken(ctx, token, ""); !errors.Is(err, auth.ErrDeviceWiped) {
+		t.Errorf("wiped device = %v", err)
+	}
+	list, err := db.ListDevices(ctx, ann.ID)
+	if err != nil || len(list) != 2 {
+		t.Fatalf("ListDevices = %+v, %v", list, err)
+	}
+	for _, d := range list {
+		if (d.ID == device.ID) != (d.WipeRequestedAt != nil) {
+			t.Errorf("device %s waits for a wipe: %v", d.ID, d.WipeRequestedAt)
+		}
+	}
+
+	// Not pruned with the devices disconnected long ago.
+	if _, err := db.pool.Exec(ctx, `UPDATE devices SET revoked_at = now() - interval '31 days' WHERE id = $1`, device.ID); err != nil {
+		t.Fatal(err)
+	}
+	second, _ := db.DeviceByToken(ctx, other, "")
+	if err := db.RevokeDevice(ctx, ann.ID, second.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.DeviceByToken(ctx, token, ""); !errors.Is(err, auth.ErrDeviceWiped) {
+		t.Errorf("wiped device a month on = %v", err)
+	}
+
+	// Removing it from the list needs a device that waits.
+	if err := db.ForgetWaitingDevice(ctx, ann.ID, second.ID); !errors.Is(err, devices.ErrNotFound) {
+		t.Errorf("forgetting a device that is not waiting = %v", err)
+	}
+
+	// Signing out tells the app has wiped itself.
+	if err := db.RevokeToken(ctx, token); err != nil {
+		t.Fatal(err)
+	}
+	if list, _ := db.ListDevices(ctx, ann.ID); len(list) != 0 {
+		t.Errorf("devices after the wipe = %+v", list)
+	}
+}
+
+func TestAWaitingDeviceCanBeForgotten(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	ann := createUser(t, db, "ann@example.com")
+	bob := createUser(t, db, "bob@example.com")
+	token, _ := db.CreateToken(ctx, ann.ID)
+	device, _ := db.DeviceByToken(ctx, token, "")
+	if err := db.RevokeDevice(ctx, ann.ID, device.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.ForgetWaitingDevice(ctx, bob.ID, device.ID); !errors.Is(err, devices.ErrNotFound) {
+		t.Errorf("another user forgetting it = %v", err)
+	}
+	if err := db.ForgetWaitingDevice(ctx, ann.ID, device.ID); err != nil {
+		t.Fatal(err)
+	}
+	if list, _ := db.ListDevices(ctx, ann.ID); len(list) != 0 {
+		t.Errorf("devices after forgetting = %+v", list)
+	}
+	if _, err := db.DeviceByToken(ctx, token, ""); !errors.Is(err, auth.ErrUnauthorized) {
+		t.Errorf("forgotten device = %v", err)
 	}
 }
 

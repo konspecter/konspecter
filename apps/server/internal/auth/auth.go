@@ -35,6 +35,10 @@ var ErrUnauthorized = errors.New("unauthorized")
 // ErrDeviceRevoked means the token's device was disconnected from its account.
 var ErrDeviceRevoked = errors.New("device revoked")
 
+// ErrDeviceWiped means the token's device was disconnected and its app must
+// erase what it holds of the account.
+var ErrDeviceWiped = errors.New("device wiped")
+
 // ErrUserNotFound means there is no user with that email address.
 var ErrUserNotFound = errors.New("user not found")
 

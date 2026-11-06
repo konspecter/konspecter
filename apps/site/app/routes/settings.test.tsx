@@ -111,6 +111,53 @@ describe("settings", () => {
     ]);
   });
 
+  it("disconnects and wipes a device through the API", async () => {
+    const calls = stubApi({
+      "DELETE /api/devices/d1?wipe=true": () => new Response(null, { status: 204 }),
+      "DELETE /api/devices/d2?wipe=true": () =>
+        Response.json(
+          { error: { code: "not_found", message: "device not found" } },
+          { status: 404 },
+        ),
+    });
+    expect(
+      await settingsAction(
+        args(post("/settings", { intent: "wipe", id: "d1", name: "Firefox on Linux" })),
+      ),
+    ).toEqual({ intent: "wipe", error: null, wiped: "Firefox on Linux" });
+    // Gone already, it may have been disconnected without the wipe: not "done".
+    const gone = (await settingsAction(
+      args(post("/settings", { intent: "wipe", id: "d2", name: "Old phone" })),
+    )) as { data: { intent: string; error: unknown } };
+    expect(gone.data.intent).toBe("wipe");
+    expect(gone.data.error).not.toBeNull();
+    expect(calls.map((c) => c.call)).toEqual([
+      "DELETE /api/devices/d1?wipe=true",
+      "DELETE /api/devices/d2?wipe=true",
+    ]);
+  });
+
+  it("removes a device waiting to be wiped from the list through the API", async () => {
+    const calls = stubApi({
+      "DELETE /api/devices/d2/wipe": () => new Response(null, { status: 204 }),
+      "DELETE /api/devices/d3/wipe": () =>
+        Response.json({ error: { code: "not_found", message: "gone" } }, { status: 404 }),
+    });
+    expect(
+      await settingsAction(
+        args(post("/settings", { intent: "forget", id: "d2", name: "Old phone" })),
+      ),
+    ).toEqual({ intent: "forget", error: null, forgotten: "Old phone" });
+    // It said it is wiped meanwhile: as good as done.
+    expect(
+      await settingsAction(args(post("/settings", { intent: "forget", id: "d3", name: "Tablet" }))),
+    ).toEqual({ intent: "forget", error: null, forgotten: "Tablet" });
+    expect(calls.map((c) => c.call)).toEqual([
+      "DELETE /api/devices/d2/wipe",
+      "DELETE /api/devices/d3/wipe",
+    ]);
+  });
+
   it("returns the API's refusal to delete to the form", async () => {
     stubApi({
       "DELETE /api/account": () =>
@@ -182,7 +229,14 @@ describe("settings", () => {
               gateways: [],
               now: Date.parse("2026-10-05T12:00:00Z"),
             }),
-            action: () => ({ intent: "disconnect", error: null, disconnected: "Firefox on Linux" }),
+            action: async ({ request }: { request: Request }) => {
+              const intent = (await request.formData()).get("intent");
+              return intent === "wipe"
+                ? { intent, error: null, wiped: "Firefox on Linux" }
+                : intent === "forget"
+                  ? { intent, error: null, forgotten: "Old phone" }
+                  : { intent: "disconnect", error: null, disconnected: "Firefox on Linux" };
+            },
           },
         ],
       },
@@ -200,6 +254,7 @@ describe("settings", () => {
         createdAt: "2026-10-01T10:00:00Z",
         lastUsedAt: "2026-10-05T11:00:00Z",
         lastSyncAt: "2026-10-05T11:55:00Z",
+        wipeRequestedAt: null,
       },
     ]);
     const list = await screen.findByRole("list", { name: "Connected devices" });
@@ -255,7 +310,57 @@ describe("settings", () => {
     createdAt: "2026-10-01T10:00:00Z",
     lastUsedAt: "2026-10-05T11:00:00Z",
     lastSyncAt: "2026-10-05T11:55:00Z",
+    wipeRequestedAt: null,
   };
+
+  it("asks in a dialog before disconnecting and wiping a device", async () => {
+    renderSettings({ name: "Ann", recentSignIn: true }, [linux]);
+    const user = userEvent.setup();
+
+    await user.click(
+      await screen.findByRole("link", { name: "Disconnect and wipe Firefox on Linux" }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Disconnect and wipe Firefox on Linux?",
+    });
+    expect(dialog).toHaveTextContent("Changes it has not synced are lost.");
+    await user.click(within(dialog).getByRole("link", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    await user.click(screen.getByRole("link", { name: "Disconnect and wipe Firefox on Linux" }));
+    await user.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: "Disconnect and wipe",
+      }),
+    );
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Firefox on Linux is disconnected. It erases its conspects the next time it goes online.",
+    );
+  });
+
+  it("lists a device waiting to wipe itself, not counted, which can only be removed", async () => {
+    renderSettings({ name: "Ann", recentSignIn: true }, [
+      linux,
+      { ...linux, id: "d2", name: "Old phone", wipeRequestedAt: "2026-10-05T09:00:00Z" },
+    ]);
+    const list = await screen.findByRole("list", { name: "Connected devices" });
+    const [, waiting] = within(list).getAllByRole("listitem");
+    if (!waiting) throw new Error("the waiting device is not listed");
+    expect(waiting).toHaveTextContent(
+      "Disconnected 3 hours ago. It erases its conspects the next time it goes online.",
+    );
+    expect(within(waiting).queryByRole("link")).toBeNull();
+    const nav = screen.getByRole("navigation", { name: "Settings sections" });
+    expect(within(nav).getByRole("link", { name: /Connected devices/ })).toHaveTextContent(
+      "Connected devices1",
+    );
+    await userEvent
+      .setup()
+      .click(within(waiting).getByRole("button", { name: "Remove Old phone from the list" }));
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Old phone is removed from the list. If it goes online again, it is not wiped",
+    );
+  });
 
   it("connects no new app while the account does not sync, but disconnects", async () => {
     renderSettings({ name: "Ann", recentSignIn: true }, [linux], null, false);

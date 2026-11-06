@@ -150,7 +150,7 @@ func NewHandler(repository NoteRepository, authenticator Authenticator, logger *
 	mux.Handle("GET /api/events", a.withDevice(a.entitledDevice(a.events)))
 	a.registerKeyRoutes(mux)
 	a.registerBillingRoutes(mux)
-	mux.Handle("DELETE /api/tokens/current", a.authenticated(a.revokeCurrentToken))
+	mux.Handle("DELETE /api/tokens/current", a.signingOut(a.revokeCurrentToken))
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, _ *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "no such endpoint")
 	})
@@ -171,7 +171,7 @@ func securityHeaders(next http.Handler) http.Handler {
 }
 
 // revokeCurrentToken signs this token out: it stops working immediately.
-func (a *api) revokeCurrentToken(w http.ResponseWriter, r *http.Request, _ auth.User) {
+func (a *api) revokeCurrentToken(w http.ResponseWriter, r *http.Request) {
 	token, _ := auth.BearerToken(r.Header.Get("Authorization"))
 	if err := a.auth.RevokeToken(r.Context(), token); err != nil {
 		a.internalError(w, r, err)
@@ -273,12 +273,34 @@ func (a *api) authenticated(next userHandler) http.Handler {
 // (`client_version`), so the device list shows the version it runs now, not
 // the one it was connected with. The query, not a header: an app updated
 // before its server would otherwise be refused by the server's CORS rules.
+//
+// A device disconnected to be wiped hears 401 device_wiped: its app then
+// erases what it holds and signs out.
 func (a *api) withDevice(next deviceHandler) http.Handler {
+	return a.bearer(next, nil)
+}
+
+// signingOut runs next for a device signing itself out. A device asked to
+// wipe itself may still do so, even from an address blocked for failed
+// sign-ins: that is how its app tells it has.
+func (a *api) signingOut(next http.HandlerFunc) http.Handler {
+	return a.bearer(func(w http.ResponseWriter, r *http.Request, _ auth.Device) { next(w, r) }, next)
+}
+
+// bearer runs next for the device of the request's bearer token, or wiped
+// (when not nil) for a device asked to wipe itself.
+func (a *api) bearer(next deviceHandler, wiped http.HandlerFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		client := clientAddress(r, a.trusted)
-		if retry, blocked := a.limiter.blocked(client); blocked {
+		retry, blocked := a.limiter.blocked(client)
+		tooMany := func() {
 			w.Header().Set("Retry-After", strconv.Itoa(int(retry.Seconds())+1))
 			writeError(w, http.StatusTooManyRequests, "rate_limited", "too many failed sign-in attempts; try again later")
+		}
+		// A blocked address may still tell a wipe is done: refused, its
+		// device would stay waiting to be wiped on the owner's list.
+		if blocked && wiped == nil {
+			tooMany()
 			return
 		}
 		token, err := auth.BearerToken(r.Header.Get("Authorization"))
@@ -286,12 +308,20 @@ func (a *api) withDevice(next deviceHandler) http.Handler {
 			var device auth.Device
 			version := devices.CleanVersion(r.URL.Query().Get("client_version"))
 			device, err = a.auth.DeviceByToken(r.Context(), token, version)
-			if err == nil {
+			if err == nil && !blocked {
 				next(w, r, device)
 				return
 			}
 		}
 		switch {
+		case errors.Is(err, auth.ErrDeviceWiped) && wiped != nil:
+			wiped(w, r)
+		case blocked:
+			tooMany()
+		case errors.Is(err, auth.ErrDeviceWiped):
+			a.limiter.record(client)
+			w.Header().Set("WWW-Authenticate", `Bearer realm="konspecter", error="invalid_token"`)
+			writeError(w, http.StatusUnauthorized, "device_wiped", "this device was disconnected from its account and must erase its notes")
 		case errors.Is(err, auth.ErrDeviceRevoked):
 			a.limiter.record(client)
 			w.Header().Set("WWW-Authenticate", `Bearer realm="konspecter", error="invalid_token"`)

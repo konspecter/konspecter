@@ -558,16 +558,25 @@ export class FolderStore implements NoteRepository {
 
   /** Moves the file to the system trash. */
   async delete(id: string): Promise<void> {
-    await this.#trash(id, "local");
+    await this.#discard(id, "local", (path) => this.#folder.trash(path));
   }
 
   /** Sync: the note was deleted elsewhere; its file goes to the trash. */
   async remove(id: string): Promise<void> {
-    await this.#trash(id, "remote");
+    await this.#discard(id, "remote", (path) => this.#folder.trash(path));
   }
 
-  async #trash(id: string, source: NoteChange["source"]): Promise<void> {
-    await this.#folder.trash(id);
+  /** The device was wiped from the site: the file is deleted for good, not to the trash. */
+  async erase(id: string): Promise<void> {
+    await this.#discard(id, "local", (path) => this.#folder.erase(path));
+  }
+
+  async #discard(
+    id: string,
+    source: NoteChange["source"],
+    discard: (path: string) => Promise<void>,
+  ): Promise<void> {
+    await discard(id);
     this.#files.delete(id);
     this.#followingTitle.delete(id);
     this.#search?.remove(id);

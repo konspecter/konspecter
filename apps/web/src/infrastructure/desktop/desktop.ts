@@ -105,6 +105,8 @@ export type FolderBridge = {
   /** Removes a folder (a path without a trailing "/") if it is empty, and its parents that are left empty. */
   removeEmptyFolder(path: string): Promise<void>;
   trash(path: string): Promise<void>;
+  /** Deletes the file for good, not to the trash (a device wiped from the site). */
+  erase(path: string): Promise<void>;
   openExternally(path: string): Promise<void>;
   reveal(path: string): Promise<void>;
   /** Reports changes made by other programs. Returns a function that stops watching. */
@@ -184,6 +186,9 @@ export const folderBridge: FolderBridge = {
   },
   async trash(path) {
     await folderCommand("folder_trash", { path });
+  },
+  async erase(path) {
+    await folderCommand("folder_delete", { path });
   },
   async openExternally(path) {
     await folderCommand("folder_open_external", { path });

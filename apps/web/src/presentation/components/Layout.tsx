@@ -34,6 +34,7 @@ import { SyncIndicator } from "./SyncIndicator";
 import { TagSuggestContext } from "./tag-suggest";
 import { ModeToggle, ThemeToggle, useDarkTheme } from "./TopBarControls";
 import { UpdateBanner } from "./UpdateBanner";
+import { WipedBanner } from "./WipedBanner";
 import { t } from "../i18n/i18n";
 import { isNarrow, useNarrow } from "../hooks/use-narrow";
 import { useScrollbarGutter } from "../hooks/use-scrollbar-gutter";
@@ -54,6 +55,8 @@ type LayoutProps = {
   /** Whether the tree's notes list their headings (hidden unless set otherwise). */
   treeHeadings?: TreeHeadings;
   updates?: UpdateSource | undefined;
+  /** The device was wiped from the site just before this start. */
+  wiped?: boolean;
   sync?: SyncEngine | undefined;
   /** The desktop app: the sidebar follows the window as it is made narrow or wide. */
   desktop?: boolean;
@@ -120,6 +123,7 @@ export function Layout({
   tagNames,
   treeHeadings = "hidden",
   updates,
+  wiped = false,
   sync,
   desktop = false,
   backButton,
@@ -519,6 +523,7 @@ export function Layout({
             </div>
           </header>
           {updates && <UpdateBanner updates={updates} />}
+          {wiped && <WipedBanner />}
           <main id="content" className="content" tabIndex={-1}>
             <DetailsSlot value={detailsSlot}>
               <IslandSlot value={islandSlot}>

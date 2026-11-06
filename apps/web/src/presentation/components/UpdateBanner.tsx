@@ -1,7 +1,7 @@
-import { CloseIcon } from "@konspecter/ui/icons";
 import { useEffect, useState } from "react";
 import type { Update, UpdateSource } from "../app/updates";
 import { t } from "../i18n/i18n";
+import { Banner } from "./Banner";
 
 export function UpdateBanner({ updates }: { updates: UpdateSource }) {
   const [update, setUpdate] = useState<Update | null>(null);
@@ -10,7 +10,11 @@ export function UpdateBanner({ updates }: { updates: UpdateSource }) {
 
   if (!update) return null;
   return (
-    <div role="status" className="update-banner">
+    <Banner
+      onClose={() => {
+        setUpdate(null);
+      }}
+    >
       <span>
         {update.kind === "download"
           ? t("app.releaseAvailable", { version: update.version })
@@ -19,17 +23,6 @@ export function UpdateBanner({ updates }: { updates: UpdateSource }) {
       <button type="button" className="button" onClick={updates.apply}>
         {update.kind === "download" ? t("app.download") : t("app.reload")}
       </button>
-      <button
-        type="button"
-        className="icon-button"
-        aria-label={t("app.close")}
-        title={t("app.close")}
-        onClick={() => {
-          setUpdate(null);
-        }}
-      >
-        <CloseIcon />
-      </button>
-    </div>
+    </Banner>
   );
 }

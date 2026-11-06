@@ -15,7 +15,10 @@ import (
 // to be connected (authorize) and polls (token) while its owner approves its
 // user code on the site's /activate page, signed in. The owner sees the
 // connected devices on the site and can disconnect any of them: its token
-// stops working and its event streams end at once.
+// stops working and its event streams end at once. Disconnected with
+// ?wipe=true, its app also erases what it holds of the account when it next
+// calls (401 device_wiped), then signs out, which tells it has (ADR-029).
+// Until then the owner may remove it from the list, which withdraws the wipe.
 //
 // The other way round, the site asks for a connect code for its signed-in
 // owner and shows it as a QR code; an app scans it and trades it for its
@@ -34,6 +37,7 @@ func (a *api) registerDeviceRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /api/devices/connect", a.deviceFlow(a.connectDevice))
 	mux.Handle("GET /api/devices", a.withSession(a.listDevices))
 	mux.Handle("DELETE /api/devices/{id}", a.withSession(a.revokeDevice))
+	mux.Handle("DELETE /api/devices/{id}/wipe", a.withSession(a.forgetWaitingDevice))
 }
 
 // deviceFlow guards the apps' side of the flow. The apps call from their own
@@ -50,19 +54,21 @@ func (a *api) deviceFlow(next http.HandlerFunc) http.Handler {
 }
 
 type deviceJSON struct {
-	ID            string     `json:"id"`
-	Name          string     `json:"name"`
-	Platform      string     `json:"platform"`
-	ClientVersion string     `json:"client_version"`
-	CreatedAt     time.Time  `json:"created_at"`
-	LastUsedAt    *time.Time `json:"last_used_at"`
-	LastSyncAt    *time.Time `json:"last_sync_at"`
+	ID              string     `json:"id"`
+	Name            string     `json:"name"`
+	Platform        string     `json:"platform"`
+	ClientVersion   string     `json:"client_version"`
+	CreatedAt       time.Time  `json:"created_at"`
+	LastUsedAt      *time.Time `json:"last_used_at"`
+	LastSyncAt      *time.Time `json:"last_sync_at"`
+	WipeRequestedAt *time.Time `json:"wipe_requested_at"`
 }
 
 func toDeviceJSON(d devices.Device) deviceJSON {
 	return deviceJSON{
 		ID: d.ID, Name: d.Name, Platform: d.Platform, ClientVersion: d.ClientVersion,
 		CreatedAt: d.CreatedAt.UTC(), LastUsedAt: utc(d.LastUsedAt), LastSyncAt: utc(d.LastSyncAt),
+		WipeRequestedAt: utc(d.WipeRequestedAt),
 	}
 }
 
@@ -288,6 +294,7 @@ func (a *api) decideDevice(approve bool) userHandler {
 	}
 }
 
+// listDevices lists the connected devices and those waiting to wipe themselves.
 func (a *api) listDevices(w http.ResponseWriter, r *http.Request, user auth.User) {
 	list, err := a.accounts.Devices.ListDevices(r.Context(), user.ID)
 	if err != nil {
@@ -302,14 +309,24 @@ func (a *api) listDevices(w http.ResponseWriter, r *http.Request, user auth.User
 }
 
 // revokeDevice disconnects a device: its token stops working and its open
-// event streams end now. Its app keeps every note; it only stops syncing.
+// event streams end now. Its app keeps every note and only stops syncing,
+// unless ?wipe=true asks it to erase them.
 func (a *api) revokeDevice(w http.ResponseWriter, r *http.Request, user auth.User) {
 	id := r.PathValue("id")
 	if !devices.ValidID(id) {
 		writeError(w, http.StatusNotFound, "not_found", "device not found")
 		return
 	}
-	err := a.accounts.Devices.RevokeDevice(r.Context(), user.ID, id)
+	var wipe bool
+	switch r.URL.Query().Get("wipe") {
+	case "", "false":
+	case "true":
+		wipe = true
+	default:
+		writeError(w, http.StatusBadRequest, "invalid_request", "wipe must be true or false")
+		return
+	}
+	err := a.accounts.Devices.RevokeDevice(r.Context(), user.ID, id, wipe)
 	if errors.Is(err, devices.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "not_found", "device not found")
 		return
@@ -319,5 +336,26 @@ func (a *api) revokeDevice(w http.ResponseWriter, r *http.Request, user auth.Use
 		return
 	}
 	a.hub.end(user.ID, id)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// forgetWaitingDevice removes a device that waits to wipe itself from the
+// list, for one that will never come online again or whose app could not say
+// it is done. The wipe is withdrawn: its token is unknown from now on.
+func (a *api) forgetWaitingDevice(w http.ResponseWriter, r *http.Request, user auth.User) {
+	id := r.PathValue("id")
+	if !devices.ValidID(id) {
+		writeError(w, http.StatusNotFound, "not_found", "device not found")
+		return
+	}
+	err := a.accounts.Devices.ForgetWaitingDevice(r.Context(), user.ID, id)
+	if errors.Is(err, devices.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not_found", "no device waits to be wiped under this id")
+		return
+	}
+	if err != nil {
+		a.internalError(w, r, err)
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }

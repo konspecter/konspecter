@@ -47,7 +47,8 @@ type DeviceStore interface {
 	CreateConnectCode(ctx context.Context, userID string, codeHash []byte, expiresAt time.Time, key *keys.Handover) error
 	RedeemConnectCode(ctx context.Context, codeHash, tokenHash []byte, client devices.Client) (devices.Device, auth.User, *keys.Handover, error)
 	ListDevices(ctx context.Context, userID string) ([]devices.Device, error)
-	RevokeDevice(ctx context.Context, userID, deviceID string) error
+	RevokeDevice(ctx context.Context, userID, deviceID string, wipe bool) error
+	ForgetWaitingDevice(ctx context.Context, userID, deviceID string) error
 }
 
 // Mailer sends one email.

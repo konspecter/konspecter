@@ -45,6 +45,8 @@ export class FakeServer {
   ]);
   /** Tokens of devices disconnected on the site: 401 device_revoked. */
   readonly revoked = new Set<string>();
+  /** Tokens of devices disconnected and asked to wipe themselves: 401 device_wiped. */
+  readonly wiped = new Set<string>();
   /** Requests to connect through the browser, by device code. */
   readonly authorizations = new Map<
     string,
@@ -112,6 +114,17 @@ export class FakeServer {
     if (method === "POST" && url.pathname === "/api/devices/connect") return this.#connect(body);
 
     const token = (new Headers(init?.headers).get("Authorization") ?? "").replace(/^Bearer /, "");
+    if (this.wiped.has(token)) {
+      // Signing out tells the server the device has wiped itself.
+      if (method === "DELETE" && url.pathname === "/api/tokens/current") {
+        this.wiped.delete(token);
+        return new Response(null, { status: 204 });
+      }
+      return json(
+        401,
+        error("device_wiped", "this device was disconnected and must erase its notes"),
+      );
+    }
     if (this.revoked.has(token)) {
       return json(401, error("device_revoked", "this device was disconnected from its account"));
     }
@@ -172,6 +185,12 @@ export class FakeServer {
   disconnectDevice(token: string): void {
     this.tokens.delete(token);
     this.revoked.add(token);
+  }
+
+  /** Disconnects the device holding `token` and asks it to wipe itself, as on the site. */
+  wipeDevice(token: string): void {
+    this.tokens.delete(token);
+    this.wiped.add(token);
   }
 
   /** The owner approves (or denies) the request with this user code on the site. */

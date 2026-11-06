@@ -148,6 +148,8 @@ Conspects are end-to-end encrypted before they leave your device. When the same 
 
 Each account has a storage quota on the server (512 MB unless the server sets another; the site's terms state it). Settings → Sync shows how full it is, in percent. When it is full, changes that need more room wait on your device until you delete conspects you no longer need; nothing is lost, and everything else keeps syncing.
 
+Your account's settings on the site list the devices that sync with it. **Disconnect** stops a device syncing; it keeps its conspects. **Disconnect and wipe** is for a device you no longer have, or one that is lost or given away. It asks first. The device stops syncing at once, and the next time it goes online it erases the conspects it holds. On a computer, the Markdown files sync covers are deleted for good, not moved to the trash; other files in the folder stay. Changes it had not synced are lost; your account and your other devices keep every conspect. Until the device has wiped itself, the site lists it as waiting; **Remove from list** drops one that will never come online again (it is then no longer wiped). The next time the app starts, it says it was wiped.
+
 ### Self-hosting
 
 The Sync Server is open source and can be self-hosted, free of charge. Each release publishes images for amd64 and arm64: the API, the account site and the web app, run with Docker Compose behind Caddy, which gets HTTPS certificates by itself.

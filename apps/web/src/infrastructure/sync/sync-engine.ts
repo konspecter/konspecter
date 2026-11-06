@@ -48,7 +48,9 @@ export type SyncState =
   | "disconnected"
   | "locked"
   | "unpaid"
-  | "full";
+  | "full"
+  /** Disconnected on the site to be wiped: erasing what the device holds. */
+  | "wiping";
 
 /** Why sync is locked: no key on the server yet ("setup"), or one to unlock ("unlock"). */
 export type SyncLock = "setup" | "unlock";
@@ -144,7 +146,20 @@ export type SyncEngineOptions = {
   /** Whether the page is shown; the change stream is closed while it is hidden. */
   isVisible?: () => boolean;
   credentials?: CredentialStore;
+  /**
+   * Erases what the device holds, once the server says it was disconnected
+   * to be wiped (401 device_wiped). The engine has stopped for good by then.
+   * The receipt is what tells the server, afterwards, that the wipe is done
+   * (`confirmWiped`). Without it, such a device is only disconnected.
+   */
+  onWiped?: (receipt: WipeReceipt) => Promise<void>;
 };
+
+/**
+ * What a wiped device keeps to tell the server the wipe is done: its own
+ * token, which the server now takes for nothing but signing out.
+ */
+export type WipeReceipt = { readonly serverUrl: string; readonly token: string };
 
 const CONFIG_KEY = "syncConfig";
 /**
@@ -212,6 +227,9 @@ export class SyncEngine {
   readonly #isOnline: () => boolean;
   readonly #isVisible: () => boolean;
   readonly #credentials: CredentialStore | null;
+  readonly #onWiped: ((receipt: WipeReceipt) => Promise<void>) | null;
+  /** Told to wipe itself: no cycle, timer or stream starts again. */
+  #wiped = false;
 
   #config: StoredConfig | null = null;
   #disconnected: Disconnected | null = null;
@@ -251,6 +269,7 @@ export class SyncEngine {
     this.#isOnline = options.isOnline ?? (() => navigator.onLine);
     this.#isVisible = options.isVisible ?? (() => document.visibilityState === "visible");
     this.#credentials = options.credentials ?? null;
+    this.#onWiped = options.onWiped ?? null;
   }
 
   // --- Status for the UI (useSyncExternalStore) -------------------------
@@ -562,7 +581,7 @@ export class SyncEngine {
   #openStream(): void {
     const config = this.#config;
     // While unpaid the stream is refused; a cycle that goes through opens it.
-    if (!config || !this.#isVisible() || this.#status.state === "unpaid") return;
+    if (!config || this.#wiped || !this.#isVisible() || this.#status.state === "unpaid") return;
     this.#stream ??= new ChangeStream(
       this.#client(config),
       {
@@ -588,7 +607,7 @@ export class SyncEngine {
   #scheduledAt: number | null = null;
 
   #schedule(delayMs: number, { sooner = false } = {}): void {
-    if (!this.#config) return;
+    if (!this.#config || this.#wiped) return;
     const at = this.#now().getTime() + delayMs;
     if (sooner && this.#scheduledAt !== null && this.#scheduledAt <= at) return;
     this.#cancelTimer();
@@ -614,7 +633,7 @@ export class SyncEngine {
    * sees every change made before the call.
    */
   syncNow(): Promise<void> {
-    if (!this.#config) return Promise.resolve();
+    if (!this.#config || this.#wiped) return Promise.resolve();
     if (this.#running) {
       this.#next ??= this.#running.then(() => {
         this.#next = null;
@@ -675,6 +694,10 @@ export class SyncEngine {
         return;
       }
       if (error instanceof ApiError && error.status === 401) {
+        if (error.code === "device_wiped" && this.#onWiped) {
+          this.#beWiped(config, this.#onWiped);
+          return;
+        }
         // Disconnected on the site, the account deleted, or the token revoked.
         await this.#becomeDisconnected(config, error);
         return;
@@ -690,6 +713,45 @@ export class SyncEngine {
         error: offline ? null : error instanceof Error ? error : new Error(String(error)),
       });
       this.#schedule(this.#retryDelay());
+    }
+  }
+
+  /**
+   * Disconnected on the site to be wiped: stop for good and hand over to
+   * `onWiped`, after this cycle. A wipe that fails shows as the status's
+   * error; nothing was confirmed, so the next start wipes again.
+   */
+  #beWiped(config: StoredConfig, onWiped: (receipt: WipeReceipt) => Promise<void>): void {
+    this.#wiped = true;
+    this.stop();
+    this.#setStatus({ state: "wiping", error: null, lock: null });
+    const receipt = { serverUrl: config.serverUrl, token: config.token };
+    void Promise.resolve(this.#running)
+      .then(() => onWiped(receipt))
+      .catch((failure: unknown) => {
+        this.#setStatus({ error: failure instanceof Error ? failure : new Error(String(failure)) });
+      });
+  }
+
+  /**
+   * Wiping: forgets the token kept outside the database (the desktop's
+   * keychain). The database itself is erased with the rest.
+   */
+  async forgetToken(): Promise<void> {
+    await this.#credentials?.clear();
+  }
+
+  /**
+   * Tells the server a wipe is done, by signing the wiped device's token
+   * out. True once the server has heard it, or no longer knows the token;
+   * false when it should be tried again (offline, a refusal for now).
+   */
+  async confirmWiped(receipt: WipeReceipt): Promise<boolean> {
+    try {
+      await this.#client(receipt).revokeCurrentToken();
+      return true;
+    } catch (error) {
+      return error instanceof ApiError && error.status === 401;
     }
   }
 

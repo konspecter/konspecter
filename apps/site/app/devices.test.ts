@@ -1,4 +1,4 @@
-import { parseClient, parseDevices, timeAgo } from "./devices";
+import { connectedDevices, parseClient, parseDevices, timeAgo } from "./devices";
 
 it("reads the API's devices and leaves out malformed ones", () => {
   const devices = parseDevices({
@@ -11,6 +11,14 @@ it("reads the API's devices and leaves out malformed ones", () => {
         created_at: "2026-10-01T10:00:00Z",
         last_used_at: "2026-10-05T10:00:00Z",
         last_sync_at: null,
+        wipe_requested_at: null,
+      },
+      {
+        id: "d3",
+        name: "Old phone",
+        platform: "android",
+        created_at: "2026-09-01T10:00:00Z",
+        wipe_requested_at: "2026-10-05T09:00:00Z",
       },
       { id: "d2", name: "No date", platform: "web" },
       { name: "No id", created_at: "2026-10-01T10:00:00Z" },
@@ -26,8 +34,20 @@ it("reads the API's devices and leaves out malformed ones", () => {
       createdAt: "2026-10-01T10:00:00Z",
       lastUsedAt: "2026-10-05T10:00:00Z",
       lastSyncAt: null,
+      wipeRequestedAt: null,
+    },
+    {
+      id: "d3",
+      name: "Old phone",
+      platform: "android",
+      clientVersion: "",
+      createdAt: "2026-09-01T10:00:00Z",
+      lastUsedAt: null,
+      lastSyncAt: null,
+      wipeRequestedAt: "2026-10-05T09:00:00Z",
     },
   ]);
+  expect(connectedDevices(devices).map((device) => device.id)).toEqual(["d1"]);
   expect(parseDevices(null)).toEqual([]);
 });
 

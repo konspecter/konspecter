@@ -54,6 +54,9 @@ then reloads. The files of the desktop's folder, exported files and the server's
 synced notes are never touched: connecting again brings the synced notes back, and the
 folder's files are matched with them rather than uploaded twice. The desktop log file and the service worker's copy of the app stay.
 
+A device **disconnected and wiped** on the site does the same by itself, after first deleting
+the files sync covers for good ([ADR-029](decisions/ADR-029-device-wipe.md)).
+
 ## Recovery paths, summarized
 
 | Problem                            | Recovery                                                                                                      |

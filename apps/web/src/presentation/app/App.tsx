@@ -41,6 +41,8 @@ type AppProps = {
   sync?: SyncEngine | undefined;
   /** Reset to factory settings in Settings; absent in tests. */
   reset?: FactoryReset | undefined;
+  /** The device was wiped from the site just before this start: say so. */
+  wiped?: boolean;
   /** The desktop app (Tauri), not a browser or the mobile app. */
   desktop?: boolean;
   /** The mobile app: the system's back button, taken over by the app. */
@@ -79,6 +81,7 @@ export function App({
   checkForRelease,
   sync,
   reset,
+  wiped = false,
   desktop = false,
   backButton,
 }: AppProps) {
@@ -172,6 +175,7 @@ export function App({
               tagNames={settings.tagNames}
               treeHeadings={settings.treeHeadings}
               updates={updates}
+              wiped={wiped}
               sync={sync}
               desktop={desktop}
               backButton={backButton}

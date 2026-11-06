@@ -1,6 +1,7 @@
 # ADR-016: Connecting apps through the browser (device authorization)
 
-Status: accepted (2026-10-05)
+Status: accepted (2026-10-05). [ADR-029](ADR-029-device-wipe.md) adds disconnecting and wiping
+a device.
 
 ## Context
 

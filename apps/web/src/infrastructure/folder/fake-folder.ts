@@ -14,6 +14,8 @@ import {
 export class FakeFolder implements FolderBridge {
   readonly files = new Map<string, { text: string; modifiedMs: number }>();
   readonly trashed: string[] = [];
+  /** Files deleted for good. */
+  readonly erased: string[] = [];
   readonly opened: string[] = [];
   readonly revealed: string[] = [];
   /** Folders removed because they were left empty. Folders are only implied by paths here. */
@@ -142,6 +144,14 @@ export class FakeFolder implements FolderBridge {
       return Promise.reject(new FolderError("not_found", `${path} does not exist`));
     }
     this.trashed.push(path);
+    return Promise.resolve();
+  }
+
+  erase(path: string) {
+    if (!this.files.delete(path)) {
+      return Promise.reject(new FolderError("not_found", `${path} does not exist`));
+    }
+    this.erased.push(path);
     return Promise.resolve();
   }
 }

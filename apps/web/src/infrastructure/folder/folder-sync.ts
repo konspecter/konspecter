@@ -8,6 +8,7 @@ import {
   type SyncBlock,
   type SyncEntry,
 } from "../../domain/sync/sync-state";
+import { FolderError } from "../desktop/desktop";
 import type { NoteStore, RemoteApplyResult, StoreChange } from "../storage/note-store";
 import type { SyncStore } from "../sync/sync-engine";
 import type { FolderStore } from "./folder-store";
@@ -132,6 +133,35 @@ export class FolderSync implements SyncStore {
     await this.#db.clearFolderLinks();
     await this.#db.setSyncCursor(0);
     this.#adopting = true;
+  }
+
+  /**
+   * The device was wiped from the site: deletes every file sync covers, for
+   * good, and forgets the links. Other files in the folder stay. Every file
+   * is tried; the first failure is thrown at the end. Returns how many went.
+   */
+  wipeFiles(): Promise<number> {
+    return this.#serial(async () => {
+      let deleted = 0;
+      let failure: Error | null = null;
+      for (const link of this.#links.values()) {
+        if (link.path === null) continue;
+        try {
+          await this.#files.erase(link.path);
+          deleted += 1;
+        } catch (error) {
+          if (!(error instanceof FolderError && error.code === "not_found")) {
+            failure ??= error instanceof Error ? error : new Error(String(error));
+          }
+        }
+      }
+      // The deletions are not news to sync: nothing is left to tell.
+      this.#links.clear();
+      this.#byPath.clear();
+      await this.#db.clearFolderLinks();
+      if (failure !== null) throw failure;
+      return deleted;
+    });
   }
 
   /**
