@@ -109,11 +109,16 @@ breakpoint in the CSS), in the browser, the PWA and the Android app alike.
   full-screen sidebar, so the page it went to shows. A swipe is one finger moving at
   least 60px sideways, twice as far as up or down, within 600 ms (`swipeDirection`). It
   does not count when it starts in a dialog or in something that scrolls sideways (a code
-  block, a table), or while text is selected.
+  block, a table), or while text is selected. On a small screen the page it goes to slides
+  in from that side (`slideIn` in `hooks/use-slide.ts`: from 30% aside and transparent to in
+  place, 240 ms; not with reduced motion), as does the one Android's back button goes to; the
+  main column clips it (`overflow-x: clip`), so nothing scrolls sideways.
 - **Android's back button** (the mobile app) closes what is open over the page (a dialog, the
   island's search, the sidebar), else goes back as a swipe to the right does; on the list, with
   nothing further back, the app goes to the background (see `clients.md`).
-- **Sidebar:** a full-screen menu, without its own bar (the island holds those buttons), in
+- **Sidebar:** a full-screen menu that slides in from the left edge and back out
+  (`useSlide`, 220 ms; at once with reduced motion; a toggle mid-way turns it round, and
+  sliding out it is `inert`), without its own bar (the island holds those buttons), in
   bigger text (16px, the tree 15px, the details 14px) and 36px pane headers. The note's details
   start folded behind their "Details" header.
 - **Editors:** the editor takes nearly the whole screen, with 8px of room around it (top and

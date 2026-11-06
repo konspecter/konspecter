@@ -27,7 +27,8 @@ import { ChevronIcon, GearIcon, NewNoteIcon, SidebarIcon } from "@konspecter/ui/
 import type { NewNoteState } from "./new-note";
 import { TagTreeView, TreeDocument } from "./TagTreeView";
 import { useFold, type FoldEdge } from "../hooks/use-fold";
-import { isNarrow } from "../hooks/use-narrow";
+import { isNarrow, useNarrow } from "../hooks/use-narrow";
+import { useSlide } from "../hooks/use-slide";
 import { t } from "../i18n/i18n";
 import { rich } from "../i18n/rich";
 
@@ -158,6 +159,9 @@ export const Sidebar = memo(function Sidebar({
   const recent = useMemo(() => (notes ? recentWithPins(notes, new Date()) : null), [notes]);
   const recentCount = recent ? recent.pinned.length + recent.recent.length : 0;
   const [folded, setFolded] = useState(initialFolded);
+  // On small screens the full-screen sidebar slides in from the left and out again.
+  const [panel, setPanel] = useState<HTMLElement | null>(null);
+  const shown = useSlide(panel, open, useNarrow());
   const toggle = (pane: PaneId) => {
     const next = new Set(folded);
     if (!next.delete(pane)) next.add(pane);
@@ -171,10 +175,13 @@ export const Sidebar = memo(function Sidebar({
 
   return (
     <aside
+      ref={setPanel}
       id="sidebar"
       className="sidebar"
       aria-label={t("sidebar.label")}
-      hidden={!open}
+      hidden={!shown}
+      // Sliding out, it is no longer there to tap or to focus.
+      inert={!open}
       onClick={handleClick}
     >
       <div className="sidebar-bar" data-tauri-drag-region="">

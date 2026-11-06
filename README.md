@@ -134,6 +134,10 @@ The back button (or the back gesture) works inside the app: it closes an open se
 sidebar or a dialog, then goes back to the page you came from, and from a conspect back to the
 list. Only on the list, with nowhere further back, does it leave the app.
 
+Swipe right to go back and left to go forward: the page you go to slides in from that side.
+The sidebar slides in from the left and back out again. With reduced motion turned on in the
+system, pages and the sidebar change at once.
+
 <p align="center">
   <img src="docs/assets/mobile.png" width="560" alt="Konspecter on a phone: the list of conspects and an open conspect">
 </p>

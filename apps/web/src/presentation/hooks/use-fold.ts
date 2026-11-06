@@ -2,7 +2,8 @@ import { useLayoutEffect, useRef, useState } from "react";
 
 const DURATION_MS = 160;
 
-function canAnimate(element: HTMLElement): boolean {
+/** Whether `element` can be animated: the Web Animations API is there and motion is not reduced. */
+export function canAnimate(element: HTMLElement): boolean {
   if (typeof element.animate !== "function") return false;
   return !(
     typeof window.matchMedia === "function" &&

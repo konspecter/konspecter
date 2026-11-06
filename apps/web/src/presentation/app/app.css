@@ -2211,6 +2211,11 @@ kbd {
     display: none;
   }
 
+  /* A page gone to by a swipe slides in from the side (`slideIn`): nothing scrolls sideways. */
+  .main {
+    overflow-x: clip;
+  }
+
   /* Bigger text in the menu: it is read and tapped at arm's length. */
   .sidebar {
     font-size: 16px;

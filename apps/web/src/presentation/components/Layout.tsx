@@ -20,6 +20,7 @@ import { pinKeyOf, SHORTCUTS } from "../app/shortcuts";
 import type { UpdateSource } from "../app/updates";
 import { stepsAway, useHistorySteps } from "../hooks/use-history-steps";
 import { useShortcuts } from "../hooks/use-shortcuts";
+import { slideIn } from "../hooks/use-slide";
 import { useSwipe } from "../hooks/use-swipe";
 import { Antenna } from "./Antenna";
 import { DetailsSlot } from "./details-slot";
@@ -327,18 +328,26 @@ export function Layout({
     if (id !== currentNoteId) void navigate(`/conspects/${encodeURIComponent(id)}`);
     return undefined;
   };
+  // On a small screen the page gone to by a swipe (or the back button) slides
+  // in from that side as it first shows.
+  const contentRef = useRef<HTMLElement>(null);
+  const slideFrom = useRef<"left" | "right" | null>(null);
+  useLayoutEffect(() => {
+    const from = slideFrom.current;
+    slideFrom.current = null;
+    if (from && contentRef.current) slideIn(contentRef.current, from);
+  }, [location.key]);
   // Back or forward, but never into Settings (past it); with nothing further
   // back in the app's history, back is to the list (if not there yet), in
   // place of the page left when `replace` is set.
   // Whether it went anywhere.
   const goPastSettings = (direction: -1 | 1, replace = false): boolean => {
     const delta = stepsAway(historySteps.steps, direction, passedBy);
-    if (delta !== null) {
-      void navigate(delta);
-      return true;
-    }
-    if (direction === 1 || (location.pathname === "/" && location.search === "")) return false;
-    void navigate("/", { replace });
+    const toList = direction === -1 && !(location.pathname === "/" && location.search === "");
+    if (delta === null && !toList) return false;
+    slideFrom.current = narrow ? (direction === -1 ? "left" : "right") : null;
+    if (delta === null) void navigate("/", { replace });
+    else void navigate(delta);
     return true;
   };
   // On touch screens a sideways swipe goes through the history: to the
@@ -524,7 +533,7 @@ export function Layout({
           </header>
           {updates && <UpdateBanner updates={updates} />}
           {wiped && <WipedBanner />}
-          <main id="content" className="content" tabIndex={-1}>
+          <main ref={contentRef} id="content" className="content" tabIndex={-1}>
             <DetailsSlot value={detailsSlot}>
               <IslandSlot value={islandSlot}>
                 <NoteFindContext value={findChannel}>
