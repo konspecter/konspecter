@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createRoutesStub, RouterContextProvider } from "react-router";
 import { accountContext } from "../account.server";
@@ -325,7 +325,10 @@ describe("settings", () => {
     });
     expect(dialog).toHaveTextContent("Changes it has not synced are lost.");
     await user.click(within(dialog).getByRole("link", { name: "Cancel" }));
-    expect(screen.queryByRole("dialog")).toBeNull();
+    // Cancel is a link: the dialog closes once the navigation has settled.
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
 
     await user.click(screen.getByRole("link", { name: "Disconnect and wipe Firefox on Linux" }));
     await user.click(
