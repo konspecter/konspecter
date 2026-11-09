@@ -319,6 +319,18 @@ Run all checks:
 pnpm check
 ```
 
+Run every check CI runs, on your machine (web, server, desktop, Android, end-to-end, the
+Docker images, and a stress run of the unit tests; it needs Docker as well):
+
+```sh
+pnpm check:all
+```
+
+`pnpm install` also sets up a git `pre-push` hook that runs `pnpm check:all` before each push
+and stops the push when a check fails. Push the commit you have checked out, with nothing left
+uncommitted, since the checks run on the working tree. To push without the checks, use
+`git push --no-verify`.
+
 Run end-to-end tests:
 
 ```sh

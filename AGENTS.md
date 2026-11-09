@@ -197,6 +197,8 @@ pnpm build            # production build
 pnpm format           # Prettier (write); format:check to verify
 pnpm licenses:check   # npm dependency license policy
 pnpm check            # all of the above, as CI runs them
+pnpm check:all        # every CI job here (web, Go, Rust, Android, e2e, images) + a stress run;
+                      # the pre-push hook (.githooks/, set by pnpm install) runs it before a push
 pnpm e2e              # Playwright end-to-end tests in Chromium (see docs/testing.md; the account
                       # and sync flows need a live server: KONSPECTER_E2E_* variables)
 pnpm icons            # re-render every app icon from scripts/render-icons.mjs (needs e2e deps

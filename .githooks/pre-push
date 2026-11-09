@@ -1,0 +1,32 @@
+#!/bin/sh
+# Before a push: every CI check (scripts/check-all.sh). Any failure stops the push.
+# Installed by pnpm install (core.hooksPath = .githooks); skip once with git push --no-verify.
+#
+# The checks run on the working tree, so the pushed commit must be the one checked out and
+# the tree must hold no uncommitted changes.
+
+head="$(git rev-parse HEAD)"
+check=no
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$local_sha" in
+    *[!0]*) ;;
+    *) continue ;; # deleting a remote branch or tag: nothing to check
+  esac
+  commit="$(git rev-parse --verify --quiet "$local_sha^{commit}")" || continue
+  if [ "$commit" != "$head" ]; then
+    echo "pre-push: $local_ref is not the checked-out commit; the checks run on the working tree."
+    echo "Check it out and push again, or skip the checks with git push --no-verify."
+    exit 1
+  fi
+  check=yes
+done
+
+[ "$check" = yes ] || exit 0
+
+if ! git diff --quiet HEAD --; then
+  echo "pre-push: there are uncommitted changes; the checks would not test what is pushed."
+  echo "Commit or stash them and push again, or skip the checks with git push --no-verify."
+  exit 1
+fi
+
+exec "$(git rev-parse --show-toplevel)/scripts/check-all.sh" </dev/null

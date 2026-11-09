@@ -13,7 +13,18 @@ pnpm --filter @konspecter/web coverage   # with coverage (text summary + HTML in
 pnpm e2e                           # Playwright, real Chromium, production build + service worker
 cd apps/server && go test -race ./...   # PostgreSQL tests need KONSPECTER_TEST_DATABASE_URL
 cd apps/desktop/src-tauri && cargo test
+pnpm check:all                     # every CI job on this machine (scripts/check-all.sh)
 ```
+
+`pnpm check:all` runs `.github/workflows/ci.yml` locally: the web job, the Go job (PostgreSQL
+in a throwaway Docker container), the Rust job, the Android build, the end-to-end tests against
+a live server and site (as below, the server on 127.0.0.1:18080), and the three images, built
+for this machine's platform only. It also runs four copies each of the web and site suites at
+once, to find timing races before CI does. Each job writes its own log, and a failed job's log
+is printed at the end. The git `pre-push` hook (`.githooks/pre-push`, which `pnpm install` sets
+up through `core.hooksPath`) runs it and stops the push when a check fails. It checks the
+working tree, so it rejects pushing a commit that is not checked out, or one with uncommitted
+changes next to it. `git push --no-verify` skips the checks.
 
 ### Against a live server
 
