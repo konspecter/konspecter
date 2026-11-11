@@ -1,4 +1,4 @@
-import { rememberLocation, restoreLocation } from "./last-location";
+import { moveLastLocation, rememberLocation, restoreLocation } from "./last-location";
 
 const exists = (ids: string[]) => (id: string) => Promise.resolve(ids.includes(id));
 const here = () => window.location.pathname + window.location.search;
@@ -18,6 +18,17 @@ describe("the last location", () => {
     rememberLocation("/?q=%23java");
     await restoreLocation(exists([]));
     expect(here()).toBe("/?q=%23java");
+  });
+
+  it("follows a note whose id gained its folder's", async () => {
+    rememberLocation("/conspects/java%2Fstreams.md#heading-2");
+    moveLastLocation((id) => `f1/${id}`);
+    await restoreLocation(exists(["f1/java/streams.md"]));
+    expect(here()).toBe("/conspects/f1%2Fjava%2Fstreams.md");
+
+    rememberLocation("/settings");
+    moveLastLocation((id) => `f1/${id}`);
+    expect(localStorage.getItem("konspecter.lastLocation")).toBe("/settings");
   });
 
   it("reads a location saved under the old /notes/ paths", async () => {

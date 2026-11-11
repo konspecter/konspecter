@@ -15,6 +15,11 @@ export type EditingArea = "highlighted" | "plain";
  * New files are named after their titles either way.
  */
 export type FileNames = "kept" | "title";
+/**
+ * Desktop, with several folders: where a new note goes, the open note's
+ * folder (the first folder with none open) or the one chosen each time.
+ */
+export type NewNoteFolder = "open-note" | "ask";
 /** Desktop: whether the app asks GitHub once a day for a newer release. */
 export type UpdateCheck = "daily" | "off";
 /** The interface language: the system's (the default) or a chosen one. */
@@ -31,6 +36,7 @@ export type Settings = {
   readonly editingArea: EditingArea;
   readonly language: Language;
   readonly fileNames: FileNames;
+  readonly newNoteFolder: NewNoteFolder;
   readonly updateCheck: UpdateCheck;
   /**
    * The app library's `.konspecterignore`: what a folder import skips, written
@@ -52,6 +58,7 @@ export const DEFAULT_SETTINGS: Settings = {
   editingArea: "highlighted",
   language: "system",
   fileNames: "kept",
+  newNoteFolder: "open-note",
   updateCheck: "daily",
   ignore: DEFAULT_IGNORE,
 };
@@ -88,6 +95,11 @@ export function parseSettings(value: unknown): Settings {
     editingArea: oneOf(record.editingArea, ["highlighted", "plain"], DEFAULT_SETTINGS.editingArea),
     language: oneOf(record.language, ["system", "en", "ru"], DEFAULT_SETTINGS.language),
     fileNames: oneOf(record.fileNames, ["kept", "title"], DEFAULT_SETTINGS.fileNames),
+    newNoteFolder: oneOf(
+      record.newNoteFolder,
+      ["open-note", "ask"],
+      DEFAULT_SETTINGS.newNoteFolder,
+    ),
     updateCheck: oneOf(record.updateCheck, ["daily", "off"], DEFAULT_SETTINGS.updateCheck),
     ignore:
       typeof record.ignore === "string" && record.ignore.length <= MAX_IGNORE_LENGTH

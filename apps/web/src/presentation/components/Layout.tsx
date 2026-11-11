@@ -25,6 +25,7 @@ import { useSwipe } from "../hooks/use-swipe";
 import { Antenna } from "./Antenna";
 import { DetailsSlot } from "./details-slot";
 import { IslandSlot } from "./island-slot";
+import type { LibraryControls } from "../app/library";
 import { newNoteState } from "./new-note";
 import { GearIcon, ListIcon, NewNoteIcon, SearchIcon, SidebarIcon } from "@konspecter/ui/icons";
 import { NO_FIND, NoteFindContext, type NoteFind, type NoteFindChannel } from "./note-find";
@@ -47,6 +48,8 @@ const passedBy = (path: string) => path === SETTINGS_PATH;
 type LayoutProps = {
   store: NoteRepository;
   catalog: NoteCatalog;
+  /** Desktop: the connected folders. */
+  library?: LibraryControls | undefined;
   activity: Activity;
   theme: Theme;
   onThemeChange: (theme: Theme) => void;
@@ -116,6 +119,7 @@ function sidebarEntry(): HTMLElement | null {
 export function Layout({
   store,
   catalog,
+  library,
   activity,
   theme,
   onThemeChange,
@@ -201,8 +205,13 @@ export function Layout({
   }, [query]);
   // A new note starts with the tag the list is filtered by, as its tree folder's chain.
   const newNote = useMemo(
-    () => newNoteState(activeTag, location.state),
-    [activeTag, location.state],
+    () =>
+      newNoteState(
+        activeTag,
+        location.state,
+        currentNoteId === null ? null : (library?.folderOf(currentNoteId) ?? null),
+      ),
+    [activeTag, location.state, currentNoteId, library],
   );
 
   const toggleSidebar = useCallback(() => {
@@ -466,6 +475,7 @@ export function Layout({
         <Sidebar
           store={store}
           catalog={catalog}
+          library={library}
           open={sidebarOpen}
           currentNoteId={currentNoteId}
           activeTag={activeTag}

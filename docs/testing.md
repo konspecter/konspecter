@@ -76,6 +76,7 @@ pnpm e2e
 | Account site (loaders, actions, pages, devices, activate, encryption) | `apps/site/app/**/*.test.ts(x)` (fetch stubbed as the API)                                    |
 | The whole account flow, live                                          | `tests/e2e/account.spec.ts`                                                                   |
 | File Mode (discovery, write-back, watcher changes, renames, races)    | `infrastructure/folder/folder-store.test.ts`, Rust `folder.rs`/`lib.rs` tests                 |
+| Several folders (ids, routing, tags, search, sync, the folder list)   | `folder-library.test.ts`, `folder-sync.test.ts`, App "several folders", Rust `library.rs`     |
 | Import / export (validation, dedupe, ZIP round-trip)                  | `application/library/import-export.test.ts`                                                   |
 | Markdown rendering and HTML safety (XSS vectors)                      | `presentation/markdown/MarkdownView.test.tsx`, e2e "HTML in a note cannot run script"         |
 | Editors (lossless text mode, source mode, metadata fields, toolbar)   | `presentation/editors/*.test.ts(x)`                                                           |
@@ -102,6 +103,7 @@ pnpm e2e
 | local edit → sync → server                               | sync engine vs fake server, vitest real-server test    | `sync.spec.ts` (two browser contexts)                     |
 | register → encrypt → connect → disconnect → delete       | site and engine tests, Go handler tests                | `account.spec.ts` (live server, site and app)             |
 | external file edit → watcher → document                  | FolderStore watcher tests, Rust real-watcher test      | — (needs the desktop app)                                 |
+| folders added, named, removed; new notes in a folder     | FolderLibrary, FolderSync, App "several folders"       | — (needs the desktop app)                                 |
 | conflict → the later edit wins                           | conflict strategy, engine conflicts, App and File Mode | `critical-flows.spec.ts` (two tabs)                       |
 | offline                                                  | fake network in engine tests                           | `critical-flows.spec.ts` (service worker, offline reload) |
 

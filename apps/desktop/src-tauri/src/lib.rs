@@ -3,12 +3,15 @@
 //! its desktop bridge (`apps/web/src/infrastructure/desktop/`).
 
 mod folder;
+mod library;
 mod log;
 
 use folder::{Changed, FileContents, FileEntry, Folder, FolderError};
+use library::{FolderInfo, Library, LibraryError};
 use notify_debouncer_mini::notify::{RecommendedWatcher, RecursiveMode};
 use notify_debouncer_mini::{DebounceEventResult, Debouncer, new_debouncer};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Duration;
@@ -48,25 +51,37 @@ impl From<FolderError> for CommandError {
     }
 }
 
-fn no_folder() -> CommandError {
-    CommandError {
-        code: "no_folder",
-        message: "no Markdown folder is open".into(),
+impl From<LibraryError> for CommandError {
+    fn from(error: LibraryError) -> Self {
+        CommandError {
+            code: error.code(),
+            message: error.message().into(),
+        }
     }
 }
 
-/// The open folder. Only the native folder picker can set it, so the web app
-/// can never point file access at an arbitrary location.
-#[derive(Default)]
-struct FolderState(Mutex<Option<Folder>>);
+fn io_error(error: impl std::fmt::Display) -> CommandError {
+    CommandError {
+        code: "io",
+        message: error.to_string(),
+    }
+}
 
-/// Watches the open folder; dropping it stops watching.
+/// The connected folders. Only the native folder picker adds one, so the web
+/// app can never point file access at an arbitrary location: it names a
+/// folder by its id and a file by its path inside it.
 #[derive(Default)]
-struct WatchState(Mutex<Option<Debouncer<RecommendedWatcher>>>);
+struct LibraryState(Mutex<Library>);
+
+/// Watches each open folder, by id; dropping a watcher stops it.
+#[derive(Default)]
+struct WatchState(Mutex<HashMap<String, Debouncer<RecommendedWatcher>>>);
 
 /// Sent to the web app as the `folder-changed` event.
 #[derive(Clone, Serialize, Debug, PartialEq)]
 struct FolderChanged {
+    /// The folder's id.
+    folder: String,
     /// Markdown files (relative paths) that were created, changed or removed.
     paths: Vec<String>,
     /// Read the whole folder again: the watcher saw something it cannot map to files.
@@ -74,7 +89,11 @@ struct FolderChanged {
 }
 
 /// What a batch of changed paths means for the web app, or nothing to report.
-fn summarize(folder: &Folder, changed: impl IntoIterator<Item = PathBuf>) -> Option<FolderChanged> {
+fn summarize(
+    id: &str,
+    folder: &Folder,
+    changed: impl IntoIterator<Item = PathBuf>,
+) -> Option<FolderChanged> {
     let mut paths = Vec::new();
     let mut rescan = false;
     for path in changed {
@@ -84,29 +103,36 @@ fn summarize(folder: &Folder, changed: impl IntoIterator<Item = PathBuf>) -> Opt
             _ => {}
         }
     }
-    (rescan || !paths.is_empty()).then_some(FolderChanged { paths, rescan })
+    (rescan || !paths.is_empty()).then_some(FolderChanged {
+        folder: id.to_string(),
+        paths,
+        rescan,
+    })
 }
 
-/// Starts watching `folder`, replacing any previous watcher. Changes are
+/// Starts watching a folder, replacing its previous watcher. Changes are
 /// debounced so a burst of writes (an editor saving) arrives as one event.
-fn watch(app: &AppHandle, folder: Option<&Folder>) {
+fn watch(app: &AppHandle, id: &str, folder: &Folder) {
     let state = app.state::<WatchState>();
-    let Ok(mut current) = state.0.lock() else {
+    let Ok(mut watchers) = state.0.lock() else {
         return;
     };
-    *current = None; // Stops the previous watcher.
-    let Some(folder) = folder.cloned() else {
-        return;
-    };
+    watchers.remove(id); // Stops the previous watcher.
 
     let handle = app.clone();
     let watched = folder.clone();
+    let watched_id = id.to_string();
     let debouncer = new_debouncer(
         Duration::from_millis(300),
         move |result: DebounceEventResult| {
             let change = match result {
-                Ok(events) => summarize(&watched, events.into_iter().map(|event| event.path)),
+                Ok(events) => summarize(
+                    &watched_id,
+                    &watched,
+                    events.into_iter().map(|event| event.path),
+                ),
                 Err(_) => Some(FolderChanged {
+                    folder: watched_id.clone(),
                     paths: Vec::new(),
                     rescan: true,
                 }),
@@ -123,174 +149,216 @@ fn watch(app: &AppHandle, folder: Option<&Folder>) {
                 .watch(folder.root(), RecursiveMode::Recursive)
                 .is_ok()
             {
-                *current = Some(debouncer);
+                watchers.insert(id.to_string(), debouncer);
             }
         }
         Err(error) => eprintln!("could not watch {}: {error}", folder.root().display()),
     }
 }
 
-impl FolderState {
+fn unwatch(app: &AppHandle, id: Option<&str>) {
+    if let Ok(mut watchers) = app.state::<WatchState>().0.lock() {
+        match id {
+            Some(id) => {
+                watchers.remove(id);
+            }
+            None => watchers.clear(),
+        }
+    }
+}
+
+impl LibraryState {
+    /// Runs `f` on the open folder with this id. The folder is cloned out of
+    /// the lock (clones share their rules), so file work never holds it.
     fn with<T>(
         &self,
+        id: &str,
         f: impl FnOnce(&Folder) -> Result<T, FolderError>,
     ) -> Result<T, CommandError> {
-        let guard = self.0.lock().map_err(|_| no_folder())?;
-        let folder = guard.as_ref().ok_or_else(no_folder)?;
-        f(folder).map_err(CommandError::from)
+        let folder = {
+            let library = self.0.lock().map_err(|_| no_folder())?;
+            library.get(id).cloned().ok_or_else(no_folder)?
+        };
+        f(&folder).map_err(CommandError::from)
     }
 
-    fn set(&self, folder: Option<Folder>) {
-        if let Ok(mut guard) = self.0.lock() {
-            *guard = folder;
-        }
-    }
-}
-
-fn saved_folder_file(app: &AppHandle) -> Option<PathBuf> {
-    app.path()
-        .app_config_dir()
-        .ok()
-        .map(|dir| dir.join("folder.json"))
-}
-
-fn save_folder(app: &AppHandle, folder: Option<&Folder>) {
-    let Some(file) = saved_folder_file(app) else {
-        return;
-    };
-    match folder {
-        Some(folder) => {
-            if let Some(dir) = file.parent() {
-                let _ = std::fs::create_dir_all(dir);
-            }
-            let json = serde_json::json!({ "path": folder.root() });
-            let _ = std::fs::write(file, json.to_string());
-        }
-        None => {
-            let _ = std::fs::remove_file(file);
-        }
+    fn change<T>(
+        &self,
+        f: impl FnOnce(&mut Library) -> Result<T, LibraryError>,
+    ) -> Result<T, CommandError> {
+        // Changed and saved as a copy, taken only once it is saved: a list
+        // that cannot be written leaves the app as it was.
+        let mut library = self.0.lock().map_err(|_| no_folder())?;
+        let mut next = library.clone();
+        let result = f(&mut next)?;
+        next.save().map_err(io_error)?;
+        *library = next;
+        Ok(result)
     }
 }
 
-/// `~/Konspecter`: the library when no folder was chosen, or the chosen one is gone.
-fn default_folder(app: &AppHandle) -> Option<Folder> {
-    Folder::open_default(&app.path().home_dir().ok()?).ok()
+fn no_folder() -> CommandError {
+    LibraryError::Unknown.into()
 }
 
-fn load_folder(app: &AppHandle) -> Option<Folder> {
-    let text = std::fs::read_to_string(saved_folder_file(app)?).ok()?;
-    let json: serde_json::Value = serde_json::from_str(&text).ok()?;
-    Folder::open(std::path::Path::new(json.get("path")?.as_str()?)).ok()
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
 }
 
-/// The open folder's absolute path, if any.
+/// The connected folders, in order.
 #[tauri::command]
-fn folder_current(state: State<'_, FolderState>) -> Option<String> {
-    let guard = state.0.lock().ok()?;
-    guard.as_ref().map(|f| f.root().display().to_string())
+fn folders_list(state: State<'_, LibraryState>) -> Vec<FolderInfo> {
+    state.0.lock().map(|l| l.infos()).unwrap_or_default()
 }
 
-/// Lets the user pick a folder with the system dialog and opens it. The
-/// dialog opens in the folder in use (`~/Konspecter` by default), so
-/// confirming it at once keeps that folder.
+/// Lets the user pick a folder with the system dialog and connects it.
+/// `None` when the dialog was cancelled.
 #[tauri::command]
-async fn folder_pick(
+async fn folder_add(
     app: AppHandle,
-    state: State<'_, FolderState>,
-) -> Result<Option<String>, CommandError> {
-    let current = state
-        .0
-        .lock()
-        .ok()
-        .and_then(|guard| guard.as_ref().map(|f| f.root().to_path_buf()));
+    state: State<'_, LibraryState>,
+) -> Result<Option<FolderInfo>, CommandError> {
     let mut dialog = app
         .dialog()
         .file()
-        .set_title("Choose a folder of Markdown conspects");
-    if let Some(current) = current {
-        dialog = dialog.set_directory(current);
+        .set_title("Add a folder of Markdown conspects");
+    if let Ok(home) = app.path().home_dir() {
+        dialog = dialog.set_directory(home);
     }
+    // The dialog waits for the user; the library is not locked meanwhile.
     let Some(picked) = dialog.blocking_pick_folder() else {
-        return Ok(None); // Cancelled.
+        return Ok(None);
     };
     let path = picked.into_path().map_err(|e| CommandError {
         code: "invalid_path",
         message: e.to_string(),
     })?;
     let folder = Folder::open(&path)?;
-    let root = folder.root().display().to_string();
-    save_folder(&app, Some(&folder));
-    watch(&app, Some(&folder));
-    state.set(Some(folder));
-    Ok(Some(root))
+    let info = state.change(|library| library.add(folder.clone(), now_ms()))?;
+    watch(&app, &info.id, &folder);
+    Ok(Some(info))
 }
 
-/// Forgets the chosen folder: back to the default one. The files are not touched.
+/// Disconnects a folder. Its files stay where they are.
 #[tauri::command]
-fn folder_close(app: AppHandle, state: State<'_, FolderState>) {
-    save_folder(&app, None);
-    let folder = default_folder(&app);
-    watch(&app, folder.as_ref());
-    state.set(folder);
+fn folder_remove(
+    app: AppHandle,
+    state: State<'_, LibraryState>,
+    folder: String,
+) -> Result<(), CommandError> {
+    state.change(|library| library.remove(&folder))?;
+    unwatch(&app, Some(&folder));
+    Ok(())
 }
 
 #[tauri::command]
-fn folder_list(state: State<'_, FolderState>) -> Result<Vec<FileEntry>, CommandError> {
-    state.with(Folder::list)
+fn folder_set_alias(
+    state: State<'_, LibraryState>,
+    folder: String,
+    alias: Option<String>,
+) -> Result<(), CommandError> {
+    state.change(|library| library.set_alias(&folder, alias.as_deref()))
+}
+
+/// Opens the folder itself in the system file manager.
+#[tauri::command]
+fn folder_reveal_root(state: State<'_, LibraryState>, folder: String) -> Result<(), CommandError> {
+    state.with(&folder, Folder::reveal_root)
+}
+
+/// Forgets every folder: the next start is a first start. No file is touched.
+#[tauri::command]
+fn folders_reset(app: AppHandle, state: State<'_, LibraryState>) -> Result<(), CommandError> {
+    unwatch(&app, None);
+    let mut library = state.0.lock().map_err(|_| no_folder())?;
+    library.reset().map_err(io_error)
+}
+
+#[tauri::command]
+fn folder_list(
+    state: State<'_, LibraryState>,
+    folder: String,
+) -> Result<Vec<FileEntry>, CommandError> {
+    state.with(&folder, Folder::list)
 }
 
 /// The folder's ignore rules (`.konspecterignore`, or the default).
 #[tauri::command]
-fn folder_ignore_read(state: State<'_, FolderState>) -> Result<String, CommandError> {
-    state.with(Folder::ignore_text)
+fn folder_ignore_read(
+    state: State<'_, LibraryState>,
+    folder: String,
+) -> Result<String, CommandError> {
+    state.with(&folder, Folder::ignore_text)
 }
 
 /// Writes the folder's `.konspecterignore`; listing and watching follow it at once.
 #[tauri::command]
-fn folder_ignore_write(state: State<'_, FolderState>, text: String) -> Result<(), CommandError> {
-    state.with(|f| f.write_ignore(&text))
+fn folder_ignore_write(
+    state: State<'_, LibraryState>,
+    folder: String,
+    text: String,
+) -> Result<(), CommandError> {
+    state.with(&folder, |f| f.write_ignore(&text))
 }
 
 #[tauri::command]
-fn folder_read(state: State<'_, FolderState>, path: String) -> Result<FileContents, CommandError> {
-    state.with(|f| f.read(&path))
+fn folder_read(
+    state: State<'_, LibraryState>,
+    folder: String,
+    path: String,
+) -> Result<FileContents, CommandError> {
+    state.with(&folder, |f| f.read(&path))
 }
 
 #[tauri::command]
 fn folder_write(
-    state: State<'_, FolderState>,
+    state: State<'_, LibraryState>,
+    folder: String,
     path: String,
     contents: String,
 ) -> Result<FileEntry, CommandError> {
-    state.with(|f| f.write(&path, &contents))
+    state.with(&folder, |f| f.write(&path, &contents))
 }
 
 #[tauri::command]
 fn folder_create_at(
-    state: State<'_, FolderState>,
+    state: State<'_, LibraryState>,
+    folder: String,
     path: String,
     contents: String,
 ) -> Result<FileEntry, CommandError> {
-    state.with(|f| f.create_at(&path, &contents))
+    state.with(&folder, |f| f.create_at(&path, &contents))
 }
 
 #[tauri::command]
 fn folder_rename(
-    state: State<'_, FolderState>,
+    state: State<'_, LibraryState>,
+    folder: String,
     from: String,
     to: String,
 ) -> Result<FileEntry, CommandError> {
-    state.with(|f| f.rename(&from, &to))
+    state.with(&folder, |f| f.rename(&from, &to))
 }
 
 #[tauri::command]
-fn folder_open_external(state: State<'_, FolderState>, path: String) -> Result<(), CommandError> {
-    state.with(|f| f.open_external(&path))
+fn folder_open_external(
+    state: State<'_, LibraryState>,
+    folder: String,
+    path: String,
+) -> Result<(), CommandError> {
+    state.with(&folder, |f| f.open_external(&path))
 }
 
 #[tauri::command]
-fn folder_reveal(state: State<'_, FolderState>, path: String) -> Result<(), CommandError> {
-    state.with(|f| f.reveal(&path))
+fn folder_reveal(
+    state: State<'_, LibraryState>,
+    folder: String,
+    path: String,
+) -> Result<(), CommandError> {
+    state.with(&folder, |f| f.reveal(&path))
 }
 
 /// Opens a web page in the system browser: signing in to sync approves this
@@ -412,40 +480,58 @@ fn log_error(app: AppHandle, entry: String) -> Result<(), CommandError> {
 }
 
 #[tauri::command]
-fn folder_trash(state: State<'_, FolderState>, path: String) -> Result<(), CommandError> {
-    state.with(|f| f.trash(&path))
+fn folder_trash(
+    state: State<'_, LibraryState>,
+    folder: String,
+    path: String,
+) -> Result<(), CommandError> {
+    state.with(&folder, |f| f.trash(&path))
 }
 
 #[tauri::command]
-fn folder_delete(state: State<'_, FolderState>, path: String) -> Result<(), CommandError> {
-    state.with(|f| f.delete(&path))
+fn folder_delete(
+    state: State<'_, LibraryState>,
+    folder: String,
+    path: String,
+) -> Result<(), CommandError> {
+    state.with(&folder, |f| f.delete(&path))
 }
 
 #[tauri::command]
 fn folder_remove_empty_dir(
-    state: State<'_, FolderState>,
+    state: State<'_, LibraryState>,
+    folder: String,
     path: String,
 ) -> Result<(), CommandError> {
-    state.with(|f| f.remove_empty_dir(&path))
+    state.with(&folder, |f| f.remove_empty_dir(&path))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .manage(FolderState::default())
+        .manage(LibraryState::default())
         .manage(WatchState::default())
         .setup(|app| {
-            let folder = load_folder(app.handle()).or_else(|| default_folder(app.handle()));
-            watch(app.handle(), folder.as_ref());
-            app.state::<FolderState>().set(folder);
+            let config = app.path().app_config_dir().ok();
+            let home = app.path().home_dir().ok();
+            let library = Library::load(config.as_deref(), home.as_deref(), now_ms());
+            for (id, folder) in library.open_folders() {
+                watch(app.handle(), &id, &folder);
+            }
+            if let Ok(mut state) = app.state::<LibraryState>().0.lock() {
+                *state = library;
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             app_info,
-            folder_current,
-            folder_pick,
-            folder_close,
+            folders_list,
+            folder_add,
+            folder_remove,
+            folder_set_alias,
+            folder_reveal_root,
+            folders_reset,
             folder_list,
             folder_ignore_read,
             folder_ignore_write,
@@ -500,20 +586,23 @@ mod tests {
         let root = folder.root().to_path_buf();
 
         let change = summarize(
+            "f1",
             &folder,
             [root.join("a.md"), root.join("a.md"), root.join(".tmp")],
         );
         assert_eq!(
             change,
             Some(FolderChanged {
+                folder: "f1".into(),
                 paths: vec!["a.md".into()],
                 rescan: false
             })
         );
-        assert_eq!(summarize(&folder, [root.join("x.png")]), None);
+        assert_eq!(summarize("f1", &folder, [root.join("x.png")]), None);
         assert_eq!(
-            summarize(&folder, [root.join("moved-dir")]),
+            summarize("f1", &folder, [root.join("moved-dir")]),
             Some(FolderChanged {
+                folder: "f1".into(),
                 paths: vec![],
                 rescan: true
             })
@@ -530,7 +619,8 @@ mod tests {
             Duration::from_millis(100),
             move |result: DebounceEventResult| {
                 if let Ok(events) = result
-                    && let Some(change) = summarize(&watched, events.into_iter().map(|e| e.path))
+                    && let Some(change) =
+                        summarize("f1", &watched, events.into_iter().map(|e| e.path))
                 {
                     let _ = sender.send(change);
                 }
@@ -552,6 +642,21 @@ mod tests {
             change.paths.contains(&"from-vim.md".to_string()) || change.rescan,
             "{change:?}"
         );
+    }
+
+    #[test]
+    fn a_list_that_cannot_be_saved_changes_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        // The config "folder" is a file: nothing can be written under it.
+        let blocker = dir.path().join("config");
+        std::fs::write(&blocker, "").unwrap();
+        let state = LibraryState(Mutex::new(Library::at(Some(blocker.join("folders.json")))));
+        let folder = Folder::open(dir.path()).unwrap();
+
+        let result = state.change(|library| library.add(folder, 1));
+
+        assert_eq!(result.map(|_| ()).map_err(|e| e.code), Err("io"));
+        assert!(state.0.lock().unwrap().infos().is_empty());
     }
 
     #[test]

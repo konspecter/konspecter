@@ -13,6 +13,7 @@ describe("parseSettings", () => {
       editingArea: "plain",
       language: "ru",
       fileNames: "title",
+      newNoteFolder: "ask",
       updateCheck: "off",
       ignore: "drafts/\n",
     };
@@ -31,6 +32,12 @@ describe("parseSettings", () => {
   it("keeps file names when titles change by default", () => {
     expect(DEFAULT_SETTINGS.fileNames).toBe("kept");
     expect(parseSettings({ fileNames: "slug" }).fileNames).toBe("kept");
+  });
+
+  it("makes new conspects in the open conspect's folder by default", () => {
+    expect(DEFAULT_SETTINGS.newNoteFolder).toBe("open-note");
+    expect(parseSettings({ newNoteFolder: "ask" }).newNoteFolder).toBe("ask");
+    expect(parseSettings({ newNoteFolder: "last" }).newNoteFolder).toBe("open-note");
   });
 
   it("checks for new versions daily by default", () => {

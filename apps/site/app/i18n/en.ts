@@ -81,7 +81,7 @@ export const en = {
   "home.sync.own.title": "Your own way",
   "home.sync.own.headline": "No account",
   "home.sync.own.folder":
-    "On a computer, every conspect is a Markdown file in a folder. Keep that folder in iCloud Drive, Dropbox, Yandex Disk, Syncthing or Git (Settings → Library → Change folder…), and your computers share it.",
+    "On a computer, every conspect is a Markdown file in a folder. Keep that folder in iCloud Drive, Dropbox, Yandex Disk, Syncthing or Git (Settings → Library → Add folder…), and your computers share it.",
   "home.sync.own.transfer":
     "On a phone or in the browser, move conspects over as .md files, a folder or a ZIP archive in Settings → Import & export.",
   "home.sync.own.server":
@@ -142,7 +142,7 @@ export const en = {
     "The web app works in any modern browser and keeps working without the internet after the first visit. To have it as an app of its own, click Install in the address bar of Chrome or Edge, or use Add to Dock or Add to Home Screen in Safari.",
   "download.library.title": "Where your conspects are kept",
   "download.library.text":
-    "On a computer, every conspect is a Markdown file in the Konspecter folder in your home folder; Settings → Library → Change folder… picks another one. On a phone and in the browser they are kept inside the app, and Settings → Import & export moves them in and out.",
+    "On a computer, every conspect is a Markdown file in the Konspecter folder in your home folder; Settings → Library → Add folder… adds others, and the app works in all of them at once. On a phone and in the browser they are kept inside the app, and Settings → Import & export moves them in and out.",
   "download.more.title": "More",
   "download.more.releases": "Every release and what changed in it",
   "download.more.source": "Source code on GitHub",

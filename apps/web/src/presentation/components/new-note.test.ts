@@ -1,4 +1,4 @@
-import { newNoteMarkdown, newNoteState, treeChain } from "./new-note";
+import { newNoteFolder, newNoteMarkdown, newNoteState, treeChain } from "./new-note";
 
 describe("a new note's tag", () => {
   it("is the chain of the tree folder the list's tag was chosen in", () => {
@@ -24,6 +24,26 @@ describe("a new note's tag", () => {
     expect(treeChain({ tagChain: "" })).toBeNull();
     expect(treeChain({ tagChain: 1 })).toBeNull();
     expect(treeChain("java")).toBeNull();
+  });
+});
+
+describe("a new note's folder", () => {
+  it("is the open note's folder, with or without a tag", () => {
+    expect(newNoteState(null, null, "work")).toEqual({ folder: "work" });
+    expect(newNoteState("java", null, "work")).toEqual({ newNoteTag: "java", folder: "work" });
+    expect(newNoteFolder({ folder: "work" })).toEqual({ folder: "work", chosen: false });
+  });
+
+  it("is said to be chosen once asked for", () => {
+    expect(newNoteFolder({ folder: "home", folderChosen: true })).toEqual({
+      folder: "home",
+      chosen: true,
+    });
+  });
+
+  it("is none otherwise", () => {
+    expect(newNoteFolder(null)).toEqual({ folder: null, chosen: false });
+    expect(newNoteFolder({ folder: 3 })).toEqual({ folder: null, chosen: false });
   });
 });
 

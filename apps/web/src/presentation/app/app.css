@@ -1322,6 +1322,22 @@ kbd {
   list-style: none;
 }
 
+/* A folder's tree under its root (several folders) lines up with the root's rows. */
+.tree-group > .tree {
+  margin: 0;
+}
+
+/* A folder's root: its name folds it, like a folder's chevron. */
+.tree-root {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
 /* The guide runs under the parent folder's chevron. */
 .tree-group::before {
   position: absolute;
@@ -1959,6 +1975,112 @@ kbd {
   margin-top: 0.75rem;
 }
 
+/*
+ * The desktop's folders (Settings → Library): a table striped like a zebra,
+ * the page's colour on every other row of the tinted panel. Narrow, each row
+ * becomes a small card: the path, the date, then the actions.
+ */
+.library-table-frame {
+  margin: 0.75rem 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.library-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.library-table th {
+  padding: 0.45rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: 550;
+  text-align: left;
+}
+
+.library-table td {
+  padding: 0.55rem 0.75rem;
+  vertical-align: middle;
+}
+
+.library-table tbody tr:nth-child(odd) {
+  background: var(--color-bg);
+}
+
+.library-path {
+  overflow-wrap: anywhere;
+}
+
+.library-alias {
+  display: block;
+  font-weight: 600;
+}
+
+.library-alias + span {
+  color: var(--color-muted);
+}
+
+.library-missing {
+  display: block;
+  color: var(--color-danger);
+  font-size: 13px;
+}
+
+.library-added {
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.library-actions {
+  text-align: right;
+}
+
+.library-actions .button {
+  margin: 0.15rem 0 0.15rem 0.35rem;
+  padding: 0.2rem 0.6rem;
+  font-size: 13px;
+}
+
+@container (width < 34rem) {
+  .library-table thead {
+    display: none;
+  }
+
+  .library-table tr,
+  .library-table td {
+    display: block;
+  }
+
+  .library-table td {
+    padding: 0.15rem 0.75rem;
+  }
+
+  .library-table tr {
+    padding: 0.45rem 0;
+  }
+
+  .library-actions {
+    text-align: left;
+  }
+
+  .library-actions .button {
+    margin: 0.3rem 0.35rem 0 0;
+  }
+}
+
+/* Which folder's ignore rules are edited, with several. */
+.ignore-folder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+  margin: 0.5rem 0 0.75rem;
+}
+
 .setting-block .connect-form,
 .setting-block .ignore-rules {
   max-width: none;
@@ -2138,6 +2260,58 @@ kbd {
 .dialog-actions {
   justify-content: flex-end;
   margin-top: 1.25rem;
+}
+
+/* Where a new conspect goes: one button per folder, its name above its path. */
+.folder-choices {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.folder-choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0 0.6rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.folder-choice:hover,
+.folder-choice:focus-visible {
+  background: var(--color-hover);
+}
+
+.folder-choice .icon {
+  grid-row: span 2;
+  color: var(--color-tree-folder);
+}
+
+.folder-choice-name {
+  font-weight: 600;
+}
+
+.folder-choice-path {
+  overflow: hidden;
+  color: var(--color-muted);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The alias field fills the dialog. */
+.dialog.connect-form {
+  max-width: none;
 }
 
 .shortcuts {

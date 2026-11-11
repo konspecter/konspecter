@@ -83,6 +83,7 @@ export class FolderStore implements NoteRepository {
   readonly #followingTitle = new Set<string>();
 
   readonly #graceMs: number;
+  readonly #readingPrefix: string;
   #followTitles: boolean;
 
   /**
@@ -90,16 +91,19 @@ export class FolderStore implements NoteRepository {
    *   as deleted (editors that save by deleting and recreating the file)
    * @param followTitles whether a save renames the file after the note's
    *   title (see `followTitles`)
+   * @param readingPrefix what reading positions are keyed by, before the
+   *   path: one prefix per folder keeps the folders' positions apart
    */
   constructor(
     folder: FolderBridge,
     reading: ReadingStateStore,
-    { graceMs = 150, followTitles = false } = {},
+    { graceMs = 150, followTitles = false, readingPrefix = "file:" } = {},
   ) {
     this.#folder = folder;
     this.#reading = reading;
     this.#graceMs = graceMs;
     this.#followTitles = followTitles;
+    this.#readingPrefix = readingPrefix;
   }
 
   /**
@@ -230,11 +234,11 @@ export class FolderStore implements NoteRepository {
   }
 
   async #moveReadingState(oldPath: string, newPath: string): Promise<void> {
-    const state = await this.#reading.readingState(readingKey(oldPath));
+    const state = await this.#reading.readingState(this.#readingKey(oldPath));
     if (!state) return;
-    await this.#reading.saveReadingPosition(readingKey(newPath), state.position);
+    await this.#reading.saveReadingPosition(this.#readingKey(newPath), state.position);
     if (state.selection) {
-      await this.#reading.saveEditorSelection(readingKey(newPath), state.selection);
+      await this.#reading.saveEditorSelection(this.#readingKey(newPath), state.selection);
     }
   }
 
@@ -589,6 +593,12 @@ export class FolderStore implements NoteRepository {
     return countTags([...this.#files.values()].map((file) => file.tags));
   }
 
+  /** Which tags each file has, by path. */
+  async tagEntries(): Promise<TagEntry[]> {
+    await this.#ensureLoaded();
+    return [...this.#files.values()].map((file) => file.tags);
+  }
+
   async notesWithTag(tag: Tag): Promise<Note[]> {
     await this.#ensureLoaded();
     return [...this.#files]
@@ -602,20 +612,25 @@ export class FolderStore implements NoteRepository {
   }
 
   readingState(noteId: string): Promise<ReadingState | null> {
-    return this.#reading.readingState(readingKey(noteId));
+    return this.#reading.readingState(this.#readingKey(noteId));
   }
 
   saveReadingPosition(noteId: string, position: number): Promise<void> {
-    return this.#reading.saveReadingPosition(readingKey(noteId), position);
+    return this.#reading.saveReadingPosition(this.#readingKey(noteId), position);
   }
 
   saveEditorSelection(noteId: string, selection: EditorSelection): Promise<void> {
-    return this.#reading.saveEditorSelection(readingKey(noteId), selection);
+    return this.#reading.saveEditorSelection(this.#readingKey(noteId), selection);
   }
 
   onChange(listener: (change: NoteChange) => void): () => void {
     this.#listeners.add(listener);
     return () => this.#listeners.delete(listener);
+  }
+
+  /** Reading positions of files are keyed apart from library notes. */
+  #readingKey(path: string): string {
+    return `${this.#readingPrefix}${path}`;
   }
 }
 
@@ -625,9 +640,4 @@ function titleOf(markdown: string): string {
 
 function toNote(path: string, markdown: string, modifiedMs: number): Note {
   return { id: path, markdown, modifiedAt: new Date(modifiedMs).toISOString() };
-}
-
-/** Reading positions of files are keyed apart from library notes. */
-function readingKey(path: string): string {
-  return `file:${path}`;
 }

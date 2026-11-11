@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **Several folders at once:** the desktop app works with more than one folder of Markdown
+  files. Add one with the new folder-with-a-plus button next to Settings, or in Settings →
+  Library; with several, each is a root of the sidebar's tree. Settings → Library lists them
+  with the date each was added, shows one in Finder, Explorer or Files, names it with an alias,
+  or removes it, which only disconnects it: its files stay where they are. Sync covers every
+  folder, and a new conspect goes into the open conspect's folder, or the app asks each time.
+
 ## 0.14.0 — 2026-10-30
 
 - **Switch between notes with Ctrl+Tab:** pressed once it goes back to the note opened before;

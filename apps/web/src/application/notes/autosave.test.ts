@@ -76,6 +76,20 @@ describe("a new note's first save", () => {
     });
   });
 
+  it("goes into the folder it was made for", async () => {
+    const store = await newStore();
+    const create = vi.spyOn(store, "create");
+    const autosave = new Autosave(store, null, {}, { delay: 5, createDelay: 5, folder: "work" });
+
+    autosave.change(() => "# In work");
+    await autosave.flush();
+
+    expect(create).toHaveBeenCalledWith("# In work", expect.any(Date), {
+      followTitle: true,
+      folder: "work",
+    });
+  });
+
   it("is stored after the longer delay even if the line is never finished", async () => {
     const store = await newStore();
     const autosave = new Autosave(store, null, {}, { delay: 5, createDelay: 30 });

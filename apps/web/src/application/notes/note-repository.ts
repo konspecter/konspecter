@@ -25,7 +25,8 @@ export type NoteChange = {
  * apart on purpose:
  *
  * - `NoteStore`: the app's own library in IndexedDB, synced with a server.
- * - `FolderStore` (desktop File Mode): real `.md` files in a folder on disk.
+ * - `FolderStore` (desktop File Mode): real `.md` files in a folder on disk,
+ *   and `FolderLibrary`, every connected folder together (ADR-030).
  *
  * Pages depend on this interface only, so every screen works with either.
  */
@@ -36,8 +37,14 @@ export interface NoteRepository {
    * Stores a new note; the backend chooses its id (a UUID, or a file name).
    * `followTitle`: the note is being written in the editor, so in File Mode
    * its file is renamed after its title on every save until `settleName`.
+   * `folder`: the desktop folder (its id) to make the note in; the first one
+   * otherwise. Other backends ignore it.
    */
-  create(markdown: string, now: Date, options?: { followTitle?: boolean }): Promise<Note>;
+  create(
+    markdown: string,
+    now: Date,
+    options?: { followTitle?: boolean; folder?: string },
+  ): Promise<Note>;
   /**
    * Saves an existing note and returns it as stored. Its id can change: in
    * File Mode a file that follows its title is renamed.
@@ -68,4 +75,6 @@ export interface NoteRepository {
   openExternally?(id: string): Promise<void>;
   /** File Mode only: shows the note's file in the system file manager. */
   reveal?(id: string): Promise<void>;
+  /** File Mode only: the note's file as people read it (its path, after its folder's name). */
+  fileOf?(id: string): string;
 }

@@ -29,8 +29,20 @@ export const ru: Dictionary = {
   "sidebar.noNotes": "Конспектов пока нет.",
   "sidebar.open": "Открыть",
   "sidebar.delete": "Удалить",
+  "sidebar.addFolder": "Добавить папку",
+  "library.reveal.mac": "Показать в Finder",
+  "library.reveal.windows": "Показать в Проводнике",
+  "library.reveal.other": "Показать в Файлах",
+  "library.unavailable": "{folder} (не открывается)",
+  "library.connected": "Эта папка уже подключена.",
+  "library.overlaps":
+    "Эта папка лежит внутри подключённой папки или содержит её. Добавляйте папки, которые не пересекаются.",
+  "newNote.chooseTitle": "Куда положить новый конспект?",
+  "newNote.noFolder": "Сначала добавьте папку: Konspecter хранит каждый конспект файлом в ней.",
   "tree.expand": "Развернуть #{tag}",
   "tree.collapse": "Свернуть #{tag}",
+  "tree.expandFolder": "Развернуть {folder}",
+  "tree.collapseFolder": "Свернуть {folder}",
   "tree.expandHeadings": "Показать заголовки «{title}»",
   "tree.collapseHeadings": "Скрыть заголовки «{title}»",
   "tree.expandHeading": "Развернуть «{heading}»",
@@ -181,8 +193,10 @@ export const ru: Dictionary = {
     "Уже есть конспекты? Импортируйте файлы {md} или папку в {settings}, там же подключается синхронизация.",
   "welcome.settings": "Настройках",
   "welcome.folder":
-    "Конспекты хранятся файлами Markdown в папке {folder}. Оставьте её или выберите другую: подойдёт и папка с вашими файлами {md}.",
-  "welcome.chooseFolder": "Выбрать другую папку…",
+    "Конспекты хранятся файлами Markdown в папке {folder}. Добавьте ещё папку, чтобы работать в нескольких: подойдёт и папка с вашими файлами {md}.",
+  "welcome.noFolder":
+    "Konspecter хранит каждый конспект файлом {md} в папке на этом компьютере. Чтобы начать, добавьте папку: новую или с вашими файлами Markdown.",
+  "welcome.addFolder": "Добавить папку…",
   "welcome.keys": "Клавиши для начала. {help} покажет все.",
   "welcome.exampleNote": `# Добро пожаловать в Konspecter
 
@@ -295,6 +309,10 @@ Map<String, Integer> counts = new HashMap<>();
   "settings.reading.restore": "Продолжать, где остановился",
   "settings.reading.ask": "Спрашивать перед переходом",
   "settings.reading.off": "Всегда начинать сначала",
+  "settings.newNoteFolder": "Новые конспекты",
+  "settings.newNoteFolder.hint": "В какую папку попадает новый конспект, когда их несколько.",
+  "settings.newNoteFolder.openNote": "Папка открытого конспекта",
+  "settings.newNoteFolder.ask": "Спрашивать каждый раз",
   "settings.fileNames": "Имена файлов",
   "settings.fileNames.hint":
     "Файлы новых конспектов называются по заголовку, например hello-mir.md для «Hello мир!».",
@@ -326,17 +344,31 @@ Map<String, Integer> counts = new HashMap<>();
   "settings.checkNow.failed": "Не удалось связаться с GitHub. Попробуйте позже.",
   "settings.checkNow.button": "Проверить сейчас",
   "settings.library": "Библиотека",
-  "settings.library.none":
-    "Konspecter хранит каждый конспект файлом {md} в папке, но не смог открыть её. Выберите папку для работы.",
-  "settings.library.open": "Выбрать папку…",
-  "settings.library.change": "Сменить папку…",
   "settings.library.folder":
-    "Каждый конспект — файл Markdown в папке {folder}: его откроет любой файловый менеджер или редактор. Изменения сохраняются в файлы; удалённые конспекты попадают в корзину системы.",
+    "Каждый конспект — файл Markdown в одной из этих папок: его откроет любой файловый менеджер или редактор. Изменения сохраняются в файлы; удалённые конспекты попадают в корзину системы.",
+  "settings.library.path": "Путь",
+  "settings.library.added": "Дата добавления",
+  "settings.library.actions": "Действия",
+  "settings.library.unavailable":
+    "Не открывается: папку перенесли, её диск не подключён или её файлы не читаются.",
+  "settings.library.empty":
+    "Ни одна папка не подключена. Добавьте папку с файлами {md}, чтобы хранить в ней конспекты.",
+  "settings.library.add": "Добавить папку…",
+  "settings.library.alias": "Псевдоним…",
+  "settings.library.remove": "Убрать",
+  "settings.library.removeTitle": "Убрать {folder} из Konspecter?",
+  "settings.library.removeMessage":
+    "Konspecter перестанет показывать и синхронизировать конспекты из {path}. Ничего не удаляется: файлы и папки остаются на месте, а конспекты — на других ваших устройствах. Папку можно добавить снова в любой момент.",
+  "settings.library.aliasTitle": "Псевдоним для {folder}",
+  "settings.library.aliasLabel": "Псевдоним",
+  "settings.library.aliasHint":
+    "Показывается вместо имени папки. Оставьте пустым, чтобы показывать имя.",
+  "settings.library.aliasSave": "Сохранить",
   "settings.library.folderSync":
-    "Синхронизация охватывает эту папку: конспекты с других устройств записываются сюда файлами, а файлы, изменённые здесь — в Konspecter или в другой программе, — уходят на них. Если конспект правят в двух местах, побеждает более поздняя правка.",
+    "Синхронизация охватывает все папки: файлы, изменённые здесь — в Konspecter или в другой программе, — уходят на другие ваши устройства, а новые для этого устройства конспекты записываются в первую папку. Если конспект правят в двух местах, побеждает более поздняя правка.",
   "settings.library.folders":
     "Папки следуют за тегами: конспект лежит в папке своего первого тега, #java#collections — это java/collections/.",
-  "settings.library.reformat": "Переупорядочить папку…",
+  "settings.library.reformat": "Переупорядочить папки…",
   "settings.library.nothingToReformat": "Все конспекты с тегами уже лежат в папках своих тегов.",
   "settings.library.reformatted": {
     one: "{count} конспект перенесён в папку своих тегов.",
@@ -401,6 +433,7 @@ Map<String, Integer> counts = new HashMap<>();
     "Что Konspecter пропускает в этой папке: не читает, не отслеживает и не создаёт там конспектов. Хранится в папке как {file}, поэтому его видят и другие программы.",
   "ignore.syntax":
     "Пишется как .gitignore: по шаблону на строку, {hidden} — скрытые файлы и папки, {negate} возвращает файл, {comment} — комментарий.",
+  "ignore.whichFolder": "Папка",
   "ignore.label": "Правила ({file})",
   "ignore.save": "Сохранить",
   "ignore.default": "Вернуть по умолчанию",

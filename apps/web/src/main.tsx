@@ -7,17 +7,21 @@ import { registerSW } from "virtual:pwa-register";
 import type { NoteRepository } from "./application/notes/note-repository";
 import type { UpdateCheck } from "./domain/settings/settings";
 import {
+  addFolder,
   appInfo,
-  closeFolder,
-  currentFolder,
   folderBridge,
   isDesktop,
   keychainCredentials,
+  libraryFolders,
   onWindowClose,
   openInBrowser,
-  pickFolder,
+  removeFolder,
+  resetFolders,
+  revealFolder,
+  setFolderAlias,
 } from "./infrastructure/desktop/desktop";
 import { watchReleases } from "./infrastructure/desktop/releases";
+import { FolderLibrary } from "./infrastructure/folder/folder-library";
 import { FolderStore } from "./infrastructure/folder/folder-store";
 import { FolderSync } from "./infrastructure/folder/folder-sync";
 import { isNativeMobile, nativeBackButton } from "./infrastructure/mobile/mobile";
@@ -33,7 +37,7 @@ import {
   type FactoryReset,
 } from "./presentation/app/factory-reset";
 import { reportError } from "./presentation/app/errors";
-import { restoreLocation } from "./presentation/app/last-location";
+import { moveLastLocation, restoreLocation } from "./presentation/app/last-location";
 import type { LibraryControls } from "./presentation/app/library";
 import type { CheckForRelease, Update, UpdateSource } from "./presentation/app/updates";
 import { followKeyboard } from "./presentation/app/keyboard";
@@ -125,32 +129,61 @@ try {
   showStage("storage");
   updateCheck = settings.updateCheck;
 
-  // On the desktop the library is a folder of Markdown files, ~/Konspecter
-  // unless another was chosen (ADR-024); elsewhere it is the app library (IndexedDB).
-  const folder = isDesktop() ? await currentFolder() : null;
-  const folderStore = folder
-    ? new FolderStore(folderBridge, store, { followTitles: settings.fileNames === "title" })
+  // On the desktop the library is the connected folders of Markdown files,
+  // ~/Konspecter at first (ADR-024, ADR-030); elsewhere it is the app library (IndexedDB).
+  const folderLibrary = isDesktop()
+    ? new FolderLibrary(
+        (await libraryFolders()).map((folder) => ({
+          folder,
+          store: folder.available
+            ? new FolderStore(folderBridge(folder.id), store, {
+                followTitles: settings.fileNames === "title",
+                readingPrefix: `file:${folder.id}/`,
+              })
+            : null,
+        })),
+        { setAlias: setFolderAlias },
+      )
     : null;
-  const repository: NoteRepository = folderStore ?? store;
-  // Sync covers the folder: links tie its files to the synced notes.
-  const folderSync =
-    folderStore && folder ? await FolderSync.open(folderStore, store, folder) : null;
-  // Notes from before the desktop kept everything in the folder move into it, once.
+  const repository: NoteRepository = folderLibrary ?? store;
+  // Sync covers the folders: links tie their files to the synced notes.
+  const folderSync = folderLibrary ? await FolderSync.open(folderLibrary, store) : null;
+  // The one folder of an earlier version: its notes' ids gained the folder's.
+  const upgradedTo = folderSync?.upgradedTo;
+  if (upgradedTo) moveLastLocation((id) => `${upgradedTo}/${id}`);
+  // Notes from before the desktop kept everything in a folder move into the first, once.
   await folderSync?.moveLibrary().catch(reportError);
   // Follow changes other programs make to the files.
-  void folderStore?.watch();
-  const library: LibraryControls | undefined = isDesktop()
+  void folderLibrary?.watch();
+  // Adding or removing a folder starts the app again on the new set of folders.
+  // Pending saves are written first, while their folder is still connected.
+  const library: LibraryControls | undefined = folderLibrary
     ? {
-        folder,
-        async chooseFolder() {
-          if (await pickFolder()) window.location.reload();
+        folders: {
+          subscribe: (listener) => folderLibrary.subscribeFolders(listener),
+          getSnapshot: () => folderLibrary.folders(),
         },
-        reformat: folderStore
-          ? { misplaced: () => folderStore.misplaced(), apply: () => folderStore.reformat() }
-          : undefined,
-        ignore: folderStore
-          ? { read: () => folderStore.ignoreText(), save: (text) => folderStore.setIgnore(text) }
-          : undefined,
+        folderOf: (noteId) => folderLibrary.folderOf(noteId),
+        tags: (folder) => folderLibrary.folderTags(folder),
+        async add() {
+          await flushBeforeClosing();
+          if (await addFolder()) window.location.reload();
+        },
+        async remove(folder) {
+          await flushBeforeClosing();
+          await removeFolder(folder);
+          window.location.reload();
+        },
+        setAlias: (folder, alias) => folderLibrary.setAlias(folder, alias),
+        reveal: revealFolder,
+        reformat: (folder) => ({
+          misplaced: () => folderLibrary.misplaced(folder),
+          apply: () => folderLibrary.reformat(folder),
+        }),
+        ignore: (folder) => ({
+          read: () => folderLibrary.ignoreText(folder),
+          save: (text) => folderLibrary.setIgnore(folder, text),
+        }),
       }
     : undefined;
 
@@ -172,7 +205,7 @@ try {
       await wipe({
         deleteFiles: folderSync ? () => folderSync.wipeFiles() : undefined,
         store,
-        closeFolder: folder ? closeFolder : undefined,
+        forgetFolders: folderLibrary ? resetFolders : undefined,
         sync,
         storage: localStorage,
         receipt,
@@ -191,7 +224,7 @@ try {
     async run() {
       await factoryReset({
         sync,
-        closeFolder: folder ? closeFolder : undefined,
+        forgetFolders: folderLibrary ? resetFolders : undefined,
         store,
         storage: localStorage,
       });
@@ -206,7 +239,7 @@ try {
           store={repository}
           initialSettings={settings}
           saveSettings={(next) => {
-            folderStore?.followTitles(next.fileNames === "title");
+            folderLibrary?.followTitles(next.fileNames === "title");
             const turnedOn = updateCheck === "off" && next.updateCheck === "daily";
             updateCheck = next.updateCheck;
             if (turnedOn) checkReleasesNow?.().catch(() => undefined);

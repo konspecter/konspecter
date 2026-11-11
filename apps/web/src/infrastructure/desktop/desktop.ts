@@ -116,14 +116,17 @@ export type FolderBridge = {
 /** Files changed outside the app (native event `folder-changed`). */
 export type FolderChange = { readonly paths: readonly string[]; readonly rescan: boolean };
 
-function parseFolderChange(value: unknown): FolderChange {
-  const { paths, rescan } = (typeof value === "object" && value !== null ? value : {}) as Record<
-    string,
-    unknown
-  >;
+/** The change if it concerns this folder; null for another folder's. */
+export function parseFolderChange(value: unknown, folder: string): FolderChange | null {
+  const {
+    folder: changed,
+    paths,
+    rescan,
+  } = (typeof value === "object" && value !== null ? value : {}) as Record<string, unknown>;
+  if (typeof changed === "string" && changed !== folder) return null;
   const valid = Array.isArray(paths) && paths.every((path) => typeof path === "string");
   // Anything unexpected is treated as "read everything again".
-  return valid && typeof rescan === "boolean"
+  return valid && typeof rescan === "boolean" && typeof changed === "string"
     ? { paths: paths, rescan }
     : { paths: [], rescan: true };
 }
@@ -153,71 +156,138 @@ function parseEntry(value: unknown): FileEntry {
   return { path, modifiedMs, size };
 }
 
-export const folderBridge: FolderBridge = {
-  async list() {
-    const value = await folderCommand("folder_list");
-    if (!Array.isArray(value)) throw new FolderError("invalid_response", "Invalid file list");
-    return value.map(parseEntry);
-  },
-  async readIgnore() {
-    const value = await folderCommand("folder_ignore_read");
-    if (typeof value !== "string") throw new FolderError("invalid_response", "Invalid rules");
-    return value;
-  },
-  async writeIgnore(text) {
-    await folderCommand("folder_ignore_write", { text });
-  },
-  async read(path) {
-    const value = (await folderCommand("folder_read", { path })) as Record<string, unknown> | null;
-    if (typeof value?.text !== "string") throw new FolderError("invalid_response", "Invalid file");
-    return { entry: parseEntry(value.entry), text: value.text };
-  },
-  async write(path, contents) {
-    return parseEntry(await folderCommand("folder_write", { path, contents }));
-  },
-  async createAt(path, contents) {
-    return parseEntry(await folderCommand("folder_create_at", { path, contents }));
-  },
-  async rename(from, to) {
-    return parseEntry(await folderCommand("folder_rename", { from, to }));
-  },
-  async removeEmptyFolder(path) {
-    await folderCommand("folder_remove_empty_dir", { path });
-  },
-  async trash(path) {
-    await folderCommand("folder_trash", { path });
-  },
-  async erase(path) {
-    await folderCommand("folder_delete", { path });
-  },
-  async openExternally(path) {
-    await folderCommand("folder_open_external", { path });
-  },
-  async reveal(path) {
-    await folderCommand("folder_reveal", { path });
-  },
-  async watch(onChange) {
-    const events = await import("@tauri-apps/api/event");
-    return events.listen("folder-changed", (event) => {
-      onChange(parseFolderChange(event.payload));
-    });
-  },
+/** The file operations of one connected folder, named by its id. */
+export function folderBridge(folder: string): FolderBridge {
+  const command = (name: string, args?: Record<string, unknown>) =>
+    folderCommand(name, { folder, ...args });
+  return {
+    async list() {
+      const value = await command("folder_list");
+      if (!Array.isArray(value)) throw new FolderError("invalid_response", "Invalid file list");
+      return value.map(parseEntry);
+    },
+    async readIgnore() {
+      const value = await command("folder_ignore_read");
+      if (typeof value !== "string") throw new FolderError("invalid_response", "Invalid rules");
+      return value;
+    },
+    async writeIgnore(text) {
+      await command("folder_ignore_write", { text });
+    },
+    async read(path) {
+      const value = (await command("folder_read", { path })) as Record<string, unknown> | null;
+      if (typeof value?.text !== "string")
+        throw new FolderError("invalid_response", "Invalid file");
+      return { entry: parseEntry(value.entry), text: value.text };
+    },
+    async write(path, contents) {
+      return parseEntry(await command("folder_write", { path, contents }));
+    },
+    async createAt(path, contents) {
+      return parseEntry(await command("folder_create_at", { path, contents }));
+    },
+    async rename(from, to) {
+      return parseEntry(await command("folder_rename", { from, to }));
+    },
+    async removeEmptyFolder(path) {
+      await command("folder_remove_empty_dir", { path });
+    },
+    async trash(path) {
+      await command("folder_trash", { path });
+    },
+    async erase(path) {
+      await command("folder_delete", { path });
+    },
+    async openExternally(path) {
+      await command("folder_open_external", { path });
+    },
+    async reveal(path) {
+      await command("folder_reveal", { path });
+    },
+    async watch(onChange) {
+      const events = await import("@tauri-apps/api/event");
+      return events.listen("folder-changed", (event) => {
+        const change = parseFolderChange(event.payload, folder);
+        if (change) onChange(change);
+      });
+    },
+  };
+}
+
+// --- The connected folders (native side: src-tauri/src/library.rs) ---
+
+/** A folder of the desktop library. */
+export type LibraryFolder = {
+  /** Stable for the folder's path; note ids start with it. */
+  readonly id: string;
+  /** The absolute path. */
+  readonly path: string;
+  /** The name the user gave it, shown instead of the folder's own. */
+  readonly alias: string | null;
+  /** When it was added, in milliseconds since the Unix epoch. */
+  readonly addedMs: number;
+  /** False while the folder cannot be opened (a disk not mounted, a folder moved away). */
+  readonly available: boolean;
 };
 
-/** The open folder's path, or null (app library). */
-export async function currentFolder(): Promise<string | null> {
-  const value = await folderCommand("folder_current");
-  return typeof value === "string" ? value : null;
+/** How a folder is named in the app: its alias, else its own name. */
+export function folderLabel(folder: Pick<LibraryFolder, "alias" | "path">): string {
+  if (folder.alias) return folder.alias;
+  const parts = folder.path.split(/[\\/]/).filter((part) => part !== "");
+  return parts.at(-1) ?? folder.path;
 }
 
-/** Shows the system folder picker. Returns the chosen path, or null if cancelled. */
-export async function pickFolder(): Promise<string | null> {
-  const value = await folderCommand("folder_pick");
-  return typeof value === "string" ? value : null;
+function parseLibraryFolder(value: unknown): LibraryFolder {
+  const { id, path, alias, addedMs, available } = (
+    typeof value === "object" && value !== null ? value : {}
+  ) as Record<string, unknown>;
+  if (
+    typeof id !== "string" ||
+    typeof path !== "string" ||
+    (alias !== null && alias !== undefined && typeof alias !== "string") ||
+    typeof addedMs !== "number" ||
+    typeof available !== "boolean"
+  ) {
+    throw new FolderError("invalid_response", "The desktop app returned an invalid folder");
+  }
+  return { id, path, alias: alias ?? null, addedMs, available };
 }
 
-export async function closeFolder(): Promise<void> {
-  await folderCommand("folder_close");
+/** The connected folders, in order. */
+export async function libraryFolders(): Promise<LibraryFolder[]> {
+  const value = await folderCommand("folders_list");
+  if (!Array.isArray(value)) throw new FolderError("invalid_response", "Invalid folder list");
+  return value.map(parseLibraryFolder);
+}
+
+/**
+ * Shows the system folder picker and connects the chosen folder. Null if
+ * cancelled; fails with "folder_connected" or "folder_overlaps" for a folder
+ * connected already, or inside or around a connected one.
+ */
+export async function addFolder(): Promise<LibraryFolder | null> {
+  const value = await folderCommand("folder_add");
+  return value === null || value === undefined ? null : parseLibraryFolder(value);
+}
+
+/** Disconnects a folder; its files stay where they are. */
+export async function removeFolder(folder: string): Promise<void> {
+  await folderCommand("folder_remove", { folder });
+}
+
+/** Names a folder for the app; null goes back to its own name. */
+export async function setFolderAlias(folder: string, alias: string | null): Promise<void> {
+  await folderCommand("folder_set_alias", { folder, alias });
+}
+
+/** Opens the folder itself in the system file manager. */
+export async function revealFolder(folder: string): Promise<void> {
+  await folderCommand("folder_reveal_root", { folder });
+}
+
+/** Forgets every folder (factory reset, a wipe): the next start is a first start. */
+export async function resetFolders(): Promise<void> {
+  await folderCommand("folders_reset");
 }
 
 /**

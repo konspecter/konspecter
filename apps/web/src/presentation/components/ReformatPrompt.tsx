@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import type { FolderReformat } from "../app/library";
+import { useEffect, useMemo, useState } from "react";
+import type { FolderReformat, LibraryControls } from "../app/library";
+import { useLibraryFolders } from "../hooks/use-library-folders";
 import { reportError } from "../app/errors";
 import { t, tn } from "../i18n/i18n";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -52,18 +53,38 @@ function rememberAsked(folder: string): void {
  * (ADR-013). Either answer is remembered for the folder; Settings can
  * reformat later.
  */
-export function ReformatPrompt({ folder, reformat }: { folder: string; reformat: FolderReformat }) {
+export function ReformatPrompt({
+  folder,
+  reformat,
+  onSettled,
+}: {
+  folder: string;
+  reformat: FolderReformat;
+  /** Nothing (more) to ask for this folder. */
+  onSettled?: () => void;
+}) {
   const [count, setCount] = useState(0);
   useEffect(() => {
-    if (wasAsked(folder)) return;
+    if (wasAsked(folder)) {
+      onSettled?.();
+      return;
+    }
     let current = true;
-    reformat.misplaced().then((paths) => {
-      if (current) setCount(paths.length);
-    }, reportError);
+    reformat.misplaced().then(
+      (paths) => {
+        if (!current) return;
+        setCount(paths.length);
+        if (paths.length === 0) onSettled?.();
+      },
+      (error: unknown) => {
+        reportError(error);
+        if (current) onSettled?.();
+      },
+    );
     return () => {
       current = false;
     };
-  }, [folder, reformat]);
+  }, [folder, reformat, onSettled]);
   if (count === 0) return null;
   return (
     <ReformatDialog
@@ -71,8 +92,28 @@ export function ReformatPrompt({ folder, reformat }: { folder: string; reformat:
       onAnswer={(yes) => {
         rememberAsked(folder);
         setCount(0);
+        onSettled?.();
         if (yes) reformat.apply().catch(reportError);
       }}
     />
+  );
+}
+
+/** Asks about each open folder in turn (`ReformatPrompt`), one question at a time. */
+export function ReformatPrompts({ library }: { library: LibraryControls }) {
+  const folders = useLibraryFolders(library).filter((folder) => folder.available);
+  const [index, setIndex] = useState(0);
+  const folder = folders[index];
+  const id = folder?.id;
+  const reformat = useMemo(() => (id === undefined ? null : library.reformat(id)), [library, id]);
+  const next = useMemo(
+    () => () => {
+      setIndex((current) => (current === index ? current + 1 : current));
+    },
+    [index],
+  );
+  if (!folder || !reformat) return null;
+  return (
+    <ReformatPrompt key={folder.id} folder={folder.path} reformat={reformat} onSettled={next} />
   );
 }

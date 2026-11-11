@@ -39,3 +39,19 @@ export async function restoreLocation(noteExists: (id: string) => Promise<boolea
   }
   window.history.replaceState(null, "", url.pathname + url.search);
 }
+
+/**
+ * Rewrites the remembered note's id (a desktop folder's file paths gained
+ * the folder's id). Anything else stays as it is.
+ */
+export function moveLastLocation(rewrite: (id: string) => string): void {
+  try {
+    const saved = localStorage.getItem(KEY);
+    const note = saved === null ? undefined : /^\/conspects\/([^/?#]+)(.*)$/.exec(saved);
+    if (!note?.[1]) return;
+    const id = rewrite(decodeURIComponent(note[1]));
+    localStorage.setItem(KEY, `/conspects/${encodeURIComponent(id)}${note[2] ?? ""}`);
+  } catch {
+    // A per-device convenience.
+  }
+}

@@ -127,6 +127,16 @@ export function FolderIcon() {
   );
 }
 
+/** A folder with a plus: connect another folder to the library. */
+export function AddFolderIcon() {
+  return (
+    <Icon>
+      <path d="M3.5 7a1.5 1.5 0 0 1 1.5-1.5h4l2 2.5h8a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 17.5z" />
+      <path d="M12 10.75v5.5M9.25 13.5h5.5" />
+    </Icon>
+  );
+}
+
 /** An open folder: an expanded tag. */
 export function FolderOpenIcon() {
   return (

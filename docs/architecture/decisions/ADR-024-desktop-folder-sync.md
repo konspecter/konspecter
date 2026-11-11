@@ -1,7 +1,9 @@
 # ADR-024: The desktop library is a folder, and sync covers it
 
 Status: accepted (2026-10-07). Supersedes [ADR-009](ADR-009-file-mode-and-sync.md) and amends
-[ADR-004](ADR-004-filesystem-mode.md).
+[ADR-004](ADR-004-filesystem-mode.md). Extended by
+[ADR-030](ADR-030-multiple-library-folders.md): the library is now one or several folders,
+and choosing another folder became adding one.
 
 ## Context
 

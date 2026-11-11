@@ -83,6 +83,7 @@ All planned phases are done. New work needs a new plan in `.claude/plans/`.
 | Quota      | Sync storage quota per account (env, `set-quota`), usage in %, in the terms | Done   |
 | Tag hints  | Tags suggested as `#x` is typed: search box and both editors (ADR-028)      | Done   |
 | Wipe       | Site: Disconnect and wipe a device; it erases its notes when online (029)   | Done   |
+| Folders    | Desktop: several folders at once, tree roots, Library table, aliases (030)  | Done   |
 
 Where the packages are described: UI architecture: `docs/architecture/ui.md`; languages:
 `docs/architecture/i18n.md`; server and API: `docs/architecture/server.md`; sync:
@@ -92,8 +93,8 @@ Where the packages are described: UI architecture: `docs/architecture/ui.md`; la
 tags (ADR-013), the account site and end-to-end encrypted sync (ADR-014 to ADR-017), connecting by
 QR code (ADR-019), published images (ADR-023), desktop folder sync (ADR-024), the key handed
 over by QR code (ADR-025), the canonical domain with an address per language (ADR-026),
-pins in the frontmatter (ADR-027), tags suggested as they are typed (ADR-028) and disconnecting
-and wiping a device (ADR-029).
+pins in the frontmatter (ADR-027), tags suggested as they are typed (ADR-028), disconnecting
+and wiping a device (ADR-029) and several library folders at once (ADR-030).
 
 ## Working rules
 
@@ -146,7 +147,8 @@ apps/site/                Account site: React Router (framework mode) with serve
   app/routes/             one module per page (loader, action, component)
 apps/mobile/              Capacitor 8 Android app around apps/web (android/: generated Gradle project)
 apps/desktop/             Tauri 2 desktop shell around apps/web
-  src-tauri/src/          Rust: lib.rs (commands), folder.rs (File Mode file access)
+  src-tauri/src/          Rust: lib.rs (commands), library.rs (the connected folders),
+                          folder.rs (File Mode file access)
 apps/server/              Go HTTP server (module konspecter/server)
   cmd/server/             entry point (serve, migrate, create-user, create-token, revoke-tokens,
                           set-quota)

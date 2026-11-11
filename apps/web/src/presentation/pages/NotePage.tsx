@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { InvalidDocumentError, updateMetadata } from "../../domain/document/document";
 import { readNote, withoutTag, type Note } from "../../domain/note/note";
 import type { EditorSelection, ReadingPositionMode } from "../../domain/reading/reading";
-import type { EditorMode } from "../../domain/settings/settings";
+import type { EditorMode, NewNoteFolder } from "../../domain/settings/settings";
 import { Autosave, savesSettled } from "../../application/notes/autosave";
 import { summarize, type NoteCatalog } from "../../application/notes/note-catalog";
 import { pinChanges, setStoredPin } from "../../application/notes/note-pins";
@@ -18,7 +18,11 @@ import { ErrorState } from "../components/ErrorState";
 import { Details } from "../components/details-slot";
 import { NoteDetails } from "../components/NoteDetails";
 import { NoteNotFound } from "../components/NoteNotFound";
-import { newNoteMarkdown } from "../components/new-note";
+import { newNoteFolder, newNoteMarkdown } from "../components/new-note";
+import { FolderChooser } from "../components/FolderChooser";
+import { AddFolderButton } from "../components/LibraryFolders";
+import type { LibraryControls } from "../app/library";
+import { useLibraryFolders } from "../hooks/use-library-folders";
 import { listFind, NoteFindContext } from "../components/note-find";
 import { TagSuggestContext } from "../components/tag-suggest";
 import { headingInHash, type HeadingTarget } from "../components/note-heading";
@@ -39,6 +43,10 @@ type NotePageProps = {
   mode: EditorMode;
   activity: Activity;
   readingPosition?: ReadingPositionMode;
+  /** Desktop: the connected folders, one of which a new note goes into. */
+  library?: LibraryControls | undefined;
+  /** With several folders: the open note's folder, or the one chosen each time. */
+  newNoteFolder?: NewNoteFolder;
 };
 
 /**
@@ -65,10 +73,13 @@ export function NotePage({
   mode,
   activity,
   readingPosition = "restore",
+  library,
+  newNoteFolder: placing = "open-note",
 }: NotePageProps) {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const openFolders = useLibraryFolders(library).filter((folder) => folder.available);
   const [adopted, setAdopted] = useState<Adopted | null>(null);
   // An adoption carries its session only over its own navigation. Gone to any
   // other note, it ends: the note it holds is the version as it was adopted,
@@ -125,6 +136,34 @@ export function NotePage({
 
   let note: Note | null;
   let selection: EditorSelection | null = null;
+  // A new note's folder (desktop): the one its state names, if it is open.
+  const where = newNoteFolder(location.state);
+  const folder = openFolders.some((f) => f.id === where.folder) ? where.folder : null;
+  if (id === undefined && library && openFolders.length === 0) {
+    return <NoFolder library={library} />;
+  }
+  if (id === undefined && placing === "ask" && openFolders.length > 1 && !where.chosen) {
+    return (
+      <FolderChooser
+        folders={openFolders}
+        suggested={folder}
+        onChoose={(chosen) => {
+          const state: unknown = location.state;
+          void navigate(".", {
+            replace: true,
+            state: {
+              ...(typeof state === "object" && state !== null ? state : {}),
+              folder: chosen,
+              folderChosen: true,
+            },
+          });
+        }}
+        onCancel={() => {
+          void navigate(-1);
+        }}
+      />
+    );
+  }
   if (id === undefined) {
     note = null;
   } else if (continued) {
@@ -152,8 +191,22 @@ export function NotePage({
       heading={heading}
       listQuery={listFind(location.state)}
       newMarkdown={id === undefined ? newNoteMarkdown(location.state) : ""}
+      newFolder={folder ?? undefined}
       onAdopt={adopt}
     />
+  );
+}
+
+/** A new note on a desktop without folders: there is nowhere to keep it yet. */
+function NoFolder({ library }: { library: LibraryControls }) {
+  return (
+    <section className="welcome" aria-labelledby="no-folder-title">
+      <h2 id="no-folder-title">{t("sidebar.newNote")}</h2>
+      <p>{t("newNote.noFolder")}</p>
+      <div className="actions">
+        <AddFolderButton library={library} label={t("welcome.addFolder")} primary />
+      </div>
+    </section>
   );
 }
 
@@ -172,6 +225,8 @@ type NoteSessionProps = {
   listQuery: string | null;
   /** The text a new note starts with: the tag the list was filtered by, or nothing. */
   newMarkdown: string;
+  /** Desktop: the folder a new note goes into; the first one without it. */
+  newFolder?: string | undefined;
   onAdopt: (note: Note) => void;
 };
 
@@ -186,6 +241,7 @@ function NoteSession({
   heading,
   listQuery,
   newMarkdown,
+  newFolder,
   onAdopt,
 }: NoteSessionProps) {
   const navigate = useNavigate();
@@ -216,24 +272,29 @@ function NoteSession({
   // `onAdopt` stays the same for a session: its key is the session's key.
   const [autosave] = useState(() => {
     let endActivity: (() => void) | null = null;
-    return new Autosave(store, initial, {
-      onSaved: (note) => {
-        setSaved(note);
-        setDeletedElsewhere(false); // Saving brought it back.
+    return new Autosave(
+      store,
+      initial,
+      {
+        onSaved: (note) => {
+          setSaved(note);
+          setDeletedElsewhere(false); // Saving brought it back.
+        },
+        onProblem: setProblem,
+        // The file was renamed after the title: the editing continues under the new id.
+        onRenamed: onAdopt,
+        onCreated: (note) => {
+          onAdopt(note);
+          // Now there is something worth keeping: ask the browser not to evict it.
+          void requestPersistence();
+        },
+        onBusy: (busy) => {
+          endActivity?.();
+          endActivity = busy ? activity.begin() : null;
+        },
       },
-      onProblem: setProblem,
-      // The file was renamed after the title: the editing continues under the new id.
-      onRenamed: onAdopt,
-      onCreated: (note) => {
-        onAdopt(note);
-        // Now there is something worth keeping: ask the browser not to evict it.
-        void requestPersistence();
-      },
-      onBusy: (busy) => {
-        endActivity?.();
-        endActivity = busy ? activity.begin() : null;
-      },
-    });
+      { folder: newFolder },
+    );
   });
 
   // Save whatever is pending when leaving the note, the page or the tab. Once

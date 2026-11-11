@@ -11,6 +11,7 @@ import {
   type MouseEvent,
   type ReactNode,
   type Ref,
+  type RefObject,
 } from "react";
 import { Link, useNavigate } from "react-router";
 import { tagTree, type TagNode } from "../../domain/tag/tags";
@@ -25,12 +26,22 @@ import { savesSettled } from "../../application/notes/autosave";
 import { recentWithPins } from "../../application/notes/note-pins";
 import type { TagNames, TreeHeadings } from "../../domain/settings/settings";
 import { formatKeys, SHORTCUTS } from "../app/shortcuts";
-import { ChevronIcon, GearIcon, NewNoteIcon, SidebarIcon } from "@konspecter/ui/icons";
+import {
+  AddFolderIcon,
+  ChevronIcon,
+  GearIcon,
+  NewNoteIcon,
+  SidebarIcon,
+} from "@konspecter/ui/icons";
+import { folderLabel, type LibraryControls, type LibraryFolder } from "../app/library";
+import { reportError } from "../app/errors";
+import { addFolderRefusal, revealFolderLabel } from "./LibraryFolders";
+import { useLibraryFolders } from "../hooks/use-library-folders";
 import type { NewNoteState } from "./new-note";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { summaryTitle } from "./note-title";
-import { TagTreeView, TreeDocument } from "./TagTreeView";
+import { FolderRoot, TagTreeView, TreeDocument } from "./TagTreeView";
 import { useFold, type FoldEdge } from "../hooks/use-fold";
 import { isNarrow, useNarrow } from "../hooks/use-narrow";
 import { useSlide } from "../hooks/use-slide";
@@ -41,6 +52,8 @@ import { rich } from "../i18n/rich";
 type SidebarProps = {
   store: NoteRepository;
   catalog: NoteCatalog;
+  /** Desktop: the connected folders; several are the tree's roots. */
+  library?: LibraryControls | undefined;
   open: boolean;
   /** The note open in the main area, if any. */
   currentNoteId: string | null;
@@ -58,8 +71,11 @@ type SidebarProps = {
   detailsRef?: (element: HTMLDivElement | null) => void;
 };
 
-/** The rows of the panes: the tag folders and notes of the tree, then the recent notes. */
-export const SIDEBAR_ROWS = "a.tree-label, a.tree-document, a.recent-link";
+/**
+ * The rows of the panes: the folders' roots (several folders), the tag
+ * folders and notes of the tree, then the recent notes.
+ */
+export const SIDEBAR_ROWS = "button.tree-root, a.tree-label, a.tree-document, a.recent-link";
 
 /** What ↑/↓ move between: the panes' headers and their rows. */
 const MOVE_TARGETS = `.pane-toggle, ${SIDEBAR_ROWS}`;
@@ -74,7 +90,7 @@ function rowOf(element: Element): HTMLElement | null {
   const row = element.closest<HTMLElement>(".tree-document, .recent-link, .tree-row, .pane-toggle");
   return row?.matches(".tree-document, .recent-link, .pane-toggle")
     ? row
-    : (row?.querySelector<HTMLElement>("a.tree-label") ?? null);
+    : (row?.querySelector<HTMLElement>("button.tree-root, a.tree-label") ?? null);
 }
 
 /** ↑/↓: the previous or next header or visible row, all the panes as one flat list. */
@@ -106,9 +122,11 @@ function focusClickedRow(event: MouseEvent<HTMLElement>): void {
 type RowMenu = {
   x: number;
   y: number;
-  row: HTMLAnchorElement;
+  row: HTMLElement;
   /** The note the row is (`data-note-id`); null for a folder or a heading. */
   noteId: string | null;
+  /** The connected folder the row is the root of (`data-folder-id`), if it is one. */
+  folderId: string | null;
 };
 
 /**
@@ -118,7 +136,7 @@ type RowMenu = {
 function rowMenuAt(event: MouseEvent<HTMLElement>): RowMenu | null {
   if (!(event.target instanceof Element)) return null;
   const row = rowOf(event.target);
-  if (!(row instanceof HTMLAnchorElement)) return null;
+  if (row === null || row.matches(".pane-toggle")) return null;
   let { clientX: x, clientY: y } = event;
   if (x === 0 && y === 0) {
     // From the keyboard, without a pointer: under the row.
@@ -126,11 +144,11 @@ function rowMenuAt(event: MouseEvent<HTMLElement>): RowMenu | null {
     x = box.left;
     y = box.bottom;
   }
-  return { x, y, row, noteId: row.dataset.noteId ?? null };
+  return { x, y, row, noteId: row.dataset.noteId ?? null, folderId: row.dataset.folderId ?? null };
 }
 
 /** The row's name, as its menu is named. */
-function rowName(row: HTMLAnchorElement): string {
+function rowName(row: HTMLElement): string {
   const label = row.matches(".tree-label") ? row : row.querySelector(".tree-label");
   return (label ?? row).textContent.trim();
 }
@@ -218,6 +236,7 @@ export function withShortcut(label: string, keys: string): string {
 export const Sidebar = memo(function Sidebar({
   store,
   catalog,
+  library: folderLibrary,
   open,
   currentNoteId,
   activeTag,
@@ -261,7 +280,21 @@ export const Sidebar = memo(function Sidebar({
     event.preventDefault();
     setMenu(next);
   };
+  const [addError, setAddError] = useState<unknown>(null);
+  const addErrorText = useErrorMessage(addError);
+  const addRefusal = addFolderRefusal(addError);
   const menuItems = (target: RowMenu): ContextMenuItem[] => {
+    const { folderId } = target;
+    if (folderId !== null && folderLibrary) {
+      return [
+        {
+          label: revealFolderLabel(),
+          onSelect: () => {
+            folderLibrary.reveal(folderId).catch(reportError);
+          },
+        },
+      ];
+    }
     const items: ContextMenuItem[] = [
       {
         label: t("sidebar.open"),
@@ -317,6 +350,20 @@ export const Sidebar = memo(function Sidebar({
         >
           <GearIcon />
         </Link>
+        {folderLibrary && (
+          <button
+            type="button"
+            className="icon-button"
+            aria-label={t("sidebar.addFolder")}
+            title={t("sidebar.addFolder")}
+            onClick={() => {
+              setAddError(null);
+              folderLibrary.add().catch(setAddError);
+            }}
+          >
+            <AddFolderIcon />
+          </button>
+        )}
         <Link
           to="/conspects/new"
           state={newNote}
@@ -332,6 +379,11 @@ export const Sidebar = memo(function Sidebar({
           {t("details.deleteFailed", { error: failureText })}
         </p>
       )}
+      {addError !== null && (
+        <p role="alert" className="inline-error sidebar-error">
+          {addRefusal ?? addErrorText}
+        </p>
+      )}
       <div
         className="sidebar-panes"
         data-recent={folded.has("recent") ? "folded" : "open"}
@@ -341,6 +393,7 @@ export const Sidebar = memo(function Sidebar({
       >
         <SidebarTags
           store={store}
+          folderLibrary={folderLibrary}
           library={library}
           untagged={untagged}
           activeTag={activeTag}
@@ -495,6 +548,8 @@ function SidebarPane({
 
 type SidebarTagsProps = {
   store: NoteRepository;
+  /** Desktop: the connected folders; with several, each is a root. */
+  folderLibrary?: LibraryControls | undefined;
   /** Changes whenever a note changes: the tags are read again then. */
   library: unknown;
   /** The notes without a tag, by title: at the tree's root. */
@@ -506,8 +561,133 @@ type SidebarTagsProps = {
   headings: boolean;
 };
 
-/** The tag tree: not a pane, so neither folded nor titled; it scrolls on its own. */
-function SidebarTags({
+const ROOTS_KEY = "konspecter.sidebar.roots";
+
+/** The folders' roots folded on this device. */
+function foldedRoots(): ReadonlySet<string> {
+  try {
+    const ids: unknown = JSON.parse(localStorage.getItem(ROOTS_KEY) ?? "[]");
+    return new Set(Array.isArray(ids) ? ids.filter((id) => typeof id === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function rememberFoldedRoots(folded: ReadonlySet<string>): void {
+  try {
+    localStorage.setItem(ROOTS_KEY, JSON.stringify([...folded]));
+  } catch {
+    // A per-device convenience; without storage every root opens again.
+  }
+}
+
+/**
+ * The tag tree: not a pane, so neither folded nor titled; it scrolls on its
+ * own. With several folders, each is a root holding its own tree (ADR-030).
+ */
+function SidebarTags(props: SidebarTagsProps) {
+  const folders = useLibraryFolders(props.folderLibrary);
+  const [folded, setFolded] = useState(foldedRoots);
+  const { folderLibrary } = props;
+  if (!folderLibrary || folders.length < 2) return <SingleTree {...props} />;
+  const toggle = (id: string, expanded: boolean) => {
+    const next = new Set(folded);
+    if (expanded) next.delete(id);
+    else next.add(id);
+    rememberFoldedRoots(next);
+    setFolded(next);
+  };
+  return (
+    <nav className="sidebar-pane tags-pane" aria-label={t("sidebar.tags")}>
+      <div className="sidebar-pane-body">
+        <ul className="tree">
+          {folders.map((folder) => (
+            <FolderRoot
+              key={folder.id}
+              id={folder.id}
+              label={folderLabel(folder)}
+              available={folder.available}
+              expanded={!folded.has(folder.id)}
+              onExpandedChange={(expanded) => {
+                toggle(folder.id, expanded);
+              }}
+            >
+              {(parent) => (
+                <FolderTree
+                  {...props}
+                  folderLibrary={folderLibrary}
+                  folder={folder}
+                  parent={parent}
+                />
+              )}
+            </FolderRoot>
+          ))}
+        </ul>
+      </div>
+    </nav>
+  );
+}
+
+/** One folder's tags and notes, under its root. */
+function FolderTree({
+  store,
+  folderLibrary,
+  folder,
+  parent,
+  library,
+  untagged,
+  activeTag,
+  currentNoteId,
+  tagNames,
+  headings,
+}: SidebarTagsProps & {
+  folderLibrary: LibraryControls;
+  folder: LibraryFolder;
+  parent: RefObject<HTMLElement | null>;
+}) {
+  const [tree, setTree] = useState<readonly TagNode[] | null>(null);
+  const loadNotes = useCallback(
+    (noteIds: readonly string[]) => notesInFolder(store, noteIds, { headings }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- library marks the change
+    [store, library, headings],
+  );
+  const notes = useMemo(
+    () => untagged.filter((note) => folderLibrary.folderOf(note.id) === folder.id),
+    [untagged, folderLibrary, folder.id],
+  );
+  useEffect(() => {
+    let current = true;
+    folderLibrary
+      .tags(folder.id)
+      .then((counts) => tagTree(counts, { capitalize: tagNames === "capitalized" }))
+      .then(
+        (next) => {
+          if (current) setTree(next);
+        },
+        () => undefined, // The tree is a convenience; the note list shows errors.
+      );
+    return () => {
+      current = false;
+    };
+  }, [folderLibrary, folder.id, library, tagNames]);
+
+  if (tree === null) return null;
+  return (
+    <TagTreeView
+      nodes={tree}
+      notes={notes}
+      activeTag={activeTag}
+      currentNoteId={currentNoteId}
+      headings={headings}
+      loadNotes={loadNotes}
+      depth={1}
+      parent={parent}
+    />
+  );
+}
+
+/** One folder, or the app library: the tags at the root. */
+function SingleTree({
   store,
   library,
   untagged,

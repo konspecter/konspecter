@@ -26,6 +26,8 @@ export type AutosaveOptions = {
    */
   createDelay?: number;
   now?: () => Date;
+  /** The desktop folder (its id) a new note is made in; the first one without it. */
+  folder?: string | undefined;
 };
 
 /** A text with nothing in it but, perhaps, a frontmatter block. */
@@ -85,6 +87,7 @@ export class Autosave {
   readonly #maxWait: number;
   readonly #createDelay: number;
   readonly #now: () => Date;
+  readonly #folder: string | undefined;
   /** The stored version this session last saw (loaded or written). */
   #base: Note | null;
   /** The editor text last written (or loaded), to skip saves that change nothing. */
@@ -118,6 +121,7 @@ export class Autosave {
     this.#maxWait = options.maxWait ?? 1000;
     this.#createDelay = options.createDelay ?? 2000;
     this.#now = options.now ?? (() => new Date());
+    this.#folder = options.folder;
   }
 
   /** The stored note being edited; null until a new note's first save. */
@@ -261,7 +265,10 @@ export class Autosave {
       // Nothing written yet: a frontmatter alone (the tag it started with) is not kept either.
       if (blank(markdown)) return;
       // The first save may catch the title half typed: the file follows it until closed.
-      const note = await this.#store.create(markdown, now, { followTitle: true });
+      const note = await this.#store.create(markdown, now, {
+        followTitle: true,
+        ...(this.#folder === undefined ? {} : { folder: this.#folder }),
+      });
       this.#adopt(note, markdown);
       if (this.#attached) this.#events.onCreated?.(note);
       return;

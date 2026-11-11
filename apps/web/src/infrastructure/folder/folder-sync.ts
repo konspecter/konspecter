@@ -11,12 +11,15 @@ import {
 import { FolderError } from "../desktop/desktop";
 import type { NoteStore, RemoteApplyResult, StoreChange } from "../storage/note-store";
 import type { SyncStore } from "../sync/sync-engine";
-import type { FolderStore } from "./folder-store";
+import type { FolderLibrary } from "./folder-library";
 
 /** One file's tie to a synced note, stored in IndexedDB (`links`) under the note's id. */
 export type FolderLink = {
   readonly noteId: string;
-  /** The file, relative to the folder; null once it was deleted (the deletion is queued). */
+  /**
+   * The file, as its note id in the library (`<folder id>/<path>`); null once
+   * it was deleted (the deletion is queued).
+   */
   readonly path: string | null;
   /** The server revision the file is based on; null if it never reached the server. */
   readonly baseRevision: number | null;
@@ -25,10 +28,12 @@ export type FolderLink = {
   readonly blocked: SyncBlock | null;
 };
 
-/** Which folder the links belong to, and whether it is still being matched with the server. */
+/** Which folders the links belong to, and whether one is still being matched with the server. */
 const STATE_KEY = "folderSync";
 
-type State = { readonly folder: string; readonly adopting: boolean };
+type State = { readonly folders: readonly string[]; readonly adopting: boolean };
+/** Before several folders: the one folder's path, and link paths without a folder id. */
+type OneFolderState = { readonly folder: string; readonly adopting: boolean };
 
 /**
  * Desktop: sync for a folder of Markdown files (ADR-024). The files stay as
@@ -37,16 +42,29 @@ type State = { readonly folder: string; readonly adopting: boolean };
  * synced is dirty, whoever changed it, and a linked file that is gone is a
  * deletion.
  *
- * A folder new to sync (another folder chosen, or a new account or key) is
- * **adopted**: until the first complete pull, files that never reached the
- * server wait, and a note pulled with the same text as such a file is linked
- * to it instead of written again. So a copy of the folder duplicates nothing.
+ * A folder new to sync (one connected, or a new account or key) is
+ * **adopted**: everything is pulled again, and until that pull is complete,
+ * files that never reached the server wait, and a note pulled with the same
+ * text as such a file is linked to it instead of written again. So a copy of
+ * a folder duplicates nothing.
+ *
+ * Every connected folder syncs (ADR-030). A note this device has no file for
+ * lands in the first folder. The links of a folder that is disconnected (or
+ * cannot be opened) are **dormant**: they push nothing, deletions included,
+ * and take nothing in, so the folder's notes stay as they are on the server
+ * and on other devices; connected again, the folder picks them up.
  */
 export class FolderSync implements SyncStore {
-  readonly #files: FolderStore;
+  readonly #files: FolderLibrary;
   /** Links, the sync cursor and the connection. */
   readonly #db: NoteStore;
-  readonly #folder: string;
+  /** The open folders, by id: links into any other folder are dormant. */
+  #active = new Set<string>();
+  /**
+   * Set when this start moved the links of a version with one folder to that
+   * folder's id: note ids that were paths are now `<id>/<path>`.
+   */
+  upgradedTo: string | null = null;
   readonly #links = new Map<string, FolderLink>();
   /** File path → note id. */
   readonly #byPath = new Map<string, string>();
@@ -55,20 +73,19 @@ export class FolderSync implements SyncStore {
   #adopting = false;
   #queue: Promise<unknown> = Promise.resolve();
 
-  private constructor(files: FolderStore, db: NoteStore, folder: string) {
+  private constructor(files: FolderLibrary, db: NoteStore) {
     this.#files = files;
     this.#db = db;
-    this.#folder = folder;
   }
 
   /**
-   * Loads the links of `folder` and squares them with its files: a file
+   * Loads the links and squares them with the open folders' files: a file
    * renamed while the app was closed keeps its link (found by its unchanged
    * text), a file that is gone queues its deletion, and a new file gets a
-   * link. Then follows the folder's changes.
+   * link. Then follows the folders' changes.
    */
-  static async open(files: FolderStore, db: NoteStore, folder: string): Promise<FolderSync> {
-    const sync = new FolderSync(files, db, folder);
+  static async open(files: FolderLibrary, db: NoteStore): Promise<FolderSync> {
+    const sync = new FolderSync(files, db);
     await sync.#load();
     files.onChange((change) => {
       void sync.#serial(() => sync.#onFileChange(change));
@@ -80,28 +97,84 @@ export class FolderSync implements SyncStore {
     for (const link of (await this.#db.folderLinks()).flatMap(parseLink)) this.#index(link);
     const state = parseState(await this.#db.loadMeta(STATE_KEY));
     this.#adopting = state?.adopting ?? false;
+    const known = state && "folder" in state ? await this.#upgrade(state.folder) : state?.folders;
+    // Listed first: a folder whose files cannot be read now is left out of
+    // the open ones, so its links wait (dormant) instead of queuing deletions.
     const files = await this.#files.list();
+    const open = this.#files.openFolders();
+    this.#active = new Set(open);
     const present = new Set(files.map((file) => file.id));
-    const linked = [...this.#links.values()].filter((link) => link.path !== null);
-    const foreign = state !== null && plainPath(state.folder) !== plainPath(this.#folder);
-    // A folder without any of its linked files is not one whose notes were all
-    // deleted: it is another folder (or one not there yet). Nothing is deleted.
-    const emptied = linked.length > 0 && linked.every((link) => !present.has(link.path ?? ""));
-    if (foreign || emptied) {
-      await this.#forgetLinks();
-    } else {
-      await this.#square(files);
+    let adopt = false;
+    for (const folder of open) {
+      // A folder without any of its linked files is not one whose notes were
+      // all deleted: it is another folder (or one not there yet). Nothing is
+      // deleted; it is adopted again.
+      const linked = [...this.#links.values()].filter(
+        (link) => link.path !== null && this.#folderOf(link.path) === folder,
+      );
+      const emptied = linked.length > 0 && linked.every((link) => !present.has(link.path ?? ""));
+      if (emptied)
+        await this.#save(
+          [],
+          linked.map((link) => link.noteId),
+        );
+      // A folder connected since the last start is new to sync.
+      if (emptied || (known !== undefined && !known.includes(folder))) adopt = true;
     }
+    if (adopt) await this.#adopt();
+    await this.#square(files);
     const unlinked = files.filter((file) => !this.#byPath.has(file.id));
     await this.#save(unlinked.map((file) => newLink(file.id)));
     await this.#saveState();
+  }
+
+  /**
+   * The links of a version with one folder: their paths gain the folder's
+   * id, and so do the files' reading positions, whether or not the folder
+   * opens now (a disk not mounted: its links then wait, dormant). Links of a
+   * folder no longer connected are forgotten, and everything is adopted
+   * again. The new state is saved at once, and every step skips what it has
+   * done already, so an upgrade cut short is finished at the next start, not
+   * done twice. Returns the folders synced so far.
+   */
+  async #upgrade(path: string): Promise<string[]> {
+    const folder = this.#files
+      .folders()
+      .find((candidate) => plainPath(candidate.path) === plainPath(path));
+    if (!folder) {
+      await this.#forgetLinks();
+      await this.#db.saveMeta(STATE_KEY, { folders: [], adopting: true } satisfies State);
+      return [];
+    }
+    const prefix = `${folder.id}/`;
+    const links = [...this.#links.values()].filter(
+      (link) => link.path !== null && !link.path.startsWith(prefix),
+    );
+    await this.#save(links.map((link) => ({ ...link, path: `${prefix}${link.path ?? ""}` })));
+    await this.#db.renameReadingKeys("file:", `file:${prefix}`);
+    await this.#db.saveMeta(STATE_KEY, {
+      folders: [folder.id],
+      adopting: this.#adopting,
+    } satisfies State);
+    this.upgradedTo = folder.id;
+    return [folder.id];
+  }
+
+  /** The folder a link's file is in. */
+  #folderOf(path: string): string {
+    return this.#files.folderOf(path) ?? "";
+  }
+
+  /** A link into a folder that is not open: it neither pushes nor takes anything in. */
+  #dormant(link: FolderLink): boolean {
+    return link.path !== null && !this.#active.has(this.#folderOf(link.path));
   }
 
   /** Links whose files are gone: renamed (same text elsewhere) or deleted. */
   async #square(files: readonly Note[]): Promise<void> {
     const present = new Set(files.map((file) => file.id));
     const missing = [...this.#links.values()].filter(
-      (link) => link.path !== null && !present.has(link.path),
+      (link) => link.path !== null && !this.#dormant(link) && !present.has(link.path),
     );
     if (missing.length === 0) return;
     // Unlinked files by the hash of their text; one rename takes each.
@@ -131,21 +204,27 @@ export class FolderSync implements SyncStore {
     this.#links.clear();
     this.#byPath.clear();
     await this.#db.clearFolderLinks();
+    await this.#adopt();
+  }
+
+  /** A folder is new to sync: everything is pulled again and matched with the files. */
+  async #adopt(): Promise<void> {
     await this.#db.setSyncCursor(0);
     this.#adopting = true;
   }
 
   /**
-   * The device was wiped from the site: deletes every file sync covers, for
-   * good, and forgets the links. Other files in the folder stay. Every file
-   * is tried; the first failure is thrown at the end. Returns how many went.
+   * The device was wiped from the site: deletes every file sync covers in
+   * the connected folders, for good, and forgets the links. Other files in
+   * the folders stay, and so do disconnected folders. Every file is tried;
+   * the first failure is thrown at the end. Returns how many went.
    */
   wipeFiles(): Promise<number> {
     return this.#serial(async () => {
       let deleted = 0;
       let failure: Error | null = null;
       for (const link of this.#links.values()) {
-        if (link.path === null) continue;
+        if (link.path === null || this.#dormant(link)) continue;
         try {
           await this.#files.erase(link.path);
           deleted += 1;
@@ -272,7 +351,11 @@ export class FolderSync implements SyncStore {
 
   syncEntries(): Promise<SyncEntry[]> {
     return this.#serial(() =>
-      Promise.all([...this.#links.values()].map((link) => this.#entry(link))),
+      Promise.all(
+        [...this.#links.values()]
+          .filter((link) => !this.#dormant(link))
+          .map((link) => this.#entry(link)),
+      ),
     );
   }
 
@@ -317,6 +400,8 @@ export class FolderSync implements SyncStore {
         await this.#linkSynced(remote, path);
         return "applied";
       }
+      // A disconnected folder's note waits as it is, for the folder to come back.
+      if (this.#dormant(link)) return "unchanged";
       const entry = await this.#entry(link);
       if (entry.baseRevision === remote.revision && !entry.dirty) return "unchanged";
       if (entry.dirty && entry.deleted && remote.deleted) {
@@ -336,7 +421,7 @@ export class FolderSync implements SyncStore {
   applyResolution(noteId: string, resolution: Resolution): Promise<void> {
     return this.#serial(async () => {
       const link = this.#links.get(noteId);
-      if (!link) return;
+      if (!link || this.#dormant(link)) return;
       const { remote } = resolution;
       if (resolution.kind === "keep-local") {
         const baseRevision = remote.revision > 0 ? remote.revision : null;
@@ -481,7 +566,7 @@ export class FolderSync implements SyncStore {
 
   #saveState(): Promise<void> {
     return this.#db.saveMeta(STATE_KEY, {
-      folder: this.#folder,
+      folders: [...this.#active],
       adopting: this.#adopting,
     } satisfies State);
   }
@@ -530,9 +615,12 @@ function parseLink(value: unknown): FolderLink[] {
   }
 }
 
-function parseState(value: unknown): State | null {
+function parseState(value: unknown): State | OneFolderState | null {
   if (typeof value !== "object" || value === null) return null;
-  const { folder, adopting } = value as Record<string, unknown>;
+  const { folder, folders, adopting } = value as Record<string, unknown>;
+  if (Array.isArray(folders) && folders.every((id) => typeof id === "string")) {
+    return { folders, adopting: adopting === true };
+  }
   return typeof folder === "string" ? { folder, adopting: adopting === true } : null;
 }
 

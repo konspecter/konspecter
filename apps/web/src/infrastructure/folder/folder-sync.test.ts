@@ -4,6 +4,7 @@ import { mustGet } from "../storage/test-utils";
 import { FakeServer, TEST_PASSPHRASE } from "../sync/fake-server";
 import { SyncEngine, type Scheduler } from "../sync/sync-engine";
 import { FakeFolder } from "./fake-folder";
+import { FolderLibrary } from "./folder-library";
 import { FolderStore } from "./folder-store";
 import { FolderSync, plainPath } from "./folder-sync";
 
@@ -30,27 +31,59 @@ function engineFor(store: FolderSync | NoteStore, server: FakeServer) {
 }
 
 type Desktop = {
+  /** The first folder, and its store (ids are paths in it). */
   folder: FakeFolder;
-  db: NoteStore;
   files: FolderStore;
+  library: FolderLibrary;
+  db: NoteStore;
   sync: FolderSync;
   engine: SyncEngine;
 };
 
-/** The desktop app: a folder, synced. Reopening the same database and folder is a restart. */
+type Connected = {
+  readonly id: string;
+  readonly path: string;
+  readonly folder: FakeFolder;
+  /** False: on the list, but it cannot be opened (a disk not mounted). */
+  readonly available?: boolean;
+};
+
+/**
+ * The desktop app: its folders, synced. Reopening the same database and
+ * folders is a restart; `more` connects further folders after the first.
+ */
 async function desktop(
   server: FakeServer,
   {
     folder = new FakeFolder(),
     db,
+    id = "home",
     path = HOME,
-  }: { folder?: FakeFolder; db?: NoteStore; path?: string } = {},
+    more = [],
+  }: {
+    folder?: FakeFolder;
+    db?: NoteStore;
+    id?: string;
+    path?: string;
+    more?: readonly Connected[];
+  } = {},
 ): Promise<Desktop> {
   const database = db ?? (await openNoteStore(uniqueName()));
-  const files = new FolderStore(folder, database, { graceMs: 5 });
-  await files.watch();
-  const sync = await FolderSync.open(files, database, path);
-  return { folder, db: database, files, sync, engine: engineFor(sync, server) };
+  const connected = [{ id, path, folder }, ...more].map((c: Connected) => {
+    const available = c.available ?? true;
+    return {
+      folder: { id: c.id, path: c.path, alias: null, addedMs: 0, available },
+      store: available
+        ? new FolderStore(c.folder, database, { graceMs: 5, readingPrefix: `file:${c.id}/` })
+        : null,
+    };
+  });
+  const library = new FolderLibrary(connected, { setAlias: () => Promise.resolve() });
+  await library.watch();
+  const sync = await FolderSync.open(library, database);
+  const files = connected[0]?.store;
+  if (!files) throw new Error("no folder");
+  return { folder, files, library, db: database, sync, engine: engineFor(sync, server) };
 }
 
 /** The web or mobile app: the app library. */
@@ -299,21 +332,241 @@ describe("FolderSync", () => {
     expect(await d.db.folderLinks()).toEqual([]);
   });
 
-  it("starts over with another folder", async () => {
+  it("moves the links of one folder to its id, uploading nothing again", async () => {
+    const server = new FakeServer();
+    const d = await desktop(server);
+    d.folder.edit("java.md", "# Java");
+    await d.files.refresh();
+    await connected(d.engine);
+    await d.files.saveReadingPosition("java.md", 0.3);
+    d.engine.stop();
+    // What a version with one folder kept: paths without an id, and the folder's path.
+    const links = (await d.db.folderLinks()) as { noteId: string; path: string }[];
+    await d.db.saveFolderLinks(links.map((link) => ({ ...link, path: link.path.slice(5) })));
+    await d.db.saveMeta("folderSync", { folder: HOME, adopting: false });
+    await d.db.renameReadingKeys("file:home/", "file:");
+    const requests = server.requests.length;
+
+    const upgraded = await desktop(server, { folder: d.folder, db: d.db });
+    await upgraded.engine.start();
+
+    expect(upgraded.sync.upgradedTo).toBe("home");
+    expect(await d.db.folderLinks()).toEqual([expect.objectContaining({ path: "home/java.md" })]);
+    expect(await d.db.loadMeta("folderSync")).toEqual({ folders: ["home"], adopting: false });
+    expect(await upgraded.files.readingState("java.md")).toMatchObject({ position: 0.3 });
+    expect(server.requests.slice(requests).filter((r) => r.startsWith("P"))).toEqual([]);
+    expect(liveNotes(server)).toHaveLength(1);
+    upgraded.engine.stop();
+  });
+
+  it("finishes an upgrade cut short without doing it twice", async () => {
+    const server = new FakeServer();
+    const d = await desktop(server);
+    d.folder.edit("java.md", "# Java");
+    await d.files.refresh();
+    await connected(d.engine);
+    await d.files.saveReadingPosition("java.md", 0.3);
+    d.engine.stop();
+    // Links and positions moved already, the state not yet: the start stopped there.
+    await d.db.saveMeta("folderSync", { folder: HOME, adopting: false });
+    const requests = server.requests.length;
+
+    const again = await desktop(server, { folder: d.folder, db: d.db });
+    await again.engine.start();
+
+    expect(await d.db.folderLinks()).toEqual([expect.objectContaining({ path: "home/java.md" })]);
+    expect(await again.files.readingState("java.md")).toMatchObject({ position: 0.3 });
+    expect(server.requests.slice(requests).filter((r) => r.startsWith("P"))).toEqual([]);
+    expect(liveNotes(server)).toHaveLength(1);
+    again.engine.stop();
+  });
+
+  it("keeps the one folder of an earlier version that cannot be opened now", async () => {
     const server = new FakeServer();
     const d = await desktop(server);
     d.folder.edit("java.md", "# Java");
     await d.files.refresh();
     await connected(d.engine);
     d.engine.stop();
+    const links = (await d.db.folderLinks()) as { noteId: string; path: string }[];
+    await d.db.saveFolderLinks(links.map((link) => ({ ...link, path: link.path.slice(5) })));
+    await d.db.saveMeta("folderSync", { folder: HOME, adopting: false });
+    const requests = server.requests.length;
+
+    // The disk is not mounted: the old folder is listed, not found, after another one.
+    const other = new FakeFolder();
+    const unmounted = await desktop(server, {
+      folder: other,
+      db: d.db,
+      id: "notes",
+      path: "/Users/ada/Notes",
+      more: [{ id: "home", path: HOME, folder: d.folder, available: false }],
+    });
+    await unmounted.engine.start();
+
+    expect(unmounted.sync.upgradedTo).toBe("home");
+    expect(await d.db.folderLinks()).toEqual([expect.objectContaining({ path: "home/java.md" })]);
+    expect(other.files.size).toBe(0);
+    expect(server.requests.slice(requests).filter((r) => r.startsWith("P"))).toEqual([]);
+    unmounted.engine.stop();
+
+    // Mounted again, it syncs as before: nothing is uploaded twice.
+    const mounted = await desktop(server, { folder: d.folder, db: d.db });
+    await mounted.engine.start();
+    expect(liveNotes(server)).toHaveLength(1);
+    expect([...d.folder.files.keys()]).toEqual(["java.md"]);
+    mounted.engine.stop();
+  });
+
+  it("deletes nothing of a folder whose files cannot be read at the start", async () => {
+    const server = new FakeServer();
+    const work = new FakeFolder();
+    work.edit("go.md", "# Go");
+    const workFolder = { id: "work", path: "/Users/ada/Work", folder: work };
+    const d = await desktop(server, { more: [workFolder] });
+    d.folder.edit("java.md", "# Java");
+    await d.files.refresh();
+    await connected(d.engine);
+    d.engine.stop();
+
+    const failing = vi.spyOn(work, "list").mockRejectedValue(new Error("share gone"));
+    const restarted = await desktop(server, { folder: d.folder, db: d.db, more: [workFolder] });
+    await restarted.engine.start();
+
+    expect(liveNotes(server)).toHaveLength(2);
+    expect(work.files.has("go.md")).toBe(true);
+    expect(await d.db.folderLinks()).toContainEqual(
+      expect.objectContaining({ path: "work/go.md" }),
+    );
+    restarted.engine.stop();
+    failing.mockRestore();
+  });
+
+  it("starts over when the one folder of an earlier version is not connected", async () => {
+    const server = new FakeServer();
+    const d = await desktop(server);
+    d.folder.edit("java.md", "# Java");
+    await d.files.refresh();
+    await connected(d.engine);
+    d.engine.stop();
+    const links = (await d.db.folderLinks()) as { noteId: string; path: string }[];
+    await d.db.saveFolderLinks(links.map((link) => ({ ...link, path: link.path.slice(5) })));
+    await d.db.saveMeta("folderSync", { folder: "/Users/ada/Elsewhere", adopting: false });
 
     const other = new FakeFolder();
-    const moved = await desktop(server, { folder: other, db: d.db, path: "/Users/ada/Notes" });
+    const moved = await desktop(server, { folder: other, db: d.db, id: "notes" });
     await moved.engine.start();
 
+    expect(moved.sync.upgradedTo).toBeNull();
     expect(liveNotes(server)).toHaveLength(1);
     expect([...other.files.values()].map((file) => file.text)).toEqual(["# Java"]);
     moved.engine.stop();
+  });
+
+  it("syncs a folder connected next to another, duplicating nothing", async () => {
+    const server = new FakeServer();
+    const d = await desktop(server);
+    d.folder.edit("java.md", "# Java");
+    await d.files.refresh();
+    await connected(d.engine);
+    d.engine.stop();
+    const requests = server.requests.length;
+
+    const work = new FakeFolder();
+    work.edit("go.md", "# Go");
+    work.edit("java-copy.md", "# Java"); // The same text as a synced note: a new note all the same.
+    const both = await desktop(server, {
+      folder: d.folder,
+      db: d.db,
+      more: [{ id: "work", path: "/Users/ada/Work", folder: work }],
+    });
+    await both.engine.start();
+
+    expect(
+      liveNotes(server)
+        .map((note) => note.markdown)
+        .sort(),
+    ).toEqual(["# Go", "# Java", "# Java"]);
+    expect(server.requests.slice(requests).filter((r) => r.startsWith("P"))).toHaveLength(2);
+    expect([...d.folder.files.keys()]).toEqual(["java.md"]);
+    expect(await d.db.loadMeta("folderSync")).toEqual({
+      folders: ["home", "work"],
+      adopting: false,
+    });
+    both.engine.stop();
+  });
+
+  it("writes notes new to this device in the first folder", async () => {
+    const server = new FakeServer();
+    const work = new FakeFolder();
+    const d = await desktop(server, {
+      more: [{ id: "work", path: "/Users/ada/Work", folder: work }],
+    });
+    const web = await library(server);
+    await web.store.put(createNote("# Postgres", date, "n1"));
+    await connected(web.engine);
+
+    await connected(d.engine);
+
+    expect([...d.folder.files.keys()]).toEqual(["postgres.md"]);
+    expect(work.files.size).toBe(0);
+  });
+
+  it("leaves a disconnected folder's notes as they are, here and on the server", async () => {
+    const server = new FakeServer();
+    const work = new FakeFolder();
+    work.edit("go.md", "# Go");
+    const workFolder = { id: "work", path: "/Users/ada/Work", folder: work };
+    const d = await desktop(server, { more: [workFolder] });
+    d.folder.edit("java.md", "# Java");
+    await d.files.refresh();
+    await connected(d.engine);
+    d.engine.stop();
+    const go = liveNotes(server).find((note) => note.markdown === "# Go");
+
+    // Work is disconnected; meanwhile its note is edited on another device.
+    const alone = await desktop(server, { folder: d.folder, db: d.db });
+    await alone.engine.start();
+    const web = await library(server);
+    await connected(web.engine);
+    const pulled = await mustGet(web.store, go?.id ?? "");
+    await web.store.put(updateNote(pulled, "# Go\n\nEdited elsewhere", minutesLater(1)));
+    await web.engine.syncNow();
+    await alone.engine.syncNow();
+
+    expect(liveNotes(server)).toHaveLength(2);
+    expect([...d.folder.files.keys()]).toEqual(["java.md"]);
+    expect(work.files.get("go.md")?.text).toBe("# Go");
+    expect(work.trashed).toEqual([]);
+    alone.engine.stop();
+
+    // Connected again, the folder takes the edit in and uploads nothing new.
+    const again = await desktop(server, { folder: d.folder, db: d.db, more: [workFolder] });
+    await again.engine.start();
+
+    expect(liveNotes(server)).toHaveLength(2);
+    expect(work.files.get("go.md")?.text).toContain("Edited elsewhere");
+    expect([...d.folder.files.keys()]).toEqual(["java.md"]);
+    again.engine.stop();
+  });
+
+  it("wipes the connected folders only", async () => {
+    const server = new FakeServer();
+    const work = new FakeFolder();
+    work.edit("go.md", "# Go");
+    const d = await desktop(server, {
+      more: [{ id: "work", path: "/Users/ada/Work", folder: work }],
+    });
+    d.folder.edit("java.md", "# Java");
+    await d.files.refresh();
+    await connected(d.engine);
+    d.engine.stop();
+
+    const alone = await desktop(server, { folder: d.folder, db: d.db });
+    expect(await alone.sync.wipeFiles()).toBe(1);
+
+    expect(d.folder.erased).toEqual(["java.md"]);
+    expect(work.files.has("go.md")).toBe(true);
   });
 });
 

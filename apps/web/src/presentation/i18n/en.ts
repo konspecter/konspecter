@@ -32,8 +32,20 @@ export const en = {
   "sidebar.noNotes": "No conspects yet.",
   "sidebar.open": "Open",
   "sidebar.delete": "Delete",
+  "sidebar.addFolder": "Add folder",
+  "library.reveal.mac": "Show in Finder",
+  "library.reveal.windows": "Show in Explorer",
+  "library.reveal.other": "Show in Files",
+  "library.unavailable": "{folder} (cannot be opened)",
+  "library.connected": "This folder is connected already.",
+  "library.overlaps":
+    "This folder is inside a connected folder, or holds one. Add folders that do not overlap.",
+  "newNote.chooseTitle": "Where should the new conspect go?",
+  "newNote.noFolder": "Add a folder first: Konspecter keeps every conspect as a file in one.",
   "tree.expand": "Expand #{tag}",
   "tree.collapse": "Collapse #{tag}",
+  "tree.expandFolder": "Expand {folder}",
+  "tree.collapseFolder": "Collapse {folder}",
   "tree.expandHeadings": "Show the headings of {title}",
   "tree.collapseHeadings": "Hide the headings of {title}",
   "tree.expandHeading": "Expand {heading}",
@@ -160,8 +172,10 @@ export const en = {
     "Have conspects already? Import {md} files or a folder in {settings}, where you can also connect sync.",
   "welcome.settings": "Settings",
   "welcome.folder":
-    "Your conspects are kept as Markdown files in {folder}. Keep this folder, or choose another one: a folder of {md} files you already have works too.",
-  "welcome.chooseFolder": "Choose another folder…",
+    "Your conspects are kept as Markdown files in {folder}. Add another folder to work in more than one: a folder of {md} files you already have works too.",
+  "welcome.noFolder":
+    "Konspecter keeps every conspect as a {md} file in a folder on this computer. Add a folder to start: a new one, or one of Markdown files you already have.",
+  "welcome.addFolder": "Add a folder…",
   "welcome.keys": "Keys to start with. {help} shows them all.",
   "welcome.exampleNote": `# Welcome to Konspecter
 
@@ -272,6 +286,10 @@ source, or delete this conspect when you are done.
   "settings.reading.restore": "Continue where I left off",
   "settings.reading.ask": "Ask before jumping",
   "settings.reading.off": "Always start at the top",
+  "settings.newNoteFolder": "New conspects",
+  "settings.newNoteFolder.hint": "Which folder a new conspect goes into, with more than one.",
+  "settings.newNoteFolder.openNote": "Open conspect's folder",
+  "settings.newNoteFolder.ask": "Ask each time",
   "settings.fileNames": "File names",
   "settings.fileNames.hint":
     "New conspects get files named after their titles, like hello-mir.md for “Hello мир!”.",
@@ -303,17 +321,31 @@ source, or delete this conspect when you are done.
   "settings.checkNow.failed": "Could not reach GitHub. Try again later.",
   "settings.checkNow.button": "Check now",
   "settings.library": "Library",
-  "settings.library.none":
-    "Konspecter keeps every conspect as a {md} file in a folder, but could not open one. Choose a folder to work in.",
-  "settings.library.open": "Choose a folder…",
-  "settings.library.change": "Change folder…",
   "settings.library.folder":
-    "Every conspect is a Markdown file in {folder}, where any file manager or editor can open it. Changes are saved to the files; deleted conspects go to the system trash.",
+    "Every conspect is a Markdown file in one of these folders, where any file manager or editor can open it. Changes are saved to the files; deleted conspects go to the system trash.",
+  "settings.library.path": "Path",
+  "settings.library.added": "Date added",
+  "settings.library.actions": "Actions",
+  "settings.library.unavailable":
+    "Cannot be opened: the folder was moved, its disk is not connected, or its files cannot be read.",
+  "settings.library.empty":
+    "No folder is connected. Add a folder of {md} files to keep your conspects in.",
+  "settings.library.add": "Add folder…",
+  "settings.library.alias": "Alias…",
+  "settings.library.remove": "Remove",
+  "settings.library.removeTitle": "Remove {folder} from Konspecter?",
+  "settings.library.removeMessage":
+    "Konspecter stops showing and syncing the conspects in {path}. Nothing is deleted: the files and folders stay where they are, and the conspects stay on your other devices. You can add the folder again at any time.",
+  "settings.library.aliasTitle": "Alias for {folder}",
+  "settings.library.aliasLabel": "Alias",
+  "settings.library.aliasHint":
+    "Shown instead of the folder's name. Leave it empty to show the name.",
+  "settings.library.aliasSave": "Save",
   "settings.library.folderSync":
-    "Sync covers this folder: conspects from your other devices are written here as files, and the files you change here, in Konspecter or in another program, go to them. When a conspect is edited in two places, the later edit wins.",
+    "Sync covers every folder: the files you change here, in Konspecter or in another program, go to your other devices, and conspects new to this device are written into the first folder. When a conspect is edited in two places, the later edit wins.",
   "settings.library.folders":
     "The folders follow the tags: a conspect is kept in the folder of its first tag, so #java#collections is java/collections/.",
-  "settings.library.reformat": "Reformat the folder…",
+  "settings.library.reformat": "Reformat the folders…",
   "settings.library.nothingToReformat": "Every conspect with tags is in its tags' folder already.",
   "settings.library.reformatted": {
     one: "Moved {count} conspect into its tags' folder.",
@@ -367,6 +399,7 @@ source, or delete this conspect when you are done.
     "What Konspecter skips in this folder: it neither reads nor watches it, and makes no conspect there. Kept in the folder as {file}, so other programs see it too.",
   "ignore.syntax":
     "Written like .gitignore: one pattern per line, {hidden} for hidden files and folders, {negate} to bring a file back, {comment} for a comment.",
+  "ignore.whichFolder": "Folder",
   "ignore.label": "Rules ({file})",
   "ignore.save": "Save",
   "ignore.default": "Restore default",

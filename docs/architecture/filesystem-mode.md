@@ -1,7 +1,8 @@
 # File Mode (desktop)
 
-On the desktop, the library is a real folder of Markdown files
-([ADR-004](decisions/ADR-004-filesystem-mode.md), [ADR-024](decisions/ADR-024-desktop-folder-sync.md)):
+On the desktop, the library is real folders of Markdown files, one or several
+([ADR-004](decisions/ADR-004-filesystem-mode.md), [ADR-024](decisions/ADR-024-desktop-folder-sync.md),
+[ADR-030](decisions/ADR-030-multiple-library-folders.md)):
 every conspect is a file the user can see in Finder or Explorer. The files are the only copy
 of the notes on the device. Other programs (VS Code, Vim, Obsidian, Git) can read and change
 them, Konspecter reads and writes them in place, and sync carries them to the other devices.
@@ -13,16 +14,34 @@ them, Konspecter reads and writes them in place, and sync carries them to the ot
 └── networking.md
 ```
 
-## The folder
+## The folders
 
-- **`~/Konspecter`** by default, made on first start: in the home folder, not hidden, and
-  outside iCloud's Documents folder. The shell falls back to it whenever no folder was
-  chosen, or the chosen one is gone.
-- Settings → **Library** → **Change folder…**, or **Choose another folder…** on the welcome
-  of an empty library, shows the system folder picker, opened in the folder in use (so
-  confirming at once keeps it); the app reloads on the chosen folder, which is remembered by
-  the desktop shell (`folder.json` in the app's config directory). The files of the previous
-  folder are not touched.
+- **`~/Konspecter`** is connected on the very first start, made if needed: in the home
+  folder, not hidden, and outside iCloud's Documents folder.
+- **More folders** are added with the folder-with-a-plus button in the sidebar, Settings →
+  **Library** → **Add folder…**, or **Add a folder…** on the welcome. Each shows the system
+  folder picker; the app then reloads with the new folder. The desktop shell remembers the
+  list (`folders.json` in the app's config directory: path, alias, date added).
+  - A folder connected already is refused, and so is one inside a connected folder, or
+    holding one.
+  - A folder's **id** is a hash of its path, so the same folder connected again keeps it.
+- **Settings → Library** is a table of the folders (path, date added). Each row can be
+  shown in Finder, Explorer or Files, given an **alias** (shown instead of the folder's
+  name), or **removed**.
+  - Removing a folder only disconnects it, the default folder included: its files and
+    folders stay where they are.
+  - A list left empty stays empty: the default folder is not made again, and the app asks
+    for a folder before anything can be written.
+  - A folder that cannot be opened, or whose files cannot be read just now, stays listed as
+    one that cannot be opened; the other folders work on.
+  - `folders.json` is written atomically; one that cannot be read is put aside as
+    `folders.unreadable.json`, never overwritten.
+- **One folder** looks as before. **Several** are the roots of the sidebar's tree, each with
+  its own tags and notes. A new note goes into the open note's folder (the first folder with
+  none open), or the folder is asked for each time (Settings → New conspects).
+- An earlier version's single folder (`folder.json`) moves into the list once, keeping its
+  links, reading positions and the last location, even when it cannot be opened at that
+  start (a disk not mounted).
 - **The app library moves in once.** On the first start after the desktop became
   folder-only, the notes of the app library (IndexedDB) are written into the folder (or
   linked to a file with the same text), keeping their sync ids and state, and leave the
@@ -31,7 +50,7 @@ them, Konspecter reads and writes them in place, and sync carries them to the ot
 
 ## Sync
 
-Sync covers the folder (`infrastructure/folder/folder-sync.ts`, `FolderSync`, the engine's
+Sync covers every connected folder (`infrastructure/folder/folder-sync.ts`, `FolderSync`, the engine's
 `SyncStore` port; [sync](sync.md#the-desktop-folder)). The files stay plain Markdown; the
 app's database keeps a **link** per file: the server's note id, the path, the base revision
 and the SHA-256 of the text last synced.
@@ -44,30 +63,40 @@ and the SHA-256 of the text last synced.
 - **Pulls are files:** a note from elsewhere is written in its first tag chain's folder,
   named after its title (numbered if taken), a changed one is written over and moved when
   its chain changed, and a deleted one goes to the trash. Open editors take them in place.
-- **Adoption:** another folder, account or key starts over: until the first complete pull,
-  files that never reached the server wait, and a pulled note with exactly their text links
-  to them rather than being written again. A copy of the folder duplicates nothing.
+- **Several folders:** a note new to this device is written into the first folder. A
+  removed folder's links are **dormant**: they push nothing and take nothing in, so its notes
+  stay as they are on the server and the other devices, and connected again it uploads
+  nothing twice.
+- **Adoption:** a folder new to sync (connected, connected again, back from a disk), an
+  account or a key starts over: everything is pulled again, until then files that never
+  reached the server wait, and a pulled note with exactly their text links to them rather
+  than being written again. A copy of a folder duplicates nothing.
 - **An emptied folder deletes nothing:** one with none of its linked files on start is
-  adopted, and the notes are written back into it. Deleting files while the app runs does
+  adopted again, and its notes are written back into the first folder. Deleting files while the app runs does
   delete them everywhere, and so does an ignore rule that leaves them out.
 
 ## How it works
 
 ```text
-pages ─→ NoteRepository ─┬─ NoteStore    (IndexedDB, synced)       — app library
-   (application/notes/)  └─ FolderStore  (folder on disk)          — File Mode
-                                   │ desktop bridge (TypeScript, validated)
-                                   ▼
-                          Rust commands (src-tauri/src/folder.rs)
+pages ─→ NoteRepository ─┬─ NoteStore     (IndexedDB, synced)      — app library
+   (application/notes/)  └─ FolderLibrary (connected folders)      — File Mode
+                                 └─ FolderStore per folder
+                                       │ desktop bridge, one per folder (validated)
+                                       ▼
+                          Rust commands (src-tauri/src/folder.rs, library.rs)
 ```
 
 - **`NoteRepository`** (`application/notes/`) is the port every page uses. Both backends
   implement it, and neither knows about the other.
-- **`FolderStore`** (`infrastructure/folder/`) reads every `.md` file into an in-memory
-  cache and derives the tag index and the search index from it, just as the app library
-  derives its indexes from notes. A note's **id is its path** relative to the folder (for
-  example `databases/postgres.md`). Reading positions are kept in the app's database
-  under `file:<path>`, never in the files.
+- **`FolderStore`** (`infrastructure/folder/`) reads every `.md` file of one folder into an
+  in-memory cache and derives its tags from it, just as the app library derives its indexes
+  from notes. Its ids are paths relative to the folder (`databases/postgres.md`).
+- **`FolderLibrary`** puts the connected folders together. A note's **id is its folder's id
+  and its path** (`9c1f0a7e3b2d4c58/databases/postgres.md`). It routes every call to the
+  note's folder, counts tags across them (and per folder, for the tree's roots), searches
+  every folder in one index, and makes new notes in the folder asked for, else the first.
+  Reading positions are kept in the app's database under `file:<folder id>/<path>`, never
+  in the files.
 - **Metadata** is parsed from each file's frontmatter, exactly as for library notes.
   Files without frontmatter are fine. Without an `updated` date, a file is ordered by its
   modification time. Saving from the app stamps `created`/`updated` into the frontmatter,
@@ -190,7 +219,7 @@ rules in `domain/note/folders.ts`): a note's folder is its **first tag chain**.
 - **Reformatting:** when a folder opens with files that have tags but sit elsewhere
   (`misplaced`), the app asks once for that folder whether to reformat the collection
   (`ReformatPrompt`); yes moves them into their chains' folders (`reformat`). Settings →
-  Library → _Reformat the folder…_ asks again at any time.
+  Library → _Reformat the folders…_ asks again at any time.
 
 ## External editors
 
@@ -219,26 +248,35 @@ Konspecter  ⇄  ~/Notes/java.md  ⇄  VS Code / Vim / Neovim / …
 
 ## The native side (Rust)
 
-`src-tauri/src/folder.rs`, exposed as commands in `lib.rs`:
+`src-tauri/src/library.rs` (the list of folders) and `src-tauri/src/folder.rs` (one
+folder's files), exposed as commands in `lib.rs`. Every file command takes the folder's id
+(`folder`) and a path inside it; the `folder-changed` event says which folder changed.
 
-| Command                          | Does                                                                                                                                                  |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `folder_pick`                    | system folder picker; opens and remembers the folder                                                                                                  |
-| `folder_current`, `folder_close` | the open folder, or none                                                                                                                              |
-| `folder_list`                    | every `.md` file the ignore rules do not skip, recursively, sorted by path                                                                            |
-| `folder_ignore_read`             | the folder's `.konspecterignore`, or the default without one                                                                                          |
-| `folder_ignore_write`            | writes `.konspecterignore` atomically; listing and watching follow it at once                                                                         |
-| `folder_read`                    | a file's text and entry (path, modification time, size)                                                                                               |
-| `folder_write`                   | atomic write (temporary file + rename); refuses with `changed_on_disk` if the file changed since `expectedModifiedMs`                                 |
-| `folder_create_at`               | a new file at exactly the given path, making its folders; `exists` if it is taken (never overwrites)                                                  |
-| `folder_rename`                  | renames a file, into other folders too (made as needed), never over another one (`exists`); a change of case only works on case-insensitive disks too |
-| `folder_remove_empty_dir`        | removes a folder left empty (but for a `.DS_Store`), then its parents left empty                                                                      |
-| `folder_trash`                   | moves the file to the system trash                                                                                                                    |
+| Command                         | Does                                                                                                                                                  |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `folders_list`                  | the connected folders: id, path, alias, date added, whether it opens                                                                                  |
+| `folder_add`                    | system folder picker; connects the folder (`folder_connected`, `folder_overlaps` refused) and watches it                                              |
+| `folder_remove`                 | disconnects a folder and stops watching it; no file is touched                                                                                        |
+| `folder_set_alias`              | names a folder (trimmed, 100 characters at most); empty goes back to its name                                                                         |
+| `folder_reveal_root`            | opens the folder itself in the system file manager                                                                                                    |
+| `folders_reset`                 | forgets the list (factory reset, a wipe): the next start is a first start                                                                             |
+| `folder_list`                   | every `.md` file the ignore rules do not skip, recursively, sorted by path                                                                            |
+| `folder_ignore_read`            | the folder's `.konspecterignore`, or the default without one                                                                                          |
+| `folder_ignore_write`           | writes `.konspecterignore` atomically; listing and watching follow it at once                                                                         |
+| `folder_read`                   | a file's text and entry (path, modification time, size)                                                                                               |
+| `folder_write`                  | atomic write (temporary file + rename), over whatever is there: the last write wins                                                                   |
+| `folder_create_at`              | a new file at exactly the given path, making its folders; `exists` if it is taken (never overwrites)                                                  |
+| `folder_rename`                 | renames a file, into other folders too (made as needed), never over another one (`exists`); a change of case only works on case-insensitive disks too |
+| `folder_remove_empty_dir`       | removes a folder left empty (but for a `.DS_Store`), then its parents left empty                                                                      |
+| `folder_trash`, `folder_delete` | moves the file to the system trash; deletes it for good (a wiped device)                                                                              |
+| `folder_open_external`          | opens the file in the system's default app for `.md`                                                                                                  |
+| `folder_reveal`                 | shows the file in the system file manager                                                                                                             |
 
 ### Safety
 
-- **Only the native folder picker can choose the folder.** The web app passes only relative
-  paths, so it cannot aim file access anywhere else, even if script were injected.
+- **Only the native folder picker can add a folder.** The web app passes only a folder's id
+  and paths relative to it, so it cannot aim file access anywhere else, even if script were
+  injected.
 - Every path is validated: no `..`, no absolute or drive paths, no backslashes, `.md` only.
   Its **real** location (symlinks resolved) must be inside the folder. New files and renames
   never land where the ignore rules skip.
@@ -250,8 +288,12 @@ Konspecter  ⇄  ~/Notes/java.md  ⇄  VS Code / Vim / Neovim / …
 
 ## Tests
 
+- Rust unit tests (`library.rs`) on temporary folders: stable ids, the first start, a list
+  left empty, the move from `folder.json`, a folder that cannot be opened, overlapping
+  folders refused (a difference in case on macOS too), removing that leaves the files, and
+  aliases.
 - Rust unit tests (`folder.rs`) on temporary folders: path validation, symlink escape,
-  recursive listing, atomic write, the changed-on-disk refusal, unique names, exact-path
+  recursive listing, atomic write, unique names, exact-path
   creation and renames that never overwrite (a change of case included), folders made for
   new paths (never through a symlink out) and removed only when empty, invalid
   UTF-8, size limits, watcher path classification, the ignore rules (default, the folder's own,

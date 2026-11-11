@@ -135,6 +135,24 @@ The desktop application uses a real folder of Markdown files:
 
 They can be opened alongside the tools you already use — VS Code, Vim, Git, other Markdown tools. Konspecter should fit into your workflow, not lock you into its own database format.
 
+#### Several folders at once
+
+Keep a personal folder, a work folder and a Git repository of notes side by side. Add a
+folder with the folder-with-a-plus button next to Settings in the sidebar, or in
+**Settings → Library → Add folder…**. With more than one, each folder is a root of the
+sidebar's tree, holding its own tags and conspects; fold the ones you don't need, or
+right-click one to show it in Finder, Explorer or Files.
+
+**Settings → Library** lists your folders with the date each was added. From there you can
+show a folder in your file manager, give it an alias (shown instead of its name), or remove
+it. Removing a folder only disconnects Konspecter from it: its files and folders stay where
+they are, and its conspects stay on your other devices. Any folder can be removed, the
+default one too, and added again later.
+
+Sync covers every folder. A new conspect goes into the folder of the conspect you have open,
+or Konspecter asks each time (**Settings → New conspects**). Conspects that arrive from your
+other devices and are new to this one go into the first folder in the list.
+
 Make the desktop window narrow and the sidebar steps aside; make it wide again and the sidebar
 comes back. If you hid the sidebar yourself, it stays hidden at any width.
 
@@ -260,8 +278,9 @@ Conspects are stored in:
 ~/Konspecter
 ```
 
-**Settings → Library → Change folder…** lets you choose another folder, as does the welcome
-while the folder is empty.
+**Settings → Library → Add folder…** connects more folders, and the same table lets you
+remove one, the default too, without touching its files (see
+[Several folders at once](#several-folders-at-once)).
 
 ### Android
 

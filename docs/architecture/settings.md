@@ -13,6 +13,7 @@ apply and are saved immediately.
 | Editing area     | Highlighted, Plain (see [editors](editors.md))       | Highlighted                                    |
 | Tag names        | Capital first letter, As written in notes            | Capital first letter                           |
 | File names       | Keep when the title changes, Rename after the title  | Keep                                           |
+| New conspects    | Open conspect's folder, Ask each time                | Open conspect's folder                         |
 | New versions     | Check daily, Don't check (desktop only)              | Check daily                                    |
 | Ignored files    | `.konspecterignore` rules, written like `.gitignore` | `.*`, `node_modules`, `vendors`, `dist`, `bin` |
 
@@ -45,9 +46,16 @@ are not synced. A separate strategy can be added with sync if needed.
   render; a change applies at once, without a reload (`App` renders its routes again, keyed
   by the language). Language names are shown in their own language.
 
-- **File names** (shown only while a Markdown folder is open): `main.tsx` passes it to
+- **File names** (desktop only): `main.tsx` passes it to every folder's
   `FolderStore.followTitles`, at start and on every change. See
   [File Mode](filesystem-mode.md#file-names).
+
+- **New conspects** (`newNoteFolder`, shown only with several folders connected): where a new
+  note goes. With _Open conspect's folder_, the layout puts the open note's folder in the new
+  note's router state (`newNoteState`), and the first folder is used with none open. With
+  _Ask each time_, the new note's page first asks for a folder (`FolderChooser`). The note
+  page hands the folder to `Autosave`, which creates the note there
+  ([ADR-030](decisions/ADR-030-multiple-library-folders.md)).
 
 - **New versions** (desktop only, under App): `main.tsx` keeps the value, and the release
   check asks it before every check, so _Don't check_ stops the next request at once and
@@ -58,8 +66,8 @@ are not synced. A separate strategy can be added with sync if needed.
 
 - **Ignored files:** a text box with Save and Restore default, not saved per keystroke. In
   the app library the rules are this setting, and a folder import skips what they match
-  ([import](import-export.md)). With a Markdown folder open they are the folder's own
-  `.konspecterignore` file instead, read and written through `FolderStore`
-  ([File Mode](filesystem-mode.md#ignored-files)).
+  ([import](import-export.md)). On the desktop they are a folder's own `.konspecterignore`
+  file instead, read and written through its `FolderStore`; with several folders, a list
+  above the box picks the folder ([File Mode](filesystem-mode.md#ignored-files)).
 
 If saving fails, the change still applies for the session and the page says so.

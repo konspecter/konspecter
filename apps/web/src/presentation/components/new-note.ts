@@ -15,18 +15,45 @@ export function treeChain(state: unknown): string | null {
     : null;
 }
 
-/** A new note's router state: the tag chain it starts with. */
-export type NewNoteState = { readonly newNoteTag: string };
+/**
+ * A new note's router state: the tag chain it starts with, and on the
+ * desktop the folder (its id) it goes into; `folderChosen` once the folder
+ * was asked for (the "ask each time" setting).
+ */
+export type NewNoteState = {
+  readonly newNoteTag?: string;
+  readonly folder?: string;
+  readonly folderChosen?: true;
+};
 
 /**
  * What a new note starts with while the list is filtered by `activeTag`:
  * the chain of the folder it was chosen in, when the list's `state` says it
- * was chosen in the tree, else the tag alone. Nothing without a filter.
+ * was chosen in the tree, else the tag alone. On the desktop, `folder` is
+ * the open note's folder, where it goes. Nothing without either.
  */
-export function newNoteState(activeTag: string | null, state: unknown): NewNoteState | undefined {
-  if (activeTag === null) return undefined;
+export function newNoteState(
+  activeTag: string | null,
+  state: unknown,
+  folder: string | null = null,
+): NewNoteState | undefined {
   const chain = treeChain(state);
-  return { newNoteTag: chain?.split("#").at(-1) === activeTag ? chain : activeTag };
+  const tag =
+    activeTag === null
+      ? {}
+      : { newNoteTag: chain?.split("#").at(-1) === activeTag ? chain : activeTag };
+  const where = folder === null ? {} : { folder };
+  return activeTag === null && folder === null ? undefined : { ...tag, ...where };
+}
+
+/** The folder a new note goes into, from its router state, and whether it was chosen. */
+export function newNoteFolder(state: unknown): { folder: string | null; chosen: boolean } {
+  if (typeof state !== "object" || state === null) return { folder: null, chosen: false };
+  const { folder, folderChosen } = state as Record<string, unknown>;
+  return {
+    folder: typeof folder === "string" && folder !== "" ? folder : null,
+    chosen: folderChosen === true,
+  };
 }
 
 /**

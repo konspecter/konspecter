@@ -174,32 +174,47 @@ stream, and the real server.
 
 ## The desktop folder
 
-On the desktop the notes are the files of a folder ([File Mode](filesystem-mode.md)), and
-the engine syncs them through `FolderSync` (`infrastructure/folder/folder-sync.ts`) instead
-of `NoteStore`: both implement the engine's `SyncStore` port, with server note ids
-([ADR-024](decisions/ADR-024-desktop-folder-sync.md)).
+On the desktop the notes are the files of the connected folders
+([File Mode](filesystem-mode.md)), and the engine syncs them through `FolderSync`
+(`infrastructure/folder/folder-sync.ts`) instead of `NoteStore`: both implement the engine's
+`SyncStore` port, with server note ids ([ADR-024](decisions/ADR-024-desktop-folder-sync.md),
+[ADR-030](decisions/ADR-030-multiple-library-folders.md)).
 
 ```text
-FolderStore (files) ⇄ FolderSync (links in IndexedDB `links`) ⇄ SyncEngine ⇄ ApiClient ⇄ …
+FolderLibrary (folders of files) ⇄ FolderSync (links in IndexedDB `links`) ⇄ SyncEngine ⇄ …
 ```
 
 - **Links** (schema v6), one per file, keyed by note id: `{ noteId, path, baseRevision,
-syncedHash, blocked }`. `path` is null while a deletion is queued; `syncedHash` is the
-  SHA-256 of the text last pushed or pulled.
+syncedHash, blocked }`. `path` is the file's id in the library (`<folder id>/<path>`), null
+  while a deletion is queued; `syncedHash` is the SHA-256 of the text last pushed or pulled.
+  The `folderSync` record in `meta` lists the folders synced so far and whether one is being
+  adopted.
 - **Sync entries are derived:** dirty when the file's text hashes differently (or the file
   is gone), so edits from any program queue the note. `FolderSync` follows `FolderStore`'s
   changes (renames move the link, new files get one, missing files queue a deletion) and
   tells the engine, which starts a cycle as after a local save.
-- **Pulled notes** are written with `FolderStore.receive` (exact text, placed and named like
+- **Pulled notes** are written with `FolderLibrary.receive` (exact text, placed and named like
   a new note; moved when the chain changes) and `remove` (to the trash), as remote changes.
-- **Adoption:** `resetSync` (another account or key) and a different folder clear the
-  revisions and the cursor. Until the cycle's pull is complete, `pendingSync` leaves out
+  A note this device has no file for goes into the first folder.
+- **Dormant links:** a link into a folder that is not open (removed, not found, or its files
+  unreadable when the app started) is left
+  out of the sync entries and answers every pull with "unchanged", deletions included. The
+  folder's notes stay as they are on the server and on other devices; connected again, it
+  takes their changes in and uploads nothing twice.
+- **Adoption:** `resetSync` (another account or key) clears the revisions and the cursor; a
+  folder new to sync (connected, connected again, back) sets the cursor back to 0 and keeps
+  the other folders' links. Until the cycle's pull is complete, `pendingSync` leaves out
   files that never reached the server; a pulled note whose text equals such a file takes it
   over. The engine then hears from `pulled()` that they are released and pushes them in
   the same cycle.
 - On start (`FolderSync.open`), links are squared with the files: a link whose file moved
   while the app was closed follows the same text; one whose file is gone queues a deletion;
-  if none of the linked files is there, the folder is adopted instead and nothing is deleted.
+  if none of a folder's linked files is there, its links are forgotten and it is adopted
+  again: nothing is deleted.
+- **Upgrade:** a database from the one-folder version (`folderSync` = `{ folder }`) has its
+  link paths and the files' reading positions prefixed with that folder's id, once (also
+  when that folder cannot be opened then; the state is saved at once, and an upgrade cut
+  short is finished, not repeated), and pushes nothing again; `upgradedTo` tells `main.tsx` to move the last location too.
 
 ## UI
 

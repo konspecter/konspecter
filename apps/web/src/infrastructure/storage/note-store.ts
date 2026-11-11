@@ -443,6 +443,26 @@ export class NoteStore implements NoteRepository {
     await Promise.all([tx.store.put(next, noteId), tx.done]);
   }
 
+  /**
+   * Moves every reading state whose key starts with `from` to the same key
+   * starting with `to` instead (the desktop folder's files gained their
+   * folder's id). Keys that start with `to` already stay, so it can run again.
+   */
+  async renameReadingKeys(from: string, to: string): Promise<void> {
+    const tx = this.#db.transaction("reading", "readwrite");
+    const keys = await tx.store.getAllKeys(IDBKeyRange.bound(from, `${from}\uffff`));
+    for (const key of keys) {
+      if (key.startsWith(to)) continue; // Moved already.
+      const renamed = `${to}${key.slice(from.length)}`;
+      const record: unknown = await tx.store.get(key);
+      await tx.store.delete(key);
+      if (typeof record === "object" && record !== null) {
+        await tx.store.put({ ...record, noteId: renamed }, renamed);
+      }
+    }
+    await tx.done;
+  }
+
   /** The saved settings, with defaults for anything missing or invalid. */
   async loadSettings(): Promise<Settings> {
     return parseSettings(await this.#db.get("meta", "settings"));

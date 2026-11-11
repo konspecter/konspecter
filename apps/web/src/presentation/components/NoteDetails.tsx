@@ -151,7 +151,7 @@ export function NoteDetails({
     } else {
       rows.push([t("details.frontmatter"), t("details.unreadable")]);
     }
-    if (store.reveal) rows.push([t("details.file"), note.id]);
+    if (store.reveal) rows.push([t("details.file"), store.fileOf?.(note.id) ?? note.id]);
   }
 
   return (

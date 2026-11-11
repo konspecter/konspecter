@@ -8,6 +8,7 @@ import {
   type EditorMode,
   type FileNames,
   type Language,
+  type NewNoteFolder,
   type Settings,
   type TagNames,
   type TreeHeadings,
@@ -22,10 +23,11 @@ import {
 import { appInfo, isDesktop, openInBrowser } from "../../infrastructure/desktop/desktop";
 import type { SyncEngine } from "../../infrastructure/sync/sync-engine";
 import { useErrorMessage } from "../hooks/use-error-message";
+import { useLibraryFolders } from "../hooks/use-library-folders";
 import { SyncSettings } from "../components/SyncSettings";
 import { ImportExport } from "../components/ImportExport";
-import { FolderIgnoreSettings, IgnoreSettings } from "../components/IgnoreSettings";
-import { ReformatDialog } from "../components/ReformatPrompt";
+import { IgnoreSettings, LibraryIgnoreSettings } from "../components/IgnoreSettings";
+import { LibraryFolders } from "../components/LibraryFolders";
 import { BackupRecovery } from "../components/BackupRecovery";
 import { ShortcutList } from "../components/ShortcutsDialog";
 import { FactoryResetSettings } from "../components/FactoryResetSettings";
@@ -35,8 +37,7 @@ import type { LibraryControls } from "../app/library";
 import { reportError } from "../app/errors";
 import type { CheckForRelease } from "../app/updates";
 import { useAsync } from "../hooks/use-async";
-import { LOCALE_NAMES, LOCALES, t, tn, type TextKey } from "../i18n/i18n";
-import { rich } from "../i18n/rich";
+import { LOCALE_NAMES, LOCALES, t, type TextKey } from "../i18n/i18n";
 
 type SettingsPageProps = {
   settings: Settings;
@@ -96,6 +97,10 @@ function options() {
       { value: "kept", label: t("settings.fileNames.kept") },
       { value: "title", label: t("settings.fileNames.title") },
     ] satisfies Option<FileNames>[],
+    newNoteFolders: [
+      { value: "open-note", label: t("settings.newNoteFolder.openNote") },
+      { value: "ask", label: t("settings.newNoteFolder.ask") },
+    ] satisfies Option<NewNoteFolder>[],
     updateChecks: [
       { value: "daily", label: t("settings.updateCheck.daily") },
       { value: "off", label: t("settings.updateCheck.off") },
@@ -122,6 +127,7 @@ export function SettingsPage({
   const saveErrorText = useErrorMessage(saveError);
   const choices = options();
   const { hash } = useLocation();
+  const folders = useLibraryFolders(library);
 
   // A link to a group (/settings#sync, from the welcome) opens on it.
   useEffect(() => {
@@ -219,8 +225,19 @@ export function SettingsPage({
         )}
         {sync && <SyncSettings sync={sync} />}
         <Group title={t("settings.group.files")}>
-          {library && <LibrarySettings library={library} />}
-          {library?.folder != null && (
+          {library && <LibraryFolders library={library} />}
+          {folders.length > 1 && (
+            <Choice
+              legend={t("settings.newNoteFolder")}
+              hint={t("settings.newNoteFolder.hint")}
+              options={choices.newNoteFolders}
+              value={settings.newNoteFolder}
+              onChange={(value) => {
+                update("newNoteFolder", value);
+              }}
+            />
+          )}
+          {library && (
             <Choice
               legend={t("settings.fileNames")}
               hint={t("settings.fileNames.hint")}
@@ -232,12 +249,10 @@ export function SettingsPage({
             />
           )}
           {!isDesktop() && <OfflineStorage />}
-          {store && library?.folder == null && (
-            <ImportExport store={store} ignore={settings.ignore} />
-          )}
-          {store && library?.folder == null && <BackupRecovery store={store} />}
-          {library?.ignore ? (
-            <FolderIgnoreSettings ignore={library.ignore} />
+          {store && !library && <ImportExport store={store} ignore={settings.ignore} />}
+          {store && !library && <BackupRecovery store={store} />}
+          {library ? (
+            <LibraryIgnoreSettings library={library} />
           ) : (
             <IgnoreSettings
               saved={settings.ignore}
@@ -494,103 +509,5 @@ function CheckNow({ check }: { check: CheckForRelease }) {
         </button>
       </div>
     </div>
-  );
-}
-
-function LibrarySettings({ library }: { library: LibraryControls }) {
-  const [busy, setBusy] = useState(false);
-  /** How many files the reformat question is about, while it is asked. */
-  const [asking, setAsking] = useState<number | null>(null);
-  const { reformat } = library;
-  const [message, setMessage] = useState<string | null>(null);
-  const [failure, setFailure] = useState<unknown>(null);
-  const failureText = useErrorMessage(failure);
-
-  function run(action: () => Promise<string | null>) {
-    setBusy(true);
-    setFailure(null);
-    setMessage(null);
-    action().then(
-      (result) => {
-        setMessage(result);
-        setBusy(false);
-      },
-      (error: unknown) => {
-        setFailure(error);
-        setBusy(false);
-      },
-    );
-  }
-
-  return (
-    <section className="setting-block" aria-labelledby="library-heading">
-      <h3 id="library-heading" className="setting-heading">
-        {t("settings.library")}
-      </h3>
-      {library.folder === null ? (
-        <p className="setting-hint">{rich("settings.library.none", { md: <code>.md</code> })}</p>
-      ) : (
-        <>
-          <p className="setting-hint">
-            {rich("settings.library.folder", { folder: <strong>{library.folder}</strong> })}
-          </p>
-          <p className="setting-hint">{t("settings.library.folderSync")}</p>
-          <p className="setting-hint">{t("settings.library.folders")}</p>
-        </>
-      )}
-      <div className="actions">
-        <button
-          type="button"
-          className="button"
-          disabled={busy}
-          onClick={() => {
-            run(async () => {
-              await library.chooseFolder();
-              return null;
-            });
-          }}
-        >
-          {t(library.folder === null ? "settings.library.open" : "settings.library.change")}
-        </button>
-        {reformat && (
-          <button
-            type="button"
-            className="button"
-            disabled={busy}
-            onClick={() => {
-              run(async () => {
-                const { length } = await reformat.misplaced();
-                if (length === 0) return t("settings.library.nothingToReformat");
-                setAsking(length);
-                return null;
-              });
-            }}
-          >
-            {t("settings.library.reformat")}
-          </button>
-        )}
-      </div>
-      {reformat && asking !== null && (
-        <ReformatDialog
-          count={asking}
-          onAnswer={(yes) => {
-            setAsking(null);
-            if (yes) {
-              run(async () => tn("settings.library.reformatted", await reformat.apply()));
-            }
-          }}
-        />
-      )}
-      {message && (
-        <p role="status" className="setting-hint">
-          {message}
-        </p>
-      )}
-      {failureText !== null && (
-        <p role="alert" className="inline-error">
-          {failureText}
-        </p>
-      )}
-    </section>
   );
 }

@@ -8,7 +8,7 @@ The interface speaks English and Russian ([i18n](i18n.md)). The account site sha
 
 ```text
 ┌─ Sidebar ─────────────┬─ Top bar: ≡ [‹ › search ]  (theme) (mode)           (antenna) ─┐
-│ ☰         ⚙  ✎        ├────────────────────────────────────────────────────────────────┤
+│ ☰      ⚙  ⊞  ✎        ├────────────────────────────────────────────────────────────────┤
 │ › Tags (tree)         │                                                                │
 │ ───────────────────── │   Main content: note list · editor · settings                  │
 │ › Recent (last edit)  │                                                                │
@@ -20,10 +20,17 @@ The interface speaks English and Russian ([i18n](i18n.md)). The account site sha
 - Two panels over the whole window (`components/Layout.tsx`): the sidebar is sticky at full
   height and scrolls on its own; the page scrolls under a sticky top bar (so the reading
   position keeps using the window's scroll). No app header, brand or menu.
-- **Sidebar** (`Sidebar.tsx`): toggle, Settings, New note; the tag tree, always open and
+- **Sidebar** (`Sidebar.tsx`): toggle, Settings, on the desktop Add folder (a folder with a
+  plus, ⊞ above: the system folder picker; a refused folder is said in the sidebar), New note;
+  the tag tree, always open and
   without a header (a navigation landmark named Goto; tags as folders, notes as documents inside them and untagged ones at the
   root; a tag's name opens `/?q=#tag`, see [tags](tags.md); a note with headings holds its
-  outline, see [Headings in the tree](#headings-in-the-tree)); recent notes, those created or edited in the last 7 days (`recentNotes`; "No activity in 7
+  outline, see [Headings in the tree](#headings-in-the-tree)). With several desktop folders
+  ([ADR-030](decisions/ADR-030-multiple-library-folders.md)), each is a root of the tree
+  (`FolderRoot`): its alias or name, folding on a click or ←/→, holding that folder's tags
+  and untagged notes; its context menu shows the folder in Finder, Explorer or Files. The
+  folded roots are remembered per device (`konspecter.sidebar.roots`). With one folder the
+  tree has no root; recent notes, those created or edited in the last 7 days (`recentNotes`; "No activity in 7
   days" when there are none), most recently edited first, with the open
   one marked. Above them the pinned notes, as StarCraft's unit groups: on a note
   `Mod+Alt+1`…`Mod+Alt+0` pins it to that key (the same keys again unpin it), and `Mod+1`…`Mod+0`
@@ -198,6 +205,13 @@ breakpoint in the CSS), in the browser, the PWA and the Android app alike.
   above the island on small screens); Enter or a click takes one, which becomes a chip. The
   layout hands the suggester (`tagSuggester` over the catalog) down through a context, so the
   editors offer the same tags; the note page leaves its own note's tags out.
+- **Settings → Library** (desktop, `LibraryFolders.tsx`): the connected folders as a table
+  with Path and Date added, striped like a zebra (every other row in the page's colour on the
+  tinted panel), each row's actions on the right: Show in Finder (Explorer, Files), Alias…
+  (`AliasDialog`) and Remove (asked first in `ConfirmDialog`, which says nothing is
+  deleted). Below it, Add folder… and Reformat the folders…. Narrow, each row becomes a small
+  card. On the welcome, a desktop with no folder offers only Add a folder…, and a new note's
+  page says a folder is needed first.
 - **Editing** ([editors](editors.md)): there is no permanent toolbar. The formatting toolbar
   is a vertical strip beside the text block holding the caret (in the island on small
   screens), shown only while the text has focus, absolutely positioned (no layout space, no shift); flat and pale until pointed at,

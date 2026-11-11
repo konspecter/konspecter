@@ -1,3 +1,8 @@
+import type { LibraryFolder } from "../../infrastructure/desktop/desktop";
+import type { TagCount } from "../../infrastructure/storage/tag-index";
+
+export { folderLabel, type LibraryFolder } from "../../infrastructure/desktop/desktop";
+
 /** File Mode: the files with tags outside their first chain's folder, and moving them there (ADR-013). */
 export type FolderReformat = {
   misplaced(): Promise<readonly string[]>;
@@ -5,7 +10,7 @@ export type FolderReformat = {
   apply(): Promise<number>;
 };
 
-/** File Mode: the open folder's `.konspecterignore` (its rules, or the default without one). */
+/** File Mode: a folder's `.konspecterignore` (its rules, or the default without one). */
 export type FolderIgnore = {
   read(): Promise<string>;
   /** Writes the file; the folder is read again by the new rules. */
@@ -13,16 +18,33 @@ export type FolderIgnore = {
 };
 
 /**
- * The desktop's folder, where every note is a file (see
- * docs/architecture/filesystem-mode.md and ADR-024).
+ * The desktop's folders, where every note is a file (see
+ * docs/architecture/filesystem-mode.md and ADR-030).
  */
 export type LibraryControls = {
-  /** The folder's path; null only when not even the default folder could be opened. */
-  readonly folder: string | null;
-  /** Opens the system folder picker; the app reloads on the chosen folder. */
-  chooseFolder: () => Promise<void>;
-  /** File Mode: reformats the folder so its files are in their tags' folders. */
-  reformat?: FolderReformat | undefined;
-  /** File Mode: the folder's ignore rules. */
-  ignore?: FolderIgnore | undefined;
+  /** The connected folders, in order; `subscribe` hears of a new alias. */
+  readonly folders: {
+    readonly subscribe: (listener: () => void) => () => void;
+    readonly getSnapshot: () => readonly LibraryFolder[];
+  };
+  /** The folder a note is in (its id), by the note's id. */
+  folderOf(noteId: string): string | null;
+  /** One folder's tags, for its root in the tree. */
+  tags(folder: string): Promise<TagCount[]>;
+  /**
+   * Opens the system folder picker and connects the chosen folder; the app
+   * then reloads with it. Fails with a `FolderError` ("folder_connected",
+   * "folder_overlaps") for a folder connected already, or inside or around one.
+   */
+  add(): Promise<void>;
+  /** Disconnects a folder, its files left where they are; the app then reloads. */
+  remove(folder: string): Promise<void>;
+  /** Names a folder in the app; null goes back to its own name. */
+  setAlias(folder: string, alias: string | null): Promise<void>;
+  /** Opens the folder in the system file manager. */
+  reveal(folder: string): Promise<void>;
+  /** Reformats one folder, or every one, so its files are in their tags' folders. */
+  reformat(folder?: string): FolderReformat;
+  /** One folder's ignore rules. */
+  ignore(folder: string): FolderIgnore;
 };

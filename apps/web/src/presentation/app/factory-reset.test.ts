@@ -3,7 +3,7 @@ import { factoryReset, sendWipeReceipt, takeWipedNotice, wipe } from "./factory-
 function parts(steps: string[]) {
   return {
     sync: { forget: () => Promise.resolve(void steps.push("sync")) },
-    closeFolder: () => Promise.resolve(void steps.push("folder")),
+    forgetFolders: () => Promise.resolve(void steps.push("folder")),
     store: { erase: () => Promise.resolve(void steps.push("store")) },
     storage: { clear: () => void steps.push("storage") },
   };
@@ -21,7 +21,7 @@ describe("factoryReset", () => {
   it("has no folder to forget outside File Mode", async () => {
     const steps: string[] = [];
 
-    await factoryReset({ ...parts(steps), closeFolder: undefined });
+    await factoryReset({ ...parts(steps), forgetFolders: undefined });
 
     expect(steps).toEqual(["sync", "store", "storage"]);
   });
@@ -58,7 +58,7 @@ describe("wipe", () => {
     return {
       deleteFiles: () => Promise.resolve(void steps.push("files")),
       store: { erase: () => Promise.resolve(void steps.push("store")) },
-      closeFolder: () => Promise.resolve(void steps.push("folder")),
+      forgetFolders: () => Promise.resolve(void steps.push("folder")),
       sync: { forgetToken: () => Promise.resolve(void steps.push("token")) },
       storage: {
         clear: () => {

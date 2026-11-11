@@ -6,6 +6,7 @@ import {
   useState,
   type CSSProperties,
   type KeyboardEvent,
+  type ReactNode,
   type RefObject,
 } from "react";
 import { Link } from "react-router";
@@ -40,6 +41,10 @@ type TagTreeViewProps = {
    * notes changed: open folders read them again.
    */
   loadNotes: (noteIds: readonly string[]) => Promise<readonly NoteSummary[]>;
+  /** How deep the tree starts: 1 under a folder's root (several folders). */
+  depth?: number;
+  /** The root's name, when the tree is under one; ← goes there. */
+  parent?: RefObject<HTMLElement | null>;
 };
 
 /** The note list filtered to the tag (a search for `#tag`). */
@@ -61,7 +66,14 @@ export function TagTreeView({
   currentNoteId = null,
   headings = false,
   loadNotes,
+  depth = 0,
+  parent,
 }: TagTreeViewProps) {
+  const onNoteKey = parent
+    ? (event: KeyboardEvent) => {
+        toLabel(event, parent);
+      }
+    : undefined;
   return (
     <ul className="tree">
       {nodes.map((node) => (
@@ -69,7 +81,8 @@ export function TagTreeView({
           key={node.tag.name}
           node={node}
           chain={node.tag.name}
-          depth={0}
+          depth={depth}
+          parent={parent}
           activeTag={activeTag}
           currentNoteId={currentNoteId}
           headings={headings}
@@ -80,12 +93,85 @@ export function TagTreeView({
         <TreeDocument
           key={note.id}
           note={note}
-          depth={0}
+          depth={depth}
           current={note.id === currentNoteId}
           headings={headings}
+          {...(onNoteKey ? { onKeyDown: onNoteKey } : {})}
         />
       ))}
     </ul>
+  );
+}
+
+type FolderRootProps = {
+  /** The folder's id, on its row for the context menu. */
+  id: string;
+  /** Its alias, or its own name. */
+  label: string;
+  /** False while the folder cannot be opened: it has nothing under it. */
+  available: boolean;
+  expanded: boolean;
+  onExpandedChange: (expanded: boolean) => void;
+  /** What is under it: its tree, which ← brings back to `parent`. */
+  children: (parent: RefObject<HTMLElement | null>) => ReactNode;
+};
+
+/**
+ * A connected folder at the root of the tree, when there are several
+ * (ADR-030): its tags and notes under it. Its name folds and unfolds it.
+ */
+export function FolderRoot({
+  id,
+  label,
+  available,
+  expanded,
+  onExpandedChange,
+  children,
+}: FolderRootProps) {
+  const name = useRef<HTMLButtonElement>(null);
+  const group = useRef<HTMLDivElement>(null);
+  const open = expanded && available;
+  const onRowKey = (event: KeyboardEvent) => {
+    branchKeys(event, { expanded: open, setExpanded: onExpandedChange, label: name, group }, () => {
+      // Nothing is above a root.
+    });
+  };
+  const shown = available ? label : t("library.unavailable", { folder: label });
+  return (
+    <li>
+      <div className="tree-row" style={indent(0)} onKeyDown={onRowKey}>
+        <button
+          type="button"
+          className="tree-toggle"
+          aria-expanded={open}
+          disabled={!available}
+          aria-label={t(open ? "tree.collapseFolder" : "tree.expandFolder", { folder: label })}
+          onClick={() => {
+            onExpandedChange(!open);
+          }}
+        >
+          <ChevronIcon />
+          {open ? <FolderOpenIcon /> : <FolderIcon />}
+        </button>
+        <button
+          ref={name}
+          type="button"
+          className="tree-label tree-root"
+          data-folder-id={id}
+          aria-expanded={open}
+          onClick={() => {
+            if (available) onExpandedChange(!open);
+          }}
+        >
+          {shown}
+        </button>
+      </div>
+      {open && (
+        <div ref={group} className="tree-group" style={indent(1)}>
+          {children(name)}
+        </div>
+      )}
+    </li>
   );
 }
 
@@ -95,7 +181,7 @@ type TagFolderProps = {
   chain: string;
   depth: number;
   /** The name of the folder this one is in; ← goes there. */
-  parent?: RefObject<HTMLAnchorElement | null>;
+  parent?: RefObject<HTMLElement | null> | undefined;
   activeTag: string | null;
   currentNoteId: string | null;
   headings: boolean;
@@ -118,10 +204,10 @@ function indent(depth: number): CSSProperties {
 type Branch = {
   readonly expanded: boolean;
   readonly setExpanded: (expanded: boolean) => void;
-  /** The row's name, a link. */
-  readonly label: RefObject<HTMLAnchorElement | null>;
+  /** The row's name, a link (or a button: a folder's root). */
+  readonly label: RefObject<HTMLElement | null>;
   /** Its rows, while open. */
-  readonly group: RefObject<HTMLUListElement | null>;
+  readonly group: RefObject<HTMLElement | null>;
 };
 
 /**
@@ -146,7 +232,7 @@ function branchKeys(event: KeyboardEvent, branch: Branch, up: (event: KeyboardEv
 }
 
 /** ← on a row inside a branch: to the branch's name. */
-function toLabel(event: KeyboardEvent, label: RefObject<HTMLAnchorElement | null>) {
+function toLabel(event: KeyboardEvent, label: RefObject<HTMLElement | null>) {
   if (sideways(event) !== "left") return;
   event.preventDefault();
   label.current?.focus();

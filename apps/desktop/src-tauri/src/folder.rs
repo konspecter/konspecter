@@ -465,6 +465,11 @@ impl Folder {
         result.map_err(|e| FolderError::Io(format!("show file: {e}")))
     }
 
+    /// Opens the folder itself in the system file manager.
+    pub fn reveal_root(&self) -> Result<(), FolderError> {
+        open::that_detached(&self.root).map_err(|e| FolderError::Io(format!("show folder: {e}")))
+    }
+
     fn existing(&self, relative: &str) -> Result<PathBuf, FolderError> {
         let path = self.resolve(relative)?;
         if path.is_file() {
@@ -583,7 +588,7 @@ fn modified_ms(meta: &fs::Metadata) -> u64 {
 
 /// Whether two paths name the same file (e.g. differing only in case on a
 /// case-insensitive disk).
-fn same_file(a: &Path, b: &Path) -> bool {
+pub(crate) fn same_file(a: &Path, b: &Path) -> bool {
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;

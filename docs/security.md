@@ -10,7 +10,7 @@ What Konspecter protects, from whom, and how. Every item below has tests unless 
 | Accounts                             | password guessing, code guessing, account enumeration, CSRF, session theft, takeover through a provider |
 | Device tokens                        | theft from storage or logs; guessing; reuse after a device is lost; tricking someone into approving one |
 | The passphrase and the content key   | the server learning them; a stolen device; a lost passphrase                                            |
-| The user's files (desktop File Mode) | the web view reaching files outside the chosen folder                                                   |
+| The user's files (desktop File Mode) | the web view reaching files outside the connected folders                                               |
 | The build                            | vulnerable or unlicensed dependencies                                                                   |
 
 ## Measures

@@ -10,13 +10,16 @@ import { createNote, type Note } from "../../domain/note/note";
 import { openNoteStore, type NoteStore } from "../../infrastructure/storage/note-store";
 import { setSourceValue, sourceValue, sourceView } from "../editors/test-helpers";
 import { FakeFolder } from "../../infrastructure/folder/fake-folder";
+import { FolderLibrary } from "../../infrastructure/folder/folder-library";
 import { FolderStore } from "../../infrastructure/folder/folder-store";
+import { FolderError } from "../../infrastructure/desktop/desktop";
 import { FakeServer, TEST_PASSPHRASE } from "../../infrastructure/sync/fake-server";
 import { SyncEngine } from "../../infrastructure/sync/sync-engine";
 import type { NoteRepository } from "../../application/notes/note-repository";
 import { applyLanguage } from "../i18n/setup";
 import { App } from "./App";
 import type { CheckForRelease } from "./updates";
+import type { LibraryControls } from "./library";
 
 let databaseCount = 0;
 async function newStore() {
@@ -35,6 +38,75 @@ function renderApp(store: NoteRepository, path = "/", settings?: Settings) {
 beforeEach(() => {
   localStorage.clear();
 });
+
+type TestFolder = {
+  readonly id: string;
+  readonly path: string;
+  readonly alias?: string;
+  readonly files?: FakeFolder;
+  readonly available?: boolean;
+};
+
+/**
+ * The desktop's library as main.tsx builds it, on folders in memory; the
+ * native parts (the picker, the file manager, the saved list) are fakes.
+ */
+async function desktopLibrary(folders: readonly TestFolder[]) {
+  const db = await newStore();
+  const library = new FolderLibrary(
+    folders.map((f) => ({
+      folder: {
+        id: f.id,
+        path: f.path,
+        alias: f.alias ?? null,
+        addedMs: Date.UTC(2026, 10, 11, 12),
+        available: f.available ?? true,
+      },
+      store:
+        (f.available ?? true)
+          ? new FolderStore(f.files ?? new FakeFolder(), db, {
+              graceMs: 5,
+              readingPrefix: `file:${f.id}/`,
+            })
+          : null,
+    })),
+    { setAlias: () => Promise.resolve() },
+  );
+  const add = vi.fn(() => Promise.resolve());
+  const remove = vi.fn<(folder: string) => Promise<void>>(() => Promise.resolve());
+  const reveal = vi.fn<(folder: string) => Promise<void>>(() => Promise.resolve());
+  const controls: LibraryControls = {
+    folders: {
+      subscribe: (listener) => library.subscribeFolders(listener),
+      getSnapshot: () => library.folders(),
+    },
+    folderOf: (noteId) => library.folderOf(noteId),
+    tags: (folder) => library.folderTags(folder),
+    add,
+    remove,
+    setAlias: (folder, alias) => library.setAlias(folder, alias),
+    reveal,
+    reformat: (folder) => ({
+      misplaced: () => library.misplaced(folder),
+      apply: () => library.reformat(folder),
+    }),
+    ignore: (folder) => ({
+      read: () => library.ignoreText(folder),
+      save: (text) => library.setIgnore(folder, text),
+    }),
+  };
+  const show = (path = "/", settings?: Settings) =>
+    render(
+      <MemoryRouter initialEntries={[path]}>
+        <App
+          store={library}
+          library={controls}
+          {...(settings ? { initialSettings: settings } : {})}
+        />
+      </MemoryRouter>,
+    );
+  return { library, controls, add, remove, reveal, show };
+}
 
 /** The rich-text editor (the default mode). It is loaded lazily. */
 const textEditor = () => screen.findByRole("textbox", { name: "Conspect text" });
@@ -2750,20 +2822,8 @@ describe("file mode", () => {
       const folder = new FakeFolder();
       folder.edit("x.md", "# X\n\n#java");
       folder.edit("java/placed.md", "# Placed\n\n#java");
-      const store = new FolderStore(folder, await newStore(), { graceMs: 5 });
-      const show = () =>
-        render(
-          <MemoryRouter initialEntries={[path]}>
-            <App
-              store={store}
-              library={{
-                folder: "/Users/ada/Notes",
-                chooseFolder: () => Promise.resolve(),
-                reformat: { misplaced: () => store.misplaced(), apply: () => store.reformat() },
-              }}
-            />
-          </MemoryRouter>,
-        );
+      const desktop = await desktopLibrary([{ id: "a", path: "/Users/ada/Notes", files: folder }]);
+      const show = () => desktop.show(path);
       return { folder, show };
     }
     const question = () =>
@@ -2796,14 +2856,14 @@ describe("file mode", () => {
       expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
       expect(folder.files.has("x.md")).toBe(true);
 
-      await userEvent.click(screen.getByRole("button", { name: "Reformat the folder…" }));
+      await userEvent.click(screen.getByRole("button", { name: "Reformat the folders…" }));
       await userEvent.click(within(await question()).getByRole("button", { name: "Reformat" }));
       expect(
         await screen.findByText("Moved 1 conspect into its tags' folder."),
       ).toBeInTheDocument();
       expect(folder.files.has("java/x.md")).toBe(true);
 
-      await userEvent.click(screen.getByRole("button", { name: "Reformat the folder…" }));
+      await userEvent.click(screen.getByRole("button", { name: "Reformat the folders…" }));
       expect(
         await screen.findByText("Every conspect with tags is in its tags' folder already."),
       ).toBeInTheDocument();
@@ -2815,19 +2875,10 @@ describe("file mode", () => {
     folder.edit("note.md", "# Note");
     folder.edit("drafts/draft.md", "# Draft");
     folder.edit(".hidden/secret.md", "# Secret");
-    const store = new FolderStore(folder, await newStore(), { graceMs: 5 });
-    render(
-      <MemoryRouter initialEntries={["/settings"]}>
-        <App
-          store={store}
-          library={{
-            folder: "/Users/ada/Notes",
-            chooseFolder: () => Promise.resolve(),
-            ignore: { read: () => store.ignoreText(), save: (text) => store.setIgnore(text) },
-          }}
-        />
-      </MemoryRouter>,
-    );
+    const { library: store, show } = await desktopLibrary([
+      { id: "a", path: "/Users/ada/Notes", files: folder },
+    ]);
+    show("/settings");
 
     const rules = await screen.findByRole("textbox", { name: "Rules (.konspecterignore)" });
     expect(rules).toHaveValue(DEFAULT_IGNORE);
@@ -2839,22 +2890,25 @@ describe("file mode", () => {
     expect(await screen.findByText("Saved.")).toBeInTheDocument();
     expect(folder.ignoreFile).toBe("drafts/");
     expect((await store.list()).map((note) => note.id).sort()).toEqual([
-      ".hidden/secret.md",
-      "note.md",
+      "a/.hidden/secret.md",
+      "a/note.md",
     ]);
   });
 
-  it("shows the folder in settings, and changes it", async () => {
-    const store = await newStore();
-    const chooseFolder = vi.fn(() => Promise.resolve());
-    render(
-      <MemoryRouter initialEntries={["/settings"]}>
-        <App store={store} library={{ folder: "/Users/ada/Konspecter", chooseFolder }} />
-      </MemoryRouter>,
-    );
+  it("shows the folder in settings, and adds another", async () => {
+    const { add, show } = await desktopLibrary([{ id: "a", path: "/Users/ada/Konspecter" }]);
+    show("/settings");
 
-    expect(screen.getByText("/Users/ada/Konspecter")).toBeInTheDocument();
-    expect(screen.getByText(/Sync covers this folder/)).toBeInTheDocument();
+    const table = await screen.findByRole("table");
+    expect(
+      within(table)
+        .getAllByRole("columnheader")
+        .map((cell) => cell.textContent),
+    ).toEqual(["Path", "Date added", "Actions"]);
+    expect(within(table).getByRole("cell", { name: "/Users/ada/Konspecter" })).toBeInTheDocument();
+    expect(screen.getByText(/Sync covers every folder/)).toBeInTheDocument();
+    // One folder: nothing to choose for new conspects.
+    expect(screen.queryByRole("radiogroup", { name: "New conspects" })).not.toBeInTheDocument();
     const fileNames = screen.getByRole("combobox", { name: "File names" });
     expect(fileNames).toHaveDisplayValue("Keep the name when the title changes");
     await userEvent.selectOptions(fileNames, "Rename the file after the title");
@@ -2862,8 +2916,199 @@ describe("file mode", () => {
     expect(
       screen.queryByRole("button", { name: "Import into the app library" }),
     ).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Change folder…" }));
-    expect(chooseFolder).toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Add folder…" }));
+    expect(add).toHaveBeenCalled();
+  });
+});
+
+describe("several folders", () => {
+  const home = () => {
+    const files = new FakeFolder();
+    files.edit("lang/java.md", "# Java\n\n#lang");
+    files.edit("diary.md", "# Diary");
+    return files;
+  };
+  const work = () => {
+    const files = new FakeFolder();
+    files.edit("lang/go.md", "# Go\n\n#lang");
+    files.edit("plans.md", "# Plans");
+    return files;
+  };
+  const twoFolders = (homeFiles = home(), workFiles = work()) =>
+    desktopLibrary([
+      { id: "a", path: "/Users/ada/Konspecter", files: homeFiles },
+      { id: "b", path: "/Users/ada/Work", files: workFiles },
+    ]);
+  const tree = () => within(sidebar()).getByRole("navigation", { name: "Goto" });
+  const root = (name: string) => within(tree()).getByRole("button", { name, expanded: true });
+
+  it("shows no root for a single folder", async () => {
+    const { show } = await desktopLibrary([
+      { id: "a", path: "/Users/ada/Konspecter", files: home() },
+    ]);
+    show();
+
+    expect(await within(sidebar()).findByRole("link", { name: "Lang" })).toBeInTheDocument();
+    expect(within(tree()).queryByRole("button", { name: "Konspecter" })).not.toBeInTheDocument();
+  });
+
+  it("puts every folder at the root, with its own tags and notes, folding each", async () => {
+    const { show } = await twoFolders();
+    show();
+
+    await waitFor(() => {
+      expect(within(tree()).getAllByRole("link", { name: "Lang" })).toHaveLength(2);
+    });
+    const homeRoot = root("Konspecter").closest("li");
+    const workRoot = root("Work").closest("li");
+    if (!homeRoot || !workRoot) throw new Error("no roots");
+    expect(within(homeRoot).getByRole("link", { name: "Diary" })).toBeInTheDocument();
+    expect(within(homeRoot).queryByRole("link", { name: "Plans" })).not.toBeInTheDocument();
+    expect(within(workRoot).getByRole("link", { name: "Plans" })).toBeInTheDocument();
+
+    await userEvent.click(root("Work"));
+    expect(within(workRoot).queryByRole("link", { name: "Plans" })).not.toBeInTheDocument();
+    expect(localStorage.getItem("konspecter.sidebar.roots")).toBe(JSON.stringify(["b"]));
+  });
+
+  it("walks from a root into its tree with the arrow keys, and back", async () => {
+    const { show } = await twoFolders();
+    show();
+
+    await waitFor(() => {
+      expect(within(tree()).getAllByRole("link", { name: "Lang" })).toHaveLength(2);
+    });
+    root("Konspecter").focus();
+    await userEvent.keyboard("{ArrowRight}");
+    const lang = within(root("Konspecter").closest("li") ?? tree()).getByRole("link", {
+      name: "Lang",
+    });
+    expect(lang).toHaveFocus();
+    await userEvent.keyboard("{ArrowLeft}");
+    expect(root("Konspecter")).toHaveFocus();
+    await userEvent.keyboard("{ArrowLeft}");
+    expect(
+      within(tree()).getByRole("button", { name: "Konspecter", expanded: false }),
+    ).toHaveFocus();
+  });
+
+  it("shows a root's folder in the file manager from its context menu", async () => {
+    const { reveal, show } = await twoFolders();
+    show();
+
+    const workRoot = await within(tree()).findByRole("button", { name: "Work" });
+    await userEvent.pointer({ keys: "[MouseRight]", target: workRoot });
+    const menu = screen.getByRole("menu", { name: "Work" });
+    await userEvent.click(within(menu).getByRole("menuitem", { name: /^Show in / }));
+    expect(reveal).toHaveBeenCalledWith("b");
+  });
+
+  it("adds a folder from the sidebar, and says why one was refused", async () => {
+    const { add, show } = await twoFolders();
+    show();
+
+    await userEvent.click(within(sidebar()).getByRole("button", { name: "Add folder" }));
+    expect(add).toHaveBeenCalledTimes(1);
+
+    add.mockRejectedValueOnce(new FolderError("folder_overlaps", "overlaps"));
+    await userEvent.click(within(sidebar()).getByRole("button", { name: "Add folder" }));
+    expect(await within(sidebar()).findByRole("alert")).toHaveTextContent(
+      "This folder is inside a connected folder, or holds one.",
+    );
+  });
+
+  it("lists the folders in settings, removes one only when confirmed, and names one", async () => {
+    const { remove, show } = await twoFolders();
+    show("/settings");
+
+    const table = await screen.findByRole("table");
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(rows.map((row) => within(row).getAllByRole("cell")[0]?.textContent)).toEqual([
+      "/Users/ada/Konspecter",
+      "/Users/ada/Work",
+    ]);
+
+    await userEvent.click(within(table).getByRole("button", { name: "Remove Work" }));
+    const dialog = screen.getByRole("alertdialog", { name: "Remove Work from Konspecter?" });
+    expect(dialog).toHaveTextContent(
+      "Nothing is deleted: the files and folders stay where they are",
+    );
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(remove).not.toHaveBeenCalled();
+    await userEvent.click(within(table).getByRole("button", { name: "Remove Work" }));
+    await userEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Remove" }),
+    );
+    expect(remove).toHaveBeenCalledWith("b");
+
+    await userEvent.click(within(table).getByRole("button", { name: "Alias… Work" }));
+    const naming = screen.getByRole("dialog", { name: "Alias for Work" });
+    await userEvent.type(within(naming).getByRole("textbox", { name: "Alias" }), "Job");
+    await userEvent.click(within(naming).getByRole("button", { name: "Save" }));
+    expect(await within(table).findByText("Job")).toBeInTheDocument();
+    expect(within(tree()).getByRole("button", { name: "Job" })).toBeInTheDocument();
+  });
+
+  it("makes a new conspect in the open conspect's folder", async () => {
+    const workFiles = work();
+    const { show } = await twoFolders(home(), workFiles);
+    show("/conspects/b%2Fplans.md");
+    expect(await textEditor()).toHaveTextContent("Plans");
+
+    await userEvent.click(within(sidebar()).getByRole("link", { name: "New conspect" }));
+    await userEvent.type(await textEditor(), "# Sprint{Enter}Body");
+
+    await waitFor(() => {
+      expect(workFiles.files.has("sprint.md")).toBe(true);
+    });
+  });
+
+  it("asks where a new conspect goes when set to", async () => {
+    const workFiles = work();
+    const { show } = await twoFolders(home(), workFiles);
+    show("/conspects/new", { ...DEFAULT_SETTINGS, newNoteFolder: "ask" });
+
+    const chooser = await screen.findByRole("dialog", {
+      name: "Where should the new conspect go?",
+    });
+    await userEvent.click(within(chooser).getByRole("button", { name: /Work/ }));
+    await userEvent.type(await textEditor(), "# Retro{Enter}Body");
+
+    await waitFor(() => {
+      expect(workFiles.files.has("retro.md")).toBe(true);
+    });
+  });
+
+  it("offers the choice for new conspects in settings", async () => {
+    const { show } = await twoFolders();
+    show("/settings");
+
+    const choice = await screen.findByRole("radiogroup", { name: "New conspects" });
+    expect(within(choice).getByRole("radio", { name: "Open conspect's folder" })).toBeChecked();
+  });
+
+  it("asks for a folder first when none is connected", async () => {
+    const { add, show } = await desktopLibrary([]);
+    show();
+
+    const welcome = await screen.findByRole("region", { name: "Welcome to Konspecter" });
+    expect(welcome).toHaveTextContent("Add a folder to start");
+    expect(
+      within(welcome).queryByRole("link", { name: "Create your first conspect" }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(within(welcome).getByRole("button", { name: "Add a folder…" }));
+    expect(add).toHaveBeenCalled();
+
+    cleanup();
+    show("/conspects/new");
+    expect(await screen.findByText(/Add a folder first/)).toBeInTheDocument();
+  });
+
+  it("names the file after its folder in the details", async () => {
+    const { show } = await twoFolders();
+    show("/conspects/b%2Flang%2Fgo.md");
+
+    expect(await screen.findByText("Work/lang/go.md")).toBeInTheDocument();
   });
 });
 
@@ -3003,33 +3248,26 @@ describe("onboarding", () => {
     expect(within(welcome).queryByRole("button", { name: /folder/ })).not.toBeInTheDocument();
   });
 
-  it("shows the desktop's folder as chosen, and can choose another", async () => {
-    const chooseFolder = vi.fn(() => Promise.resolve());
-    render(
-      <MemoryRouter>
-        <App store={await newStore()} library={{ folder: "/Users/ada/Konspecter", chooseFolder }} />
-      </MemoryRouter>,
-    );
+  it("shows the desktop's folder, and can add another", async () => {
+    const { add, show } = await desktopLibrary([{ id: "a", path: "/Users/ada/Konspecter" }]);
+    show();
 
     const welcome = await screen.findByRole("region", { name: "Welcome to Konspecter" });
     expect(welcome).toHaveTextContent(
-      "Your conspects are kept as Markdown files in /Users/ada/Konspecter. Keep this folder",
+      "Your conspects are kept as Markdown files in /Users/ada/Konspecter. Add another folder",
     );
-    await userEvent.click(within(welcome).getByRole("button", { name: "Choose another folder…" }));
-    expect(chooseFolder).toHaveBeenCalled();
+    await userEvent.click(within(welcome).getByRole("button", { name: "Add a folder…" }));
+    expect(add).toHaveBeenCalled();
   });
 
-  it("says why choosing the folder failed", async () => {
-    const chooseFolder = vi.fn(() => Promise.reject(new Error("dialog crashed")));
+  it("says why adding a folder failed", async () => {
+    const { add, show } = await desktopLibrary([]);
+    add.mockRejectedValueOnce(new Error("dialog crashed"));
     const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    render(
-      <MemoryRouter>
-        <App store={await newStore()} library={{ folder: null, chooseFolder }} />
-      </MemoryRouter>,
-    );
+    show();
 
     const welcome = await screen.findByRole("region", { name: "Welcome to Konspecter" });
-    await userEvent.click(within(welcome).getByRole("button", { name: "Choose a folder…" }));
+    await userEvent.click(within(welcome).getByRole("button", { name: "Add a folder…" }));
     expect(await within(welcome).findByRole("alert")).toHaveTextContent(
       "Oops, something went wrong.",
     );

@@ -19,13 +19,14 @@ import type { ShortcutName } from "../app/shortcuts";
 import { isDisplayableCover } from "../components/CoverImage";
 import { colorStyle } from "../components/note-color";
 import { EmptyState } from "../components/EmptyState";
+import { AddFolderButton } from "../components/LibraryFolders";
 import { ErrorState } from "../components/ErrorState";
 import { NoteDate } from "../components/NoteDate";
 import { ShortcutList } from "../components/ShortcutsDialog";
 import { Snippet } from "../components/Snippet";
 import { summaryTitle } from "../components/note-title";
 import { useAsync } from "../hooks/use-async";
-import { useErrorMessage } from "../hooks/use-error-message";
+import { useLibraryFolders } from "../hooks/use-library-folders";
 import { t } from "../i18n/i18n";
 import { rich } from "../i18n/rich";
 
@@ -336,11 +337,15 @@ function Welcome({
 }) {
   const navigate = useNavigate();
   const [adding, setAdding] = useState(false);
+  // A desktop without folders has nowhere to keep a conspect yet.
+  const folders = useLibraryFolders(library);
+  const noFolder = library !== undefined && folders.every((folder) => !folder.available);
   return (
     <section className="welcome" aria-labelledby="welcome-title">
       <h2 id="welcome-title">{t("welcome.title")}</h2>
       <p>{rich("welcome.text", { tags: <code>#tags</code> })}</p>
-      <div className="actions">
+      {library && <WelcomeFolder library={library} />}
+      <div className="actions" hidden={noFolder}>
         <Link to="/conspects/new" className="button button-primary">
           {t("welcome.create")}
         </Link>
@@ -364,7 +369,6 @@ function Welcome({
           </Link>
         )}
       </div>
-      {library && <WelcomeFolder library={library} />}
       <p className="setting-hint">
         {rich("welcome.import", {
           md: <code>.md</code>,
@@ -380,48 +384,26 @@ function Welcome({
 }
 
 /**
- * The desktop's folder, already chosen: ~/Konspecter unless another was
- * (ADR-024). Keeping it needs nothing; another one reloads the app on it.
+ * The desktop's folders: ~/Konspecter at first (ADR-024), more added at will
+ * (ADR-030). Without any, a folder is what the welcome asks for first.
  */
 function WelcomeFolder({ library }: { library: LibraryControls }) {
-  const [choosing, setChoosing] = useState(false);
-  const [failure, setFailure] = useState<unknown>(null);
-  const failureText = useErrorMessage(failure);
+  const folders = useLibraryFolders(library);
   return (
     <div className="welcome-folder">
       <p className="setting-hint">
-        {library.folder === null
-          ? rich("settings.library.none", { md: <code>.md</code> })
+        {folders.length === 0
+          ? rich("welcome.noFolder", { md: <code>.md</code> })
           : rich("welcome.folder", {
-              folder: <strong>{library.folder}</strong>,
+              folder: <strong>{folders.map((folder) => folder.path).join(", ")}</strong>,
               md: <code>.md</code>,
             })}
       </p>
-      <button
-        type="button"
-        className="button"
-        disabled={choosing}
-        onClick={() => {
-          setChoosing(true);
-          setFailure(null);
-          library.chooseFolder().then(
-            () => {
-              setChoosing(false);
-            },
-            (error: unknown) => {
-              setChoosing(false);
-              setFailure(error);
-            },
-          );
-        }}
-      >
-        {t(library.folder === null ? "settings.library.open" : "welcome.chooseFolder")}
-      </button>
-      {failureText !== null && (
-        <p role="alert" className="inline-error">
-          {failureText}
-        </p>
-      )}
+      <AddFolderButton
+        library={library}
+        label={t("welcome.addFolder")}
+        primary={folders.length === 0}
+      />
     </div>
   );
 }

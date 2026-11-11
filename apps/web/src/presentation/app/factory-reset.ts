@@ -12,8 +12,11 @@ export type FactoryReset = {
 export type FactoryResetParts = {
   /** Signs this device out of sync and forgets the connection and its key. */
   sync: { forget(): Promise<void> };
-  /** Desktop: forgets the chosen Markdown folder. Its files stay as they are. */
-  closeFolder?: (() => Promise<void>) | undefined;
+  /**
+   * Desktop: forgets the connected Markdown folders (the next start connects
+   * ~/Konspecter). Their files stay as they are.
+   */
+  forgetFolders?: (() => Promise<void>) | undefined;
   /** The app library, settings, reading positions and indexes (IndexedDB). */
   store: { erase(): Promise<void> };
   /** The interface's own state: sidebar, toolbar, last location. */
@@ -26,7 +29,7 @@ export type FactoryResetParts = {
  */
 export async function factoryReset(parts: FactoryResetParts): Promise<void> {
   await parts.sync.forget();
-  await parts.closeFolder?.();
+  await parts.forgetFolders?.();
   await parts.store.erase();
   try {
     parts.storage.clear();
@@ -45,8 +48,8 @@ export type WipeParts = {
   deleteFiles?: (() => Promise<unknown>) | undefined;
   /** The app library, settings, reading positions, indexes and sync's own records. */
   store: { erase(): Promise<void> };
-  /** Desktop: forgets the chosen folder. */
-  closeFolder?: (() => Promise<void>) | undefined;
+  /** Desktop: forgets the connected folders. */
+  forgetFolders?: (() => Promise<void>) | undefined;
   /** Forgets the token kept outside the database (the desktop's keychain). */
   sync: { forgetToken(): Promise<void> };
   storage: Pick<Storage, "clear" | "setItem">;
@@ -71,7 +74,7 @@ export async function wipe(parts: WipeParts): Promise<void> {
     parts.report(error);
   }
   await parts.store.erase();
-  await parts.closeFolder?.();
+  await parts.forgetFolders?.();
   try {
     parts.storage.clear();
     parts.storage.setItem(RECEIPT_KEY, JSON.stringify(parts.receipt));

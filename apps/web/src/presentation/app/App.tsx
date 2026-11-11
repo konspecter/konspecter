@@ -12,7 +12,7 @@ import type { NoteRepository } from "../../application/notes/note-repository";
 import type { BackButton } from "../../infrastructure/mobile/mobile";
 import type { SyncEngine } from "../../infrastructure/sync/sync-engine";
 import { Layout } from "../components/Layout";
-import { ReformatPrompt } from "../components/ReformatPrompt";
+import { ReformatPrompts } from "../components/ReformatPrompt";
 import { preloadEditor } from "../editors/LazyNoteEditor";
 import { preloadReader } from "../markdown/LazyMarkdownView";
 import { NotFoundPage } from "../pages/NotFoundPage";
@@ -152,21 +152,22 @@ export function App({
       mode={settings.defaultEditor}
       activity={activity}
       readingPosition={settings.readingPosition}
+      library={library}
+      newNoteFolder={settings.newNoteFolder}
     />
   );
   // A new language renders everything again: labels are looked up when
   // rendering, and memoized parts would otherwise keep the old ones.
   return (
     <>
-      {library?.folder != null && library.reformat && (
-        <ReformatPrompt folder={library.folder} reformat={library.reformat} />
-      )}
+      {library && <ReformatPrompts library={library} />}
       <Routes key={settings.language}>
         <Route
           element={
             <Layout
               store={store}
               catalog={catalog}
+              library={library}
               activity={activity}
               theme={settings.theme}
               onThemeChange={setTheme}
