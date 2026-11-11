@@ -12,6 +12,7 @@ import { FolderStore } from "../../infrastructure/folder/folder-store";
 import { openNoteStore, type NoteStore } from "../../infrastructure/storage/note-store";
 import { Activity } from "../app/activity";
 import { DetailsSlot } from "../components/details-slot";
+import { rememberColor } from "../components/note-color";
 import { NotePage } from "./NotePage";
 
 // Simulates the renderer chunk failing to download, e.g. when offline.
@@ -340,6 +341,30 @@ describe("an existing note", () => {
       }
       cleanup();
     }
+  });
+
+  it("writes the colour picked in the Details to its frontmatter, and removes it", async () => {
+    rememberColor("#445566");
+    const store = await newStore();
+    await store.put(createNote("# N\n\nBody", new Date(), "n"));
+    renderNotePage(store, "/conspects/n");
+    const details = await screen.findByRole("region", { name: "Details" });
+    await textBox();
+
+    await userEvent.click(within(details).getByRole("button", { name: "Colour" }));
+    await userEvent.click(screen.getByRole("button", { name: "#445566" }));
+
+    await waitFor(async () => {
+      expect((await store.get("n"))?.markdown).toContain('color: "#445566"\n');
+    });
+    const swatch = within(details).getByRole("button", { name: "Colour" }).firstElementChild;
+    expect(swatch).toHaveStyle({ "--cover-color": "#445566" });
+
+    await userEvent.click(within(details).getByRole("button", { name: "Colour" }));
+    await userEvent.click(screen.getByRole("button", { name: "Default colour" }));
+    await waitFor(async () => {
+      expect((await store.get("n"))?.markdown).not.toContain("color:");
+    });
   });
 
   it("keeps its editor and the focus while a tag being typed moves the file again and again", async () => {

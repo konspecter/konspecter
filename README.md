@@ -90,6 +90,14 @@ See [TAG-CHAIN-SPEC.md](TAG-CHAIN-SPEC.md) for the full specification and exampl
 
 Every conspect is ordinary Markdown: frontmatter, GitHub-flavored Markdown, syntax highlighting, sanitized raw HTML, import/export of `.md` files, folders and ZIP archives. Your knowledge stays in a format that doesn't belong to Konspecter.
 
+### A colour for each conspect
+
+In the list, a conspect without a cover shows its first letter on a colour of its own: a pastel
+picked for it at random, the same every time. To choose another, click the coloured circle in its
+Details (before Properties): pick any colour from the spectrum, or one of the nine you chose last,
+kept in the row under it. **Default colour** goes back to the pastel. The colour is written in the
+conspect's frontmatter (`color: "#4f8fd6"`), so it syncs and stays in the file.
+
 ### Local-first
 
 Your library lives on your device and works offline: IndexedDB in the web app, installable PWA, no cloud account required for local use, offline full-text search, remembered reading position, export at any time. The hosted service is optional.

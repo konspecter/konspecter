@@ -13,6 +13,7 @@ function summary(id: string, daysAgo: number): NoteSummary {
     excerpt: "",
     headings: [],
     pin: null,
+    color: null,
     valid: true,
   };
 }

@@ -19,6 +19,7 @@ import {
  *     author: Ann
  *     cover: null
  *     pin: 3
+ *     color: "#4f8fd6"
  *     ---
  *
  *     # Java Collections
@@ -42,6 +43,8 @@ export type Metadata = {
   readonly conflictOf: string | null;
   /** The key the note is pinned to in Recent (Mod+1…0 opens it). */
   readonly pin: PinKey | null;
+  /** The note's colour, lowercase `#rrggbb`: its letter's background in the list. */
+  readonly color: string | null;
 };
 
 /** The keys a note can be pinned to (Mod+1…0), in the order Recent lists the pins. */
@@ -70,6 +73,7 @@ const METADATA_KEYS = [
   "cover",
   "conflictOf",
   "pin",
+  "color",
 ] as const;
 
 /**
@@ -84,6 +88,7 @@ const FRONTMATTER_KEYS: Record<keyof Metadata, readonly [string, ...string[]]> =
   cover: ["cover"],
   conflictOf: ["conflict_of"],
   pin: ["pin"],
+  color: ["color"],
 };
 
 const EMPTY_METADATA: Metadata = {
@@ -94,6 +99,7 @@ const EMPTY_METADATA: Metadata = {
   cover: null,
   conflictOf: null,
   pin: null,
+  color: null,
 };
 
 const OPENING_DELIMITER = /^\uFEFF?---[ \t]*\r?\n/;
@@ -170,7 +176,26 @@ function readMetadata(frontmatter: Document): Metadata {
     cover: readText(record, key("cover")),
     conflictOf: readText(record, key("conflictOf")),
     pin: readPin(record, key("pin")),
+    color: readColor(record, key("color")),
   };
+}
+
+/**
+ * A hex colour, `#rrggbb` or `#rgb`, as lowercase `#rrggbb`. Anything else
+ * (a colour name, a number) is no colour rather than an invalid document: like
+ * a pin, a colour is a convenience, not content.
+ */
+function readColor(record: Record<string, unknown>, key: string): string | null {
+  const value = record[key];
+  return typeof value === "string" ? noteColor(value) : null;
+}
+
+/** `value` as lowercase `#rrggbb` when it is a hex colour (`#rgb` or `#rrggbb`), else null. */
+export function noteColor(value: string): string | null {
+  const text = value.trim().toLowerCase();
+  if (/^#[0-9a-f]{6}$/.test(text)) return text;
+  if (!/^#[0-9a-f]{3}$/.test(text)) return null;
+  return text.replace(/[0-9a-f]/g, (digit) => digit + digit);
 }
 
 /**
@@ -275,7 +300,7 @@ export function frontmatterTags(markdown: string): string[] {
 
 /**
  * The frontmatter fields Konspecter does not manage itself (anything but
- * title, dates, author, cover, conflict_of, pin and tags), in written order, with each value as
+ * title, dates, author, cover, conflict_of, pin, color and tags), in written order, with each value as
  * display text. Empty when there is no valid frontmatter.
  */
 export function otherMetadata(markdown: string): { key: string; value: string }[] {

@@ -27,6 +27,7 @@ import { displayTitle } from "./note-title";
 import { t, tn } from "../i18n/i18n";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { isEmbeddedCover, uploadedCoverLabel } from "./CoverImage";
+import { ColorPicker } from "./ColorPicker";
 
 type NoteDetailsProps = {
   /** The stored note; null while a new note has not been saved yet. */
@@ -36,6 +37,8 @@ type NoteDetailsProps = {
   onToggleMetadata: () => void;
   /** Removes a tag from the frontmatter's `tags` list (one the body does not write). */
   onRemoveTag?: (written: string) => void;
+  /** Sets the note's colour in its frontmatter (`color`), or removes it with null. */
+  onSetColor?: (color: string | null) => void;
   onDelete: () => Promise<void>;
 };
 
@@ -51,6 +54,7 @@ export function NoteDetails({
   showMetadata,
   onToggleMetadata,
   onRemoveTag,
+  onSetColor,
   onDelete,
 }: NoteDetailsProps) {
   const headingId = useId();
@@ -62,6 +66,14 @@ export function NoteDetails({
     setFailure({ error, deleting: false });
   };
   const read = note ? readNote(note) : null;
+  // The colour just picked, shown until the save it made comes back as `note`.
+  const [picked, setPicked] = useState<{ color: string | null; markdown: string } | null>(null);
+  const color =
+    picked !== null && picked.markdown === note?.markdown
+      ? picked.color
+      : read?.valid
+        ? read.document.metadata.color
+        : null;
 
   async function handleDelete() {
     setConfirming(false);
@@ -156,6 +168,16 @@ export function NoteDetails({
         ))}
       </dl>
       <div className="details-actions" role="group" aria-label={t("details.actions")}>
+        {note && read?.valid && onSetColor && (
+          <ColorPicker
+            id={note.id}
+            color={color}
+            onPick={(next) => {
+              setPicked({ color: next, markdown: note.markdown });
+              onSetColor(next);
+            }}
+          />
+        )}
         <button
           type="button"
           className="icon-button"

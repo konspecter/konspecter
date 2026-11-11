@@ -31,6 +31,8 @@ export type NoteSummary = {
   readonly headings: readonly Heading[];
   /** The key the frontmatter pins the note to (`pin: 3`), if any. */
   readonly pin: PinKey | null;
+  /** The note's colour (`color: "#4f8fd6"`), if the frontmatter sets one. */
+  readonly color: string | null;
   /** False when the frontmatter cannot be read. */
   readonly valid: boolean;
 };
@@ -71,6 +73,7 @@ export function summarize(note: Note, { headings = false }: SummaryOptions = {})
     excerpt: blocks.join(" ").replace(/\s+/g, " ").trim().slice(0, EXCERPT_LENGTH),
     headings: headings && read.valid ? outlineHeadings(read.document.body, title) : [],
     pin: read.valid ? read.document.metadata.pin : null,
+    color: read.valid ? read.document.metadata.color : null,
     valid: read.valid,
   };
 }

@@ -435,6 +435,11 @@ function NoteSession({
           onRemoveTag={(written) => {
             setEdit({ apply: (markdown) => withoutTag(markdown, written) });
           }}
+          onSetColor={(color) => {
+            // Saved at once, like a pin: the list shows the colour straight away.
+            saveNow.current = true;
+            setEdit({ apply: (markdown) => updateMetadata(markdown, { color }) });
+          }}
           onDelete={async () => {
             if (!saved) return;
             await autosave.dispose();

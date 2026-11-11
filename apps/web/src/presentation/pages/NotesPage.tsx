@@ -5,7 +5,6 @@ import {
   useMemo,
   useState,
   useSyncExternalStore,
-  type CSSProperties,
   type KeyboardEvent,
 } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
@@ -18,6 +17,7 @@ import type { SearchHit } from "../../infrastructure/search/search-index";
 import type { LibraryControls } from "../app/library";
 import type { ShortcutName } from "../app/shortcuts";
 import { isDisplayableCover } from "../components/CoverImage";
+import { colorStyle } from "../components/note-color";
 import { EmptyState } from "../components/EmptyState";
 import { ErrorState } from "../components/ErrorState";
 import { NoteDate } from "../components/NoteDate";
@@ -41,6 +41,8 @@ type Row = {
   readonly title: readonly SnippetPart[];
   readonly updated: string | null;
   readonly cover: string | null;
+  /** The note's own colour; null for its default. */
+  readonly color: string | null;
   readonly tags: readonly string[];
   /** The start of the text, or where a search matched it. */
   readonly text: readonly SnippetPart[];
@@ -56,6 +58,7 @@ function summaryRow(note: NoteSummary): Row {
     title: [{ text: summaryTitle(note), match: false }],
     updated: note.updated,
     cover: note.cover,
+    color: note.color,
     tags: note.tags,
     text: note.excerpt === "" ? [] : [{ text: note.excerpt, match: false }],
   };
@@ -72,6 +75,7 @@ function hitRow(hit: SearchHit, note: NoteSummary | undefined): Row {
     title: highlight(hit.title || t("note.untitled"), hit.terms),
     updated: hit.updated || null,
     cover: note?.cover ?? null,
+    color: note?.color ?? null,
     tags: note?.tags ?? [],
     text: snippet(text, hit.terms),
   };
@@ -252,7 +256,7 @@ const ResultList = memo(function ResultList({
 const ResultRow = memo(function ResultRow({ row, find }: { row: Row; find: string }) {
   return (
     <li className="note-result">
-      <ListCover id={row.id} cover={row.cover} title={row.title} />
+      <ListCover id={row.id} cover={row.cover} color={row.color} title={row.title} />
       <div className="note-result-body">
         <Link
           to={`/conspects/${encodeURIComponent(row.id)}`}
@@ -278,16 +282,18 @@ const ResultRow = memo(function ResultRow({ row, find }: { row: Row; find: strin
 });
 
 /**
- * The note's cover, or its title's first letter on a pastel colour that the
- * note's id picks, so each note keeps its colour.
+ * The note's cover, or its title's first letter on the note's colour: the one
+ * its frontmatter sets, or else a pastel its id picks, so each note keeps it.
  */
 function ListCover({
   id,
   cover,
+  color,
   title,
 }: {
   id: string;
   cover: string | null;
+  color: string | null;
   title: readonly SnippetPart[];
 }) {
   if (cover !== null && isDisplayableCover(cover)) {
@@ -302,7 +308,7 @@ function ListCover({
   return (
     <span
       className="note-result-cover note-result-letter"
-      style={{ "--cover-hue": placeholderHue(id) } as CSSProperties}
+      style={colorStyle(id, color)}
       aria-hidden="true"
     >
       {letter}
@@ -311,15 +317,6 @@ function ListCover({
 }
 
 const graphemes = new Intl.Segmenter();
-
-/** A hue from 0 to 359 from the id's characters (FNV-1a). */
-function placeholderHue(id: string): number {
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < id.length; index += 1) {
-    hash = Math.imul(hash ^ id.charCodeAt(index), 0x01000193);
-  }
-  return (hash >>> 0) % 360;
-}
 
 /** The keys the welcome shows: enough to start; "?" shows the rest. */
 const WELCOME_KEYS: readonly ShortcutName[] = [

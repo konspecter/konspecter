@@ -37,6 +37,7 @@ const noMetadata = {
   cover: null,
   conflictOf: null,
   pin: null,
+  color: null,
 };
 
 describe("parseDocument", () => {
@@ -50,6 +51,7 @@ describe("parseDocument", () => {
         cover: null,
         conflictOf: null,
         pin: null,
+        color: null,
       },
       body: "# Java Collections\n\nArrayList — dynamic array.\n\n#java#collections\n\nHashMap stores key/value pairs.\n",
     });
@@ -134,6 +136,7 @@ describe("serializeDocument", () => {
         author: "Ann",
         conflictOf: null,
         pin: null,
+        color: null,
       },
       body: "# Java\n",
     });
@@ -359,6 +362,37 @@ describe("pin", () => {
 
   it("is not one of the other fields", () => {
     expect(otherMetadata("---\npin: 2\nproject: K\n---\n")).toEqual([
+      { key: "project", value: "K" },
+    ]);
+  });
+});
+
+describe("color", () => {
+  it("writes the colour quoted, as a YAML comment would swallow it, and removes it", () => {
+    const markdown = updateMetadata("---\ntitle: A\n---\n\nBody", { color: "#4f8fd6" });
+
+    expect(markdown).toBe('---\ntitle: A\ncolor: "#4f8fd6"\n---\n\nBody');
+    expect(parseDocument(markdown).metadata.color).toBe("#4f8fd6");
+    expect(updateMetadata(markdown, { color: "#000000" })).toBe(
+      '---\ntitle: A\ncolor: "#000000"\n---\n\nBody',
+    );
+    expect(updateMetadata(markdown, { color: null })).toBe("---\ntitle: A\n---\n\nBody");
+    expect(updateMetadata("Body", { color: "#abcdef" })).toBe('---\ncolor: "#abcdef"\n---\n\nBody');
+  });
+
+  it.each([
+    ["six digits", '"#4F8FD6"', "#4f8fd6"],
+    ["three digits", "'#abc'", "#aabbcc"],
+    ["unquoted (a comment: no value)", "#4f8fd6", null],
+    ["a name", "red", null],
+    ["a number", "123456", null],
+    ["eight digits", '"#4f8fd6ff"', null],
+  ])("reads %s, leaving anything but a hex colour uncoloured", (_name, value, color) => {
+    expect(parseDocument(`---\ncolor: ${value}\n---\n\nBody`).metadata.color).toBe(color);
+  });
+
+  it("is not one of the other fields", () => {
+    expect(otherMetadata('---\ncolor: "#abc"\nproject: K\n---\n')).toEqual([
       { key: "project", value: "K" },
     ]);
   });

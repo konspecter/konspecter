@@ -60,7 +60,10 @@ The interface speaks English and Russian ([i18n](i18n.md)). The account site sha
   time; `domain/document/stats.ts`), tags as written (links to their lists; a tag only the frontmatter lists has a × that removes
   it from `tags`, applied through the open editor as an edit: `NoteEditor`'s `edit`), cover, the file
   (File Mode) and any other frontmatter fields (`otherMetadata`). Below, the actions as icon
-  buttons with titles: properties, download or export (open externally and show in
+  buttons with titles: the note's colour (`ColorPicker.tsx`: a round swatch that opens a
+  spectrum, hue across and white to black down, over nine slots of the colours picked last, each
+  the size of a Details button; kept per device, `konspecter.recentColors`; the pick is written
+  to the frontmatter's `color` through `NoteEditor`'s `edit` and saved at once), properties, download or export (open externally and show in
   folder in File Mode), delete. Delete asks first in the app's own dialog
   (`ConfirmDialog.tsx`: Cancel focused, Escape cancels), since the browser's `confirm()` is
   not shown by every web view. Smaller (12px) and quieter (`--color-faint`, still WCAG AA)
@@ -155,8 +158,9 @@ breakpoint in the CSS), in the browser, the PWA and the Android app alike.
   (↑/↓ a row, ←/→ a column). Each item, the same in search results, is the cover beside four
   lines of text, each a quarter of the cover's height: the title, the last-edit date with the
   tags, and two lines of the note's text (in search results, where it matched). A note
-  without a displayable cover gets its title's first letter on a pastel colour, its hue
-  hashed from the note's id so it stays the same (`--cover-*` tokens per theme).
+  without a displayable cover gets its title's first letter on its colour: the frontmatter's
+  `color`, with dark or light ink by contrast, or else a pastel whose hue is hashed from the
+  note's id so it stays the same (`--cover-*` tokens per theme; `components/note-color.ts`).
 - **Search** (`pages/NotesPage.tsx`, `SearchBox.tsx`): focusing the search box shows the list,
   except over an open note (new or existing): that stays while the field is empty, and
   emptying the field again returns to it (the list's router state remembers it). Typing

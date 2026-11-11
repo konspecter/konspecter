@@ -26,9 +26,9 @@ async function ready(
 }
 
 describe("summarize", () => {
-  it("keeps the title, date, cover, tags, pin and the start of the readable text", () => {
+  it("keeps the title, date, cover, tags, pin, colour and the start of the readable text", () => {
     const note = createNote(
-      "---\ncover: https://example.com/maps.png\ntags: [Java#Collections]\npin: 5\n---\n# Hash maps\n\nBuckets #java #algorithms.",
+      '---\ncover: https://example.com/maps.png\ntags: [Java#Collections]\npin: 5\ncolor: "#4f8fd6"\n---\n# Hash maps\n\nBuckets #java #algorithms.',
       new Date("2024-01-02"),
     );
 
@@ -41,6 +41,7 @@ describe("summarize", () => {
       excerpt: "Buckets #java #algorithms.",
       headings: [],
       pin: "5",
+      color: "#4f8fd6",
       valid: true,
     });
   });
@@ -76,6 +77,7 @@ describe("summarize", () => {
       tags: [],
       headings: [],
       pin: null,
+      color: null,
     });
   });
 });
