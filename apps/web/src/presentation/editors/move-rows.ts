@@ -1,5 +1,13 @@
 import { Fragment, type Node, type ResolvedPos } from "prosemirror-model";
-import { TextSelection, type Command, type EditorState, type Transaction } from "prosemirror-state";
+import {
+  Plugin,
+  PluginKey,
+  TextSelection,
+  type Command,
+  type EditorState,
+  type Transaction,
+} from "prosemirror-state";
+import { Decoration, DecorationSet } from "prosemirror-view";
 
 /**
  * Moving rows with ⌥↑/⌥↓ (Alt elsewhere), as the Markdown editor moves lines.
@@ -18,7 +26,7 @@ export function moveRow(direction: -1 | 1): Command {
         ? moveCodeLines(state, direction)
         : moveBlocks(state, direction);
     if (!tr) return false;
-    dispatch?.(tr.scrollIntoView());
+    dispatch?.(tr.setMeta(movingKey, "moved").scrollIntoView());
     return true;
   };
 }
@@ -102,3 +110,140 @@ function withSelectionMoved(tr: Transaction, state: EditorState, shift: number):
   const { anchor, head } = state.selection;
   return tr.setSelection(TextSelection.create(tr.doc, anchor + shift, head + shift));
 }
+
+/**
+ * How the rows being moved are marked: they light up (`enter`) at the first
+ * move, stay lit while ⌥ is held (`held`), and fade out (`leave`) once it is
+ * released; each step of the fade takes `MOVE_FADE_MS`.
+ */
+export type MovePhase = "idle" | "enter" | "held" | "leave";
+
+type MoveEvent = "moved" | "released" | "faded";
+
+/** The fade in and out of the rows being moved, in milliseconds (as in `editors.css`). */
+export const MOVE_FADE_MS = 150;
+
+export function nextMovePhase(phase: MovePhase, event: MoveEvent): MovePhase {
+  switch (event) {
+    case "moved":
+      return phase === "enter" || phase === "held" ? "held" : "enter";
+    case "released":
+      return phase === "enter" || phase === "held" ? "leave" : phase;
+    case "faded":
+      return phase === "leave" ? "idle" : phase;
+  }
+}
+
+/** A row being moved: a whole block (`node`), or lines of code inside one. */
+type MovedRange = { readonly from: number; readonly to: number; readonly node: boolean };
+
+type MovingState = { readonly phase: MovePhase; readonly ranges: readonly MovedRange[] };
+
+const movingKey = new PluginKey<MovingState>("moving-rows");
+
+const NOT_MOVING: MovingState = { phase: "idle", ranges: [] };
+
+/** The rows the selection covers in `state`, just after they moved. */
+function movedRanges(state: EditorState): MovedRange[] {
+  const { $from, $to } = state.selection;
+  if ($from.parent.type.spec.code && $from.sameParent($to)) {
+    const text = $from.parent.textContent;
+    const start = $from.start();
+    const from = text.lastIndexOf("\n", $from.parentOffset - 1) + 1;
+    const end = text.indexOf("\n", $to.parentOffset);
+    return [{ from: start + from, to: start + (end < 0 ? text.length : end), node: false }];
+  }
+  const rows = selectedRows(state);
+  if (!rows) return [];
+  const parent = $from.node(rows.depth);
+  const ranges: MovedRange[] = [];
+  let pos = $from.start(rows.depth);
+  for (let index = 0; index < rows.end; index++) {
+    const size = parent.child(index).nodeSize;
+    if (index >= rows.start) ranges.push({ from: pos, to: pos + size, node: true });
+    pos += size;
+  }
+  return ranges;
+}
+
+/**
+ * Marks the rows that ⌥↑/⌥↓ move, in the colour of the selected search match,
+ * until ⌥ is released (`.moving-row` in `editors.css`).
+ */
+export const movingRows: Plugin<MovingState> = new Plugin<MovingState>({
+  key: movingKey,
+  state: {
+    init: () => NOT_MOVING,
+    apply(tr, previous, _old, state) {
+      const event = tr.getMeta(movingKey) as MoveEvent | undefined;
+      if (event === "moved") {
+        return { phase: nextMovePhase(previous.phase, event), ranges: movedRanges(state) };
+      }
+      const phase = event ? nextMovePhase(previous.phase, event) : previous.phase;
+      if (phase === "idle") return NOT_MOVING;
+      const ranges = tr.docChanged
+        ? previous.ranges
+            .map(({ from, to, node }) => ({
+              from: tr.mapping.map(from, 1),
+              to: tr.mapping.map(to, -1),
+              node,
+            }))
+            .filter(({ from, to }) => from < to)
+        : previous.ranges;
+      return phase === previous.phase && ranges === previous.ranges ? previous : { phase, ranges };
+    },
+  },
+  props: {
+    decorations(state) {
+      const moving = movingKey.getState(state);
+      if (!moving || moving.phase === "idle") return null;
+      const attrs = { class: `moving-row moving-row-${moving.phase}` };
+      return DecorationSet.create(
+        state.doc,
+        moving.ranges.map(({ from, to, node }) =>
+          node ? Decoration.node(from, to, attrs) : Decoration.inline(from, to, attrs),
+        ),
+      );
+    },
+  },
+  view(view) {
+    let fading: ReturnType<typeof setTimeout> | undefined;
+    const send = (event: MoveEvent) => {
+      view.dispatch(view.state.tr.setMeta(movingKey, event));
+    };
+    const release = () => {
+      const phase = movingKey.getState(view.state)?.phase;
+      if (phase === "enter" || phase === "held") send("released");
+    };
+    // ⌥ let go anywhere, a key pressed without it, or the window left.
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key === "Alt") release();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!event.altKey) release();
+    };
+    window.addEventListener("keyup", onKeyUp, true);
+    window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("blur", release);
+    return {
+      update() {
+        const leaving = movingKey.getState(view.state)?.phase === "leave";
+        if (leaving && fading === undefined) {
+          fading = setTimeout(() => {
+            fading = undefined;
+            send("faded");
+          }, MOVE_FADE_MS);
+        } else if (!leaving && fading !== undefined) {
+          clearTimeout(fading);
+          fading = undefined;
+        }
+      },
+      destroy() {
+        clearTimeout(fading);
+        window.removeEventListener("keyup", onKeyUp, true);
+        window.removeEventListener("keydown", onKeyDown, true);
+        window.removeEventListener("blur", release);
+      },
+    };
+  },
+});

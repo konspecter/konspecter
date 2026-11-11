@@ -162,6 +162,45 @@
 }
 
 /*
+ * The rows ⌥↑/⌥↓ move (`move-rows.ts`), in the selected search match's colour
+ * while ⌥ is held; they fade in and out in MOVE_FADE_MS.
+ */
+.text-editor-content .moving-row {
+  border-radius: 2px;
+  background-color: var(--color-mark-current);
+  color: var(--color-mark-current-fg);
+}
+
+.text-editor-content .moving-row-enter {
+  animation: moving-row-in 0.15s ease-out;
+}
+
+.text-editor-content .moving-row-leave {
+  animation: moving-row-out 0.15s ease-in forwards;
+}
+
+@keyframes moving-row-in {
+  from {
+    background-color: transparent;
+    color: var(--color-fg);
+  }
+}
+
+@keyframes moving-row-out {
+  to {
+    background-color: transparent;
+    color: var(--color-fg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .text-editor-content .moving-row-enter,
+  .text-editor-content .moving-row-leave {
+    animation-duration: 1ms;
+  }
+}
+
+/*
  * Every list item holds a paragraph in the editor. In a tight list (no blank
  * line between the items in the Markdown) that paragraph adds no margin, so
  * the list looks as the reader shows it; a loose list keeps paragraph spacing.

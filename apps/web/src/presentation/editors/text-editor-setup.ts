@@ -31,7 +31,7 @@ import { typedTag } from "../../domain/tag/tag-suggestions";
 import { tagRanges } from "../../domain/tag/tags";
 import { blockDecorations, updatedBlockDecorations } from "./block-decorations";
 import { codeHighlighting } from "./code-highlight";
-import { moveRow } from "./move-rows";
+import { moveRow, movingRows } from "./move-rows";
 import { ListItemView, splitItem, taskInputRule, toggleTask, untask } from "./task-items";
 import { textSchema } from "./text-schema";
 import { diffSequences, offsets } from "./diff";
@@ -563,6 +563,7 @@ export function createTextEditorState(
       addresses,
       codeHighlighting(),
       find,
+      movingRows,
       typing(),
     ],
   });

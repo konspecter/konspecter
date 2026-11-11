@@ -1,5 +1,6 @@
 import { TextSelection, type EditorState } from "prosemirror-state";
-import { moveRow } from "./move-rows";
+import { EditorView } from "prosemirror-view";
+import { MOVE_FADE_MS, moveRow, nextMovePhase } from "./move-rows";
 import { createTextEditorState } from "./text-editor-setup";
 import { textDocToMarkdown } from "./text-markdown";
 import { textMarkdownParser } from "./text-schema";
@@ -87,5 +88,68 @@ describe("moving rows", () => {
     });
     expect(moved(state, 1).markdown).toBe("```\nfirst\nthird\nsecond\n```");
     expect(moved(stateWith("```\nfirst\nsecond\n```", "first"), -1).done).toBe(false);
+  });
+});
+
+describe("marking the rows being moved", () => {
+  /** The classes and text of the elements marked as moving in `state`. */
+  function marked(state: EditorState): string[] {
+    const view = new EditorView(document.createElement("div"), { state });
+    const rows = [...view.dom.querySelectorAll(".moving-row")].map(
+      (element) =>
+        `${element.className.replace(/\s*task-item\s*/, " ").trim()}: ${element.textContent}`,
+    );
+    view.destroy();
+    return rows;
+  }
+
+  function moveIn(state: EditorState, direction: -1 | 1): EditorState {
+    let next = state;
+    moveRow(direction)(state, (tr) => {
+      next = state.apply(tr);
+    });
+    return next;
+  }
+
+  it("lights the moved list item up, then keeps it lit", () => {
+    const first = moveIn(stateWith("* a\n* b\n  * b1\n* c", "b"), -1);
+    expect(marked(first)).toEqual(["moving-row moving-row-enter: bb1"]);
+    expect(marked(moveIn(first, 1))).toEqual(["moving-row moving-row-held: bb1"]);
+  });
+
+  it("marks every selected row, and the moved lines of code", () => {
+    const rows = moveIn(stateWith("one\n\ntwo\n\nthree", "two", "three"), -1);
+    expect(marked(rows)).toEqual([
+      "moving-row moving-row-enter: two",
+      "moving-row moving-row-enter: three",
+    ]);
+    const code = moveIn(stateWith("```\nfirst\nsecond\nthird\n```", "second"), -1);
+    expect(marked(code)).toEqual(["moving-row moving-row-enter: second"]);
+  });
+
+  it("fades out once Alt is released, then lets go", () => {
+    vi.useFakeTimers();
+    const view = new EditorView(document.createElement("div"), {
+      state: stateWith("one\n\ntwo", "two"),
+    });
+    moveRow(-1)(view.state, (tr) => {
+      view.dispatch(tr);
+    });
+    expect(view.dom.querySelector(".moving-row-enter")).not.toBeNull();
+    window.dispatchEvent(new KeyboardEvent("keyup", { key: "Alt" }));
+    expect(view.dom.querySelector(".moving-row-leave")?.textContent).toBe("two");
+    vi.advanceTimersByTime(MOVE_FADE_MS);
+    expect(view.dom.querySelector(".moving-row")).toBeNull();
+    view.destroy();
+    vi.useRealTimers();
+  });
+
+  it("goes from lit to fading to gone", () => {
+    expect(nextMovePhase("idle", "moved")).toBe("enter");
+    expect(nextMovePhase("enter", "moved")).toBe("held");
+    expect(nextMovePhase("held", "released")).toBe("leave");
+    expect(nextMovePhase("leave", "moved")).toBe("enter");
+    expect(nextMovePhase("leave", "faded")).toBe("idle");
+    expect(nextMovePhase("idle", "released")).toBe("idle");
   });
 });

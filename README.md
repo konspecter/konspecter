@@ -301,6 +301,10 @@ add Shift (`Ctrl+Shift+Tab`) to step back through the loop if you went too far; 
 on the one you reached. Browsers keep `Ctrl+Tab` for their own tabs, so
 it works in the desktop app, not in a browser tab.
 
+In the editor, `⌥↑` / `⌥↓` (`Alt+↑` / `Alt+↓` elsewhere) move the line, list item or selected
+lines up or down. The rows being moved are highlighted in the colour of the current search match
+while you hold Option or Alt, and the highlight fades away when you let go.
+
 ---
 
 ## Development
