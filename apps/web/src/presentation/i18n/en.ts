@@ -50,6 +50,7 @@ export const en = {
   "tree.collapseHeadings": "Hide the headings of {title}",
   "tree.expandHeading": "Expand {heading}",
   "tree.collapseHeading": "Collapse {heading}",
+  "tree.back": "Back to {folder}",
   "tree.notes": { one: "{count} conspect", other: "{count} conspects" },
 
   "topbar.search": "Search conspects",

@@ -137,6 +137,18 @@ breakpoint in the CSS), in the browser, the PWA and the Android app alike.
   sliding out it is `inert`), without its own bar (the island holds those buttons), in
   bigger text (16px, the tree 15px, the details 14px) and 36px pane headers. The note's details
   start folded behind their "Details" header.
+- **Tags as a list** (`TagListView`, in place of `TagTreeView` while `useNarrow()`): a tree's
+  chevrons were too easy to miss with a finger, so the tags show one folder at a time and every
+  row is tapped as a whole. At the root: the top folders (a folder icon, the name, the count,
+  › on the right) and the untagged notes. A folder's row goes into it (a button: the sidebar
+  stays open); inside, a back row (‹ and the name above: the tags' pane, or the folder's
+  root with several folders; "Back to …" read out), the folder's
+  name as a link to `/?q=#tag` with its chain (as a tree folder's name), its folders, its own
+  notes, then a group for every folder below it, depth first: a thin line with the tag's name
+  in the middle, then that folder's notes, 10px further in per level. The notes of the folder
+  and all below it are read in one `loadNotes` call. Going in or out scrolls to the top (with
+  several folders, to the root's row) and focuses the back row, or the row of the folder just left. No outlines in the list; with
+  several folders, each root holds its own list.
 - **Editors:** the editor takes nearly the whole screen, with 8px of room around it (top and
   sides, instead of the page's inset), and its text 4px inside it on every side (CodeMirror's own
   line padding is dropped). The Markdown source is 13px, at a line height of 1.45.

@@ -1490,6 +1490,91 @@ kbd {
   }
 }
 
+/*
+ * The tags on a small screen (`TagListView`): one folder at a time, every row
+ * tapped as a whole. No chevrons on the left, so no room kept for them; the
+ * notes of the folders below come grouped under a thin line with the tag's
+ * name, each level a little further in.
+ */
+.tag-list {
+  --tree-indent: 10px;
+}
+
+.tag-list .tree-document {
+  padding-left: calc(var(--tree-pad) + var(--depth) * var(--tree-indent));
+}
+
+.tag-list button.tree-document {
+  box-sizing: border-box;
+  width: 100%;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* A tap leaves the pointer over the row that takes the tapped one's place: no hover there. */
+@media (hover: hover) {
+  .tag-list button.tree-document:hover {
+    background: var(--color-hover);
+  }
+}
+
+@media (hover: none) {
+  .tag-list .tree-row:not([aria-current]):hover {
+    background: none;
+  }
+}
+
+.tag-list-back {
+  color: var(--color-muted);
+}
+
+.tag-list-back .icon-chevron {
+  transform: rotate(180deg);
+}
+
+.tag-list-open {
+  font-weight: 600;
+}
+
+.tag-list-folder > .icon-chevron {
+  color: var(--color-muted);
+}
+
+.tag-list-notes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tag-list-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 2px;
+  padding: 0 8px 0 calc(var(--tree-pad) + var(--depth) * var(--tree-indent));
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.tag-list-divider::before,
+.tag-list-divider::after {
+  flex: 1;
+  height: 1px;
+  background: var(--color-tree-guide);
+  content: "";
+}
+
+.tag-list-divider > span {
+  max-width: 70%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* --- Page content -------------------------------------------------------- */
 
 .page-title {

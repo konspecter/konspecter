@@ -47,6 +47,7 @@ export const ru: Dictionary = {
   "tree.collapseHeadings": "Скрыть заголовки «{title}»",
   "tree.expandHeading": "Развернуть «{heading}»",
   "tree.collapseHeading": "Свернуть «{heading}»",
+  "tree.back": "Назад: {folder}",
   "tree.notes": {
     one: "{count} конспект",
     few: "{count} конспекта",

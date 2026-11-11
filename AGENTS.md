@@ -84,6 +84,7 @@ All planned phases are done. New work needs a new plan in `.claude/plans/`.
 | Tag hints  | Tags suggested as `#x` is typed: search box and both editors (ADR-028)      | Done   |
 | Wipe       | Site: Disconnect and wipe a device; it erases its notes when online (029)   | Done   |
 | Folders    | Desktop: several folders at once, tree roots, Library table, aliases (030)  | Done   |
+| Tag list   | Small screens: one tag folder at a time, notes below grouped by tag         | Done   |
 
 Where the packages are described: UI architecture: `docs/architecture/ui.md`; languages:
 `docs/architecture/i18n.md`; server and API: `docs/architecture/server.md`; sync:

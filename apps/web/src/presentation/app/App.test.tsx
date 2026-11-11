@@ -3664,6 +3664,59 @@ describe("small screens", () => {
     expect(screen.queryByRole("toolbar")).not.toBeInTheDocument();
   });
 
+  it("lists one tag folder at a time, with the notes below it grouped by tag", async () => {
+    const store = await newStore();
+    await store.put(createNote("# Basics\n\n#java", daysAgo(1), "basics"));
+    await store.put(createNote("# Lists\n\n#java#collections", daysAgo(2), "lists"));
+    await store.put(createNote("# Sorting\n\n#java#collections#algo", daysAgo(3), "sorting"));
+    await store.put(createNote("# Plain", daysAgo(4), "plain"));
+    renderApp(store);
+    await noteList();
+    await userEvent.click(islandButton("Show sidebar"));
+
+    // At the root: the top folders as whole rows, no chevrons to aim at, and the untagged notes.
+    const goto = await within(sidebar()).findByRole("navigation", { name: "Goto" });
+    expect(within(goto).queryByRole("button", { name: /^Expand/ })).not.toBeInTheDocument();
+    expect(within(goto).getByRole("link", { name: "Plain" })).toBeInTheDocument();
+    const java = within(goto).getByRole("button", { name: "Java, 3 conspects" });
+
+    await userEvent.click(java);
+    // Inside: a row back, the folder's own list, its folders and notes...
+    const back = within(goto).getByRole("button", { name: "Back to Goto" });
+    expect(back).toHaveFocus();
+    expect(within(goto).getByRole("link", { name: "Java, 3 conspects" })).toHaveAttribute(
+      "href",
+      "/?q=%23java",
+    );
+    expect(within(goto).getByRole("button", { name: "Collections, 2 conspects" })).toBeVisible();
+    expect(within(goto).queryByRole("link", { name: "Plain" })).not.toBeInTheDocument();
+    const basics = await within(goto).findByRole("link", { name: "Basics" });
+    expect(basics.style.getPropertyValue("--depth")).toBe("0");
+    // ...then every note below, under its tag, each level a little further in.
+    const collections = within(goto).getByRole("list", { name: "Collections" });
+    const lists = await within(collections).findByRole("link", { name: "Lists" });
+    expect(lists.style.getPropertyValue("--depth")).toBe("1");
+    const algo = within(goto).getByRole("list", { name: "Algo" });
+    const sorting = await within(algo).findByRole("link", { name: "Sorting" });
+    expect(sorting.style.getPropertyValue("--depth")).toBe("2");
+    expect(within(collections).queryByRole("link", { name: "Sorting" })).not.toBeInTheDocument();
+
+    // Deeper, then back up: the folder left takes the focus.
+    await userEvent.click(within(goto).getByRole("button", { name: "Collections, 2 conspects" }));
+    expect(within(goto).getByRole("button", { name: "Back to Java" })).toHaveFocus();
+    expect(await within(goto).findByRole("link", { name: "Lists" })).toBeInTheDocument();
+    await userEvent.click(within(goto).getByRole("button", { name: "Back to Java" }));
+    expect(within(goto).getByRole("button", { name: "Collections, 2 conspects" })).toHaveFocus();
+    await userEvent.click(within(goto).getByRole("button", { name: "Back to Goto" }));
+    expect(within(goto).getByRole("button", { name: "Java, 3 conspects" })).toHaveFocus();
+
+    // A note opens, and the sidebar gets out of the way.
+    await userEvent.click(within(goto).getByRole("button", { name: "Java, 3 conspects" }));
+    await userEvent.click(await within(goto).findByRole("link", { name: "Sorting" }));
+    expect(await textEditor()).toHaveTextContent("Sorting");
+    expect(screen.queryByRole("complementary", { name: "Sidebar" })).not.toBeInTheDocument();
+  });
+
   it("has no editor tools in the Markdown source", async () => {
     renderApp(await storeWithNotes(), "/conspects/maps");
     await textEditor();

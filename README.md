@@ -164,6 +164,13 @@ The back button (or the back gesture) works inside the app: it closes an open se
 sidebar or a dialog, then goes back to the page you came from, and from a conspect back to the
 list. Only on the list, with nowhere further back, does it leave the app.
 
+On a phone the sidebar lists one tag folder at a time instead of a tree, so there are no small
+arrows to aim at. Tap a folder's row to go into it, and the row at the top (‹ and the name
+above) to go back. Inside a folder you see its own folders and conspects, then every conspect
+further down, grouped by tag under a thin line with the tag's name; the deeper the tag, the
+further in its conspects sit. Tap the folder's name to show its conspects in the list.
+Headings are not listed under conspects there.
+
 Swipe right to go back and left to go forward: the page you go to slides in from that side.
 The sidebar slides in from the left and back out again. With reduced motion turned on in the
 system, pages and the sidebar change at once.
