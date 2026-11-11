@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.15.0 — 2026-11-12
 
 - **Several folders at once:** the desktop app works with more than one folder of Markdown
   files. Add one with the new folder-with-a-plus button next to Settings, or in Settings →
@@ -8,6 +8,33 @@
   with the date each was added, shows one in Finder, Explorer or Files, names it with an alias,
   or removes it, which only disconnects it: its files stay where they are. Sync covers every
   folder, and a new conspect goes into the open conspect's folder, or the app asks each time.
+- **Disconnect and wipe a device:** the site's device list offers Disconnect and wipe next to
+  Disconnect. A lost or sold device erases its conspects and what the app keeps the next time
+  it is online (on the desktop, the files sync covers, for good), then leaves the list. Until
+  then you can remove it from the list yourself, which withdraws the wipe. An app older than
+  this release treats the wipe as a plain disconnect and keeps its notes.
+- **A colour for each conspect:** pick one in Details. It is written to the note's
+  frontmatter, so it syncs and stays in the file; the nine recent colours are kept per device.
+  Without one, the list keeps the pastel it had.
+- **A menu for the sidebar's rows:** right-click a folder or heading to open it, or a note to
+  open or delete it; deleting asks first.
+- **Tag folders one at a time on phones:** on small screens a tag folder's whole row opens it
+  in the sidebar, with a back row above, and the notes of the folders inside come grouped under
+  their tag's name.
+- **Android's back button goes back:** it closes a dialog, the search or the sidebar, then goes
+  back as a swipe does, and cancels a confirmation; only on the list does it leave the app.
+- **Pages slide on phones:** a swipe slides the page in and the sidebar in and out, unless
+  the system asks for reduced motion.
+- **See the lines you move:** while Option or Alt is held, the lines `⌥↑` / `⌥↓` move are
+  highlighted, and the highlight fades when you let go.
+- **The title field only when it matters:** the note's properties no longer repeat the title,
+  which is the body's first line. A `title` set apart from the first line shows in its own
+  field in Text mode, where it can be seen and cleared.
+- **Smaller fixes:** tag suggestions list only the tags that start with what you typed; the
+  highlighted editor has a little room above it on phones; scrollbars are thin and stay out of
+  the way.
+- **Security updates:** the server is built with Go 1.27.4, and glob and minimatch are updated
+  for advisories.
 
 ## 0.14.0 — 2026-10-30
 
