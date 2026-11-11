@@ -1251,6 +1251,116 @@ describe("tags", () => {
 
     expect(await within(await tagTree()).findByRole("link", { name: "Rust" })).toBeInTheDocument();
   });
+
+  describe("the context menu", () => {
+    /** A right click on the row: true when the browser's own menu would show. */
+    async function rightClick(row: HTMLElement) {
+      let native = true;
+      const seen = (event: Event) => {
+        native = !event.defaultPrevented;
+      };
+      window.addEventListener("contextmenu", seen);
+      await userEvent.pointer({ keys: "[MouseRight]", target: row });
+      window.removeEventListener("contextmenu", seen);
+      return native;
+    }
+    const menu = (name: string) => screen.getByRole("menu", { name });
+    const items = (name: string) =>
+      within(menu(name))
+        .getAllByRole("menuitem")
+        .map((item) => item.textContent);
+
+    it("offers Open on a tag folder, in place of the browser's menu", async () => {
+      renderApp(await storeWithTaggedNotes());
+      const tree = await tagTree();
+
+      expect(await rightClick(within(tree).getByRole("link", { name: "Java" }))).toBe(false);
+      expect(items("Java")).toEqual(["Open"]);
+      expect(within(menu("Java")).getByRole("menuitem", { name: "Open" })).toHaveFocus();
+      await userEvent.click(within(menu("Java")).getByRole("menuitem", { name: "Open" }));
+
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+      await waitFor(async () => {
+        expect(await listTitles()).toEqual(["Lists", "Streams"]);
+      });
+      expect(within(tree).getByRole("button", { name: "Collapse #java" })).toBeInTheDocument();
+    });
+
+    it("offers Open and Delete on a note, and opens it", async () => {
+      renderApp(await storeWithTaggedNotes());
+      const tree = await tagTree();
+
+      await rightClick(await within(tree).findByRole("link", { name: "Untagged" }));
+      expect(items("Untagged")).toEqual(["Open", "Delete"]);
+      await userEvent.keyboard("{ArrowDown}");
+      expect(within(menu("Untagged")).getByRole("menuitem", { name: "Delete" })).toHaveFocus();
+      await userEvent.keyboard("{ArrowDown}{Enter}");
+
+      expect(await textEditor()).toHaveTextContent("Untagged");
+    });
+
+    it("closes on Escape, giving the focus back", async () => {
+      renderApp(await storeWithTaggedNotes());
+      const java = within(await tagTree()).getByRole("link", { name: "Java" });
+      java.focus();
+
+      await rightClick(java);
+      await userEvent.keyboard("{Escape}");
+
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+      expect(java).toHaveFocus();
+    });
+
+    it("deletes a note after confirmation, and keeps it when cancelled", async () => {
+      const store = await storeWithTaggedNotes();
+      renderApp(store);
+      const tree = await tagTree();
+      const untagged = await within(tree).findByRole("link", { name: "Untagged" });
+
+      await rightClick(untagged);
+      await userEvent.click(within(menu("Untagged")).getByRole("menuitem", { name: "Delete" }));
+      let dialog = screen.getByRole("alertdialog", { name: "Delete this conspect?" });
+      expect(dialog).toHaveAccessibleDescription(
+        "“Untagged” will be deleted. This cannot be undone.",
+      );
+      expect(within(dialog).getByRole("button", { name: "Cancel" })).toHaveFocus();
+      await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      expect(await store.get("plain")).toBeDefined();
+
+      await rightClick(untagged);
+      await userEvent.click(within(menu("Untagged")).getByRole("menuitem", { name: "Delete" }));
+      dialog = screen.getByRole("alertdialog", { name: "Delete this conspect?" });
+      await userEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+
+      await waitFor(async () => {
+        expect(await store.get("plain")).toBeUndefined();
+      });
+      await waitFor(() => {
+        expect(within(tree).queryByRole("link", { name: "Untagged" })).not.toBeInTheDocument();
+      });
+    });
+
+    it("deletes the open note from Recent, leaving it first, unsaved changes and all", async () => {
+      const store = await storeWithTaggedNotes();
+      renderApp(store, "/conspects/plain");
+      setSourceValue(await markdownEditor(), "# Untagged\n\nTyped just now.");
+
+      const row = within(recentNav()).getByRole("link", { name: "Untagged" });
+      await rightClick(row);
+      await userEvent.click(within(menu("Untagged")).getByRole("menuitem", { name: "Delete" }));
+      await userEvent.click(
+        within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete" }),
+      );
+
+      expect(await screen.findByRole("list", { name: "Conspects" })).toBeInTheDocument();
+      await waitFor(async () => {
+        expect(await store.get("plain")).toBeUndefined();
+      });
+      // The editor's last save does not bring the note back.
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(await store.get("plain")).toBeUndefined();
+    });
+  });
 });
 
 describe("tag suggestions", () => {

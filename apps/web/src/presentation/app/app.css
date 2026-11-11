@@ -1128,6 +1128,54 @@ kbd {
   font-variant-numeric: tabular-nums;
 }
 
+/* --- Context menu -------------------------------------------------------- */
+
+/* The sidebar rows' own menu (ContextMenu.tsx), drawn like the tag suggestions. */
+.context-menu {
+  position: fixed;
+  z-index: 35;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-width: 160px;
+  max-width: 240px;
+  padding: 4px;
+  border-radius: 9px;
+  background: var(--color-bg);
+  box-shadow:
+    0 0 0 1px var(--color-border),
+    0 6px 24px var(--color-shadow);
+  font-family: var(--font-ui);
+}
+
+.context-menu-item {
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--color-fg);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.4;
+  text-align: start;
+  cursor: pointer;
+}
+
+.context-menu-item:hover,
+.context-menu-item:focus-visible {
+  background: var(--color-hover);
+  outline: none;
+}
+
+.context-menu-danger {
+  color: var(--color-danger);
+}
+
+.sidebar-error {
+  margin: 0 12px 8px;
+  font-size: 13px;
+}
+
 /* --- Tag tree ------------------------------------------------------------ */
 
 /*

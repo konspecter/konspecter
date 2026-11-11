@@ -39,7 +39,13 @@ The interface speaks English and Russian ([i18n](i18n.md)). The account site sha
   the bottom; at once with reduced motion), any number open at once;
   the open panes share the height, each scrolling on its own and taking no more than its content
   needs; the tree above them scrolls the same way but never folds. The tags keep to the top and the details to the bottom; folded, the recent notes slide
-  down to the details (and back up as they open). ↑/↓ move through the tree's rows, the headers and the rows of open panes as one list. What is folded is
+  down to the details (and back up as they open). ↑/↓ move through the tree's rows, the headers and the rows of open panes as one list. A row's
+  context menu (right click, long press, the menu key) is the app's own (`ContextMenu.tsx`,
+  `role="menu"`: ↑/↓ between items, Escape closes and gives the focus back), not the
+  browser's: a folder or heading offers Open, a note (`data-note-id` on its link) Open and
+  Delete. Open is a click on the row; Delete asks in `ConfirmDialog` like the details' Delete.
+  The open note is left first (for `/`), and deleted once its editor's last save has settled
+  (`savesSettled`), so that save does not bring it back. What is folded is
   remembered per device (`localStorage`, `konspecter.sidebar.folded`); at first everything is
   open, except the details on small screens. Hidden or shown per device (`localStorage`); while it is hidden, its toggle and New note sit at the start of the top bar; on small screens it starts hidden
   and covers the whole screen when opened (see [Small screens](#small-screens)). In the desktop

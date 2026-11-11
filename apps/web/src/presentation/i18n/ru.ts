@@ -27,6 +27,8 @@ export const ru: Dictionary = {
   "sidebar.tagsHint": "Напишите в конспекте {tag} или {nested}.",
   "sidebar.recent": "Недавние",
   "sidebar.noNotes": "Конспектов пока нет.",
+  "sidebar.open": "Открыть",
+  "sidebar.delete": "Удалить",
   "tree.expand": "Развернуть #{tag}",
   "tree.collapse": "Свернуть #{tag}",
   "tree.expandHeadings": "Показать заголовки «{title}»",

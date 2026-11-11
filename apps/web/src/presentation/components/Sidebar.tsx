@@ -4,6 +4,7 @@ import {
   useEffect,
   useId,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type KeyboardEvent,
@@ -11,7 +12,7 @@ import {
   type ReactNode,
   type Ref,
 } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { tagTree, type TagNode } from "../../domain/tag/tags";
 import {
   notesInFolder,
@@ -20,15 +21,20 @@ import {
   type NoteSummary,
 } from "../../application/notes/note-catalog";
 import type { NoteRepository } from "../../application/notes/note-repository";
+import { savesSettled } from "../../application/notes/autosave";
 import { recentWithPins } from "../../application/notes/note-pins";
 import type { TagNames, TreeHeadings } from "../../domain/settings/settings";
 import { formatKeys, SHORTCUTS } from "../app/shortcuts";
 import { ChevronIcon, GearIcon, NewNoteIcon, SidebarIcon } from "@konspecter/ui/icons";
 import type { NewNoteState } from "./new-note";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
+import { summaryTitle } from "./note-title";
 import { TagTreeView, TreeDocument } from "./TagTreeView";
 import { useFold, type FoldEdge } from "../hooks/use-fold";
 import { isNarrow, useNarrow } from "../hooks/use-narrow";
 import { useSlide } from "../hooks/use-slide";
+import { useErrorMessage } from "../hooks/use-error-message";
 import { t } from "../i18n/i18n";
 import { rich } from "../i18n/rich";
 
@@ -94,6 +100,78 @@ function moveBetweenRows(event: KeyboardEvent<HTMLElement>): void {
 function focusClickedRow(event: MouseEvent<HTMLElement>): void {
   if (!(event.target instanceof Element)) return;
   rowOf(event.target)?.focus({ focusVisible: false, preventScroll: true });
+}
+
+/** A row's context menu: where it opened and the row it acts on. */
+type RowMenu = {
+  x: number;
+  y: number;
+  row: HTMLAnchorElement;
+  /** The note the row is (`data-note-id`); null for a folder or a heading. */
+  noteId: string | null;
+};
+
+/**
+ * The context menu asked for on a row (a right click, a long press, the menu
+ * key): the app's own, not the browser's. Null off the rows.
+ */
+function rowMenuAt(event: MouseEvent<HTMLElement>): RowMenu | null {
+  if (!(event.target instanceof Element)) return null;
+  const row = rowOf(event.target);
+  if (!(row instanceof HTMLAnchorElement)) return null;
+  let { clientX: x, clientY: y } = event;
+  if (x === 0 && y === 0) {
+    // From the keyboard, without a pointer: under the row.
+    const box = row.getBoundingClientRect();
+    x = box.left;
+    y = box.bottom;
+  }
+  return { x, y, row, noteId: row.dataset.noteId ?? null };
+}
+
+/** The row's name, as its menu is named. */
+function rowName(row: HTMLAnchorElement): string {
+  const label = row.matches(".tree-label") ? row : row.querySelector(".tree-label");
+  return (label ?? row).textContent.trim();
+}
+
+/**
+ * Deletes notes from the sidebar. The open note is left first, for the note
+ * list: its editor hands its last changes over as the page goes, and the note
+ * is deleted once no save of it is running, so nothing brings it back.
+ */
+function useNoteDeletion(store: NoteRepository, currentNoteId: string | null) {
+  const navigate = useNavigate();
+  const [failure, setFailure] = useState<unknown>(null);
+  const leaving = useRef<string | null>(null);
+
+  const remove = useCallback(
+    (id: string) => {
+      void savesSettled(store, id)
+        .then(() => store.delete(id))
+        .catch(setFailure);
+    },
+    [store],
+  );
+
+  // The open note's page is gone, and with it its editor's last save began.
+  useEffect(() => {
+    const id = leaving.current;
+    if (id === null || id === currentNoteId) return;
+    leaving.current = null;
+    remove(id);
+  }, [currentNoteId, remove]);
+
+  const deleteNote = (id: string) => {
+    setFailure(null);
+    if (id !== currentNoteId) {
+      remove(id);
+      return;
+    }
+    leaving.current = id;
+    void navigate("/", { replace: true });
+  };
+  return { deleteNote, failure };
 }
 
 type PaneId = "recent" | "details";
@@ -173,6 +251,39 @@ export const Sidebar = memo(function Sidebar({
     if (event.target instanceof Element && event.target.closest("a")) onNavigate();
   };
 
+  const [menu, setMenu] = useState<RowMenu | null>(null);
+  const [confirming, setConfirming] = useState<NoteSummary | null>(null);
+  const { deleteNote, failure } = useNoteDeletion(store, currentNoteId);
+  const failureText = useErrorMessage(failure);
+  const openMenu = (event: MouseEvent<HTMLElement>) => {
+    const next = rowMenuAt(event);
+    if (next === null) return;
+    event.preventDefault();
+    setMenu(next);
+  };
+  const menuItems = (target: RowMenu): ContextMenuItem[] => {
+    const items: ContextMenuItem[] = [
+      {
+        label: t("sidebar.open"),
+        // As a click on the row: it opens, a folder unfolds, a narrow sidebar closes.
+        onSelect: () => {
+          target.row.click();
+        },
+      },
+    ];
+    const note = target.noteId === null ? undefined : notes?.find((n) => n.id === target.noteId);
+    if (note) {
+      items.push({
+        label: t("sidebar.delete"),
+        danger: true,
+        onSelect: () => {
+          setConfirming(note);
+        },
+      });
+    }
+    return items;
+  };
+
   return (
     <aside
       ref={setPanel}
@@ -216,11 +327,17 @@ export const Sidebar = memo(function Sidebar({
           <NewNoteIcon />
         </Link>
       </div>
+      {failureText !== null && (
+        <p role="alert" className="inline-error sidebar-error">
+          {t("details.deleteFailed", { error: failureText })}
+        </p>
+      )}
       <div
         className="sidebar-panes"
         data-recent={folded.has("recent") ? "folded" : "open"}
         onKeyDown={moveBetweenRows}
         onClick={focusClickedRow}
+        onContextMenu={openMenu}
       >
         <SidebarTags
           store={store}
@@ -279,6 +396,34 @@ export const Sidebar = memo(function Sidebar({
           }}
         />
       </div>
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          label={rowName(menu.row)}
+          items={menuItems(menu)}
+          onClose={() => {
+            setMenu(null);
+          }}
+        />
+      )}
+      {confirming && (
+        <ConfirmDialog
+          title={t("details.deleteTitle")}
+          message={t(store.reveal ? "details.confirmDeleteFile" : "details.confirmDelete", {
+            title: summaryTitle(confirming),
+          })}
+          confirmLabel={t("sidebar.delete")}
+          danger
+          onConfirm={() => {
+            setConfirming(null);
+            deleteNote(confirming.id);
+          }}
+          onCancel={() => {
+            setConfirming(null);
+          }}
+        />
+      )}
     </aside>
   );
 });

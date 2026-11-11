@@ -304,6 +304,8 @@ export const TreeDocument = memo(function TreeDocument({
     <li>
       <Link
         to={`/conspects/${encodeURIComponent(note.id)}`}
+        // The sidebar's context menu offers to delete the note (`Sidebar.tsx`).
+        data-note-id={note.id}
         className={className ? `tree-row tree-document ${className}` : "tree-row tree-document"}
         style={indent(depth)}
         {...(current ? { "aria-current": "page" } : {})}
@@ -370,6 +372,7 @@ function OutlinedDocument({ note, depth, current, outline, onKeyDown }: Outlined
         <Link
           ref={label}
           to={`/conspects/${encodeURIComponent(note.id)}`}
+          data-note-id={note.id}
           className="tree-label"
           {...(current ? { "aria-current": "page" } : {})}
         >

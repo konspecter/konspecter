@@ -80,6 +80,10 @@ starts with that chain in its frontmatter (`java#collections` under `tags:`), so
 folder. A tag chosen elsewhere (a link, the search box) comes alone. A conspect you leave
 without writing anything is not kept.
 
+Right-click a row in the sidebar (or press the menu key on it) for its menu: a folder offers
+**Open**, a conspect **Open** and **Delete**. Delete asks first; deleting the conspect you have
+open takes you back to the list.
+
 See [TAG-CHAIN-SPEC.md](TAG-CHAIN-SPEC.md) for the full specification and examples.
 
 ### Markdown-native

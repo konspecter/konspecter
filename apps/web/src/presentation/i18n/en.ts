@@ -30,6 +30,8 @@ export const en = {
   "sidebar.tagsHint": "Write {tag} or {nested} in a conspect.",
   "sidebar.recent": "Recent",
   "sidebar.noNotes": "No conspects yet.",
+  "sidebar.open": "Open",
+  "sidebar.delete": "Delete",
   "tree.expand": "Expand #{tag}",
   "tree.collapse": "Collapse #{tag}",
   "tree.expandHeadings": "Show the headings of {title}",
