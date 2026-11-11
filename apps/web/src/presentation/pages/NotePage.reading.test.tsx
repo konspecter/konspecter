@@ -4,6 +4,7 @@ import { Link, MemoryRouter, Route, Routes } from "react-router";
 import type { ReadingPositionMode } from "../../domain/reading/reading";
 import type { EditorMode } from "../../domain/settings/settings";
 import { sourceView } from "../editors/test-helpers";
+import { preloadReader } from "../markdown/LazyMarkdownView";
 import { createNote } from "../../domain/note/note";
 import { openNoteStore, type NoteStore } from "../../infrastructure/storage/note-store";
 import { NoteCatalog } from "../../application/notes/note-catalog";
@@ -253,6 +254,13 @@ describe("a heading followed in the tree", () => {
       } as DOMRect;
     });
   }
+
+  // A note with a table is shown rendered, and the renderer loads on first use. Loading it
+  // here keeps that cold import out of the test's wait for the text, which it outran in the
+  // stress run (four suites at once).
+  beforeAll(async () => {
+    await preloadReader();
+  }, 20_000);
 
   beforeEach(() => {
     Object.defineProperty(window, "scrollY", { configurable: true, value: 0 });
