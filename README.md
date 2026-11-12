@@ -41,7 +41,7 @@ Konspecter is built around this workflow.
 
 ## See it in action
 
-![Writing a conspect with a tag, then finding it again with search](docs/assets/demo.gif)
+![Writing a conspect and picking its tag from the suggestions, then finding it again with search](docs/assets/demo.gif)
 
 The core workflow:
 
@@ -190,7 +190,7 @@ The sidebar slides in from the left and back out again. With reduced motion turn
 system, pages and the sidebar change at once.
 
 <p align="center">
-  <img src="docs/assets/mobile.png" width="560" alt="Konspecter on a phone: the list of conspects and an open conspect">
+  <img src="docs/assets/mobile.png" width="720" alt="Konspecter on a phone: the list of conspects, a conspect with the formatting tools unfolded, and a tag's list grouped by the tags below it, with search open above the bar">
 </p>
 
 ---
