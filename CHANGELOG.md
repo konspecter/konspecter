@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.16.0 — 2026-11-12
+
+- **A big + on phones:** the bar at the bottom of the screen has a big round + in its middle for
+  a new conspect, sand-coloured in the light theme and a deeper sand in the dark one. Pressed,
+  its light turns over, so it clicks in.
+- **Search above the bar on phones:** search opens just above the bottom bar, which keeps every
+  button. A circle fades in in the middle and stretches to both sides, then the search box fades
+  in; closing plays it backwards. Opening the sidebar ends the search.
+- **The editor's tools in a bar of their own on phones:** in the text editor, a small round
+  button just above Settings shows the formatting you are in. Tapping it opens every tool in a
+  column that grows up out of it; with search open, the two share one row.
+- **Tag suggestions within reach on phones:** the list is drawn like the bottom bar, as wide as
+  its longest tag, with the best tag nearest your finger; ↑/↓ follow it as drawn.
+- **What you move or find stays in sight:** the page scrolls with the lines `⌥↑` / `⌥↓` move,
+  keeping them in the middle of the screen, and a match found in the conspect lands in the
+  middle of what can be seen, above the phone's bottom bar.
+
 ## 0.15.1 — 2026-11-12
 
 - **A tag's conspects grouped on phones:** the sidebar keeps its tree on small screens too
