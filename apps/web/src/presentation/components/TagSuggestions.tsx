@@ -16,24 +16,19 @@ export function TagSuggestionList({
   style?: CSSProperties;
   ref?: Ref<HTMLUListElement>;
 }) {
-  const list = useRef<HTMLUListElement>(null);
   // A list that scrolls keeps the chosen tag (↑/↓) in sight.
   useLayoutEffect(() => {
-    const element = list.current;
+    const element = document.getElementById(completion.listId);
     const option = element?.querySelector<HTMLElement>('[aria-selected="true"]');
     if (!element || !option) return;
     if (option.offsetTop < element.scrollTop) element.scrollTop = option.offsetTop;
     const bottom = option.offsetTop + option.offsetHeight - element.clientHeight;
     if (bottom > element.scrollTop) element.scrollTop = bottom;
-  }, [completion.selected]);
+  }, [completion.listId, completion.selected]);
   if (!completion.typing) return null;
   return (
     <ul
-      ref={(element) => {
-        list.current = element;
-        if (typeof ref === "function") ref(element);
-        else if (ref) ref.current = element;
-      }}
+      ref={ref}
       id={completion.listId}
       role="listbox"
       aria-label={t("tags.suggestions")}
