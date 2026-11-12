@@ -151,7 +151,7 @@ export function Layout({
   const [sidebarOpen, setSidebarOpen] = useState(initialSidebarOpen);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [detailsSlot, setDetailsSlot] = useState<HTMLDivElement | null>(null);
-  const [islandSlot, setIslandSlot] = useState<HTMLSpanElement | null>(null);
+  const [islandSlot, setIslandSlot] = useState<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const closeIslandSearch = useRef<() => void>(null);
   const sidebarToggleRef = useRef<HTMLButtonElement>(null);
@@ -566,73 +566,77 @@ export function Layout({
             </DetailsSlot>
           </main>
         </div>
-        {/* The island's search: a panel of its own just above it, as the editor's tools are. */}
-        {narrow && islandSearchShown && (
-          <div id={islandSearchId} className="island-search">
-            {searchBox(() => {
-              setIslandSearch(false);
-            })}
-          </div>
-        )}
+        {/*
+          The island at the bottom, and the row just above it: the island's
+          search, and the open editor's tools in a bar of their own over Settings.
+        */}
         {narrow && (
-          <nav className="island" aria-label={t("topbar.actions")}>
-            <button
-              type="button"
-              className="island-button"
-              aria-label={sidebarOpen ? t("sidebar.hide") : t("sidebar.show")}
-              aria-expanded={sidebarOpen}
-              aria-controls="sidebar"
-              onClick={toggleSidebar}
-            >
-              <SidebarIcon />
-            </button>
-            <Link
-              to="/"
-              className="island-button"
-              aria-label={t("sidebar.allNotes")}
-              onClick={closeSidebarOnNarrow}
-            >
-              <ListIcon />
-            </Link>
-            {/* New note: the big round button in the middle. */}
-            <Link
-              to="/conspects/new"
-              state={newNote}
-              className="island-button island-new"
-              aria-label={t("sidebar.newNote")}
-              onClick={closeSidebarOnNarrow}
-            >
-              <PlusIcon />
-            </Link>
-            {/* The open editor's tools, when it has any. */}
-            <span ref={setIslandSlot} className="island-slot" />
-            <button
-              type="button"
-              className="island-button"
-              aria-label={onNote ? t("topbar.find") : t("topbar.search")}
-              aria-expanded={islandSearchShown}
-              aria-controls={islandSearchId}
-              onClick={() => {
-                if (islandSearchShown) {
-                  endIslandSearch();
-                  return;
-                }
-                closeSidebarOnNarrow();
-                setLibraryScope(false);
-                setIslandSearch(true);
-              }}
-            >
-              <SearchIcon />
-            </button>
-            <Link
-              to={SETTINGS_PATH}
-              className="island-button island-settings"
-              aria-label={t("sidebar.settings")}
-              onClick={closeSidebarOnNarrow}
-            >
-              <GearIcon />
-            </Link>
-          </nav>
+          <div className="island-dock">
+            {islandSearchShown && (
+              <div id={islandSearchId} className="island-search">
+                {searchBox(() => {
+                  setIslandSearch(false);
+                })}
+              </div>
+            )}
+            <div ref={setIslandSlot} className="island-editor-slot" />
+            <nav className="island" aria-label={t("topbar.actions")}>
+              <button
+                type="button"
+                className="island-button"
+                aria-label={sidebarOpen ? t("sidebar.hide") : t("sidebar.show")}
+                aria-expanded={sidebarOpen}
+                aria-controls="sidebar"
+                onClick={toggleSidebar}
+              >
+                <SidebarIcon />
+              </button>
+              <Link
+                to="/"
+                className="island-button"
+                aria-label={t("sidebar.allNotes")}
+                onClick={closeSidebarOnNarrow}
+              >
+                <ListIcon />
+              </Link>
+              {/* New note: the big round button in the middle. */}
+              <Link
+                to="/conspects/new"
+                state={newNote}
+                className="island-button island-new"
+                aria-label={t("sidebar.newNote")}
+                onClick={closeSidebarOnNarrow}
+              >
+                <PlusIcon />
+              </Link>
+              <button
+                type="button"
+                className="island-button"
+                aria-label={onNote ? t("topbar.find") : t("topbar.search")}
+                aria-expanded={islandSearchShown}
+                aria-controls={islandSearchId}
+                onClick={() => {
+                  if (islandSearchShown) {
+                    endIslandSearch();
+                    return;
+                  }
+                  closeSidebarOnNarrow();
+                  setLibraryScope(false);
+                  setIslandSearch(true);
+                }}
+              >
+                <SearchIcon />
+              </button>
+              <Link
+                to={SETTINGS_PATH}
+                className="island-button island-settings"
+                aria-label={t("sidebar.settings")}
+                onClick={closeSidebarOnNarrow}
+              >
+                <GearIcon />
+              </Link>
+            </nav>
+          </div>
         )}
         {showShortcuts && <ShortcutsDialog onClose={closeShortcuts} />}
       </div>

@@ -103,23 +103,29 @@ breakpoint in the CSS), in the browser, the PWA and the Android app alike.
 ┌──────────────────────── (theme) (mode) (antenna) ─┐
 │ Title                                             │
 │ Text across the width: 8px room, 4px inside       │
-│                                                   │
-│      ( ▯  ☰  (+)  B  ⌕   ⚙ )                      │   the island
+│ ( ⌕ Search     × )  ( B )                         │   the row above: search, tools
+│      ( ▯  ☰  (+)  ⌕   ⚙ )                         │   the island
 └───────────────────────────────────────────────────┘
 ```
 
 - **The island** (`Layout.tsx`): a rounded block fixed at the bottom centre with round 44px
   buttons: sidebar, all notes, new note (a slightly raised sand-coloured round button with a plus in the
-  middle, a little taller than the island), the text editor's tools (on the note page), search
-  and, a little apart, settings. It stays above the open sidebar, whose menu it completes; its links close the sidebar. Search opens
-  a panel of its own just above the island (`.island-search`, the island's height, across the
-  screen; the island keeps its buttons, and the search button, `aria-expanded`, closes it
-  again): the search box (the same `SearchBox`, the library or the open note) with a close
-  button at its end (`onClose`), which empties the query. The panel also shows while the list
-  has a query (a tag chosen in the sidebar), and goes when a note opens while it does not have
-  the focus (a result tapped). The editor's tools, opened, go over it. The island is always on
-  screen, also while a note is edited: both editors scroll the caret into view above it and the
-  open search (`coveredBelow` in `editors/place.ts`, as ProseMirror's
+  middle, a little taller than the island), search and, a little apart, settings. It stays
+  above the open sidebar, whose menu it completes; its links close the sidebar. It sits in a
+  dock (`.island-dock`, a grid three columns wide, the island in the middle one) with a row
+  12px above it. Search opens a panel in that row (`.island-search`, the island's height,
+  across the screen; the island keeps its buttons, and the search button, `aria-expanded`,
+  closes it again): the search box (the same `SearchBox`, the library or the open note) with a
+  close button at its end (`onClose`), which empties the query. The panel also shows while the
+  list has a query (a tag chosen in the sidebar), and goes when a note opens while it does not
+  have the focus (a result tapped). The text editor's tools are a little island of their own in
+  the same row (`.island-editor`, rendered through `IslandSlot`/`InIsland`, only by the text
+  editor), at the middle column's end, so over Settings: one button showing the tool a folded
+  toolbar would show, every tool in a column above it once pressed. With both there, the row
+  goes across the screen: the tools move to the third column's end (the right gutter) and the
+  search ends 12px before them. Over the open sidebar the tools are hidden. The island is always
+  on screen, also while a note is edited: both editors scroll the caret into view above it and
+  the row above it (`coveredBelow` in `editors/place.ts`, as ProseMirror's
   `scrollMargin` and CodeMirror's `scrollMargins`). The viewport meta has
   `interactive-widget=resizes-content`, so the island rides above the soft keyboard.
 - **Swipes** (`hooks/use-swipe.ts`, on every touch screen, wide ones too): a sideways swipe

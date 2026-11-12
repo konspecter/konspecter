@@ -24,11 +24,12 @@ export function mapPlace(place: Place, map: (position: number) => number): Place
 }
 
 /**
- * How far up from the window's bottom edge the island, and its search when
- * open above it, cover the page (small screens), else 0.
+ * How far up from the window's bottom edge the island, and the row above it
+ * (its search when open, the editor's tools), cover the page (small screens),
+ * else 0.
  */
 export function coveredBelow(): number {
-  const tops = [...document.querySelectorAll(".island, .island-search")].map(
+  const tops = [...document.querySelectorAll(".island, .island-search, .island-editor")].map(
     (element) => element.getBoundingClientRect().top,
   );
   return tops.length === 0 ? 0 : Math.max(0, window.innerHeight - Math.min(...tops));

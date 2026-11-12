@@ -166,6 +166,10 @@ Konspecter runs on Android through Capacitor. The same knowledge base travels wi
 On a phone the main buttons sit in a rounded bar at the bottom of the screen: the sidebar, the
 list, a big round **+** in the middle for a new conspect, search and settings. Search opens
 just above the bar, so its buttons stay where they are; the search button closes it again.
+In the text editor, a small round bar of its own sits just above Settings; with search open,
+the two share one row across the screen, the bar at its right edge. The bar's one button shows
+the formatting you are in (or the last one you used), and tapping it opens every formatting
+tool above it.
 
 The back button (or the back gesture) works inside the app: it closes an open search, the
 sidebar or a dialog, then goes back to the page you came from, and from a conspect back to the

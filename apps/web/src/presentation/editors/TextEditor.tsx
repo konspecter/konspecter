@@ -246,8 +246,8 @@ function shownAddress(href: string): string {
  * the block being edited, shown only while the editor has focus. It is
  * positioned absolutely, so it never takes space or shifts the text, and it
  * folds to a single tool and its toggle. Small screens have no margin for it:
- * there the island holds the tool a folded toolbar would show, and pressing
- * it opens every tool (`IslandTools`).
+ * there a bar of its own over the island's Settings button holds the tool a
+ * folded toolbar would show, and pressing it opens every tool (`IslandTools`).
  */
 export const TextEditor = memo(function TextEditor({
   initialDoc,
@@ -707,9 +707,10 @@ function ToolButton({ tool, onUse }: { tool: Tool; onUse: () => void }) {
 }
 
 /**
- * The toolbar in the island (small screens): one button showing the tool a
- * folded toolbar would show; pressing it opens every tool in a column above it,
- * and using one, or tapping elsewhere, closes them again.
+ * The toolbar on small screens: a little island of its own over the island's
+ * Settings button, with one button showing the tool a folded toolbar would
+ * show; pressing it opens every tool in a column above it, and using one, or
+ * tapping elsewhere, closes them again.
  */
 function IslandTools({
   tools,
@@ -722,7 +723,7 @@ function IslandTools({
 }) {
   const id = useId();
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLSpanElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
     const close = (event: PointerEvent) => {
@@ -734,7 +735,7 @@ function IslandTools({
     };
   }, [open]);
   return (
-    <span ref={ref} className="island-tools">
+    <div ref={ref} className="island-editor">
       <button
         type="button"
         className="island-button island-tool"
@@ -743,7 +744,7 @@ function IslandTools({
         aria-expanded={open}
         aria-controls={id}
         data-pressed={pinned?.pressed === true}
-        // Keep the editor's selection when the island is tapped.
+        // Keep the editor's selection when the button is tapped.
         onMouseDown={(event) => {
           event.preventDefault();
         }}
@@ -773,6 +774,6 @@ function IslandTools({
           ))}
         </div>
       )}
-    </span>
+    </div>
   );
 }

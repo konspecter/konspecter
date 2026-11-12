@@ -94,16 +94,34 @@ test("no screen overflows sideways on a phone", async ({ browser }) => {
   const searchBox = await search.boundingBox();
   const islandBox = await island.boundingBox();
   expect(searchBox && islandBox && searchBox.y + searchBox.height).toBeLessThan(islandBox?.y ?? 0);
+  // The editor's tools are a bar of their own, in one row with the search across the screen:
+  // the search from the left gutter, the tools' bar (its button) at the right one.
+  const formatting = page.getByRole("button", { name: "Formatting" });
+  const bar = page.locator(".island-editor");
+  const row = await page.locator(".island-search").boundingBox();
+  const barBox = await bar.boundingBox();
+  if (!row || !barBox) throw new Error("no search panel or tools' bar");
+  expect(row.x).toBeCloseTo(16, 0);
+  expect(barBox.x + barBox.width).toBeCloseTo(360 - 16, 0);
+  expect(row.x + row.width).toBeLessThan(barBox.x);
+  expect(barBox.y + barBox.height / 2).toBeCloseTo(row.y + row.height / 2, 0);
+  expect(barBox.y + barBox.height).toBeLessThan(islandBox?.y ?? 0);
   expect(await overflow(), "island search").toBeLessThanOrEqual(0);
   expect(await audit(page), "island search").toEqual([]);
   await search.getByRole("button", { name: "Close search" }).click();
   await expect(page.getByRole("searchbox")).toBeHidden();
-  // The island stays while the text is edited, and holds the editor's tools.
+  // Without the search, the tools' bar is over Settings.
+  const toolsBox = await formatting.boundingBox();
+  const settingsBox = await island.getByRole("link", { name: "Settings" }).boundingBox();
+  if (!toolsBox || !settingsBox) throw new Error("no tools or settings button");
+  expect(toolsBox.x + toolsBox.width / 2).toBeCloseTo(settingsBox.x + settingsBox.width / 2, 0);
+  expect(toolsBox.y + toolsBox.height).toBeLessThan(settingsBox.y);
+  // The island and the editor's tools stay while the text is edited.
   await page.getByRole("textbox", { name: "Conspect text" }).click();
   await expect(island).toBeVisible();
   const toolbar = page.getByRole("toolbar", { name: "Formatting" });
   await expect(toolbar).toBeHidden();
-  await island.getByRole("button", { name: "Formatting" }).click();
+  await formatting.click();
   await expect(toolbar).toBeVisible();
   expect(await overflow(), "island tools").toBeLessThanOrEqual(0);
   expect(await audit(page), "island tools").toEqual([]);

@@ -3549,6 +3549,13 @@ describe("small screens", () => {
     return panel;
   };
 
+  /** The text editor's tools: a bar of their own above the island. */
+  const editorBar = () => {
+    const bar = document.querySelector<HTMLElement>(".island-editor");
+    if (!bar) throw new Error("no editor bar");
+    return bar;
+  };
+
   async function storeWithNotes() {
     const store = await newStore();
     await store.put(createNote("# Hash maps\n\nBuckets. #java", new Date("2020-01-01"), "maps"));
@@ -3673,6 +3680,7 @@ describe("small screens", () => {
   it("holds the text editor's tools: the one in effect, and every tool until one is used", async () => {
     renderApp(await storeWithNotes(), "/conspects/maps");
     const editor = await textEditor();
+    // The tools are a bar of their own above the island, not one of its buttons.
     expect(
       [...island().querySelectorAll("button, a")].map((control) =>
         control.getAttribute("aria-label"),
@@ -3681,20 +3689,28 @@ describe("small screens", () => {
       "Show sidebar",
       "All conspects",
       "New conspect",
-      "Formatting",
       "Search in this conspect",
       "Settings",
     ]);
-    // No toolbar beside the text; the island's button shows the folded toolbar's tool.
-    const tools = islandButton("Formatting");
+    const bar = editorBar();
+    expect(bar.parentElement).toHaveClass("island-editor-slot");
+    expect(bar.parentElement?.nextElementSibling).toBe(island());
+    // No toolbar beside the text; the bar's one button shows the folded toolbar's tool.
+    const tools = within(bar).getByRole("button", { name: "Formatting" });
     expect(tools).toHaveTextContent("B");
     expect(screen.queryByRole("toolbar")).not.toBeInTheDocument();
+
+    // The island's search shares the row with it.
+    await userEvent.click(islandButton("Search in this conspect"));
+    expect(islandSearch().nextElementSibling).toBe(bar.parentElement);
+    await userEvent.click(within(islandSearch()).getByRole("button", { name: "Close search" }));
+    expect(editorBar()).toBe(bar);
 
     await userEvent.click(editor);
     caretAtEnd(editor);
     await userEvent.click(tools);
     expect(tools).toHaveAttribute("aria-expanded", "true");
-    const toolbar = within(island()).getByRole("toolbar", { name: "Formatting" });
+    const toolbar = within(bar).getByRole("toolbar", { name: "Formatting" });
     await userEvent.click(within(toolbar).getByRole("button", { name: "Heading" }));
 
     expect(editor.querySelector("h2")).toHaveTextContent("Buckets.");
@@ -3754,11 +3770,17 @@ describe("small screens", () => {
     expect(algoHere.closest("section")?.style.getPropertyValue("--level")).toBe("1");
   });
 
-  it("has no editor tools in the Markdown source", async () => {
+  it("shows the editor tools' bar only in the text editor", async () => {
     renderApp(await storeWithNotes(), "/conspects/maps");
     await textEditor();
+    expect(editorBar()).toBeInTheDocument();
     await markdownEditor();
-    expect(within(island()).queryByRole("button", { name: "Formatting" })).not.toBeInTheDocument();
+    expect(document.querySelector(".island-editor")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Formatting" })).not.toBeInTheDocument();
+
+    await userEvent.click(islandLink("All conspects"));
+    await noteList();
+    expect(document.querySelector(".island-editor")).toBeNull();
   });
 
   describe("the mobile app's back button", () => {
