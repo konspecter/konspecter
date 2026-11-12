@@ -19,6 +19,7 @@ import { rememberLocation } from "../app/last-location";
 import { pinKeyOf, SHORTCUTS } from "../app/shortcuts";
 import type { UpdateSource } from "../app/updates";
 import { stepsAway, useHistorySteps } from "../hooks/use-history-steps";
+import { useIslandStretch } from "../hooks/use-island-stretch";
 import { useShortcuts } from "../hooks/use-shortcuts";
 import { slideIn } from "../hooks/use-slide";
 import { useSwipe } from "../hooks/use-swipe";
@@ -198,6 +199,16 @@ export function Layout({
 
   const query = location.pathname === "/" ? (searchParams.get("q") ?? "") : "";
   const islandSearchShown = islandSearch || query !== "";
+  // It stretches open and shrinks back (`hooks/use-island-stretch.ts`), staying while it shrinks.
+  const dockRef = useRef<HTMLDivElement>(null);
+  const islandSearchRef = useRef<HTMLDivElement>(null);
+  const islandSearchRendered = useIslandStretch(
+    islandSearchShown,
+    narrow,
+    dockRef,
+    islandSearchRef,
+    islandSlot,
+  );
   // Opened, the island's field takes the focus (and brings up the keyboard).
   useLayoutEffect(() => {
     if (islandSearch) searchRef.current?.focus();
@@ -571,9 +582,14 @@ export function Layout({
           search, and the open editor's tools in a bar of their own over Settings.
         */}
         {narrow && (
-          <div className="island-dock">
-            {islandSearchShown && (
-              <div id={islandSearchId} className="island-search">
+          <div ref={dockRef} className="island-dock">
+            {islandSearchRendered && (
+              <div
+                ref={islandSearchRef}
+                id={islandSearchId}
+                className="island-search"
+                inert={!islandSearchShown}
+              >
                 {searchBox(() => {
                   setIslandSearch(false);
                 })}

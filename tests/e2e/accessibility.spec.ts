@@ -90,6 +90,8 @@ test("no screen overflows sideways on a phone", async ({ browser }) => {
   await island.getByRole("button", { name: "Search in this conspect" }).click();
   const search = page.getByRole("search");
   await expect(search.getByRole("searchbox")).toBeFocused();
+  // It stretches open from a circle in the middle; measured once it has.
+  await expect(page.locator(".island-search[data-stretching]")).toHaveCount(0);
   await expect(island.getByRole("link", { name: "New conspect" })).toBeVisible();
   const searchBox = await search.boundingBox();
   const islandBox = await island.boundingBox();
@@ -109,6 +111,8 @@ test("no screen overflows sideways on a phone", async ({ browser }) => {
   expect(await overflow(), "island search").toBeLessThanOrEqual(0);
   expect(await audit(page), "island search").toEqual([]);
   await search.getByRole("button", { name: "Close search" }).click();
+  // It shrinks back, then goes.
+  await expect(page.locator(".island-search")).toHaveCount(0);
   await expect(page.getByRole("searchbox")).toBeHidden();
   // Without the search, the tools' bar is over Settings.
   const toolsBox = await formatting.boundingBox();

@@ -165,7 +165,9 @@ Konspecter runs on Android through Capacitor. The same knowledge base travels wi
 
 On a phone the main buttons sit in a rounded bar at the bottom of the screen: the sidebar, the
 list, a big round **+** in the middle for a new conspect, search and settings. Search opens
-just above the bar, so its buttons stay where they are; the search button closes it again.
+just above the bar, so its buttons stay where they are: it grows quickly out of the middle to
+both sides, then the search box fades in. The search button closes it again: the search box
+fades out and the bar shrinks back the same way.
 In the text editor, a small round bar of its own sits just above Settings; with search open,
 the two share one row across the screen, the bar at its right edge. The bar's one button shows
 the formatting you are in (or the last one you used), and tapping it opens every formatting

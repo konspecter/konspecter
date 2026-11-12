@@ -2517,6 +2517,21 @@ kbd {
   font-family: var(--font-ui);
 }
 
+/*
+ * While the panel stretches open or shrinks back (`hooks/use-island-stretch.ts`), its
+ * search box keeps its open width, centred, and the panel shows as much of it
+ * as fits.
+ */
+.island-search[data-stretching] {
+  justify-content: center;
+  overflow: hidden;
+}
+
+.island-search[data-stretching] > .search-box {
+  flex: none;
+  width: var(--stretch-width);
+}
+
 .island-search .search-box {
   flex: 1;
   height: 44px;
