@@ -49,6 +49,16 @@ export function visibleArea(): { top: number; bottom: number } {
 }
 
 /**
+ * Scrolls the page so that `rect` (in window coordinates) is in the middle of
+ * the part of the window where the note can be seen (`visibleArea`).
+ */
+export function centreInView(rect: { readonly top: number; readonly bottom: number }): void {
+  const { top, bottom } = visibleArea();
+  const off = (rect.top + rect.bottom) / 2 - (top + bottom) / 2;
+  if (Math.abs(off) >= 1) window.scrollBy({ top: off });
+}
+
+/**
  * A block's text and where each of its characters is, with one more position
  * at the end: the block's end.
  */

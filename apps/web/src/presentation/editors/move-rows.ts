@@ -8,6 +8,7 @@ import {
   type Transaction,
 } from "prosemirror-state";
 import { Decoration, DecorationSet } from "prosemirror-view";
+import { centreInView } from "./place";
 
 /**
  * Moving rows with ⌥↑/⌥↓ (Alt elsewhere), as the Markdown editor moves lines.
@@ -15,10 +16,11 @@ import { Decoration, DecorationSet } from "prosemirror-view";
  * so a list item moves among its list's items; the rows the selection covers
  * move together, past the row above or below them in the same parent. In a
  * code block, the lines of its code move instead. Nothing moves past the
- * first or the last row (the key is then not taken).
+ * first or the last row (the key is then not taken). In an editor on screen,
+ * the caret's line is kept in the middle of it as the rows move.
  */
 export function moveRow(direction: -1 | 1): Command {
-  return (state, dispatch) => {
+  return (state, dispatch, view) => {
     const { $from, $to } = state.selection;
     if (!$from.parent.isTextblock || !$to.parent.isTextblock) return false;
     const tr =
@@ -26,7 +28,14 @@ export function moveRow(direction: -1 | 1): Command {
         ? moveCodeLines(state, direction)
         : moveBlocks(state, direction);
     if (!tr) return false;
-    dispatch?.(tr.setMeta(movingKey, "moved").scrollIntoView());
+    if (!dispatch) return true;
+    tr.setMeta(movingKey, "moved");
+    if (view) {
+      dispatch(tr);
+      centreInView(view.coordsAtPos(view.state.selection.head));
+    } else {
+      dispatch(tr.scrollIntoView());
+    }
     return true;
   };
 }

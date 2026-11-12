@@ -1,4 +1,11 @@
-import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  indentWithTab,
+  moveLineDown,
+  moveLineUp,
+} from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { yamlFrontmatter } from "@codemirror/lang-yaml";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
@@ -42,7 +49,7 @@ import { withSavedDates, type Note } from "../../domain/note/note";
 import { findMatches, type Match } from "../../domain/search/find";
 import { NO_FIND, type NoteFind } from "../components/note-find";
 import { headingTop, type HeadingTarget } from "../components/note-heading";
-import { coveredBelow, visibleArea, type Place } from "./place";
+import { centreInView, coveredBelow, visibleArea, type Place } from "./place";
 
 type MarkdownSourceEditorProps = {
   /** Read once, when the editor mounts. */
@@ -180,6 +187,16 @@ export const firstLineTitle: Command = (view) => {
   return true;
 };
 
+/** `command` (⌥↑/⌥↓ moving lines), then the caret's line in the middle of the screen. */
+function centred(command: Command): Command {
+  return (view) => {
+    if (!command(view)) return false;
+    const caret = view.coordsAtPos(view.state.selection.main.head);
+    if (caret) centreInView(caret);
+    return true;
+  };
+}
+
 export function createSourceExtensions(
   onChange: (value: string) => void,
   {
@@ -206,6 +223,8 @@ export function createSourceExtensions(
     highlightSelectionMatches(),
     // Searching is the top bar's (Mod+F); CodeMirror keeps its selection commands.
     keymap.of([
+      { key: "Alt-ArrowUp", run: centred(moveLineUp) },
+      { key: "Alt-ArrowDown", run: centred(moveLineDown) },
       ...defaultKeymap,
       ...historyKeymap,
       { key: "Mod-d", run: selectNextOccurrence, preventDefault: true },

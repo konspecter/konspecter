@@ -144,6 +144,26 @@ describe("marking the rows being moved", () => {
     vi.useRealTimers();
   });
 
+  it("keeps the moved line in the middle of the screen", () => {
+    const view = new EditorView(document.createElement("div"), {
+      state: stateWith("one\n\ntwo", "two"),
+    });
+    const caret = vi
+      .spyOn(view, "coordsAtPos")
+      .mockReturnValue({ left: 0, right: 0, top: 700, bottom: 720 });
+    const scrollBy = vi.spyOn(window, "scrollBy").mockImplementation(() => undefined);
+    moveRow(-1)(
+      view.state,
+      (tr) => {
+        view.dispatch(tr);
+      },
+      view,
+    );
+    expect(caret).toHaveBeenCalledWith(view.state.selection.head);
+    expect(scrollBy).toHaveBeenCalledWith({ top: 710 - window.innerHeight / 2 });
+    view.destroy();
+  });
+
   it("goes from lit to fading to gone", () => {
     expect(nextMovePhase("idle", "moved")).toBe("enter");
     expect(nextMovePhase("enter", "moved")).toBe("held");

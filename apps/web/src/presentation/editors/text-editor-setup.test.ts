@@ -51,6 +51,8 @@ describe("text editor quotes", () => {
 describe("moving rows in the text editor", () => {
   it("moves the row at the caret with Alt+↑ and Alt+↓", () => {
     const { view } = editorWith("one\n\ntwo\n\nthree");
+    // jsdom does not scroll: the moved line is kept in the middle of the screen.
+    vi.spyOn(window, "scrollBy").mockImplementation(() => undefined);
     // In "two".
     view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 7)));
     const press = (key: string) =>
