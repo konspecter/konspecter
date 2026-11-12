@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.15.1 — 2026-11-12
+
+- **A tag's conspects grouped on phones:** the sidebar keeps its tree on small screens too
+  again: the arrow opens a folder, its name shows the folder's conspects. Those come grouped
+  instead: the tag's own first, then those of each tag inside it under a thin line with its
+  name, which opens that tag's list. While you scroll, the lines of the group you are reading
+  and of the tags above it stay at the top, one under the other.
+- **A compact list on phones:** each conspect shows a smaller cover with the date of its last
+  edit on it, beside its title and tags.
+- **Smaller fixes:** screen readers call the sidebar's tags "Tags" again, not "Goto".
+
 ## 0.15.0 — 2026-11-12
 
 - **Several folders at once:** the desktop app works with more than one folder of Markdown
