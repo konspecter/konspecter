@@ -2706,11 +2706,6 @@ kbd {
   font-size: 14px;
 }
 
-/* Settings stands a little apart from the rest. */
-.island-settings {
-  margin-left: 10px;
-}
-
 @media (max-width: 760px) {
   :root {
     /* The top bar: 12px from the screen's top edge to its icons, 2px below them. */

@@ -110,7 +110,7 @@ breakpoint in the CSS), in the browser, the PWA and the Android app alike.
 
 - **The island** (`Layout.tsx`): a rounded block fixed at the bottom centre with round 44px
   buttons: sidebar, all notes, new note (a slightly raised sand-coloured round button with a plus in the
-  middle, a little taller than the island), search and, a little apart, settings. It stays
+  middle, a little taller than the island), search and settings. It stays
   above the open sidebar, whose menu it completes; its links close the sidebar. It sits in a
   dock (`.island-dock`, a grid three columns wide, the island in the middle one) with a row
   12px above it. Search opens a panel in that row (`.island-search`, the island's height,
