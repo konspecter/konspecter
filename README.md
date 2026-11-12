@@ -98,6 +98,9 @@ Details (before Properties): pick any colour from the spectrum, or one of the ni
 kept in the row under it. **Default colour** goes back to the pastel. The colour is written in the
 conspect's frontmatter (`color: "#4f8fd6"`), so it syncs and stays in the file.
 
+On a phone the list is more compact: a small cover with the date of the last edit on it
+(as 12.11.26), and beside it the title and the tags.
+
 ### Local-first
 
 Your library lives on your device and works offline: IndexedDB in the web app, installable PWA, no cloud account required for local use, offline full-text search, remembered reading position, export at any time. The hosted service is optional.
@@ -164,12 +167,11 @@ The back button (or the back gesture) works inside the app: it closes an open se
 sidebar or a dialog, then goes back to the page you came from, and from a conspect back to the
 list. Only on the list, with nowhere further back, does it leave the app.
 
-On a phone the sidebar lists one tag folder at a time instead of a tree, so there are no small
-arrows to aim at. Tap a folder's row to go into it, and the row at the top (‹ and the name
-above) to go back. Inside a folder you see its own folders and conspects, then every conspect
-further down, grouped by tag under a thin line with the tag's name; the deeper the tag, the
-further in its conspects sit. Tap the folder's name to show its conspects in the list.
-Headings are not listed under conspects there.
+On a phone, a tag's list (tap a tag's name in the sidebar) comes grouped: first the
+conspects of the tag itself, then those of every tag below it, each group under a thin line
+with the tag's name; the deeper the tag, the further in its conspects sit. Tap a name in a
+line to open that tag's list. While you scroll, the lines of the group you are reading and of
+the tags above it stay at the top, one under the other, so you always see where you are.
 
 Swipe right to go back and left to go forward: the page you go to slides in from that side.
 The sidebar slides in from the left and back out again. With reduced motion turned on in the

@@ -48,7 +48,7 @@ type TagTreeViewProps = {
 };
 
 /** The note list filtered to the tag (a search for `#tag`). */
-export function tagPath(tag: Tag): string {
+function tagPath(tag: Tag): string {
   return `/?q=${encodeURIComponent(`#${tag.name}`)}`;
 }
 
@@ -196,7 +196,7 @@ function sideways(event: KeyboardEvent): "left" | "right" | null {
 }
 
 /** The row's indentation level, read by the stylesheet. */
-export function indent(depth: number): CSSProperties {
+function indent(depth: number): CSSProperties {
   return { "--depth": depth } as CSSProperties;
 }
 

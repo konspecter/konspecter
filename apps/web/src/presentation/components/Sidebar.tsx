@@ -42,7 +42,6 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { summaryTitle } from "./note-title";
 import { FolderRoot, TagTreeView, TreeDocument } from "./TagTreeView";
-import { TagListView } from "./TagListView";
 import { useFold, type FoldEdge } from "../hooks/use-fold";
 import { isNarrow, useNarrow } from "../hooks/use-narrow";
 import { useSlide } from "../hooks/use-slide";
@@ -74,10 +73,9 @@ type SidebarProps = {
 
 /**
  * The rows of the panes: the folders' roots (several folders), the tag
- * folders and notes of the tree (or of the list, on a small screen: its
- * folders are buttons), then the recent notes.
+ * folders and notes of the tree, then the recent notes.
  */
-export const SIDEBAR_ROWS = "button.tree-root, a.tree-label, .tree-document, a.recent-link";
+export const SIDEBAR_ROWS = "button.tree-root, a.tree-label, a.tree-document, a.recent-link";
 
 /** What ↑/↓ move between: the panes' headers and their rows. */
 const MOVE_TARGETS = `.pane-toggle, ${SIDEBAR_ROWS}`;
@@ -648,14 +646,10 @@ function FolderTree({
   parent: RefObject<HTMLElement | null>;
 }) {
   const [tree, setTree] = useState<readonly TagNode[] | null>(null);
-  // A small screen lists one folder at a time: a tree's chevrons are too small to tap.
-  const narrow = useNarrow();
   const loadNotes = useCallback(
-    // The list on a small screen shows no headings: they are not read for it.
-    (noteIds: readonly string[]) =>
-      notesInFolder(store, noteIds, { headings: headings && !narrow }),
+    (noteIds: readonly string[]) => notesInFolder(store, noteIds, { headings }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- library marks the change
-    [store, library, headings, narrow],
+    [store, library, headings],
   );
   const notes = useMemo(
     () => untagged.filter((note) => folderLibrary.folderOf(note.id) === folder.id),
@@ -678,17 +672,7 @@ function FolderTree({
   }, [folderLibrary, folder.id, library, tagNames]);
 
   if (tree === null) return null;
-  return narrow ? (
-    <TagListView
-      nodes={tree}
-      notes={notes}
-      activeTag={activeTag}
-      currentNoteId={currentNoteId}
-      loadNotes={loadNotes}
-      depth={1}
-      rootName={folderLabel(folder)}
-    />
-  ) : (
+  return (
     <TagTreeView
       nodes={tree}
       notes={notes}
@@ -713,15 +697,11 @@ function SingleTree({
   headings,
 }: SidebarTagsProps) {
   const [tree, setTree] = useState<readonly TagNode[] | null>(null);
-  // A small screen lists one folder at a time: a tree's chevrons are too small to tap.
-  const narrow = useNarrow();
   // A new loader for every change, so open folders read their notes again.
   const loadNotes = useCallback(
-    // The list on a small screen shows no headings: they are not read for it.
-    (noteIds: readonly string[]) =>
-      notesInFolder(store, noteIds, { headings: headings && !narrow }),
+    (noteIds: readonly string[]) => notesInFolder(store, noteIds, { headings }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- library marks the change
-    [store, library, headings, narrow],
+    [store, library, headings],
   );
   // Read again whenever a note changes; the old tree stays until then.
   useEffect(() => {
@@ -752,14 +732,6 @@ function SingleTree({
               nested: <code>#parent#child</code>,
             })}
           </p>
-        ) : narrow ? (
-          <TagListView
-            nodes={tree}
-            notes={untagged}
-            activeTag={activeTag}
-            currentNoteId={currentNoteId}
-            loadNotes={loadNotes}
-          />
         ) : (
           <TagTreeView
             nodes={tree}

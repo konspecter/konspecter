@@ -24,7 +24,7 @@ export const en = {
   "sidebar.settings": "Settings",
   "sidebar.allNotes": "All conspects",
   "sidebar.newNote": "New conspect",
-  "sidebar.tags": "Goto",
+  "sidebar.tags": "Tags",
   "tags.suggestions": "Tags to choose from",
   "sidebar.noRecent": "No activity in 7 days",
   "sidebar.tagsHint": "Write {tag} or {nested} in a conspect.",
@@ -50,7 +50,6 @@ export const en = {
   "tree.collapseHeadings": "Hide the headings of {title}",
   "tree.expandHeading": "Expand {heading}",
   "tree.collapseHeading": "Collapse {heading}",
-  "tree.back": "Back to {folder}",
   "tree.notes": { one: "{count} conspect", other: "{count} conspects" },
 
   "topbar.search": "Search conspects",

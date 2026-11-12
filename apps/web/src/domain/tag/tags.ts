@@ -271,6 +271,66 @@ export function tagTreeContains(node: TagNode, name: string): boolean {
   return node.children.some((child) => child.tag.name === name || tagTreeContains(child, name));
 }
 
+/** A folder below a tag's folder, `level` folders down, with the notes in it itself. */
+export type TagGroup = {
+  readonly tag: Tag;
+  /** Its path from the root: `java#collections#algo`. */
+  readonly chain: string;
+  readonly label: string;
+  readonly level: number;
+  readonly noteIds: readonly string[];
+};
+
+/**
+ * A tag's folder in the tree, as a list of the notes in it: those in the
+ * folder itself, then a group for every folder below it, depth first.
+ * `chain` (`java#collections`) picks the folder where the tag shows in more
+ * than one; without it, or when it leads nowhere, the first one depth first.
+ * Null when the tag is not in the tree.
+ */
+export function tagGroups(
+  nodes: readonly TagNode[],
+  name: string,
+  chain: string | null = null,
+): { readonly noteIds: readonly string[]; readonly groups: readonly TagGroup[] } | null {
+  const found =
+    (chain === null ? null : nodeAt(nodes, chain.split("#"), name)) ?? firstNamed(nodes, name, "");
+  if (!found) return null;
+  const below = (parent: TagNode, above: string, level: number): TagGroup[] =>
+    parent.children.flatMap((child) => {
+      const path = `${above}#${child.tag.name}`;
+      return [
+        { tag: child.tag, chain: path, label: child.label, level, noteIds: child.noteIds },
+        ...below(child, path, level + 1),
+      ];
+    });
+  return { noteIds: found.node.noteIds, groups: below(found.node, found.chain, 1) };
+}
+
+type Found = { readonly node: TagNode; readonly chain: string };
+
+/** The folder at the end of `path` from the root, if it is the tag named `name`. */
+function nodeAt(nodes: readonly TagNode[], path: readonly string[], name: string): Found | null {
+  let level = nodes;
+  let found: TagNode | undefined;
+  for (const each of path) {
+    found = level.find((node) => node.tag.name === each);
+    if (!found) return null;
+    level = found.children;
+  }
+  return found?.tag.name === name ? { node: found, chain: path.join("#") } : null;
+}
+
+function firstNamed(nodes: readonly TagNode[], name: string, above: string): Found | null {
+  for (const node of nodes) {
+    const chain = above === "" ? node.tag.name : `${above}#${node.tag.name}`;
+    if (node.tag.name === name) return { node, chain };
+    const below = firstNamed(node.children, name, chain);
+    if (below) return below;
+  }
+  return null;
+}
+
 /**
  * How a tag is shown inside the tree: its spelling, case kept, with "_" shown
  * as a space ("Linked_List" → "Linked List"), and with a capital first letter

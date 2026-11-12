@@ -583,7 +583,7 @@ describe("sidebar panes", () => {
   it("folds each pane on its header, any number open, and remembers it", async () => {
     renderApp(await taggedStore(), "/conspects/java");
     await textEditor();
-    const tags = await within(sidebar()).findByRole("navigation", { name: "Goto" });
+    const tags = await within(sidebar()).findByRole("navigation", { name: "Tags" });
     const javaTag = within(tags).getByRole("link", { name: "Java" });
     const recentNote = within(recentNav()).getByRole("link", { name: "Java Collections" });
     const details = within(sidebar()).getByRole("region", { name: "Details" });
@@ -603,7 +603,7 @@ describe("sidebar panes", () => {
     cleanup();
     renderApp(await taggedStore(), "/conspects/java");
     await textEditor();
-    await within(sidebar()).findByRole("navigation", { name: "Goto" });
+    await within(sidebar()).findByRole("navigation", { name: "Tags" });
     expect(paneToggle("Recent")).toHaveAttribute("aria-expanded", "false");
     expect(paneToggle("Details")).toHaveAttribute("aria-expanded", "false");
     await userEvent.click(paneToggle("Recent"));
@@ -612,14 +612,14 @@ describe("sidebar panes", () => {
 
   it("keeps the tag tree open, with no header to fold it", async () => {
     renderApp(await taggedStore());
-    const tags = await within(sidebar()).findByRole("navigation", { name: "Goto" });
-    expect(within(sidebar()).queryByRole("button", { name: "Goto" })).not.toBeInTheDocument();
+    const tags = await within(sidebar()).findByRole("navigation", { name: "Tags" });
+    expect(within(sidebar()).queryByRole("button", { name: "Tags" })).not.toBeInTheDocument();
     expect(within(tags).getByRole("link", { name: "Java" })).toBeVisible();
   });
 
   it("moves with ↑/↓ through the tree, the headers and the rows of open panes", async () => {
     renderApp(await taggedStore());
-    const tags = await within(sidebar()).findByRole("navigation", { name: "Goto" });
+    const tags = await within(sidebar()).findByRole("navigation", { name: "Tags" });
     const java = within(tags).getByRole("link", { name: "Java" });
     act(() => {
       java.focus();
@@ -640,7 +640,7 @@ describe("sidebar panes", () => {
 
   it("moves with ↑/↓ from a clicked row, also where a click does not focus it (WebKit)", async () => {
     renderApp(await taggedStore());
-    const tags = await within(sidebar()).findByRole("navigation", { name: "Goto" });
+    const tags = await within(sidebar()).findByRole("navigation", { name: "Tags" });
     // A bare click event, as WebKit sends it: no focus of its own.
     const java = within(tags).getByRole("link", { name: "Java" });
     fireEvent.click(java);
@@ -654,7 +654,7 @@ describe("sidebar panes", () => {
 
   it("enters the sidebar with Ctrl+\\ on an open pane only", async () => {
     renderApp(await taggedStore(), "/conspects/java");
-    const tags = await within(sidebar()).findByRole("navigation", { name: "Goto" });
+    const tags = await within(sidebar()).findByRole("navigation", { name: "Tags" });
     await userEvent.click(paneToggle("Recent"));
     await userEvent.click(await textEditor());
 
@@ -1037,7 +1037,7 @@ describe("tags", () => {
     await store.put(createNote("# Untagged", daysAgo(3), "plain"));
     return store;
   }
-  const tagTree = () => within(sidebar()).findByRole("navigation", { name: "Goto" });
+  const tagTree = () => within(sidebar()).findByRole("navigation", { name: "Tags" });
 
   it("shows the tags as folders with their notes inside, with counts, collapsed", async () => {
     renderApp(await storeWithTaggedNotes());
@@ -1585,7 +1585,7 @@ describe("headings in the tree", () => {
     await store.put(createNote("# Plain\n\nNo headings.", daysAgo(2), "plain"));
     return store;
   }
-  const tagTree = () => within(sidebar()).findByRole("navigation", { name: "Goto" });
+  const tagTree = () => within(sidebar()).findByRole("navigation", { name: "Tags" });
   const shown: Settings = { ...DEFAULT_SETTINGS, treeHeadings: "shown" };
 
   it("lists a note's headings up to h3 under it, nested, folded until opened", async () => {
@@ -2178,7 +2178,7 @@ describe("settings and the top bar", () => {
     await store.put(createNote("# N\n\n#новые_технологии", new Date(), "n"));
     renderWithSettings(store, "/settings");
 
-    const tree = await within(sidebar()).findByRole("navigation", { name: "Goto" });
+    const tree = await within(sidebar()).findByRole("navigation", { name: "Tags" });
     expect(await within(tree).findByRole("link", { name: "Новые технологии" })).toBeInTheDocument();
     await userEvent.selectOptions(
       screen.getByRole("combobox", { name: "Tag names" }),
@@ -2195,7 +2195,7 @@ describe("settings and the top bar", () => {
     await store.put(createNote("# Maps\n\n## Buckets", new Date(), "maps"));
     renderWithSettings(store, "/settings");
 
-    const tree = await within(sidebar()).findByRole("navigation", { name: "Goto" });
+    const tree = await within(sidebar()).findByRole("navigation", { name: "Tags" });
     expect(await within(tree).findByRole("link", { name: "Maps" })).toHaveClass("tree-document");
     const headings = screen.getByRole("radiogroup", { name: "Headings in the sidebar" });
     expect(within(headings).getByRole("radio", { name: "Hidden" })).toBeChecked();
@@ -2939,7 +2939,7 @@ describe("several folders", () => {
       { id: "a", path: "/Users/ada/Konspecter", files: homeFiles },
       { id: "b", path: "/Users/ada/Work", files: workFiles },
     ]);
-  const tree = () => within(sidebar()).getByRole("navigation", { name: "Goto" });
+  const tree = () => within(sidebar()).getByRole("navigation", { name: "Tags" });
   const root = (name: string) => within(tree()).getByRole("button", { name, expanded: true });
 
   it("shows no root for a single folder", async () => {
@@ -3224,7 +3224,7 @@ describe("onboarding", () => {
     });
     // The example opens in the text editor, and its tags reach the sidebar.
     expect(await textEditor()).toHaveTextContent("Headings and lists");
-    const tree = await within(sidebar()).findByRole("navigation", { name: "Goto" });
+    const tree = await within(sidebar()).findByRole("navigation", { name: "Tags" });
     expect(await within(tree).findByRole("link", { name: "Konspecter" })).toBeInTheDocument();
   });
 
@@ -3664,7 +3664,7 @@ describe("small screens", () => {
     expect(screen.queryByRole("toolbar")).not.toBeInTheDocument();
   });
 
-  it("lists one tag folder at a time, with the notes below it grouped by tag", async () => {
+  it("groups a tag's list by the tags below it, each a link to its own list", async () => {
     const store = await newStore();
     await store.put(createNote("# Basics\n\n#java", daysAgo(1), "basics"));
     await store.put(createNote("# Lists\n\n#java#collections", daysAgo(2), "lists"));
@@ -3674,47 +3674,39 @@ describe("small screens", () => {
     await noteList();
     await userEvent.click(islandButton("Show sidebar"));
 
-    // At the root: the top folders as whole rows, no chevrons to aim at, and the untagged notes.
-    const goto = await within(sidebar()).findByRole("navigation", { name: "Goto" });
-    expect(within(goto).queryByRole("button", { name: /^Expand/ })).not.toBeInTheDocument();
-    expect(within(goto).getByRole("link", { name: "Plain" })).toBeInTheDocument();
-    const java = within(goto).getByRole("button", { name: "Java, 3 conspects" });
+    // The sidebar keeps its tree: a chevron opens a folder, its name selects it.
+    const tags = await within(sidebar()).findByRole("navigation", { name: "Tags" });
+    expect(within(tags).getByRole("button", { name: "Expand #java" })).toBeInTheDocument();
+    await userEvent.click(within(tags).getByRole("link", { name: "Java" }));
 
-    await userEvent.click(java);
-    // Inside: a row back, the folder's own list, its folders and notes...
-    const back = within(goto).getByRole("button", { name: "Back to Goto" });
-    expect(back).toHaveFocus();
-    expect(within(goto).getByRole("link", { name: "Java, 3 conspects" })).toHaveAttribute(
-      "href",
-      "/?q=%23java",
-    );
-    expect(within(goto).getByRole("button", { name: "Collections, 2 conspects" })).toBeVisible();
-    expect(within(goto).queryByRole("link", { name: "Plain" })).not.toBeInTheDocument();
-    const basics = await within(goto).findByRole("link", { name: "Basics" });
-    expect(basics.style.getPropertyValue("--depth")).toBe("0");
-    // ...then every note below, under its tag, each level a little further in.
-    const collections = within(goto).getByRole("list", { name: "Collections" });
-    const lists = await within(collections).findByRole("link", { name: "Lists" });
-    expect(lists.style.getPropertyValue("--depth")).toBe("1");
-    const algo = within(goto).getByRole("list", { name: "Algo" });
-    const sorting = await within(algo).findByRole("link", { name: "Sorting" });
-    expect(sorting.style.getPropertyValue("--depth")).toBe("2");
+    // The tag's own notes first, then each tag below it under a line, a little further in.
+    const collections = await screen.findByRole("list", { name: "Collections" });
+    const own = screen.getByRole("list", { name: "Conspects" });
+    expect(within(own).getByRole("link", { name: "Basics" })).toBeInTheDocument();
+    expect(within(own).queryByRole("link", { name: "Lists" })).not.toBeInTheDocument();
+    // On the cover, the date of the last edit in numbers only, the year in two digits.
+    const chip = own.querySelector(".note-result-date-chip time");
+    expect(chip?.textContent).toMatch(/^\d{2}\D\d{2}\D\d{2}$/);
+    expect(within(collections).getByRole("link", { name: "Lists" })).toBeInTheDocument();
     expect(within(collections).queryByRole("link", { name: "Sorting" })).not.toBeInTheDocument();
+    const algo = screen.getByRole("list", { name: "Algo" });
+    expect(within(algo).getByRole("link", { name: "Sorting" })).toBeInTheDocument();
+    expect(algo.closest("section")?.style.getPropertyValue("--level")).toBe("2");
+    // A group holds those below it: its line stays stacked at the top while they are read.
+    expect(algo.closest("section")?.parentElement?.closest("section")).toContainElement(
+      collections,
+    );
 
-    // Deeper, then back up: the folder left takes the focus.
-    await userEvent.click(within(goto).getByRole("button", { name: "Collections, 2 conspects" }));
-    expect(within(goto).getByRole("button", { name: "Back to Java" })).toHaveFocus();
-    expect(await within(goto).findByRole("link", { name: "Lists" })).toBeInTheDocument();
-    await userEvent.click(within(goto).getByRole("button", { name: "Back to Java" }));
-    expect(within(goto).getByRole("button", { name: "Collections, 2 conspects" })).toHaveFocus();
-    await userEvent.click(within(goto).getByRole("button", { name: "Back to Goto" }));
-    expect(within(goto).getByRole("button", { name: "Java, 3 conspects" })).toHaveFocus();
-
-    // A note opens, and the sidebar gets out of the way.
-    await userEvent.click(within(goto).getByRole("button", { name: "Java, 3 conspects" }));
-    await userEvent.click(await within(goto).findByRole("link", { name: "Sorting" }));
-    expect(await textEditor()).toHaveTextContent("Sorting");
-    expect(screen.queryByRole("complementary", { name: "Sidebar" })).not.toBeInTheDocument();
+    // A tag's name in its line opens that tag's list.
+    await userEvent.click(screen.getByRole("link", { name: "Collections" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("link", { name: "Basics" })).not.toBeInTheDocument();
+    });
+    const inCollections = screen.getByRole("list", { name: "Conspects" });
+    expect(within(inCollections).getByRole("link", { name: "Lists" })).toBeInTheDocument();
+    const algoHere = screen.getByRole("list", { name: "Algo" });
+    expect(within(algoHere).getByRole("link", { name: "Sorting" })).toBeInTheDocument();
+    expect(algoHere.closest("section")?.style.getPropertyValue("--level")).toBe("1");
   });
 
   it("has no editor tools in the Markdown source", async () => {

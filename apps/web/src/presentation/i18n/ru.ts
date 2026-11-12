@@ -21,7 +21,7 @@ export const ru: Dictionary = {
   "sidebar.settings": "Настройки",
   "sidebar.allNotes": "Все конспекты",
   "sidebar.newNote": "Новый конспект",
-  "sidebar.tags": "Goto",
+  "sidebar.tags": "Теги",
   "tags.suggestions": "Теги на выбор",
   "sidebar.noRecent": "Нет активности за 7 дней",
   "sidebar.tagsHint": "Напишите в конспекте {tag} или {nested}.",
@@ -47,7 +47,6 @@ export const ru: Dictionary = {
   "tree.collapseHeadings": "Скрыть заголовки «{title}»",
   "tree.expandHeading": "Развернуть «{heading}»",
   "tree.collapseHeading": "Свернуть «{heading}»",
-  "tree.back": "Назад: {folder}",
   "tree.notes": {
     one: "{count} конспект",
     few: "{count} конспекта",

@@ -23,7 +23,7 @@ The interface speaks English and Russian ([i18n](i18n.md)). The account site sha
 - **Sidebar** (`Sidebar.tsx`): toggle, Settings, on the desktop Add folder (a folder with a
   plus, ⊞ above: the system folder picker; a refused folder is said in the sidebar), New note;
   the tag tree, always open and
-  without a header (a navigation landmark named Goto; tags as folders, notes as documents inside them and untagged ones at the
+  without a header (a navigation landmark named Tags; tags as folders, notes as documents inside them and untagged ones at the
   root; a tag's name opens `/?q=#tag`, see [tags](tags.md); a note with headings holds its
   outline, see [Headings in the tree](#headings-in-the-tree)). With several desktop folders
   ([ADR-030](decisions/ADR-030-multiple-library-folders.md)), each is a root of the tree
@@ -137,18 +137,19 @@ breakpoint in the CSS), in the browser, the PWA and the Android app alike.
   sliding out it is `inert`), without its own bar (the island holds those buttons), in
   bigger text (16px, the tree 15px, the details 14px) and 36px pane headers. The note's details
   start folded behind their "Details" header.
-- **Tags as a list** (`TagListView`, in place of `TagTreeView` while `useNarrow()`): a tree's
-  chevrons were too easy to miss with a finger, so the tags show one folder at a time and every
-  row is tapped as a whole. At the root: the top folders (a folder icon, the name, the count,
-  › on the right) and the untagged notes. A folder's row goes into it (a button: the sidebar
-  stays open); inside, a back row (‹ and the name above: the tags' pane, or the folder's
-  root with several folders; "Back to …" read out), the folder's
-  name as a link to `/?q=#tag` with its chain (as a tree folder's name), its folders, its own
-  notes, then a group for every folder below it, depth first: a thin line with the tag's name
-  in the middle, then that folder's notes, 10px further in per level. The notes of the folder
-  and all below it are read in one `loadNotes` call. Going in or out scrolls to the top (with
-  several folders, to the root's row) and focuses the back row, or the row of the folder just left. No outlines in the list; with
-  several folders, each root holds its own list.
+- **A tag's list, grouped** (`GroupedList` in `NotesPage`, while `useNarrow()` and the query
+  is one tag and no words): the sidebar's tree is the same as on a wide screen, so the list
+  shows what is below the tag. The tree is read (`store.tags()`, `tagTree`) and `tagGroups`
+  finds the tag's folder: the one the router state's `tagChain` leads to (a tree folder's or a
+  line's link), else the first depth first. The found notes in the folder itself (and any
+  found nowhere below it) come first; then for every folder below, depth first, a line with
+  the tag's name in the middle (a link to `/?q=#tag` with its chain) and that folder's found
+  notes, 12px further in per level (`--level`). A note in several folders shows in each; a
+  folder with no found notes in it or below it shows no line. Arrow keys go through every
+  group. A group's `section` holds the groups below it, and its line is `position: sticky`
+  under the top bar, 22px lower per level: it stays only while its section is on the screen,
+  so the lines of the group being read and of the groups above it stack at the top, and the
+  next group's line takes the place of one left behind (scrolling up unstacks them).
 - **Editors:** the editor takes nearly the whole screen, with 8px of room around it (top and
   sides, instead of the page's inset), and its text 4px inside it on every side (CodeMirror's own
   line padding is dropped). The Markdown source is 13px, at a line height of 1.45.
@@ -180,6 +181,11 @@ breakpoint in the CSS), in the browser, the PWA and the Android app alike.
   without a displayable cover gets its title's first letter on its colour: the frontmatter's
   `color`, with dark or light ink by contrast, or else a pastel whose hue is hashed from the
   note's id so it stays the same (`--cover-*` tokens per theme; `components/note-color.ts`).
+  On a small screen an item is smaller: a 64px cover (`.note-result-preview`) with the
+  last-edit date on it as a chip (numbers only, a two-digit year: `NoteDate short`), centred
+  3px above its bottom, light text on a translucent dark veil so it reads on any photo or
+  colour; beside it two lines, the title and the tags. The note's text and the date beside the
+  title are hidden there.
 - **Search** (`pages/NotesPage.tsx`, `SearchBox.tsx`): focusing the search box shows the list,
   except over an open note (new or existing): that stays while the field is empty, and
   emptying the field again returns to it (the list's router state remembers it). Typing

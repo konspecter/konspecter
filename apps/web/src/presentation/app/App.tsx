@@ -183,7 +183,17 @@ export function App({
             />
           }
         >
-          <Route index element={<NotesPage store={store} catalog={catalog} library={library} />} />
+          <Route
+            index
+            element={
+              <NotesPage
+                store={store}
+                catalog={catalog}
+                library={library}
+                tagNames={settings.tagNames}
+              />
+            }
+          />
           {/* The same element for both, so a new note keeps its editor once saved. */}
           <Route path="conspects/new" element={notePage} />
           <Route path="conspects/:id" element={notePage} />

@@ -60,7 +60,7 @@ test("Markdown → index → search, and Markdown → tags → navigation", asyn
   await search.fill("#net");
   await expect(list(page).getByRole("link")).toHaveText(["Networking"]);
 
-  const tags = page.getByRole("navigation", { name: "Goto" });
+  const tags = page.getByRole("navigation", { name: "Tags" });
   await tags.getByRole("link", { name: "Java" }).click();
   await expect(list(page).getByRole("link")).toHaveText(["Hash maps"]);
   // The tag is a chip in the search box.
@@ -277,7 +277,7 @@ test("a heading in the tree opens the note scrolled to it, in either editor", as
   await saved(page);
 
   const tree = page.getByRole("complementary", { name: "Sidebar" }).getByRole("navigation", {
-    name: "Goto",
+    name: "Tags",
   });
   // The open note shows its outline; the heading lands just under the top bar.
   const underTopBar = async (heading: ReturnType<typeof page.locator>) => {

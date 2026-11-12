@@ -1490,91 +1490,6 @@ kbd {
   }
 }
 
-/*
- * The tags on a small screen (`TagListView`): one folder at a time, every row
- * tapped as a whole. No chevrons on the left, so no room kept for them; the
- * notes of the folders below come grouped under a thin line with the tag's
- * name, each level a little further in.
- */
-.tag-list {
-  --tree-indent: 10px;
-}
-
-.tag-list .tree-document {
-  padding-left: calc(var(--tree-pad) + var(--depth) * var(--tree-indent));
-}
-
-.tag-list button.tree-document {
-  box-sizing: border-box;
-  width: 100%;
-  border: 0;
-  background: none;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-/* A tap leaves the pointer over the row that takes the tapped one's place: no hover there. */
-@media (hover: hover) {
-  .tag-list button.tree-document:hover {
-    background: var(--color-hover);
-  }
-}
-
-@media (hover: none) {
-  .tag-list .tree-row:not([aria-current]):hover {
-    background: none;
-  }
-}
-
-.tag-list-back {
-  color: var(--color-muted);
-}
-
-.tag-list-back .icon-chevron {
-  transform: rotate(180deg);
-}
-
-.tag-list-open {
-  font-weight: 600;
-}
-
-.tag-list-folder > .icon-chevron {
-  color: var(--color-muted);
-}
-
-.tag-list-notes {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.tag-list-divider {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 8px 0 2px;
-  padding: 0 8px 0 calc(var(--tree-pad) + var(--depth) * var(--tree-indent));
-  color: var(--color-muted);
-  font-size: 12px;
-  line-height: 1.3;
-}
-
-.tag-list-divider::before,
-.tag-list-divider::after {
-  flex: 1;
-  height: 1px;
-  background: var(--color-tree-guide);
-  content: "";
-}
-
-.tag-list-divider > span {
-  max-width: 70%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* --- Page content -------------------------------------------------------- */
 
 .page-title {
@@ -1594,6 +1509,64 @@ kbd {
   margin: 0 -12px;
   padding: 0;
   list-style: none;
+}
+
+/*
+ * A tag's list on a small screen (`GroupedList`): the notes of every folder
+ * below the tag under a thin line with its name, each level 12px further in.
+ * A group holds the groups below it, so a line sticks under the top bar, one
+ * line lower per level, only while its group is on the screen: the lines of
+ * the group being read and of those above it stay stacked, and the next
+ * group's line takes the place of one left behind.
+ */
+.note-group {
+  margin: 0;
+}
+
+.note-group > .note-results {
+  margin-left: calc(var(--level) * 12px - 12px);
+}
+
+.tag-divider {
+  --tag-divider-height: 22px;
+  position: sticky;
+  top: calc(
+    var(--topbar-height, 0px) + env(safe-area-inset-top) + (var(--level) - 1) *
+      var(--tag-divider-height)
+  );
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--tag-divider-height);
+  margin-top: 8px;
+  padding-left: calc((var(--level) - 1) * 12px);
+  background: var(--color-bg);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.tag-divider::before,
+.tag-divider::after {
+  flex: 1;
+  height: 1px;
+  background: var(--color-tree-guide);
+  content: "";
+}
+
+.tag-divider > a {
+  max-width: 70%;
+  overflow: hidden;
+  color: var(--color-muted);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tag-divider > a:hover,
+.tag-divider > a:focus-visible {
+  color: var(--color-fg);
+  text-decoration: underline;
 }
 
 /* Beside the cover, four lines of text: the title, the date and tags, two of text. */
@@ -1634,6 +1607,17 @@ kbd {
   text-decoration: none;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* The cover, and on a small screen the date on it. */
+.note-result-preview {
+  position: relative;
+  width: var(--list-cover-size);
+  height: var(--list-cover-size);
+}
+
+.note-result-date-chip {
+  display: none;
 }
 
 .note-result-cover {
@@ -2752,9 +2736,50 @@ kbd {
     display: none;
   }
 
+  /*
+   * A smaller row: a 64px cover with the date on it as a chip, beside two
+   * lines (the title, the tags); no text, no date beside the title.
+   */
   .note-result {
-    --list-cover-size: 84px;
+    --list-cover-size: 64px;
+    --list-line: 24px;
+    align-items: center;
     gap: 12px;
+    padding: 6px 12px;
+    contain-intrinsic-size: auto 76px;
+  }
+
+  .note-result .search-snippet,
+  .note-result-meta time {
+    display: none;
+  }
+
+  /* The letter keeps clear of the chip below it. */
+  .note-result-letter {
+    padding-bottom: 14px;
+    font-size: 24px;
+  }
+
+  /* Light on a dark veil: readable on a photo and on a pale or deep colour alike. */
+  .note-result-date-chip {
+    position: absolute;
+    bottom: 3px;
+    left: 50%;
+    display: block;
+    max-width: calc(100% - 4px);
+    padding: 0 5px;
+    border-radius: 999px;
+    background: rgb(0 0 0 / 62%);
+    color: #fff;
+    font-family: var(--font-ui);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    line-height: 15px;
+    white-space: nowrap;
+    transform: translateX(-50%);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    pointer-events: none;
   }
 
   .search-snippet {

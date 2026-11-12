@@ -2,6 +2,7 @@ import {
   chainLinks,
   parseTagChain,
   parseTags,
+  tagGroups,
   tagLabel,
   tagRanges,
   tagSpellings,
@@ -297,6 +298,59 @@ describe("writtenTags", () => {
       "linked_list",
       "go",
     ]);
+  });
+});
+
+describe("tagGroups", () => {
+  const entry = (name: string, parents: string[] = [], chains: Record<string, string> = {}) => ({
+    tag: { name },
+    parents,
+    chains: Object.entries(chains).map(([noteId, chain]) => ({ noteId, tags: chain.split("#") })),
+  });
+  const group = (name: string, chain: string, label: string, level: number, noteIds: string[]) => ({
+    tag: { name },
+    chain,
+    label,
+    level,
+    noteIds,
+  });
+  const tree = tagTree(
+    [
+      entry("java", [], { basics: "java" }),
+      entry("python", [], { intro: "python" }),
+      entry("collections", ["java", "python"], {
+        lists: "java#collections",
+        dicts: "python#collections",
+      }),
+      entry("algo", ["collections"], { sorting: "java#collections#algo" }),
+      entry("streams", ["java"], { flow: "java#streams" }),
+    ],
+    { capitalize: true },
+  );
+
+  it("lists the folder's own notes, then every folder below it, depth first", () => {
+    expect(tagGroups(tree, "java")).toEqual({
+      noteIds: ["basics"],
+      groups: [
+        group("collections", "java#collections", "Collections", 1, ["lists"]),
+        group("algo", "java#collections#algo", "Algo", 2, ["sorting"]),
+        group("streams", "java#streams", "Streams", 1, ["flow"]),
+      ],
+    });
+  });
+
+  it("takes the folder the chain leads to, else the first one", () => {
+    expect(tagGroups(tree, "collections", "python#collections")).toEqual({
+      noteIds: ["dicts"],
+      groups: [group("algo", "python#collections#algo", "Algo", 1, [])],
+    });
+    expect(tagGroups(tree, "collections")?.noteIds).toEqual(["lists"]);
+    expect(tagGroups(tree, "collections", "go#collections")?.noteIds).toEqual(["lists"]);
+    expect(tagGroups(tree, "collections", "java#streams")?.noteIds).toEqual(["lists"]);
+  });
+
+  it("is null for a tag not in the tree", () => {
+    expect(tagGroups(tree, "go")).toBeNull();
   });
 });
 

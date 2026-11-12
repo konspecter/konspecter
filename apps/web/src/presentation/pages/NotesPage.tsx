@@ -5,11 +5,14 @@ import {
   useMemo,
   useState,
   useSyncExternalStore,
+  type CSSProperties,
   type KeyboardEvent,
 } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { isEmptyQuery, parseQuery } from "../../domain/search/query";
 import { highlight, snippet, type SnippetPart } from "../../domain/search/snippet";
+import type { TagNames } from "../../domain/settings/settings";
+import { tagGroups, tagTree, type TagGroup, type TagNode } from "../../domain/tag/tags";
 import type { NoteCatalog, NoteSummary } from "../../application/notes/note-catalog";
 import type { NoteRepository } from "../../application/notes/note-repository";
 import { isNativeMobile } from "../../infrastructure/mobile/mobile";
@@ -18,6 +21,7 @@ import type { LibraryControls } from "../app/library";
 import type { ShortcutName } from "../app/shortcuts";
 import { isDisplayableCover } from "../components/CoverImage";
 import { colorStyle } from "../components/note-color";
+import { treeChain } from "../components/new-note";
 import { EmptyState } from "../components/EmptyState";
 import { AddFolderButton } from "../components/LibraryFolders";
 import { ErrorState } from "../components/ErrorState";
@@ -27,6 +31,7 @@ import { Snippet } from "../components/Snippet";
 import { summaryTitle } from "../components/note-title";
 import { useAsync } from "../hooks/use-async";
 import { useLibraryFolders } from "../hooks/use-library-folders";
+import { useNarrow } from "../hooks/use-narrow";
 import { t } from "../i18n/i18n";
 import { rich } from "../i18n/rich";
 
@@ -35,6 +40,8 @@ type NotesPageProps = {
   catalog: NoteCatalog;
   /** The desktop's folder; absent on the web and mobile. */
   library?: LibraryControls | undefined;
+  /** How the tags are named in the groups of a tag's list, as in the sidebar. */
+  tagNames?: TagNames;
 };
 
 type Row = {
@@ -95,7 +102,12 @@ function byRecentEdit(a: SearchHit, b: SearchHit): number {
  * you type (`?q=`, words and `#tag` filters) and marks what matched. While a
  * search runs, the previous list stays, so typing never blanks the page.
  */
-export function NotesPage({ store, catalog, library: controls }: NotesPageProps) {
+export function NotesPage({
+  store,
+  catalog,
+  library: controls,
+  tagNames = "capitalized",
+}: NotesPageProps) {
   const [searchParams] = useSearchParams();
   const query = searchParams.get("q") ?? "";
   const parsed = useMemo(() => parseQuery(query), [query]);
@@ -134,6 +146,37 @@ export function NotesPage({ store, catalog, library: controls }: NotesPageProps)
     );
     return found.hits.map((hit) => hitRow(hit, notes.get(hit.id)));
   }, [found, library]);
+  // A tag's list on a small screen, where the sidebar shows only the tag's own notes:
+  // the notes of the folders below it come grouped under their tags.
+  const narrow = useNarrow();
+  const groupTag =
+    narrow && parsed.words.length === 0 && parsed.tags.length === 1
+      ? (parsed.tags[0]?.name ?? null)
+      : null;
+  const [tree, setTree] = useState<readonly TagNode[] | null>(null);
+  useEffect(() => {
+    if (groupTag === null) return;
+    let current = true;
+    store
+      .tags()
+      .then((counts) => tagTree(counts, { capitalize: tagNames === "capitalized" }))
+      .then(
+        (next) => {
+          if (current) setTree(next);
+        },
+        () => undefined, // The groups are a convenience: without them the list is whole.
+      );
+    return () => {
+      current = false;
+    };
+  }, [store, groupTag, tagNames, library]);
+  // The folder the tag was chosen in, when it shows in more than one.
+  const chain = treeChain(useLocation().state);
+  const groups = useMemo(
+    () => (groupTag === null || tree === null ? null : tagGroups(tree, groupTag, chain)),
+    [groupTag, tree, chain],
+  );
+
   const noteRows = useMemo(
     () => (library.status === "ready" ? library.notes.map(summaryRow) : []),
     [library],
@@ -154,7 +197,9 @@ export function NotesPage({ store, catalog, library: controls }: NotesPageProps)
     content = <ErrorState title={t("list.searchFailed")} error={found.error} />;
   } else {
     const rows = searching && hitRows ? hitRows : noteRows;
-    if (rows.length > 0) {
+    if (rows.length > 0 && groups && groups.groups.length > 0 && rows === hitRows) {
+      content = <GroupedList rows={rows} groups={groups} />;
+    } else if (rows.length > 0) {
       // A result opens with the same words searched in the note (tags are not text).
       content = <ResultList rows={rows} find={searching ? parsed.words.join(" ") : ""} />;
     } else if (searching && found?.query === query) {
@@ -191,7 +236,7 @@ export function NotesPage({ store, catalog, library: controls }: NotesPageProps)
  * Tab goes from note to note as links do; Shift+Tab on the first one goes
  * back to the search box too (whose Tab comes here).
  */
-function moveFocus(event: KeyboardEvent<HTMLOListElement>) {
+function moveFocus(event: KeyboardEvent<HTMLElement>) {
   if (event.key === "Tab") {
     backToSearch(event);
     return;
@@ -217,7 +262,7 @@ function moveFocus(event: KeyboardEvent<HTMLOListElement>) {
 }
 
 /** Shift+Tab on the first note: back to the search box. */
-function backToSearch(event: KeyboardEvent<HTMLOListElement>) {
+function backToSearch(event: KeyboardEvent<HTMLElement>) {
   if (!event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return;
   const first = event.currentTarget.querySelector<HTMLAnchorElement>(".note-result-title");
   const search = document.querySelector<HTMLInputElement>("[role=search] input");
@@ -249,15 +294,124 @@ const ResultList = memo(function ResultList({
   );
 });
 
+/** A folder below the tag, with the found notes in it and the folders below it. */
+type FoundGroup = TagGroup & { readonly rows: readonly Row[]; readonly children: FoundGroup[] };
+
+/**
+ * The groups nested as their folders are (`groups` come depth first, each
+ * with its level), each with the rows found in it; only those with a row in
+ * them or below them.
+ */
+function nestGroups(groups: readonly TagGroup[], rows: readonly Row[]): FoundGroup[] {
+  const roots: FoundGroup[] = [];
+  const open: FoundGroup[] = [];
+  for (const group of groups) {
+    const ids = new Set(group.noteIds);
+    const found: FoundGroup = {
+      ...group,
+      rows: rows.filter((row) => ids.has(row.id)),
+      children: [],
+    };
+    open.length = group.level - 1;
+    (open.at(-1)?.children ?? roots).push(found);
+    open.push(found);
+  }
+  const prune = (list: FoundGroup[]): FoundGroup[] =>
+    list
+      .map((group) => ({ ...group, children: prune(group.children) }))
+      .filter((group) => group.rows.length > 0 || group.children.length > 0);
+  return prune(roots);
+}
+
+/**
+ * A tag's list on a small screen: the notes in the tag's folder itself (and
+ * any found nowhere below it), then those of every folder below it, depth
+ * first, under a thin line with the tag's name (a link to its own list),
+ * each level a little further in. A note in several folders shows in each; a
+ * folder with no found note in it or below it shows no line. Each group holds
+ * the groups below it, so as the page scrolls the lines of the group being
+ * read and of those above it stay stacked at the top (`app.css`). One column,
+ * so the arrow keys go through every group.
+ */
+function GroupedList({
+  rows,
+  groups,
+}: {
+  rows: readonly Row[];
+  groups: NonNullable<ReturnType<typeof tagGroups>>;
+}) {
+  const nested = nestGroups(groups.groups, rows);
+  const own = new Set(groups.noteIds);
+  const below = new Set<string>();
+  const collect = (list: readonly FoundGroup[]) => {
+    for (const group of list) {
+      group.rows.forEach((row) => below.add(row.id));
+      collect(group.children);
+    }
+  };
+  collect(nested);
+  const top = rows.filter((row) => own.has(row.id) || !below.has(row.id));
+  return (
+    <div className="note-groups" onKeyDown={moveFocus}>
+      {top.length > 0 && (
+        <ol className="note-results" aria-label={t("list.notes")}>
+          {top.map((row) => (
+            <ResultRow key={row.id} row={row} find="" />
+          ))}
+        </ol>
+      )}
+      {nested.map((group) => (
+        <NoteGroup key={group.chain} group={group} />
+      ))}
+    </div>
+  );
+}
+
+function NoteGroup({ group }: { group: FoundGroup }) {
+  return (
+    <section className="note-group" style={{ "--level": group.level } as CSSProperties}>
+      <div className="tag-divider">
+        <Link
+          to={`/?q=${encodeURIComponent(`#${group.tag.name}`)}`}
+          // As a tree folder's name: a new note made there starts with this chain.
+          state={{ tagChain: group.chain }}
+        >
+          {group.label}
+        </Link>
+      </div>
+      {group.rows.length > 0 && (
+        <ol className="note-results" aria-label={group.label}>
+          {group.rows.map((row) => (
+            <ResultRow key={row.id} row={row} find="" />
+          ))}
+        </ol>
+      )}
+      {group.children.map((child) => (
+        <NoteGroup key={child.chain} group={child} />
+      ))}
+    </section>
+  );
+}
+
 /**
  * A conspect, the same in the list and in search results: its cover beside
  * four lines of text, about as tall as the cover: the title; the date it was
- * last edited and its tags; two of the text (where a search matched it).
+ * last edited and its tags; two of the text (where a search matched it). On a
+ * small screen the row is smaller: a small cover with the date on it as a
+ * chip, then the title and the tags, no text.
  */
 const ResultRow = memo(function ResultRow({ row, find }: { row: Row; find: string }) {
   return (
     <li className="note-result">
-      <ListCover id={row.id} cover={row.cover} color={row.color} title={row.title} />
+      <div className="note-result-preview">
+        <ListCover id={row.id} cover={row.cover} color={row.color} title={row.title} />
+        {/* Shown instead of the date beside the title on a small screen (`app.css`). */}
+        {row.updated !== null && (
+          <span className="note-result-date-chip">
+            <NoteDate value={row.updated} short />
+          </span>
+        )}
+      </div>
       <div className="note-result-body">
         <Link
           to={`/conspects/${encodeURIComponent(row.id)}`}
