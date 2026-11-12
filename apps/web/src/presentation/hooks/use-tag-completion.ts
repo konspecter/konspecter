@@ -22,9 +22,15 @@ export type TagCompletion = {
   readonly choose: (index: number) => void;
 };
 
+/** Whether the list shows its first tag at the bottom (a phone: nearest the finger). */
+function bottomUp(listId: string): boolean {
+  const list = document.getElementById(listId);
+  return list !== null && getComputedStyle(list).flexDirection === "column-reverse";
+}
+
 /**
  * The library's tags offered for the tag being typed (`typing`, null when
- * none is): ↑ and ↓ choose one, Enter takes it (`accept` writes it in place
+ * none is): ↑ and ↓ choose one (as the list is drawn), Enter takes it (`accept` writes it in place
  * of the name typed), Escape closes the list until another tag is typed.
  * With `passExact`, Enter on a tag that is just what is typed is not taken:
  * it closes the list and goes on (a new line in an editor).
@@ -69,7 +75,9 @@ export function useTagCompletion(
       }
       const count = suggestions.length;
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-        select((selected + (event.key === "ArrowDown" ? 1 : count - 1)) % count);
+        // A phone shows the list bottom-up: the arrows follow the screen.
+        const next = event.key === (bottomUp(listId) ? "ArrowUp" : "ArrowDown");
+        select((selected + (next ? 1 : count - 1)) % count);
       } else if (event.key === "Escape") {
         setDismissed(open.from);
       } else if (event.key === "Enter" && !event.shiftKey) {

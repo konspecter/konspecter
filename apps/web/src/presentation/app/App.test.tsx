@@ -1480,6 +1480,20 @@ describe("tag suggestions", () => {
     });
   });
 
+  it("moves ↑/↓ as the suggestions are drawn: up the list a phone shows bottom-up", async () => {
+    renderApp(await storeWithTags());
+    await noteList();
+    await userEvent.click(searchBox());
+    await userEvent.keyboard("#ja");
+    // The phone's style sheet (app.css), which the tests do not load.
+    suggestions()?.style.setProperty("flex-direction", "column-reverse");
+
+    await userEvent.keyboard("{ArrowUp}");
+    expect(screen.getByRole("option", { selected: true })).toHaveTextContent("#jakarta");
+    await userEvent.keyboard("{ArrowDown}{ArrowDown}");
+    expect(screen.getByRole("option", { selected: true })).toHaveTextContent(/^#java1$/);
+  });
+
   it("closes the suggestions with Escape, and takes one that is clicked", async () => {
     renderApp(await storeWithTags());
     await noteList();

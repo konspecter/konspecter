@@ -1198,6 +1198,8 @@ kbd {
   max-width: 240px;
   margin: 0;
   padding: 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   list-style: none;
   border-radius: 9px;
   background: var(--color-bg);
@@ -2840,6 +2842,52 @@ kbd {
 
   .search-snippet {
     font-size: 14px;
+  }
+
+  /*
+   * The tag suggestions are drawn like the island and its search: a rounder
+   * block with big rows for fingers, each a pill when chosen. As wide as the
+   * longest tag, up to the screen's width (a longer one ends in an ellipsis).
+   * Bottom-up: the best tag is nearest the finger (↑/↓ follow, see
+   * `useTagCompletion`).
+   */
+  .tag-suggestions {
+    display: flex;
+    flex-direction: column-reverse;
+    max-width: calc(100vw - 2 * var(--gutter));
+    padding: 6px;
+    border-radius: 28px;
+    font-size: 16px;
+  }
+
+  .tag-suggestions li {
+    align-items: center;
+    min-height: 44px;
+    padding: 0 16px;
+    border-radius: 999px;
+  }
+
+  .tag-suggestion-count {
+    font-size: 14px;
+  }
+
+  /*
+   * Above the island's search, at its left edge, no wider than it and as far
+   * from it as it is from the island; no taller than the room up to the top
+   * bar (it scrolls).
+   */
+  .island-search .search-box {
+    position: static;
+  }
+
+  .island-search .search-box .tag-suggestions {
+    bottom: calc(100% + 12px);
+    left: 0;
+    max-width: 100%;
+    max-height: calc(
+      100dvh - var(--bottom-inset) - var(--island-margin) - 2 * var(--island-height) - 24px -
+        env(safe-area-inset-top) - var(--topbar-height) - 8px
+    );
   }
 }
 
