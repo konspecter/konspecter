@@ -18,9 +18,10 @@ import { OUTLINE_DEPTH } from "../../domain/document/outline";
 import { openInBrowser } from "../../infrastructure/desktop/desktop";
 import { reportError } from "../app/errors";
 import { InIsland } from "../components/island-slot";
-import { NO_FIND, revealMatch, type NoteFind } from "../components/note-find";
+import { NO_FIND, type NoteFind } from "../components/note-find";
 import { revealHeading, type HeadingTarget } from "../components/note-heading";
 import { CaretTagSuggestions } from "../components/TagSuggestions";
+import { useToolbarUnfold } from "../hooks/use-island-stretch";
 import { useTagCompletion } from "../hooks/use-tag-completion";
 import {
   codeAtCaret,
@@ -39,7 +40,7 @@ import {
 } from "./text-editor-setup";
 import { t, type TextKey } from "../i18n/i18n";
 import { useNarrow } from "../hooks/use-narrow";
-import { coveredBelow, visibleArea, type Place } from "./place";
+import { centreInView, coveredBelow, visibleArea, type Place } from "./place";
 
 type TextEditorProps = {
   /** Read once, when the editor mounts. */
@@ -407,7 +408,7 @@ export const TextEditor = memo(function TextEditor({
     view.dispatch(findTransaction(view.state, find.query, find.selected));
     if (revealed.current !== null && revealed.current !== find.reveal) {
       const current = view.dom.querySelector(".find-current");
-      if (current) revealMatch(current.getBoundingClientRect());
+      if (current) centreInView(current.getBoundingClientRect());
     }
     revealed.current = find.reveal;
   }, [find]);
@@ -709,8 +710,8 @@ function ToolButton({ tool, onUse }: { tool: Tool; onUse: () => void }) {
 /**
  * The toolbar on small screens: a little island of its own over the island's
  * Settings button, with one button showing the tool a folded toolbar would
- * show; pressing it opens every tool in a column above it, and using one, or
- * tapping elsewhere, closes them again.
+ * show; pressing it opens every tool in a column above it, growing up out of
+ * a circle, and using one, or tapping elsewhere, closes them again.
  */
 function IslandTools({
   tools,
@@ -724,6 +725,9 @@ function IslandTools({
   const id = useId();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  // The column grows up out of a circle and shrinks back (`hooks/use-island-stretch.ts`).
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const toolbarRendered = useToolbarUnfold(open, toolbarRef);
   useEffect(() => {
     if (!open) return;
     const close = (event: PointerEvent) => {
@@ -754,13 +758,16 @@ function IslandTools({
       >
         {pinned?.content}
       </button>
-      {open && (
+      {toolbarRendered && (
         <div
+          ref={toolbarRef}
           id={id}
           role="toolbar"
           aria-label={t("editor.formatting")}
           aria-orientation="vertical"
           className="island-toolbar"
+          // Shrinking back, it is no longer there to use.
+          inert={!open}
         >
           {tools.map((tool) => (
             <ToolButton

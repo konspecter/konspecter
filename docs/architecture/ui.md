@@ -118,19 +118,25 @@ breakpoint in the CSS), in the browser, the PWA and the Android app alike.
   closes it again): the search box (the same `SearchBox`, the library or the open note) with a
   close button at its end (`onClose`), which empties the query. The panel also shows while the
   list has a query (a tag chosen in the sidebar), and goes when a note opens while it does not
-  have the focus (a result tapped). The text editor's tools are a little island of their own in
+  have the focus (a result tapped). Opening the full-screen sidebar ends it, as its close button
+  does. The text editor's tools are a little island of their own in
   the same row (`.island-editor`, rendered through `IslandSlot`/`InIsland`, only by the text
   editor), at the middle column's end, so over Settings: one button showing the tool a folded
   toolbar would show, every tool in a column above it once pressed. With both there, the row
   goes across the screen: the tools move to the third column's end (the right gutter) and the
   search ends 12px before them. The panel stretches open (`hooks/use-island-stretch.ts`, Web
-  Animations, 200 ms eased in and out): it starts as a circle the tools' size in the middle of
-  the row and grows to both sides, its right edge pushing the tools from over Settings to the
-  row's end, 12px ahead of it. The search box shows only then, fading in over 100 ms. Closing
-  plays it all backwards, as one timeline: the search box fades out, then the panel shrinks
-  (it stays, `inert`, until it has); a press mid-way turns it around. Without `Element.animate` or with reduced motion
-  asked for, the panel comes and goes at once. Over the open sidebar the tools are hidden. The island is always
-  on screen, also while a note is edited: both editors scroll the caret into view above it and
+  Animations): it starts as a circle the tools' size in the middle of the row, which fades in
+  over 100 ms, then grows (200 ms, eased in and out) to both sides, its right edge pushing the
+  tools from over Settings to the row's end, 12px ahead of it. The search box shows only then,
+  fading in over 100 ms. Closing plays it all backwards, as one timeline: the search box fades
+  out, the panel shrinks, then the circle fades out (it stays, `inert`, until it has); a press
+  mid-way turns it around. Without `Element.animate` or with reduced motion asked for, the panel
+  comes and goes at once. The tools' column opens the same way, upwards (`useToolbarUnfold`, the
+  same timing): it starts as a circle at its foot, just above the tools' bar, which fades in,
+  grows up to its height, and only then do its tools fade in; closing, it shrinks back down and
+  fades out (`inert` meanwhile). Over the open sidebar the tools are hidden. The island is
+  always on screen, also while a note is edited: both editors scroll the caret into view above
+  it and
   the row above it (`coveredBelow` in `editors/place.ts`, as ProseMirror's
   `scrollMargin` and CodeMirror's `scrollMargins`). The viewport meta has
   `interactive-widget=resizes-content`, so the island rides above the soft keyboard.

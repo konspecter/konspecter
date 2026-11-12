@@ -1945,10 +1945,11 @@ describe("search in the note", () => {
     new Date("2020-01-01"),
     "maps",
   );
-  let scrollTo: ReturnType<typeof vi.fn>;
+  // A match is scrolled to the middle of what can be seen (`centreInView`).
+  let scrollBy: ReturnType<typeof vi.fn>;
   beforeEach(() => {
-    scrollTo = vi.fn();
-    window.scrollTo = scrollTo as unknown as typeof window.scrollTo;
+    scrollBy = vi.fn();
+    window.scrollBy = scrollBy as unknown as typeof window.scrollBy;
   });
 
   async function openMaps(settings?: Settings) {
@@ -1967,14 +1968,14 @@ describe("search in the note", () => {
     await openMaps();
     const editor = await textEditor();
     await userEvent.click(findBox());
-    scrollTo.mockClear();
+    scrollBy.mockClear();
 
     await userEvent.keyboard("map");
 
     expect(marked(editor)).toEqual(["map", "Map", "map", "Map"]);
     expect(current()).toBe("map");
     expect(count()).toHaveTextContent("Match 1 of 4");
-    expect(scrollTo).toHaveBeenCalled();
+    expect(scrollBy).toHaveBeenCalled();
     // The note stays; the library is not searched.
     expect(screen.queryByRole("list", { name: "Conspects" })).not.toBeInTheDocument();
     expect(editor).toHaveTextContent("A HashMap maps keys.");
@@ -1985,7 +1986,7 @@ describe("search in the note", () => {
     await store.put(maps);
     renderApp(store, "/?q=treemap");
     const result = within(await noteList()).getByRole("link", { name: "Hash maps" });
-    scrollTo.mockClear();
+    scrollBy.mockClear();
 
     await userEvent.click(result);
 
@@ -1994,7 +1995,7 @@ describe("search in the note", () => {
     await waitFor(() => {
       expect(marked(editor)).toEqual(["TreeMap"]);
       expect(count()).toHaveTextContent("Match 1 of 1");
-      expect(scrollTo).toHaveBeenCalled();
+      expect(scrollBy).toHaveBeenCalled();
     });
     expect(findBox()).toHaveValue("treemap");
   });
@@ -3592,6 +3593,26 @@ describe("small screens", () => {
     expect(screen.queryByRole("complementary", { name: "Sidebar" })).not.toBeInTheDocument();
     await userEvent.click(islandLink("New conspect"));
     expect(await textEditor()).toHaveFocus();
+  });
+
+  it("ends the island's search when the sidebar opens over it", async () => {
+    renderApp(await storeWithNotes());
+    await noteList();
+
+    await userEvent.click(islandButton("Search conspects"));
+    await userEvent.keyboard("tcp");
+    await waitFor(async () => {
+      expect(await listTitles()).toEqual(["Networking"]);
+    });
+
+    await userEvent.click(islandButton("Show sidebar"));
+    expect(sidebar()).toBeInTheDocument();
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    expect(islandButton("Search conspects")).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(islandButton("Hide sidebar"));
+    await waitFor(async () => {
+      expect(await listTitles()).toEqual(["Networking", "Hash maps"]);
+    });
   });
 
   it("opens the search box above the island, keeping its buttons, and closes it", async () => {

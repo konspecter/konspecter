@@ -218,6 +218,11 @@ export function Layout({
     if (closeIslandSearch.current) closeIslandSearch.current();
     else setIslandSearch(false);
   };
+  // The full-screen sidebar ends the island's search, which would stay on top of
+  // it, searching a list nobody sees.
+  useEffect(() => {
+    if (narrow && sidebarOpen) endIslandSearch();
+  }, [narrow, sidebarOpen]);
   // A note opened from the results (the field let go of the focus) ends the search.
   useEffect(() => {
     if (onNote && document.activeElement !== searchRef.current) setIslandSearch(false);

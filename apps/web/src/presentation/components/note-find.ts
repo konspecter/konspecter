@@ -43,13 +43,3 @@ export function listFind(state: unknown): string | null {
     ? state.find
     : null;
 }
-
-/**
- * Scrolls the page so that `rect` (a match, in window coordinates) is in the
- * middle of what can be seen of it: below the sticky top bar.
- */
-export function revealMatch(rect: DOMRect): void {
-  const top = document.querySelector(".topbar")?.getBoundingClientRect().bottom ?? 0;
-  const middle = top + (window.innerHeight - top) / 2;
-  window.scrollTo({ top: window.scrollY + rect.top + rect.height / 2 - middle });
-}

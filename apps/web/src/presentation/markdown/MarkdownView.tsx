@@ -6,7 +6,8 @@ import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { documentHeadings } from "../../domain/document/outline";
 import { findMatches, type Match } from "../../domain/search/find";
-import { NO_FIND, revealMatch, type NoteFind } from "../components/note-find";
+import { NO_FIND, type NoteFind } from "../components/note-find";
+import { centreInView } from "../editors/place";
 import { revealHeading, type HeadingTarget } from "../components/note-heading";
 import { omitLeadingTitle } from "./omit-leading-title";
 import { rehypeTags } from "./rehype-tags";
@@ -127,7 +128,7 @@ function useFind(
     onFindCount?.(ranges.length);
     const current = ranges[Math.min(find.selected, ranges.length - 1)];
     if (current && revealed.current !== null && revealed.current !== find.reveal) {
-      revealMatch(current.getBoundingClientRect());
+      centreInView(current.getBoundingClientRect());
     }
     revealed.current = find.reveal;
     if (!highlights || ranges.length === 0) return;

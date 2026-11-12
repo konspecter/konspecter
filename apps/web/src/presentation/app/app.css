@@ -2494,6 +2494,19 @@ kbd {
   pointer-events: auto;
 }
 
+/* The island and the blocks above it: rounded, the island's height, softly raised. */
+.island,
+.island-search,
+.island-editor {
+  height: var(--island-height);
+  border-radius: 999px;
+  background: var(--color-bg);
+  box-shadow:
+    0 0 0 1px var(--color-border),
+    0 6px 24px var(--color-shadow);
+  font-family: var(--font-ui);
+}
+
 /*
  * The island: a rounded block with big round buttons (sidebar, list, the big
  * new note, search, then settings).
@@ -2504,14 +2517,7 @@ kbd {
   display: flex;
   align-items: center;
   gap: 4px;
-  height: var(--island-height);
   padding: 0 6px;
-  border-radius: 999px;
-  background: var(--color-bg);
-  box-shadow:
-    0 0 0 1px var(--color-border),
-    0 6px 24px var(--color-shadow);
-  font-family: var(--font-ui);
 }
 
 /*
@@ -2526,14 +2532,7 @@ kbd {
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  height: var(--island-height);
   padding: 0 6px;
-  border-radius: 999px;
-  background: var(--color-bg);
-  box-shadow:
-    0 0 0 1px var(--color-border),
-    0 6px 24px var(--color-shadow);
-  font-family: var(--font-ui);
 }
 
 /*
@@ -2682,13 +2681,6 @@ kbd {
   display: grid;
   place-items: center;
   width: var(--island-height);
-  height: var(--island-height);
-  border-radius: 999px;
-  background: var(--color-bg);
-  box-shadow:
-    0 0 0 1px var(--color-border),
-    0 6px 24px var(--color-shadow);
-  font-family: var(--font-ui);
 }
 
 .island-tool {
@@ -2709,7 +2701,7 @@ kbd {
   flex-direction: column;
   gap: 4px;
   max-height: calc(
-    100dvh - var(--island-space) - var(--topbar-height) - 16px - var(--keyboard-inset, 0px)
+    100dvh - var(--island-space) - var(--topbar-height) - 16px - var(--bottom-inset)
   );
   padding: 6px;
   overflow-y: auto;
@@ -2720,6 +2712,11 @@ kbd {
     0 0 0 1px var(--color-border),
     0 6px 24px var(--color-shadow);
   transform: translateX(-50%);
+}
+
+/* While it grows up or shrinks back (`hooks/use-island-stretch.ts`), it clips its tools. */
+.island-toolbar[data-stretching] {
+  overflow: hidden;
 }
 
 .island-toolbar .toolbar-button {
