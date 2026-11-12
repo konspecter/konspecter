@@ -23,6 +23,13 @@
   --cover-saturation: 70%;
   --cover-lightness: 86%;
   --cover-letter-lightness: 32%;
+  /* The island's new-note button: sand, lit from above. */
+  --color-new-top: #ede2c9;
+  --color-new-bottom: #e3d4b4;
+  --color-new-fg: #5b4628;
+  --color-new-light: rgb(255 255 255 / 40%);
+  --color-new-shade: rgb(90 65 30 / 8%);
+  --color-new-edge: rgb(120 90 50 / 22%);
 
   --column-width: 720px;
   --sidebar-width: 272px;
@@ -47,6 +54,12 @@
     --cover-saturation: 32%;
     --cover-lightness: 62%;
     --cover-letter-lightness: 16%;
+    --color-new-top: #6b5c42;
+    --color-new-bottom: #5c4e36;
+    --color-new-fg: #f3e5c4;
+    --color-new-light: rgb(255 255 255 / 14%);
+    --color-new-shade: rgb(0 0 0 / 18%);
+    --color-new-edge: rgb(0 0 0 / 40%);
   }
 }
 
@@ -65,6 +78,12 @@
   --cover-saturation: 32%;
   --cover-lightness: 62%;
   --cover-letter-lightness: 16%;
+  --color-new-top: #6b5c42;
+  --color-new-bottom: #5c4e36;
+  --color-new-fg: #f3e5c4;
+  --color-new-light: rgb(255 255 255 / 14%);
+  --color-new-shade: rgb(0 0 0 / 18%);
+  --color-new-edge: rgb(0 0 0 / 40%);
 }
 
 /* Code colours, for the reader's highlighting and the Markdown editor (GitHub's palettes). */
@@ -2591,30 +2610,36 @@ kbd {
 
 /*
  * New note: a round button with a plus in the middle of the island, a little
- * taller than the island, so it stands out above and below it. Sand in both
- * themes, lit softly from above (a light top edge, a faint shade towards the
- * bottom) and casting a small shadow, so it looks a little raised; a tap darkens it. The selectors
- * outweigh `.island :is(button, a[href])`, whose shadow shows a tap.
+ * taller than the island, so it stands out above and below it. Sand (a deeper
+ * one in the dark theme), lit softly from above (a light top edge, a faint
+ * shade towards the bottom) and casting a small shadow, so it looks a little
+ * raised. A press clicks it in: at once the same light turns over (the
+ * gradient, the light edge and the shade swap top and bottom), so the
+ * button looks pushed in, with nothing moving or shrinking; let go, it pops
+ * back out. The selectors outweigh `.island :is(button, a[href])`,
+ * whose shadow shows a tap.
  */
 .island a.island-new {
-  --new-raise:
-    inset 0 1px 0 rgb(255 255 255 / 40%), inset 0 -1px 2px rgb(90 65 30 / 8%),
-    0 0 0 1px rgb(120 90 50 / 22%), 0 1px 3px var(--color-shadow);
-
   width: calc(var(--island-height) + 8px);
   height: calc(var(--island-height) + 8px);
   margin: 0 2px;
-  background: linear-gradient(to bottom, #ede2c9, #e3d4b4);
+  background: linear-gradient(to bottom, var(--color-new-top), var(--color-new-bottom));
   box-shadow:
-    inset 0 0 0 100vmax transparent,
-    var(--new-raise);
-  color: #5b4628;
+    inset 0 1px 0 var(--color-new-light),
+    inset 0 -1px 2px var(--color-new-shade),
+    0 0 0 1px var(--color-new-edge),
+    0 1px 3px var(--color-shadow);
+  color: var(--color-new-fg);
+  transition: none;
 }
 
 .island a.island-new:active {
+  background: linear-gradient(to top, var(--color-new-top), var(--color-new-bottom));
   box-shadow:
-    inset 0 0 0 100vmax rgb(90 65 30 / 14%),
-    var(--new-raise);
+    inset 0 -1px 0 var(--color-new-light),
+    inset 0 1px 2px var(--color-new-shade),
+    0 0 0 1px var(--color-new-edge),
+    0 1px 3px var(--color-shadow);
 }
 
 .island-new .icon {
