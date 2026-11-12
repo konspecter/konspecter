@@ -1215,8 +1215,8 @@ kbd {
   left: 0;
 }
 
-/* The island is at the bottom of the screen: the list opens above it. */
-.island .search-box .tag-suggestions {
+/* The island's search is at the bottom of the screen: the list opens above it. */
+.island-search .search-box .tag-suggestions {
   top: auto;
   bottom: calc(100% + 8px);
 }
@@ -2447,9 +2447,9 @@ kbd {
 
 /*
  * The island: a rounded block fixed at the bottom of a small screen, with big
- * round buttons (sidebar, list, the big new note, search, then settings), or the
- * search box with its close button. It keeps above the full-screen sidebar,
- * and above the on-screen keyboard where that covers the page (`keyboard.ts`).
+ * round buttons (sidebar, list, the big new note, search, then settings). It
+ * keeps above the full-screen sidebar, and above the on-screen keyboard where
+ * that covers the page (`keyboard.ts`).
  */
 .island {
   position: fixed;
@@ -2471,12 +2471,30 @@ kbd {
   transform: translateX(-50%);
 }
 
-/* Searching, it spans the screen with the field. */
-.island:has(.search-box) {
-  width: calc(100% - 2 * var(--gutter));
+/*
+ * The island's search: the search box with its close button in a rounded
+ * block of the island's height, across the screen just above the island (as
+ * the editor's tools open above it). The tools, opened, go over it.
+ */
+.island-search {
+  position: fixed;
+  right: var(--gutter);
+  bottom: calc(var(--island-margin) + var(--bottom-inset) + var(--island-height) + 12px);
+  left: var(--gutter);
+  z-index: 24;
+  display: flex;
+  align-items: center;
+  height: var(--island-height);
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-bg);
+  box-shadow:
+    0 0 0 1px var(--color-border),
+    0 6px 24px var(--color-shadow);
+  font-family: var(--font-ui);
 }
 
-.island .search-box {
+.island-search .search-box {
   flex: 1;
   height: 44px;
   padding: 0 6px 0 14px;
@@ -2634,6 +2652,11 @@ kbd {
     --island-margin: 12px;
     /* What the island covers at the bottom of the page. */
     --island-space: calc(var(--island-height) + 2 * var(--island-margin));
+  }
+
+  /* With its search open above it, the island covers that much more. */
+  .app:has(.island-search) {
+    --island-space: calc(2 * var(--island-height) + 12px + 2 * var(--island-margin));
   }
 
   body {

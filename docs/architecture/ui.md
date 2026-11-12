@@ -111,12 +111,15 @@ breakpoint in the CSS), in the browser, the PWA and the Android app alike.
 - **The island** (`Layout.tsx`): a rounded block fixed at the bottom centre with round 44px
   buttons: sidebar, all notes, new note (a slightly raised sand-coloured round button with a plus in the
   middle, a little taller than the island), the text editor's tools (on the note page), search
-  and, a little apart, settings. It stays above the open sidebar, whose menu it completes; its links close the sidebar. Search turns it into
-  the search box (the same `SearchBox`, the library or the open note) with a close button at
-  its end (`onClose`), which empties the query. The box also shows while the list has a query
-  (a tag chosen in the sidebar), and goes when a note opens while it does not have the focus
-  (a result tapped). It is always on screen, also while a note is edited: both editors scroll
-  the caret into view above it (`coveredBelow` in `editors/place.ts`, as ProseMirror's
+  and, a little apart, settings. It stays above the open sidebar, whose menu it completes; its links close the sidebar. Search opens
+  a panel of its own just above the island (`.island-search`, the island's height, across the
+  screen; the island keeps its buttons, and the search button, `aria-expanded`, closes it
+  again): the search box (the same `SearchBox`, the library or the open note) with a close
+  button at its end (`onClose`), which empties the query. The panel also shows while the list
+  has a query (a tag chosen in the sidebar), and goes when a note opens while it does not have
+  the focus (a result tapped). The editor's tools, opened, go over it. The island is always on
+  screen, also while a note is edited: both editors scroll the caret into view above it and the
+  open search (`coveredBelow` in `editors/place.ts`, as ProseMirror's
   `scrollMargin` and CodeMirror's `scrollMargins`). The viewport meta has
   `interactive-widget=resizes-content`, so the island rides above the soft keyboard.
 - **Swipes** (`hooks/use-swipe.ts`, on every touch screen, wide ones too): a sideways swipe

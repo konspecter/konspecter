@@ -85,14 +85,19 @@ test("no screen overflows sideways on a phone", async ({ browser }) => {
   await details.click();
   await expect(sidebar.getByText("Created")).toBeVisible();
   expect(await audit(page), "open sidebar with details").toEqual([]);
-  // The search fills the island, with its close button at the end.
+  // The search opens above the island, which keeps its buttons; it ends in a close button.
   await island.getByRole("button", { name: "Hide sidebar" }).click();
   await island.getByRole("button", { name: "Search in this conspect" }).click();
-  await expect(island.getByRole("searchbox")).toBeFocused();
+  const search = page.getByRole("search");
+  await expect(search.getByRole("searchbox")).toBeFocused();
+  await expect(island.getByRole("link", { name: "New conspect" })).toBeVisible();
+  const searchBox = await search.boundingBox();
+  const islandBox = await island.boundingBox();
+  expect(searchBox && islandBox && searchBox.y + searchBox.height).toBeLessThan(islandBox?.y ?? 0);
   expect(await overflow(), "island search").toBeLessThanOrEqual(0);
   expect(await audit(page), "island search").toEqual([]);
-  await island.getByRole("button", { name: "Close search" }).click();
-  await expect(island.getByRole("searchbox")).toBeHidden();
+  await search.getByRole("button", { name: "Close search" }).click();
+  await expect(page.getByRole("searchbox")).toBeHidden();
   // The island stays while the text is edited, and holds the editor's tools.
   await page.getByRole("textbox", { name: "Conspect text" }).click();
   await expect(island).toBeVisible();

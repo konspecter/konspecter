@@ -3528,6 +3528,12 @@ describe("small screens", () => {
   const island = () => screen.getByRole("navigation", { name: "Main actions" });
   const islandButton = (name: string) => within(island()).getByRole("button", { name });
   const islandLink = (name: string) => within(island()).getByRole("link", { name });
+  /** The island's search: a panel of its own above the island. */
+  const islandSearch = () => {
+    const panel = document.querySelector<HTMLElement>(".island-search");
+    if (!panel) throw new Error("no island search");
+    return panel;
+  };
 
   async function storeWithNotes() {
     const store = await newStore();
@@ -3567,24 +3573,47 @@ describe("small screens", () => {
     expect(await textEditor()).toHaveFocus();
   });
 
-  it("turns the island into the search box with a close button, and back", async () => {
+  it("opens the search box above the island, keeping its buttons, and closes it", async () => {
     renderApp(await storeWithNotes());
     await noteList();
 
-    await userEvent.click(islandButton("Search conspects"));
+    const search = islandButton("Search conspects");
+    expect(search).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(search);
     expect(searchBox()).toHaveFocus();
-    expect(within(island()).queryByRole("link")).not.toBeInTheDocument();
+    expect(islandSearch()).toContainElement(searchBox());
+    expect(island()).not.toContainElement(searchBox());
+    expect(search).toHaveAttribute("aria-expanded", "true");
+    expect(search).toHaveAttribute("aria-controls", islandSearch().id);
+    // The island keeps every button.
+    expect(
+      [...island().querySelectorAll("button, a")].map((control) =>
+        control.getAttribute("aria-label"),
+      ),
+    ).toEqual(["Show sidebar", "All conspects", "New conspect", "Search conspects", "Settings"]);
     await userEvent.keyboard("tcp");
     await waitFor(async () => {
       expect(await listTitles()).toEqual(["Networking"]);
     });
 
-    await userEvent.click(islandButton("Close search"));
+    await userEvent.click(within(islandSearch()).getByRole("button", { name: "Close search" }));
     expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
     await waitFor(async () => {
       expect(await listTitles()).toEqual(["Networking", "Hash maps"]);
     });
-    expect(islandButton("Search conspects")).toBeInTheDocument();
+    expect(search).toHaveAttribute("aria-expanded", "false");
+
+    // The search button closes it too, emptying the query as × does.
+    await userEvent.click(search);
+    await userEvent.keyboard("tcp");
+    await waitFor(async () => {
+      expect(await listTitles()).toEqual(["Networking"]);
+    });
+    await userEvent.click(search);
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    await waitFor(async () => {
+      expect(await listTitles()).toEqual(["Networking", "Hash maps"]);
+    });
   });
 
   it("shows the search while a tag filters the list, and ends it when a result opens", async () => {
@@ -3592,7 +3621,9 @@ describe("small screens", () => {
     await waitFor(async () => {
       expect(await listTitles()).toEqual(["Hash maps"]);
     });
-    expect(within(island()).getByRole("list", { name: "Tag filters" })).toHaveTextContent("#java");
+    expect(within(islandSearch()).getByRole("list", { name: "Tag filters" })).toHaveTextContent(
+      "#java",
+    );
 
     await userEvent.click(screen.getByRole("link", { name: "Hash maps" }));
     expect(await textEditor()).toHaveTextContent("Buckets.");
@@ -3608,7 +3639,7 @@ describe("small screens", () => {
     await userEvent.keyboard("buck");
     expect(editor.querySelector(".find-match")).toHaveTextContent("Buck");
 
-    await userEvent.click(islandButton("Close search"));
+    await userEvent.click(within(islandSearch()).getByRole("button", { name: "Close search" }));
     expect(editor.querySelector(".find-match")).toBeNull();
   });
 
