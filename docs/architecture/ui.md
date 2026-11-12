@@ -139,7 +139,11 @@ breakpoint in the CSS), in the browser, the PWA and the Android app alike.
   it and
   the row above it (`coveredBelow` in `editors/place.ts`, as ProseMirror's
   `scrollMargin` and CodeMirror's `scrollMargins`). The viewport meta has
-  `interactive-widget=resizes-content`, so the island rides above the soft keyboard.
+  `interactive-widget=resizes-content`, so the island rides above the soft keyboard. Where the
+  keyboard covers the page instead (Safari on iOS), `app/keyboard.ts` lifts the island by
+  `--keyboard-inset`; and when Safari moves a page that can scroll no further (a short list) up
+  past its end to show the island's field, taking the top bar off the screen, it scrolls the page
+  back (the dock's `data-above-keyboard`).
 - **Swipes** (`hooks/use-swipe.ts`, on every touch screen, wide ones too): a sideways swipe
   goes through the app's history, past Settings: to the right back (to the list
   when there is nothing further back), to the left forward. One that goes somewhere closes the

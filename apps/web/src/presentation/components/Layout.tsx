@@ -585,9 +585,10 @@ export function Layout({
         {/*
           The island at the bottom, and the row just above it: the island's
           search, and the open editor's tools in a bar of their own over Settings.
+          It rises above an on-screen keyboard by itself (`app/keyboard.ts`).
         */}
         {narrow && (
-          <div ref={dockRef} className="island-dock">
+          <div ref={dockRef} className="island-dock" data-above-keyboard="">
             {islandSearchRendered && (
               <div
                 ref={islandSearchRef}
