@@ -104,14 +104,14 @@ breakpoint in the CSS), in the browser, the PWA and the Android app alike.
 │ Title                                             │
 │ Text across the width: 8px room, 4px inside       │
 │                                                   │
-│      ( ▯  ☰  ⌕  B  ✎   ⚙ )                        │   the island
+│      ( ▯  ☰  (+)  B  ⌕   ⚙ )                      │   the island
 └───────────────────────────────────────────────────┘
 ```
 
 - **The island** (`Layout.tsx`): a rounded block fixed at the bottom centre with round 44px
-  buttons: sidebar, all notes, search, the text editor's tools (on the note page), new note
-  and, a little apart, settings. It stays above
-  the open sidebar, whose menu it completes; its links close the sidebar. Search turns it into
+  buttons: sidebar, all notes, new note (a slightly raised sand-coloured round button with a plus in the
+  middle, a little taller than the island), the text editor's tools (on the note page), search
+  and, a little apart, settings. It stays above the open sidebar, whose menu it completes; its links close the sidebar. Search turns it into
   the search box (the same `SearchBox`, the library or the open note) with a close button at
   its end (`onClose`), which empties the query. The box also shows while the list has a query
   (a tag chosen in the sidebar), and goes when a note opens while it does not have the focus

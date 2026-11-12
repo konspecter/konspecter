@@ -3536,7 +3536,7 @@ describe("small screens", () => {
     return store;
   }
 
-  it("gathers the sidebar, the list, search, new note and settings in the island", async () => {
+  it("gathers the sidebar, the list, new note, search and settings in the island", async () => {
     renderApp(await storeWithNotes());
     expect(await listTitles()).toEqual(["Networking", "Hash maps"]);
 
@@ -3544,7 +3544,7 @@ describe("small screens", () => {
       [...island().querySelectorAll("button, a")].map((control) =>
         control.getAttribute("aria-label"),
       ),
-    ).toEqual(["Show sidebar", "All conspects", "Search conspects", "New conspect", "Settings"]);
+    ).toEqual(["Show sidebar", "All conspects", "New conspect", "Search conspects", "Settings"]);
     // The top bar keeps theme, mode and activity; the search is in the island.
     expect(within(topBar()).queryByRole("search")).not.toBeInTheDocument();
     expect(within(topBar()).queryByRole("link")).not.toBeInTheDocument();
@@ -3635,9 +3635,9 @@ describe("small screens", () => {
     ).toEqual([
       "Show sidebar",
       "All conspects",
-      "Search in this conspect",
-      "Formatting",
       "New conspect",
+      "Formatting",
+      "Search in this conspect",
       "Settings",
     ]);
     // No toolbar beside the text; the island's button shows the folded toolbar's tool.

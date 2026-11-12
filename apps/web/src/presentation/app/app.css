@@ -2447,7 +2447,7 @@ kbd {
 
 /*
  * The island: a rounded block fixed at the bottom of a small screen, with big
- * round buttons (sidebar, list, search, new note, then settings), or the
+ * round buttons (sidebar, list, the big new note, search, then settings), or the
  * search box with its close button. It keeps above the full-screen sidebar,
  * and above the on-screen keyboard where that covers the page (`keyboard.ts`).
  */
@@ -2529,6 +2529,39 @@ kbd {
 .island-button .icon {
   width: 22px;
   height: 22px;
+}
+
+/*
+ * New note: a round button with a plus in the middle of the island, a little
+ * taller than the island, so it stands out above and below it. Sand in both
+ * themes, lit softly from above (a light top edge, a faint shade towards the
+ * bottom) and casting a small shadow, so it looks a little raised; a tap darkens it. The selectors
+ * outweigh `.island :is(button, a[href])`, whose shadow shows a tap.
+ */
+.island a.island-new {
+  --new-raise:
+    inset 0 1px 0 rgb(255 255 255 / 40%), inset 0 -1px 2px rgb(90 65 30 / 8%),
+    0 0 0 1px rgb(120 90 50 / 22%), 0 1px 3px var(--color-shadow);
+
+  width: calc(var(--island-height) + 8px);
+  height: calc(var(--island-height) + 8px);
+  margin: 0 2px;
+  background: linear-gradient(to bottom, #ede2c9, #e3d4b4);
+  box-shadow:
+    inset 0 0 0 100vmax transparent,
+    var(--new-raise);
+  color: #5b4628;
+}
+
+.island a.island-new:active {
+  box-shadow:
+    inset 0 0 0 100vmax rgb(90 65 30 / 14%),
+    var(--new-raise);
+}
+
+.island-new .icon {
+  width: 28px;
+  height: 28px;
 }
 
 /*

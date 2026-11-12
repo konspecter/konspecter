@@ -61,6 +61,14 @@ export function NewNoteIcon() {
   );
 }
 
+export function PlusIcon() {
+  return (
+    <Icon>
+      <path d="M12 5v14M5 12h14" />
+    </Icon>
+  );
+}
+
 export function SunIcon() {
   return (
     <Icon>

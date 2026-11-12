@@ -27,7 +27,14 @@ import { DetailsSlot } from "./details-slot";
 import { IslandSlot } from "./island-slot";
 import type { LibraryControls } from "../app/library";
 import { newNoteState } from "./new-note";
-import { GearIcon, ListIcon, NewNoteIcon, SearchIcon, SidebarIcon } from "@konspecter/ui/icons";
+import {
+  GearIcon,
+  ListIcon,
+  NewNoteIcon,
+  PlusIcon,
+  SearchIcon,
+  SidebarIcon,
+} from "@konspecter/ui/icons";
 import { NO_FIND, NoteFindContext, type NoteFind, type NoteFindChannel } from "./note-find";
 import { SearchBox } from "./SearchBox";
 import { ShortcutsDialog } from "./ShortcutsDialog";
@@ -579,6 +586,18 @@ export function Layout({
                 >
                   <ListIcon />
                 </Link>
+                {/* New note: the big round button in the middle. */}
+                <Link
+                  to="/conspects/new"
+                  state={newNote}
+                  className="island-button island-new"
+                  aria-label={t("sidebar.newNote")}
+                  onClick={closeSidebarOnNarrow}
+                >
+                  <PlusIcon />
+                </Link>
+                {/* The open editor's tools, when it has any. */}
+                <span ref={setIslandSlot} className="island-slot" />
                 <button
                   type="button"
                   className="island-button"
@@ -591,17 +610,6 @@ export function Layout({
                 >
                   <SearchIcon />
                 </button>
-                {/* The open editor's tools, when it has any. */}
-                <span ref={setIslandSlot} className="island-slot" />
-                <Link
-                  to="/conspects/new"
-                  state={newNote}
-                  className="island-button"
-                  aria-label={t("sidebar.newNote")}
-                  onClick={closeSidebarOnNarrow}
-                >
-                  <NewNoteIcon />
-                </Link>
                 <Link
                   to={SETTINGS_PATH}
                   className="island-button island-settings"
