@@ -38,6 +38,7 @@ import { tags } from "@lezer/highlight";
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { codeHighlighter, codeLanguages } from "./code-highlight";
 import { textChanges } from "./diff";
+import { continueWrappedItem } from "./source-lists";
 import { sourceEditorMarks, tagAtCaret } from "./source-marks";
 import { CaretTagSuggestions } from "../components/TagSuggestions";
 import { useTagCompletion, type TagTyping } from "../hooks/use-tag-completion";
@@ -218,6 +219,8 @@ export function createSourceExtensions(
   return [
     Prec.highest(EditorView.domEventHandlers({ keydown: (event) => onKey?.(event) ?? false })),
     ...(titleFromFirstLine ? [Prec.high(keymap.of([{ key: "Enter", run: firstLineTitle }]))] : []),
+    // Ahead of the Markdown keymap's Enter, which continues lists only from an item's first line.
+    Prec.high(keymap.of([{ key: "Enter", run: continueWrappedItem }])),
     history(),
     drawSelection(),
     highlightSelectionMatches(),

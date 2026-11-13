@@ -112,6 +112,10 @@ Konspecter provides two ways to work with the same content: a distraction-free, 
 The text editor's toolbar formats text and draws a horizontal line (`---`). In the text editor, put the caret in a link and a button under it opens the link; put it in
 code, inline or a code block, and the button copies the code.
 
+In both editors, Enter in a list starts the next item: the next number, or an unticked `[ ]` for a
+task. In the Markdown editor that holds on any line of an item, also one that wrapped onto the
+next line.
+
 ![The same conspect in the text editor and in the Markdown source editor](docs/assets/editors.png)
 
 ### Search
