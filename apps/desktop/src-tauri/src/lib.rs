@@ -571,6 +571,21 @@ mod tests {
         assert!(!is_web_url("https://example.com/\u{0}"));
     }
 
+    /// Tauri adds a nonce to `style-src` unless told not to, and a nonce makes the
+    /// browser ignore `'unsafe-inline'`: CodeMirror's stylesheet and every inline
+    /// `style` would be blocked (the Markdown editor drew its selection beside the text).
+    #[test]
+    fn leaves_the_style_policy_as_written() {
+        let config: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        let security = &config["app"]["security"];
+        assert_eq!(security["csp"]["style-src"], "'self' 'unsafe-inline'");
+        assert_eq!(
+            security["dangerousDisableAssetCspModification"],
+            serde_json::json!(["style-src"])
+        );
+    }
+
     #[test]
     fn app_info_reports_the_package_version() {
         let info = app_info();

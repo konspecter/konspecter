@@ -35,7 +35,8 @@
         "object-src": "'none'",
         "base-uri": "'none'",
         "frame-ancestors": "'none'"
-      }
+      },
+      "dangerousDisableAssetCspModification": ["style-src"]
     }
   },
   "bundle": {

@@ -134,7 +134,10 @@ What Konspecter protects, from whom, and how. Every item below has tests unless 
   `script-src 'self'` (no inline or remote script), `object-src 'none'`, `base-uri 'none'`,
   `form-action 'self'`. Styles allow `'unsafe-inline'` (React and CodeMirror set inline
   styles, and the splash screen's style is inline in `index.html`); images and `connect-src` allow any `https:`/`http:` because notes show remote
-  images and sync may use any server.
+  images and sync may use any server. The desktop app sets
+  `dangerousDisableAssetCspModification: ["style-src"]`: Tauri would otherwise add a nonce
+  to `style-src`, and a nonce makes the webview ignore `'unsafe-inline'`, blocking
+  CodeMirror's styles and every inline `style`. `script-src` keeps Tauri's hardening.
 - Server responses: `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src
 'none'`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store`.
 - The hosted web app (`apps/web/Caddyfile`, [ADR-018](architecture/decisions/ADR-018-web-app-origin.md)):
