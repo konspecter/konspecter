@@ -40,6 +40,7 @@ import { codeHighlighter, codeLanguages } from "./code-highlight";
 import { textChanges } from "./diff";
 import { continueWrappedItem } from "./source-lists";
 import { sourceEditorMarks, tagAtCaret } from "./source-marks";
+import { deleteWordBackward } from "./source-words";
 import { CaretTagSuggestions } from "../components/TagSuggestions";
 import { useTagCompletion, type TagTyping } from "../hooks/use-tag-completion";
 import { t } from "../i18n/i18n";
@@ -228,6 +229,8 @@ export function createSourceExtensions(
     keymap.of([
       { key: "Alt-ArrowUp", run: centred(moveLineUp) },
       { key: "Alt-ArrowDown", run: centred(moveLineDown) },
+      // Ahead of CodeMirror's group deletion: a word goes as it does in the Text editor.
+      { key: "Mod-Backspace", mac: "Alt-Backspace", run: deleteWordBackward, preventDefault: true },
       ...defaultKeymap,
       ...historyKeymap,
       { key: "Mod-d", run: selectNextOccurrence, preventDefault: true },

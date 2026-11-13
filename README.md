@@ -350,6 +350,10 @@ lines up or down. The rows being moved are highlighted in the colour of the curr
 while you hold Option or Alt, and the highlight fades away when you let go. The page scrolls with
 them, so the line you are moving stays in the middle of the screen.
 
+`⌥⌫` (`Ctrl+Backspace` elsewhere) deletes the word before the cursor the same way in both
+editors: any spaces and punctuation right before the cursor go with the word, and the space in
+front of the word stays.
+
 ---
 
 ## Development
