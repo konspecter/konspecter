@@ -1,6 +1,6 @@
 [package]
 name = "konspecter-desktop"
-version = "0.16.0"
+version = "0.16.1"
 description = "Konspecter desktop app"
 edition = "2024"
 license = "MIT"

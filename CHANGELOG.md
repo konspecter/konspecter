@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.16.1 — 2026-11-13
+
+- **Lists go on from any line in Markdown mode:** Enter on a line a list item wrapped onto starts
+  the next item, as it does on the item's first line, and a numbered list counts on correctly.
+- **Words deleted the same way in both editors:** `⌥⌫` (`Ctrl+Backspace` elsewhere) in Markdown
+  mode takes the word before the cursor together with any spaces and punctuation after it, as the
+  Text editor does, and keeps the space in front of the word.
+- **A clean selection in the desktop app's Markdown mode:** the selection is drawn once again,
+  without the system's own showing through under the text.
+- **Short lists stay put on iPhone:** opening the keyboard on a tag's short list no longer pushes
+  the top bar and the list's top off the screen.
+
 ## 0.16.0 — 2026-11-12
 
 - **A big + on phones:** the bar at the bottom of the screen has a big round + in its middle for
